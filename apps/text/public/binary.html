@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Binary & Hex Converter | binary.openvibe.tools</title>
+    <meta name="description" content="Convert text to binary, hexadecimal, decimal, octal and back. See the raw bytes of your text.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+</head>
+<body>
+    <div class="tool-wrap">
+        <div class="page-header">
+            <h1><i class="fas fa-microchip"></i> Binary & Hex Converter</h1>
+            <p class="subtitle">Convert text to binary, hex, decimal, and back.</p>
+        </div>
+
+        <div class="tool-section">
+            <div class="input-group">
+                <label>Text</label>
+                <textarea id="input" class="large" placeholder="Type your text..." autofocus>Hello</textarea>
+            </div>
+            <div class="live-hint"><span class="live-dot"></span> Results update as you type</div>
+            <div class="generate-row">
+                <button class="btn btn-primary generate-btn" onclick="document.querySelector('#input, textarea').dispatchEvent(new Event('input', {bubbles:true}))"><i class="fas fa-bolt"></i> Generate</button>
+            </div>
+        </div>
+
+        <div id="output" class="output-grid" style="grid-template-columns: 1fr;"></div>
+
+        <div class="tool-section">
+            <h2><i class="fas fa-rotate-left"></i> Decode Binary</h2>
+            <div class="input-group">
+                <textarea id="binInput" class="mono" placeholder="Paste binary (space-separated bytes)..." rows="2"></textarea>
+            </div>
+            <div id="binOutput" class="output-box" style="display:none;"></div>
+        </div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://text.openvibe.tools">Text.OpenVibe Hub</a>
+                <a href="https://morse.openvibe.tools">Morse Code</a>
+                <a href="https://escape.openvibe.tools">Escape / Unescape</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/text-engine.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+        const output = document.getElementById('output');
+
+        function toHex(text) { return [...text].map(c => c.codePointAt(0).toString(16).toUpperCase().padStart(2, '0')).join(' '); }
+        function toDec(text) { return [...text].map(c => c.codePointAt(0)).join(' '); }
+        function toOct(text) { return [...text].map(c => c.codePointAt(0).toString(8).padStart(3, '0')).join(' '); }
+
+        const cards = {};
+        const formats = [
+            { key: 'binary', name: 'Binary', fn: TextOpenVibeEngine.toBinary },
+            { key: 'hex', name: 'Hexadecimal', fn: toHex },
+            { key: 'decimal', name: 'Decimal', fn: toDec },
+            { key: 'octal', name: 'Octal', fn: toOct },
+        ];
+
+        function update() {
+            const text = document.getElementById('input').value;
+            if (!text) { output.innerHTML = ''; return; }
+            if (Object.keys(cards).length === 0) {
+                output.innerHTML = '';
+                formats.forEach(f => {
+                    cards[f.key] = OpenVibeUI.createOutputCard(f.name, f.fn(text), output);
+                    cards[f.key].querySelector('.style-text').classList.add('mono');
+                    cards[f.key].querySelector('.style-text').style.fontSize = '0.9rem';
+                });
+            } else {
+                formats.forEach(f => { if (cards[f.key]) OpenVibeUI.updateOutputCard(cards[f.key], f.fn(text)); });
+            }
+        }
+
+        document.getElementById('input').addEventListener('input', update);
+        update();
+
+        document.getElementById('binInput').addEventListener('input', function() {
+            const out = document.getElementById('binOutput');
+            if (this.value.trim()) {
+                out.style.display = 'block';
+                out.textContent = TextOpenVibeEngine.fromBinary(this.value);
+            } else {
+                out.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

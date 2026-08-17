@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transparent Text PNG | transparent.openvibe.tools</title>
+    <meta name="description" content="Generate transparent text PNG images. Pick font, size, color — download with no background.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+    <style>
+        .tp-layout { max-width: 700px; margin: 0 auto; }
+        .canvas-wrap { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 2rem; text-align: center; margin: 2rem 0; background-image: linear-gradient(45deg, #141414 25%, transparent 25%), linear-gradient(-45deg, #141414 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #141414 75%), linear-gradient(-45deg, transparent 75%, #141414 75%); background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0; }
+        .canvas-wrap canvas { max-width: 100%; height: auto; }
+        .ctrl-bar { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; }
+        .ctrl { display: flex; flex-direction: column; gap: .3rem; }
+        .ctrl label { font-size: .8rem; color: var(--text-secondary); }
+        .ctrl input[type="color"] { width: 40px; height: 34px; border: 1px solid var(--border); background: var(--bg-secondary); border-radius: 8px; cursor: pointer; padding: 2px; }
+        .btn-row { display: flex; gap: .75rem; justify-content: center; margin-top: 1.5rem; }
+    </style>
+</head>
+<body>
+    <div class="tool-wrap">
+        <div class="page-header">
+            <h1><i class="fas fa-eye-slash"></i> Transparent Text PNG</h1>
+            <p class="subtitle">Type text, pick a font and color — get a transparent PNG you can layer anywhere.</p>
+        </div>
+
+        <div class="tp-layout">
+            <div class="tool-section">
+                <textarea id="text" rows="2" placeholder="Your text here..." style="width:100%; font-size: 1.1rem;">TRANSPARENT</textarea>
+            </div>
+
+            <div class="ctrl-bar">
+                <div class="ctrl" style="flex: 1; min-width: 150px;">
+                    <label>Font</label>
+                    <select id="font"></select>
+                </div>
+                <div class="ctrl">
+                    <label>Size</label>
+                    <select id="fontSize">
+                        <option value="32">32px</option>
+                        <option value="48">48px</option>
+                        <option value="64">64px</option>
+                        <option value="96" selected>96px</option>
+                        <option value="128">128px</option>
+                        <option value="160">160px</option>
+                        <option value="200">200px</option>
+                    </select>
+                </div>
+                <div class="ctrl">
+                    <label>Weight</label>
+                    <select id="fontWeight">
+                        <option value="400">Regular</option>
+                        <option value="700" selected>Bold</option>
+                        <option value="900">Black</option>
+                    </select>
+                </div>
+                <div class="ctrl">
+                    <label>Color</label>
+                    <input type="color" id="color" value="#ffffff">
+                </div>
+            </div>
+
+            <div class="canvas-wrap">
+                <canvas id="canvas"></canvas>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn btn-primary btn-lg" onclick="dl('png')"><i class="fas fa-download"></i> Download PNG</button>
+                <button class="btn btn-secondary" onclick="dl('webp')"><i class="fas fa-download"></i> WebP</button>
+            </div>
+        </div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://logo.openvibe.tools">Logo Hub</a>
+                <a href="https://title.openvibe.tools">Title Cards</a>
+                <a href="https://wordmark.openvibe.tools">Wordmark</a>
+                <a href="https://text.openvibe.tools">Text.OpenVibe</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/logo-engine.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+        const E = LogoOpenVibeEngine;
+        const canvas = document.getElementById('canvas');
+
+        const fontSel = document.getElementById('font');
+        E.fonts.forEach(f => { const o = document.createElement('option'); o.value = f; o.textContent = f; if (f === 'Inter') o.selected = true; fontSel.appendChild(o); });
+
+        function getOpts() {
+            return {
+                font: fontSel.value,
+                fontSize: +document.getElementById('fontSize').value,
+                fontWeight: document.getElementById('fontWeight').value,
+                color: document.getElementById('color').value,
+                bg: 'transparent',
+                padding: 30,
+            };
+        }
+
+        let timeout;
+        function renderPreview() {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                E.render(canvas, document.getElementById('text').value || 'TEXT', getOpts());
+            }, 80);
+        }
+
+        function dl(fmt) {
+            const text = document.getElementById('text').value || 'TEXT';
+            const slug = text.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase().slice(0, 30);
+            E.download(canvas, `${slug}-transparent.${fmt}`, fmt);
+        }
+
+        document.querySelectorAll('input, select, textarea').forEach(el => {
+            el.addEventListener('input', renderPreview);
+        });
+        renderPreview();
+    </script>
+</body>
+</html>

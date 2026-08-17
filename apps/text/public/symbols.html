@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Symbols & Special Characters — Click to Copy | symbols.openvibe.tools</title>
+    <meta name="description" content="Browse and click-to-copy arrows, stars, hearts, math symbols, currency, bullets, boxes, lines, and more special characters.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+</head>
+<body>
+    <div class="tool-wrap" style="max-width: 1000px;">
+        <div class="page-header">
+            <h1><i class="fas fa-icons"></i> Symbols & Special Characters</h1>
+            <p class="subtitle">Click any symbol to copy it to your clipboard instantly.</p>
+        </div>
+
+        <!-- Collected symbols -->
+        <div class="input-group" style="margin-bottom: 24px;">
+            <label>Your collected symbols (click to copy all)</label>
+            <div id="collected" class="output-box mono" style="min-height: 44px; cursor: pointer; font-size: 1.4rem; letter-spacing: 0.3em;" onclick="OpenVibeUI.copyText(this.textContent)"></div>
+            <div class="btn-row">
+                <button class="btn btn-ghost btn-sm" onclick="clearCollected()"><i class="fas fa-xmark"></i> Clear</button>
+                <button class="btn btn-ghost btn-sm" onclick="OpenVibeUI.copyText(document.getElementById('collected').textContent)"><i class="fas fa-copy"></i> Copy All</button>
+            </div>
+        </div>
+
+        <div id="categories"></div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://text.openvibe.tools">Text.OpenVibe Hub</a>
+                <a href="https://kaomoji.openvibe.tools">Kaomoji</a>
+                <a href="https://fancy.openvibe.tools">Fancy Text</a>
+                <a href="https://unicode.openvibe.tools">Unicode Inspector</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/text-engine.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+        const categories = document.getElementById('categories');
+        const collected = document.getElementById('collected');
+
+        const categoryIcons = {
+            arrows: 'fa-right-long', stars: 'fa-star', hearts: 'fa-heart', music: 'fa-music',
+            math: 'fa-superscript', currency: 'fa-dollar-sign', bullets: 'fa-list',
+            boxes: 'fa-square', lines: 'fa-grip-lines', dividers: 'fa-minus',
+            check: 'fa-check', zodiac: 'fa-star-of-david', weather: 'fa-cloud-sun',
+            gaming: 'fa-chess', hands: 'fa-hand', faces: 'fa-face-smile',
+        };
+
+        for (const [name, syms] of Object.entries(TextOpenVibeEngine.symbols)) {
+            const section = document.createElement('div');
+            section.className = 'tool-section';
+            const icon = categoryIcons[name] || 'fa-hashtag';
+            section.innerHTML = `<h2><i class="fas ${icon}"></i> ${name.charAt(0).toUpperCase() + name.slice(1)}</h2>`;
+            const grid = document.createElement('div');
+            grid.className = 'symbol-grid';
+
+            syms.forEach(sym => {
+                const btn = document.createElement('button');
+                btn.className = 'symbol-btn';
+                btn.textContent = sym;
+                btn.title = `Copy "${sym}"`;
+                btn.addEventListener('click', () => {
+                    OpenVibeUI.copyText(sym, btn);
+                    collected.textContent += sym;
+                });
+                grid.appendChild(btn);
+            });
+
+            section.appendChild(grid);
+            categories.appendChild(section);
+        }
+
+        function clearCollected() {
+            collected.textContent = '';
+        }
+    </script>
+</body>
+</html>

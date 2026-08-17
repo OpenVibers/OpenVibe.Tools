@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Cleaner — Remove Invisible Chars, Fix Quotes, Strip Zalgo | clean.openvibe.tools</title>
+    <meta name="description" content="Clean up messy text: remove invisible characters, fix smart quotes, strip Zalgo diacritics, normalize spacing, remove HTML tags.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+</head>
+<body>
+    <div class="tool-wrap">
+        <div class="page-header">
+            <h1><i class="fas fa-broom"></i> Text Cleaner</h1>
+            <p class="subtitle">Clean up messy text with one click. Fix quotes, strip invisible characters, normalize spacing.</p>
+        </div>
+
+        <div class="tool-section">
+            <div class="input-group">
+                <label>Input (paste messy text)</label>
+                <textarea id="input" class="large" placeholder="Paste text to clean..." autofocus></textarea>
+            </div>
+
+            <h2 style="margin: 16px 0 12px;"><i class="fas fa-sliders"></i> Options</h2>
+            <div class="toggle-row"><label class="toggle"><input type="checkbox" id="optInvisible" checked><span class="slider"></span></label><span class="toggle-label">Remove invisible characters (ZWSP, ZWNJ, BOM, soft hyphen)</span></div>
+            <div class="toggle-row"><label class="toggle"><input type="checkbox" id="optQuotes" checked><span class="slider"></span></label><span class="toggle-label">Normalize smart quotes → straight quotes</span></div>
+            <div class="toggle-row"><label class="toggle"><input type="checkbox" id="optHyphens" checked><span class="slider"></span></label><span class="toggle-label">Normalize em/en dashes → hyphens</span></div>
+            <div class="toggle-row"><label class="toggle"><input type="checkbox" id="optSpaces" checked><span class="slider"></span></label><span class="toggle-label">Collapse multiple spaces</span></div>
+            <div class="toggle-row"><label class="toggle"><input type="checkbox" id="optTrim" checked><span class="slider"></span></label><span class="toggle-label">Trim whitespace from each line</span></div>
+            <div class="toggle-row"><label class="toggle"><input type="checkbox" id="optLines" checked><span class="slider"></span></label><span class="toggle-label">Collapse 3+ newlines → 2</span></div>
+            <div class="toggle-row"><label class="toggle"><input type="checkbox" id="optBlank"><span class="slider"></span></label><span class="toggle-label">Remove blank lines entirely</span></div>
+            <div class="toggle-row"><label class="toggle"><input type="checkbox" id="optZalgo"><span class="slider"></span></label><span class="toggle-label">Strip Zalgo / combining diacritics</span></div>
+            <div class="toggle-row"><label class="toggle"><input type="checkbox" id="optHtml"><span class="slider"></span></label><span class="toggle-label">Strip HTML tags</span></div>
+            <div class="live-hint"><span class="live-dot"></span> Results update as you type</div>
+            <div class="generate-row">
+                <button class="btn btn-primary generate-btn" onclick="document.querySelector('#input, textarea').dispatchEvent(new Event('input', {bubbles:true}))"><i class="fas fa-bolt"></i> Generate</button>
+            </div>
+        </div>
+
+        <div class="tool-section">
+            <h2><i class="fas fa-sparkles"></i> Cleaned Output</h2>
+            <div id="output" class="output-box mono"></div>
+            <div class="btn-row">
+                <button class="btn btn-primary" onclick="OpenVibeUI.copyText(document.getElementById('output').textContent)"><i class="fas fa-copy"></i> Copy</button>
+                <button class="btn btn-secondary" onclick="OpenVibeUI.downloadText(document.getElementById('output').textContent)"><i class="fas fa-download"></i> Download</button>
+            </div>
+        </div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://text.openvibe.tools">Text.OpenVibe Hub</a>
+                <a href="https://count.openvibe.tools">Text Counter</a>
+                <a href="https://escape.openvibe.tools">Escape / Unescape</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/text-engine.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+        const opts = ['optInvisible','optQuotes','optHyphens','optSpaces','optTrim','optLines','optBlank','optZalgo','optHtml'];
+
+        function update() {
+            let text = document.getElementById('input').value;
+            if (!text) { document.getElementById('output').textContent = ''; return; }
+            const c = TextOpenVibeEngine.clean;
+            if (document.getElementById('optInvisible').checked) text = c.removeInvisible(text);
+            if (document.getElementById('optZalgo').checked) text = c.removeZalgo(text);
+            if (document.getElementById('optQuotes').checked) text = c.normalizeQuotes(text);
+            if (document.getElementById('optHyphens').checked) text = c.normalizeHyphens(text);
+            if (document.getElementById('optHtml').checked) text = c.stripHtml(text);
+            if (document.getElementById('optSpaces').checked) text = c.collapseSpaces(text);
+            if (document.getElementById('optTrim').checked) text = c.trimLines(text);
+            if (document.getElementById('optBlank').checked) text = c.removeBlankLines(text);
+            if (document.getElementById('optLines').checked) text = c.collapseLines(text);
+            document.getElementById('output').textContent = text;
+        }
+
+        document.getElementById('input').addEventListener('input', update);
+        opts.forEach(id => document.getElementById(id).addEventListener('change', update));
+    </script>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaomoji & Japanese Emoticons — Click to Copy | kaomoji.openvibe.tools</title>
+    <meta name="description" content="Browse and copy Japanese text emoticons (kaomoji) sorted by mood: happy, sad, angry, love, lenny, table flip, and more.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+</head>
+<body>
+    <div class="tool-wrap" style="max-width: 1000px;">
+        <div class="page-header">
+            <h1><i class="fas fa-face-smile-beam"></i> Kaomoji</h1>
+            <p class="subtitle">Japanese text emoticons sorted by mood. Click any to copy. (◕‿◕)</p>
+        </div>
+
+        <div id="categories"></div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://text.openvibe.tools">Text.OpenVibe Hub</a>
+                <a href="https://symbols.openvibe.tools">Symbols</a>
+                <a href="https://bio.openvibe.tools">Bio Generator</a>
+                <a href="https://fancy.openvibe.tools">Fancy Text</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/text-engine.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+        const container = document.getElementById('categories');
+        const moodIcons = {
+            happy:'fa-face-smile-beam', sad:'fa-face-sad-tear', angry:'fa-face-angry',
+            love:'fa-heart', shrug:'fa-person-shrugging', surprise:'fa-face-surprise',
+            cool:'fa-sunglasses', silly:'fa-face-grin-tongue', animals:'fa-paw',
+            music:'fa-music', tableFlip:'fa-table', tableUnflip:'fa-table',
+            lenny:'fa-face-grin-wink', fight:'fa-hand-fist', sparkle:'fa-sparkles',
+        };
+
+        for (const [mood, items] of Object.entries(TextOpenVibeEngine.kaomoji)) {
+            const section = document.createElement('div');
+            section.className = 'tool-section';
+            const icon = moodIcons[mood] || 'fa-face-smile';
+            const prettyName = mood.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase());
+            section.innerHTML = `<h2><i class="fas ${icon}"></i> ${prettyName}</h2>`;
+
+            const grid = document.createElement('div');
+            grid.className = 'kaomoji-grid';
+            items.forEach(k => {
+                const item = document.createElement('div');
+                item.className = 'kaomoji-item';
+                item.textContent = k;
+                item.addEventListener('click', () => OpenVibeUI.copyText(k));
+                grid.appendChild(item);
+            });
+
+            section.appendChild(grid);
+            container.appendChild(section);
+        }
+    </script>
+</body>
+</html>

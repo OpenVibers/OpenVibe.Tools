@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zalgo / Glitch Text Generator | zalgo.openvibe.tools</title>
+    <meta name="description" content="Generate creepy Zalgo glitch text with adjustable intensity. Control above, middle, and below combining characters.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+</head>
+<body>
+    <div class="tool-wrap">
+        <div class="page-header">
+            <h1><i class="fas fa-ghost"></i> Zalgo Text Generator</h1>
+            <p class="subtitle">H̷̡̛̗̊ë̵̝́ ̸̰̉c̵̨̈́o̵̜͝m̴̛̼ë̵̘́s̷̩̈. Generate glitch text with adjustable chaos level.</p>
+        </div>
+
+        <div class="tool-section">
+            <div class="input-group">
+                <textarea id="input" class="large" placeholder="Type your text here..." autofocus>He comes</textarea>
+            </div>
+
+            <div class="slider-group">
+                <label>Intensity</label>
+                <input type="range" id="intensity" min="0" max="3" value="1" step="1">
+                <span class="slider-val" id="intensityLabel">medium</span>
+            </div>
+
+            <div class="toggle-row">
+                <label class="toggle"><input type="checkbox" id="up" checked><span class="slider"></span></label>
+                <span class="toggle-label">Above (diacritics going up)</span>
+            </div>
+            <div class="toggle-row">
+                <label class="toggle"><input type="checkbox" id="mid" checked><span class="slider"></span></label>
+                <span class="toggle-label">Middle (through characters)</span>
+            </div>
+            <div class="toggle-row">
+                <label class="toggle"><input type="checkbox" id="down" checked><span class="slider"></span></label>
+                <span class="toggle-label">Below (diacritics going down)</span>
+            </div>
+        </div>
+
+        <div class="tool-section">
+            <h2><i class="fas fa-skull-crossbones"></i> Output</h2>
+            <div id="output" class="output-box" style="font-size: 1.3rem; min-height: 80px; line-height: 2.5;"></div>
+            <div class="btn-row">
+                <button class="btn btn-primary" onclick="copyOutput()"><i class="fas fa-copy"></i> Copy</button>
+                <button class="btn btn-secondary" onclick="regenerate()"><i class="fas fa-rotate"></i> Regenerate</button>
+                <button class="btn btn-ghost" onclick="OpenVibeUI.shareText(lastOutput)"><i class="fas fa-share"></i> Share</button>
+            </div>
+        </div>
+
+        <div class="tool-section">
+            <h2><i class="fas fa-broom"></i> Need to clean Zalgo?</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 12px;">Paste Zalgo text and strip all the combining characters.</p>
+            <div class="input-group">
+                <textarea id="cleanInput" placeholder="Paste Zalgo text to clean..." rows="3"></textarea>
+            </div>
+            <div id="cleanOutput" class="output-box mono" style="display:none;"></div>
+        </div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://text.openvibe.tools">Text.OpenVibe Hub</a>
+                <a href="https://fancy.openvibe.tools">Fancy Text</a>
+                <a href="https://clean.openvibe.tools">Text Cleaner</a>
+                <a href="https://symbols.openvibe.tools">Symbols</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/text-engine.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+        const intensityNames = ['low', 'medium', 'high', 'insane'];
+        let lastOutput = '';
+
+        function getOpts() {
+            return {
+                intensity: intensityNames[document.getElementById('intensity').value],
+                up: document.getElementById('up').checked,
+                mid: document.getElementById('mid').checked,
+                down: document.getElementById('down').checked,
+            };
+        }
+
+        function update() {
+            const text = document.getElementById('input').value;
+            document.getElementById('intensityLabel').textContent = intensityNames[document.getElementById('intensity').value];
+            if (!text.trim()) {
+                document.getElementById('output').textContent = '';
+                return;
+            }
+            lastOutput = TextOpenVibeEngine.zalgo(text, getOpts());
+            document.getElementById('output').textContent = lastOutput;
+        }
+
+        function regenerate() { update(); }
+        function copyOutput() { OpenVibeUI.copyText(lastOutput); }
+
+        document.getElementById('input').addEventListener('input', update);
+        document.getElementById('intensity').addEventListener('input', update);
+        ['up', 'mid', 'down'].forEach(id => document.getElementById(id).addEventListener('change', update));
+
+        // Clean Zalgo
+        document.getElementById('cleanInput').addEventListener('input', function() {
+            const out = document.getElementById('cleanOutput');
+            if (this.value.trim()) {
+                out.style.display = 'block';
+                out.textContent = TextOpenVibeEngine.clean.removeZalgo(this.value);
+            } else {
+                out.style.display = 'none';
+            }
+        });
+
+        update();
+    </script>
+</body>
+</html>

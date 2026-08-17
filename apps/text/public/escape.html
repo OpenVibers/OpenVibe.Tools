@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Escape &amp; Encode Text | escape.openvibe.tools</title>
+    <meta name="description" content="HTML escape/unescape, URL encode/decode, JSON stringify/parse, Base64, and more.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+    <style>
+        .escape-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        .escape-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; }
+        .escape-card h3 { color: var(--accent); margin: 0 0 .75rem; font-size: 1rem; }
+        .escape-card .output-box { min-height: 80px; max-height: 200px; overflow-y: auto; font-family: 'Fira Code', 'JetBrains Mono', monospace; font-size: .85rem; word-break: break-all; }
+        .escape-card .btn-row { margin-top: .75rem; }
+        @media (max-width: 768px) { .escape-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="tool-wrap">
+        <div class="page-header">
+            <h1><i class="fas fa-shield-halved"></i> Escape &amp; Encode</h1>
+            <p class="subtitle">HTML escape, URL encode, JSON stringify, Base64, and more — all in one place.</p>
+        </div>
+
+        <div class="tool-section">
+            <div class="input-group">
+                <label>Input Text</label>
+                <textarea id="input" rows="5" placeholder='Enter text, HTML, JSON, or URLs...'><div class="hello">It's a "test" & demo — with <special> chars!</div></textarea>
+            </div>
+            <div class="live-hint"><span class="live-dot"></span> Results update as you type</div>
+            <div class="generate-row">
+                <button class="btn btn-primary generate-btn" onclick="document.querySelector('#input, textarea').dispatchEvent(new Event('input', {bubbles:true}))"><i class="fas fa-bolt"></i> Generate</button>
+            </div>
+        </div>
+
+        <div class="escape-grid" id="grid"></div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://text.openvibe.tools">Text.OpenVibe Hub</a>
+                <a href="https://unicode.openvibe.tools">Unicode Inspector</a>
+                <a href="https://clean.openvibe.tools">Text Cleaner</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/text-engine.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+
+        const TRANSFORMS = [
+            { id: 'htmlEscape', label: 'HTML Escaped', icon: 'fa-code', fn: t => TextOpenVibeEngine.escapeHtml(t) },
+            { id: 'htmlUnescape', label: 'HTML Unescaped', icon: 'fa-code', fn: t => TextOpenVibeEngine.unescapeHtml(t) },
+            { id: 'urlEncode', label: 'URL Encoded', icon: 'fa-link', fn: t => encodeURIComponent(t) },
+            { id: 'urlDecode', label: 'URL Decoded', icon: 'fa-link', fn: t => { try { return decodeURIComponent(t); } catch { return '[Invalid encoded string]'; } } },
+            { id: 'base64Encode', label: 'Base64 Encoded', icon: 'fa-lock', fn: t => { try { return btoa(unescape(encodeURIComponent(t))); } catch { return '[Error]'; } } },
+            { id: 'base64Decode', label: 'Base64 Decoded', icon: 'fa-unlock', fn: t => { try { return decodeURIComponent(escape(atob(t))); } catch { return '[Invalid Base64]'; } } },
+            { id: 'jsonStringify', label: 'JSON Stringified', icon: 'fa-brackets-curly', fn: t => JSON.stringify(t) },
+            { id: 'jsonParse', label: 'JSON Parsed', icon: 'fa-brackets-curly', fn: t => { try { return typeof JSON.parse(t) === 'string' ? JSON.parse(t) : JSON.stringify(JSON.parse(t), null, 2); } catch { return '[Invalid JSON string]'; } } },
+            { id: 'cssEscape', label: 'CSS Escaped', icon: 'fa-paintbrush', fn: t => t.replace(/([^\w-])/g, '\\$1') },
+            { id: 'regexEscape', label: 'Regex Escaped', icon: 'fa-asterisk', fn: t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') },
+            { id: 'unicodeEscape', label: 'Unicode Escape', icon: 'fa-globe', fn: t => [...t].map(c => { const cp = c.codePointAt(0); return cp > 127 ? (cp > 0xFFFF ? '\\u{' + cp.toString(16) + '}' : '\\u' + cp.toString(16).padStart(4, '0')) : c; }).join('') },
+            { id: 'hexEncode', label: 'Hex Encoded', icon: 'fa-hashtag', fn: t => [...new TextEncoder().encode(t)].map(b => b.toString(16).padStart(2, '0')).join(' ') },
+        ];
+
+        const grid = document.getElementById('grid');
+        TRANSFORMS.forEach(tr => {
+            const card = document.createElement('div');
+            card.className = 'escape-card';
+            card.innerHTML = `
+                <h3><i class="fas ${tr.icon}"></i> ${tr.label}</h3>
+                <div class="output-box" id="out-${tr.id}"></div>
+                <div class="btn-row">
+                    <button class="btn btn-sm btn-primary" onclick="OpenVibeUI.copyText(document.getElementById('out-${tr.id}').textContent)"><i class="fas fa-copy"></i> Copy</button>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+
+        function update() {
+            const text = document.getElementById('input').value;
+            TRANSFORMS.forEach(tr => {
+                document.getElementById('out-' + tr.id).textContent = tr.fn(text);
+            });
+        }
+
+        document.getElementById('input').addEventListener('input', update);
+        update();
+    </script>
+</body>
+</html>

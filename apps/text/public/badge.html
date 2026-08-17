@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Badge &amp; Sticker Maker | badge.openvibe.tools</title>
+    <meta name="description" content="Create badges, stickers, and labels with custom text, backgrounds, shapes, and colors. Download as PNG.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+    <style>
+        .badge-layout { display: grid; grid-template-columns: 340px 1fr; gap: 2rem; align-items: start; }
+        .badge-controls { display: flex; flex-direction: column; gap: 1rem; }
+        .ctrl-group { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; }
+        .ctrl-group h3 { margin: 0 0 .75rem; color: var(--accent); font-size: .9rem; }
+        .ctrl-row { display: flex; gap: .75rem; align-items: center; margin-bottom: .6rem; }
+        .ctrl-row label { min-width: 72px; font-size: .82rem; color: var(--text-secondary); }
+        .ctrl-row select, .ctrl-row input[type="text"] { flex: 1; }
+        .ctrl-row input[type="color"] { width: 38px; height: 32px; border: 1px solid var(--border); background: var(--bg-secondary); border-radius: 8px; cursor: pointer; padding: 2px; }
+        .ctrl-row input[type="range"] { flex: 1; }
+        .ctrl-row .val { min-width: 32px; text-align: right; font-size: .78rem; color: var(--text-muted); font-family: monospace; }
+        .preview-area { display: flex; flex-direction: column; align-items: center; gap: 1.5rem; }
+        .canvas-wrap { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 2rem; text-align: center; width: 100%; display: flex; align-items: center; justify-content: center; min-height: 250px; background-image: linear-gradient(45deg, #111 25%, transparent 25%), linear-gradient(-45deg, #111 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #111 75%), linear-gradient(-45deg, transparent 75%, #111 75%); background-size: 14px 14px; background-position: 0 0, 0 7px, 7px -7px, -7px 0; }
+        .canvas-wrap canvas { max-width: 100%; height: auto; }
+        .shape-pills { display: flex; gap: .5rem; flex-wrap: wrap; }
+        .shape-pill { padding: .4rem .9rem; border-radius: 20px; border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-secondary); font-size: .8rem; cursor: pointer; transition: all .2s; }
+        .shape-pill:hover, .shape-pill.active { border-color: var(--accent); color: var(--accent); background: rgba(192,150,92,0.1); }
+        .quick-colors { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .5rem; }
+        .quick-color { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--border); cursor: pointer; transition: all .15s; }
+        .quick-color:hover { transform: scale(1.15); border-color: #fff; }
+        @media (max-width: 768px) { .badge-layout { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="tool-wrap" style="max-width: 1000px;">
+        <div class="page-header">
+            <h1><i class="fas fa-certificate"></i> Badge &amp; Sticker Maker</h1>
+            <p class="subtitle">Design badges, stickers, and labels with custom shapes, colors, and fonts.</p>
+        </div>
+
+        <div class="badge-layout">
+            <div class="badge-controls">
+                <div class="ctrl-group">
+                    <h3><i class="fas fa-keyboard"></i> Text</h3>
+                    <div class="ctrl-row"><label>Text</label><input type="text" id="text" value="NEW" placeholder="Badge text..."></div>
+                    <div class="ctrl-row"><label>Font</label><select id="font"></select></div>
+                    <div class="ctrl-row">
+                        <label>Size</label>
+                        <input type="range" id="fontSize" min="16" max="120" value="48">
+                        <span class="val" id="fontSizeVal">48</span>
+                    </div>
+                </div>
+
+                <div class="ctrl-group">
+                    <h3><i class="fas fa-shapes"></i> Shape</h3>
+                    <div class="shape-pills" id="shapes">
+                        <button class="shape-pill active" data-shape="roundedRect">Rounded</button>
+                        <button class="shape-pill" data-shape="rect">Square</button>
+                        <button class="shape-pill" data-shape="pill">Pill</button>
+                        <button class="shape-pill" data-shape="circle">Circle</button>
+                    </div>
+                    <div class="ctrl-row" style="margin-top: .75rem;">
+                        <label>Radius</label>
+                        <input type="range" id="radius" min="0" max="60" value="16">
+                        <span class="val" id="radiusVal">16</span>
+                    </div>
+                    <div class="ctrl-row">
+                        <label>Padding</label>
+                        <input type="range" id="padding" min="8" max="80" value="30">
+                        <span class="val" id="paddingVal">30</span>
+                    </div>
+                </div>
+
+                <div class="ctrl-group">
+                    <h3><i class="fas fa-palette"></i> Colors</h3>
+                    <div class="ctrl-row"><label>BG Color</label><input type="color" id="bgColor" value="#c0965c"></div>
+                    <div class="quick-colors" id="quickBg"></div>
+                    <div class="ctrl-row" style="margin-top: .75rem;"><label>Text Color</label><input type="color" id="textColor" value="#0b0c12"></div>
+                    <div class="ctrl-row"><label>Stroke</label><input type="color" id="strokeColor" value="#000000"> <input type="range" id="strokeWidth" min="0" max="8" value="0" style="flex:.5;"> <span class="val" id="strokeWidthVal">0</span></div>
+                </div>
+            </div>
+
+            <div class="preview-area">
+                <div class="canvas-wrap">
+                    <canvas id="canvas"></canvas>
+                </div>
+                <div style="display: flex; gap: .75rem;">
+                    <button class="btn btn-primary" onclick="dl('png')"><i class="fas fa-download"></i> Download PNG</button>
+                    <button class="btn btn-secondary" onclick="dl('webp')"><i class="fas fa-download"></i> WebP</button>
+                </div>
+            </div>
+        </div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://logo.openvibe.tools">Logo Hub</a>
+                <a href="https://title.openvibe.tools">Title Cards</a>
+                <a href="https://wordmark.openvibe.tools">Wordmark</a>
+                <a href="https://text.openvibe.tools">Text.OpenVibe</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/logo-engine.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+        const E = LogoOpenVibeEngine;
+        const canvas = document.getElementById('canvas');
+
+        // Populate fonts
+        const fontSel = document.getElementById('font');
+        E.fonts.forEach(f => { const o = document.createElement('option'); o.value = f; o.textContent = f; if (f === 'Inter') o.selected = true; fontSel.appendChild(o); });
+
+        // Quick BG colors
+        const bgColors = ['#c0965c', '#e74c3c', '#3498db', '#2ecc71', '#9b59b6', '#f39c12', '#1abc9c', '#e91e63', '#ffffff', '#0b0c12'];
+        const quickBg = document.getElementById('quickBg');
+        bgColors.forEach(c => {
+            const el = document.createElement('div');
+            el.className = 'quick-color';
+            el.style.background = c;
+            el.onclick = () => { document.getElementById('bgColor').value = c; renderPreview(); };
+            quickBg.appendChild(el);
+        });
+
+        // Shape pills
+        let activeShape = 'roundedRect';
+        document.querySelectorAll('.shape-pill').forEach(btn => {
+            btn.onclick = () => {
+                activeShape = btn.dataset.shape;
+                document.querySelectorAll('.shape-pill').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                if (activeShape === 'pill') document.getElementById('radius').value = 50;
+                if (activeShape === 'rect') document.getElementById('radius').value = 0;
+                if (activeShape === 'roundedRect') document.getElementById('radius').value = 16;
+                updateVals();
+                renderPreview();
+            };
+        });
+
+        function getOpts() {
+            return {
+                font: fontSel.value,
+                fontSize: +document.getElementById('fontSize').value,
+                fontWeight: '700',
+                color: document.getElementById('textColor').value,
+                bg: document.getElementById('bgColor').value,
+                bgShape: activeShape === 'pill' ? 'roundedRect' : activeShape,
+                bgPadding: +document.getElementById('padding').value,
+                bgRadius: activeShape === 'circle' ? 999 : +document.getElementById('radius').value,
+                strokeColor: document.getElementById('strokeColor').value,
+                strokeWidth: +document.getElementById('strokeWidth').value,
+                padding: 10,
+            };
+        }
+
+        function updateVals() {
+            ['fontSize', 'radius', 'padding', 'strokeWidth'].forEach(id => {
+                const valEl = document.getElementById(id + 'Val');
+                if (valEl) valEl.textContent = document.getElementById(id).value;
+            });
+        }
+
+        let timeout;
+        function renderPreview() {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                const text = document.getElementById('text').value || 'BADGE';
+                E.render(canvas, text, getOpts());
+            }, 50);
+        }
+
+        function dl(fmt) {
+            const text = document.getElementById('text').value || 'BADGE';
+            const slug = text.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase().slice(0, 30);
+            E.download(canvas, `badge-${slug}.${fmt}`, fmt);
+        }
+
+        document.querySelectorAll('input, select').forEach(el => {
+            el.addEventListener('input', () => { updateVals(); renderPreview(); });
+        });
+
+        updateVals();
+        renderPreview();
+    </script>
+</body>
+</html>

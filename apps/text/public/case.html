@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Case Converter — UPPER, lower, Title, camelCase & More | case.openvibe.tools</title>
+    <meta name="description" content="Convert text between UPPERCASE, lowercase, Title Case, camelCase, snake_case, kebab-case, PascalCase, sPoNgEbOb mocking case, and more.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+</head>
+<body>
+    <div class="tool-wrap">
+        <div class="page-header">
+            <h1><i class="fas fa-text-slash"></i> Case Converter</h1>
+            <p class="subtitle">Instantly convert text between 14 different case styles. Click any result to copy.</p>
+        </div>
+
+        <div class="tool-section">
+            <div class="input-group">
+                <textarea id="input" class="large" placeholder="Type or paste your text here..." autofocus>the quick brown fox jumps over the lazy dog</textarea>
+            </div>
+            <div class="live-hint"><span class="live-dot"></span> Results update as you type</div>
+            <div class="generate-row">
+                <button class="btn btn-primary generate-btn" onclick="document.querySelector('#input, textarea').dispatchEvent(new Event('input', {bubbles:true}))"><i class="fas fa-bolt"></i> Generate</button>
+            </div>
+        </div>
+
+        <div id="output" class="output-grid" style="grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));"></div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://text.openvibe.tools">Text.OpenVibe Hub</a>
+                <a href="https://fancy.openvibe.tools">Fancy Text</a>
+                <a href="https://clean.openvibe.tools">Text Cleaner</a>
+                <a href="https://count.openvibe.tools">Text Counter</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/text-engine.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+        const input = document.getElementById('input');
+        const output = document.getElementById('output');
+        const caseNames = {
+            upper: 'UPPERCASE', lower: 'lowercase', title: 'Title Case',
+            sentence: 'Sentence case', capitalize: 'Capitalize Words',
+            inverse: 'iNVERSE cASE', alternating: 'aLtErNaTiNg', mocking: 'mOcKiNg CaSe',
+            snake: 'snake_case', camel: 'camelCase', pascal: 'PascalCase',
+            kebab: 'kebab-case', constant: 'CONSTANT_CASE', dot: 'dot.case',
+        };
+        const cards = {};
+
+        function updateAll() {
+            const text = input.value || '';
+            if (!text.trim()) {
+                output.innerHTML = '<div style="color: var(--text-muted); text-align: center; grid-column: 1/-1; padding: 40px;">Type or paste text above...</div>';
+                return;
+            }
+            if (Object.keys(cards).length === 0) {
+                output.innerHTML = '';
+                for (const [key, name] of Object.entries(caseNames)) {
+                    cards[key] = OpenVibeUI.createOutputCard(name, TextOpenVibeEngine.case[key](text), output);
+                }
+            } else {
+                for (const [key, name] of Object.entries(caseNames)) {
+                    if (cards[key]) OpenVibeUI.updateOutputCard(cards[key], TextOpenVibeEngine.case[key](text));
+                }
+            }
+        }
+
+        input.addEventListener('input', updateAll);
+        updateAll();
+    </script>
+</body>
+</html>

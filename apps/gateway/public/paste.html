@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paste.OpenVibe — Code & Text Sharing</title>
+    <meta name="description" content="Free paste / snippet sharing with syntax highlighting, screenshots, forks, likes, and comments. Part of the OpenVibe.">
+    <meta property="og:title" content="Paste.OpenVibe — Code & Text Sharing">
+    <meta property="og:description" content="Free paste / snippet sharing with syntax highlighting, screenshots, forks, likes, and comments.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://pastes.openvibe.tools">
+    <link rel="canonical" href="https://pastes.openvibe.tools">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --bg-primary: #0b0c12;
+            --bg-secondary: #12131c;
+            --bg-tertiary: #1a1b28;
+            --bg-card: rgba(22,24,36,0.85);
+            --bg-hover: #252738;
+            --bg-input: #181926;
+            --text-primary: #f1f4fb;
+            --text-secondary: #a0a8c4;
+            --text-muted: #5e6580;
+            --accent: #8b5cf6;
+            --accent-light: #a78bfa;
+            --accent-dark: #6d28d9;
+            --green: #22c55e;
+            --red: #ef4444;
+            --yellow: #f59e0b;
+            --blue: #3b82f6;
+            --cyan: #06b6d4;
+            --border: rgba(255,255,255,0.07);
+            --border-light: rgba(255,255,255,0.12);
+            --shadow: 0 24px 64px rgba(0,0,0,0.4);
+            --radius: 16px;
+            --radius-sm: 10px;
+            --mono: 'JetBrains Mono', 'Fira Code', monospace;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { background: var(--bg-primary); scroll-behavior: smooth; }
+        body {
+            min-height: 100vh;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .bg-glow {
+            position: fixed; top: -40%; left: -20%;
+            width: 140vw; height: 140vh;
+            background: radial-gradient(ellipse at 30% 20%, rgba(139,92,246,0.04) 0%, transparent 60%),
+                        radial-gradient(ellipse at 70% 80%, rgba(59,130,246,0.03) 0%, transparent 50%);
+            pointer-events: none; z-index: 0;
+        }
+
+        .page { position: relative; z-index: 1; }
+        .nav-placeholder { height: 56px; }
+        .shell { width: min(960px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 60px; }
+
+        /* ── Hero ─── */
+        .hero { text-align: center; padding: 32px 0 24px; }
+        .hero h1 { font-size: 2rem; font-weight: 800; letter-spacing: -0.02em; }
+        .hero h1 i { color: var(--accent); margin-right: 8px; }
+        .hero p { color: var(--text-secondary); margin-top: 4px; font-size: 0.95rem; }
+
+        /* ── Buttons ─── */
+        .btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 8px 16px; border-radius: var(--radius-sm);
+            font-weight: 600; font-size: 0.85rem; cursor: pointer;
+            border: 1px solid var(--border-light); background: var(--bg-tertiary);
+            color: var(--text-primary); transition: background 0.15s;
+        }
+        .btn:hover { background: var(--bg-hover); }
+        .btn-accent { background: var(--accent); color: #000; border-color: var(--accent); }
+        .btn-accent:hover { background: var(--accent-light); }
+        .btn-small { padding: 5px 12px; font-size: 0.8rem; }
+        .btn-icon { padding: 6px 10px; }
+
+        /* ── Tabs ─── */
+        .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+        .tab {
+            padding: 6px 14px; border-radius: var(--radius-sm); cursor: pointer;
+            font-size: 0.85rem; color: var(--text-secondary); transition: all 0.15s;
+            border: none; background: none;
+        }
+        .tab:hover { color: var(--text-primary); background: var(--bg-hover); }
+        .tab.active { color: var(--accent); background: rgba(139,92,246,0.1); font-weight: 600; }
+
+        /* ── Card ─── */
+        .card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 20px;
+            backdrop-filter: blur(12px);
+        }
+
+        /* ── New Paste Form ─── */
+        .paste-editor { display: flex; flex-direction: column; gap: 12px; }
+        .paste-editor input, .paste-editor textarea, .paste-editor select {
+            background: var(--bg-input); border: 1px solid var(--border);
+            border-radius: var(--radius-sm); padding: 10px 14px;
+            color: var(--text-primary); font-family: inherit; font-size: 0.9rem;
+            outline: none; transition: border 0.15s;
+        }
+        .paste-editor input:focus, .paste-editor textarea:focus { border-color: var(--accent); }
+        .paste-editor textarea {
+            font-family: var(--mono); font-size: 0.85rem;
+            min-height: 260px; resize: vertical; line-height: 1.5;
+            tab-size: 4;
+        }
+        .paste-editor .row { display: flex; gap: 10px; flex-wrap: wrap; }
+        .paste-editor .row > * { flex: 1; min-width: 120px; }
+
+        /* ── Paste List ─── */
+        .paste-list { display: flex; flex-direction: column; gap: 8px; }
+        .paste-item {
+            display: flex; align-items: flex-start; gap: 14px;
+            padding: 14px 16px; border-radius: var(--radius-sm);
+            background: var(--bg-secondary); border: 1px solid var(--border);
+            cursor: pointer; transition: all 0.15s;
+        }
+        .paste-item:hover { background: var(--bg-hover); border-color: var(--border-light); }
+        .paste-item-icon {
+            width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+            background: rgba(139,92,246,0.1); color: var(--accent);
+            border-radius: 8px; font-size: 0.9rem; flex-shrink: 0;
+        }
+        .paste-item-icon.screenshot { background: rgba(59,130,246,0.1); color: var(--blue); }
+        .paste-item-body { flex: 1; min-width: 0; }
+        .paste-item-title { font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .paste-item-meta { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; display: flex; gap: 12px; flex-wrap: wrap; }
+        .paste-item-snippet {
+            font-family: var(--mono); font-size: 0.75rem; color: var(--text-secondary);
+            margin-top: 6px; max-height: 3.2em; overflow: hidden;
+            white-space: pre-wrap; word-break: break-all;
+        }
+
+        /* ── Single Paste View ─── */
+        .paste-view-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+        .paste-view-title { font-size: 1.3rem; font-weight: 700; }
+        .paste-view-meta { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+        .paste-view-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+        .paste-content-wrap {
+            position: relative; background: var(--bg-input); border: 1px solid var(--border);
+            border-radius: var(--radius-sm); overflow: hidden;
+        }
+        .paste-content {
+            padding: 16px; font-family: var(--mono); font-size: 0.82rem;
+            line-height: 1.65; white-space: pre-wrap; word-break: break-all;
+            max-height: 600px; overflow-y: auto;
+        }
+        .paste-content-wrap .copy-btn {
+            position: absolute; top: 8px; right: 8px;
+        }
+        .paste-screenshot img {
+            max-width: 100%; border-radius: var(--radius-sm);
+        }
+
+        /* ── Comments ─── */
+        .comments { margin-top: 20px; }
+        .comments h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 10px; }
+        .comment {
+            padding: 10px 14px; margin-bottom: 6px;
+            background: var(--bg-secondary); border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+        }
+        .comment-header { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px; }
+        .comment-header strong { color: var(--text-secondary); }
+        .comment-body { font-size: 0.85rem; }
+        .comment-form { display: flex; gap: 8px; margin-top: 10px; }
+        .comment-form input {
+            flex: 1; background: var(--bg-input); border: 1px solid var(--border);
+            border-radius: var(--radius-sm); padding: 8px 12px; color: var(--text-primary);
+            font-size: 0.85rem; outline: none;
+        }
+        .comment-form input:focus { border-color: var(--accent); }
+
+        /* ── Pagination ─── */
+        .pagination { display: flex; gap: 6px; justify-content: center; margin-top: 16px; }
+
+        /* ── States ─── */
+        .empty { text-align: center; padding: 40px; color: var(--text-muted); }
+        .loading { text-align: center; padding: 40px; color: var(--text-muted); }
+        .hidden { display: none !important; }
+
+        /* ── Toast ─── */
+        .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 6px; }
+        .toast {
+            padding: 10px 16px; border-radius: var(--radius-sm);
+            font-size: 0.82rem; font-weight: 500;
+            background: var(--bg-tertiary); border: 1px solid var(--border-light);
+            color: var(--text-primary); animation: slideIn 0.2s;
+        }
+        .toast.error { border-color: var(--red); color: var(--red); }
+        .toast.success { border-color: var(--green); color: var(--green); }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+        @media (max-width: 600px) {
+            .hero h1 { font-size: 1.4rem; }
+            .shell { padding: 16px 0 40px; }
+            .paste-view-header { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-glow"></div>
+    <div class="page">
+        <div class="nav-placeholder" id="navbar-mount"></div>
+        <div class="shell">
+            <div class="hero">
+                <h1><i class="fa-solid fa-paste"></i> Paste.OpenVibe</h1>
+                <p>Share code, text, and screenshots. No signup required.</p>
+            </div>
+
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab active" data-view="browse" onclick="showView('browse')"><i class="fa-solid fa-list"></i> Browse</button>
+                <button class="tab" data-view="new" onclick="showView('new')"><i class="fa-solid fa-plus"></i> New Paste</button>
+            </div>
+
+            <!-- Browse View -->
+            <div id="view-browse">
+                <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+                    <input type="text" id="paste-search" placeholder="Search pastes…" style="flex:1;min-width:200px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;color:var(--text-primary);font-size:0.85rem;outline:none;" oninput="debouncedSearch()">
+                    <select id="paste-type-filter" onchange="loadPastes()" style="background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;color:var(--text-primary);font-size:0.85rem;">
+                        <option value="">All Types</option>
+                        <option value="paste">Text</option>
+                        <option value="screenshot">Screenshots</option>
+                    </select>
+                </div>
+                <div id="paste-list" class="paste-list">
+                    <div class="loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</div>
+                </div>
+                <div id="paste-pagination" class="pagination"></div>
+            </div>
+
+            <!-- New Paste View -->
+            <div id="view-new" class="hidden">
+                <div class="card">
+                    <form class="paste-editor" onsubmit="createPaste(event)">
+                        <input type="text" id="np-title" placeholder="Title (optional)" maxlength="200">
+                        <textarea id="np-content" placeholder="Paste your code or text here…" required></textarea>
+                        <div class="row">
+                            <select id="np-language">
+                                <option value="text">Plain Text</option>
+                                <option value="javascript">JavaScript</option>
+                                <option value="python">Python</option>
+                                <option value="html">HTML</option>
+                                <option value="css">CSS</option>
+                                <option value="json">JSON</option>
+                                <option value="bash">Bash</option>
+                                <option value="sql">SQL</option>
+                                <option value="markdown">Markdown</option>
+                                <option value="c">C</option>
+                                <option value="cpp">C++</option>
+                                <option value="java">Java</option>
+                                <option value="rust">Rust</option>
+                                <option value="go">Go</option>
+                                <option value="ruby">Ruby</option>
+                                <option value="php">PHP</option>
+                                <option value="yaml">YAML</option>
+                                <option value="xml">XML</option>
+                            </select>
+                            <select id="np-visibility">
+                                <option value="public">Public</option>
+                                <option value="unlisted">Unlisted</option>
+                            </select>
+                        </div>
+                        <div style="display:flex;gap:10px;align-items:center;">
+                            <label style="font-size:0.82rem;color:var(--text-secondary);display:flex;align-items:center;gap:6px;">
+                                <input type="checkbox" id="np-burn"> Burn after read
+                            </label>
+                            <label style="font-size:0.82rem;color:var(--text-secondary);display:flex;align-items:center;gap:6px;">
+                                <input type="checkbox" id="np-nsfw"> NSFW
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-accent"><i class="fa-solid fa-paper-plane"></i> Create Paste</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Single Paste View -->
+            <div id="view-paste" class="hidden">
+                <div id="paste-detail"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toasts"></div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+    <script>
+    'use strict';
+
+    const API = '/api/pastes';
+    const PAGE_SIZE = 20;
+    let currentOffset = 0;
+    let token = null;
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    function timeAgo(ts) {
+        const d = new Date(ts);
+        const diff = (Date.now() - d.getTime()) / 1000;
+        if (diff < 60) return 'just now';
+        if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+        if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+        return d.toLocaleDateString();
+    }
+
+    function getCookie(n) {
+        const m = document.cookie.match(new RegExp('(?:^|; )' + n + '=([^;]*)'));
+        return m ? decodeURIComponent(m[1]) : null;
+    }
+
+    async function api(path, opts = {}) {
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const res = await fetch(`${API}${path}`, { ...opts, headers: { ...headers, ...opts.headers } });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+        return data;
+    }
+
+    // ── Views ──────────────────────────────────────────────
+    function showView(view) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
+        document.getElementById('view-browse').classList.toggle('hidden', view !== 'browse');
+        document.getElementById('view-new').classList.toggle('hidden', view !== 'new');
+        document.getElementById('view-paste').classList.toggle('hidden', view !== 'paste');
+        if (view === 'browse') { loadPastes(); history.pushState(null, '', '/'); }
+        if (view === 'new') history.pushState(null, '', '/new');
+    }
+
+    // ── Browse ─────────────────────────────────────────────
+    let _searchTimer;
+    function debouncedSearch() { clearTimeout(_searchTimer); _searchTimer = setTimeout(() => { currentOffset = 0; loadPastes(); }, 300); }
+
+    async function loadPastes() {
+        const list = document.getElementById('paste-list');
+        const search = document.getElementById('paste-search').value.trim();
+        const type = document.getElementById('paste-type-filter').value;
+        list.innerHTML = '<div class="loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</div>';
+
+        try {
+            const params = new URLSearchParams({ limit: PAGE_SIZE, offset: currentOffset });
+            if (search) params.set('search', search);
+            if (type) params.set('type', type);
+            const data = await api(`/?${params}`);
+            renderPasteList(data.pastes || [], data.total || 0);
+        } catch (err) {
+            list.innerHTML = `<div class="empty"><i class="fa-solid fa-triangle-exclamation"></i> ${esc(err.message)}</div>`;
+        }
+    }
+
+    function renderPasteList(pastes, total) {
+        const list = document.getElementById('paste-list');
+        if (!pastes.length) {
+            list.innerHTML = '<div class="empty"><i class="fa-solid fa-clipboard-question"></i> No pastes found</div>';
+            document.getElementById('paste-pagination').innerHTML = '';
+            return;
+        }
+
+        list.innerHTML = pastes.map(p => {
+            const isScreenshot = p.type === 'screenshot';
+            const iconClass = isScreenshot ? 'screenshot' : '';
+            const icon = isScreenshot ? 'fa-image' : 'fa-code';
+            const snippet = !isScreenshot && p.content ? `<div class="paste-item-snippet">${esc(p.content.slice(0, 200))}</div>` : '';
+            return `<div class="paste-item" onclick="viewPaste('${esc(p.slug)}')">
+                <div class="paste-item-icon ${iconClass}"><i class="fa-solid ${icon}"></i></div>
+                <div class="paste-item-body">
+                    <div class="paste-item-title">${esc(p.title || 'Untitled')}</div>
+                    <div class="paste-item-meta">
+                        <span>${esc(p.display_name || p.username || 'Anonymous')}</span>
+                        <span>${timeAgo(p.created_at)}</span>
+                        ${p.language && p.language !== 'text' ? `<span>${esc(p.language)}</span>` : ''}
+                        <span><i class="fa-solid fa-eye"></i> ${p.views || 0}</span>
+                        <span><i class="fa-solid fa-heart"></i> ${p.likes || 0}</span>
+                    </div>
+                    ${snippet}
+                </div>
+            </div>`;
+        }).join('');
+
+        // Pagination
+        const pages = Math.ceil(total / PAGE_SIZE);
+        const currentPage = Math.floor(currentOffset / PAGE_SIZE);
+        const pag = document.getElementById('paste-pagination');
+        if (pages <= 1) { pag.innerHTML = ''; return; }
+        let html = '';
+        for (let i = 0; i < pages && i < 10; i++) {
+            html += `<button class="btn btn-small ${i === currentPage ? 'btn-accent' : ''}" onclick="goPage(${i})">${i + 1}</button>`;
+        }
+        pag.innerHTML = html;
+    }
+
+    function goPage(page) {
+        currentOffset = page * PAGE_SIZE;
+        loadPastes();
+    }
+
+    // ── View Single Paste ──────────────────────────────────
+    async function viewPaste(slug) {
+        showViewDirect('paste');
+        const detail = document.getElementById('paste-detail');
+        detail.innerHTML = '<div class="loading"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</div>';
+        history.pushState(null, '', `/p/${slug}`);
+
+        try {
+            const data = await api(`/${slug}`);
+            const p = data.paste;
+            renderPasteView(p);
+            loadComments(slug);
+        } catch (err) {
+            detail.innerHTML = `<div class="empty">${esc(err.message)}</div>`;
+        }
+    }
+
+    function renderPasteView(p) {
+        const detail = document.getElementById('paste-detail');
+        const isScreenshot = p.type === 'screenshot';
+
+        const contentHtml = isScreenshot
+            ? `<div class="paste-screenshot"><img src="${esc(p.screenshot_url)}" alt="Screenshot"></div>`
+            : `<div class="paste-content-wrap">
+                <button class="btn btn-small btn-icon copy-btn" onclick="copyPaste('${esc(p.slug)}')"><i class="fa-solid fa-copy"></i></button>
+                <pre class="paste-content">${esc(p.content || '')}</pre>
+            </div>`;
+
+        detail.innerHTML = `
+            <div class="card">
+                <div class="paste-view-header">
+                    <div>
+                        <div class="paste-view-title">${esc(p.title || 'Untitled')}</div>
+                        <div class="paste-view-meta">
+                            ${esc(p.display_name || p.username || 'Anonymous')} &middot; ${timeAgo(p.created_at)}
+                            ${p.language && p.language !== 'text' ? ` &middot; ${esc(p.language)}` : ''}
+                            &middot; <i class="fa-solid fa-eye"></i> ${p.views || 0}
+                            ${p.burn_after_read ? ' &middot; <span style="color:var(--red)"><i class="fa-solid fa-fire"></i> Burn after read</span>' : ''}
+                            ${p.is_nsfw ? ' &middot; <span style="color:var(--yellow)">NSFW</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="paste-view-actions">
+                        <button class="btn btn-small" onclick="likePaste('${esc(p.slug)}')">
+                            <i class="fa-${p.liked ? 'solid' : 'regular'} fa-heart"></i> <span id="like-count">${p.likes || 0}</span>
+                        </button>
+                        <button class="btn btn-small" onclick="forkPaste('${esc(p.slug)}')"><i class="fa-solid fa-code-fork"></i> Fork</button>
+                        ${!isScreenshot ? `<button class="btn btn-small" onclick="copyPaste('${esc(p.slug)}')"><i class="fa-solid fa-copy"></i> Copy</button>` : ''}
+                        <a class="btn btn-small" href="${API}/${esc(p.slug)}/raw" target="_blank"><i class="fa-solid fa-download"></i> Raw</a>
+                        <button class="btn btn-small" onclick="showView('browse')"><i class="fa-solid fa-arrow-left"></i> Back</button>
+                    </div>
+                </div>
+                ${contentHtml}
+                <div class="comments" id="comments-section"></div>
+            </div>`;
+    }
+
+    // ── Actions ────────────────────────────────────────────
+    async function createPaste(e) {
+        e.preventDefault();
+        const content = document.getElementById('np-content').value;
+        if (!content.trim()) return;
+        try {
+            const data = await api('/', {
+                method: 'POST',
+                body: JSON.stringify({
+                    title: document.getElementById('np-title').value.trim() || undefined,
+                    content,
+                    language: document.getElementById('np-language').value,
+                    visibility: document.getElementById('np-visibility').value,
+                    burn_after_read: document.getElementById('np-burn').checked,
+                    is_nsfw: document.getElementById('np-nsfw').checked,
+                }),
+            });
+            toast('Paste created!', 'success');
+            viewPaste(data.paste.slug);
+            document.querySelector('.paste-editor').reset();
+        } catch (err) {
+            toast(err.message, 'error');
+        }
+    }
+
+    async function likePaste(slug) {
+        try {
+            const data = await api(`/${slug}/like`, { method: 'POST' });
+            document.getElementById('like-count').textContent = data.likes;
+        } catch (err) {
+            toast(err.message, 'error');
+        }
+    }
+
+    async function forkPaste(slug) {
+        try {
+            const data = await api(`/${slug}/fork`, { method: 'POST' });
+            toast('Forked!', 'success');
+            viewPaste(data.paste.slug);
+        } catch (err) {
+            toast(err.message, 'error');
+        }
+    }
+
+    async function copyPaste(slug) {
+        try {
+            const data = await api(`/${slug}`);
+            await navigator.clipboard.writeText(data.paste.content || '');
+            api(`/${slug}/copy`, { method: 'POST' }).catch(() => {});
+            toast('Copied!', 'success');
+        } catch {
+            toast('Copy failed', 'error');
+        }
+    }
+
+    // ── Comments ───────────────────────────────────────────
+    async function loadComments(slug) {
+        const section = document.getElementById('comments-section');
+        try {
+            const data = await api(`/${slug}/comments`);
+            const comments = data.comments || [];
+            section.innerHTML = `
+                <h3><i class="fa-solid fa-comments"></i> Comments (${comments.length})</h3>
+                ${comments.map(c => `
+                    <div class="comment">
+                        <div class="comment-header"><strong>${esc(c.display_name || c.username || c.anon_name || 'Anonymous')}</strong> &middot; ${timeAgo(c.created_at)}</div>
+                        <div class="comment-body">${esc(c.message)}</div>
+                    </div>
+                `).join('')}
+                <form class="comment-form" onsubmit="postComment(event, '${esc(slug)}')">
+                    <input type="text" id="comment-input" placeholder="Add a comment…" maxlength="500" required>
+                    <button type="submit" class="btn btn-small btn-accent"><i class="fa-solid fa-paper-plane"></i></button>
+                </form>`;
+        } catch { /* non-critical */ }
+    }
+
+    async function postComment(e, slug) {
+        e.preventDefault();
+        const input = document.getElementById('comment-input');
+        const message = input.value.trim();
+        if (!message) return;
+        try {
+            await api(`/${slug}/comments`, { method: 'POST', body: JSON.stringify({ message }) });
+            input.value = '';
+            loadComments(slug);
+        } catch (err) {
+            toast(err.message, 'error');
+        }
+    }
+
+    // ── Routing ────────────────────────────────────────────
+    function showViewDirect(view) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
+        document.getElementById('view-browse').classList.toggle('hidden', view !== 'browse');
+        document.getElementById('view-new').classList.toggle('hidden', view !== 'new');
+        document.getElementById('view-paste').classList.toggle('hidden', view !== 'paste');
+    }
+
+    function route() {
+        const path = location.pathname;
+        if (path.startsWith('/p/')) {
+            const slug = path.split('/')[2];
+            if (slug) { viewPaste(slug); return; }
+        }
+        if (path === '/new') { showView('new'); return; }
+        showView('browse');
+    }
+
+    window.addEventListener('popstate', route);
+
+    // ── Toast ──────────────────────────────────────────────
+    function toast(msg, type = 'info') {
+        const container = document.getElementById('toasts');
+        const t = document.createElement('div');
+        t.className = `toast ${type}`;
+        t.textContent = msg;
+        container.appendChild(t);
+        setTimeout(() => t.remove(), 4000);
+    }
+
+    // ── Init ───────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+        token = localStorage.getItem('ov_token') || getCookie('ov_token');
+
+        try {
+            OpenVibeNavbar.init({ service: 'paste', apiBase: 'https://openvibe.network', token });
+        } catch {}
+
+        route();
+    });
+    </script>
+  <script src="https://openvibe.live/live-notify.js" async></script>
+</body>
+</html>

@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ICE Alerts & Know Your Rights | ice.openvibe.tools</title>
+    <meta name="description" content="ICE raid alerts, know your rights resources, detention facility finder, emergency contacts, and preparedness tools for immigrant communities.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+    <style>
+        .alert-banner {
+            background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+            border: 1px solid #f87171;
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .alert-banner i { font-size: 1.8rem; color: #fbbf24; flex-shrink: 0; }
+        .alert-banner p { color: #fef2f2; margin: 0; line-height: 1.5; }
+        .alert-banner strong { color: #fff; }
+
+        .rights-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+        .rights-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            transition: border-color 0.2s, transform 0.2s;
+        }
+        .rights-card:hover { border-color: var(--border-accent); transform: translateY(-2px); }
+        .rights-card h3 { color: var(--text-primary); margin: 0 0 8px; font-size: 1rem; display: flex; align-items: center; gap: 10px; }
+        .rights-card h3 i { color: var(--accent); font-size: 1.1rem; }
+        .rights-card p { color: var(--text-secondary); margin: 0; font-size: 0.9rem; line-height: 1.6; }
+        .rights-card .rights-lang { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+        .rights-card .lang-tag {
+            background: var(--accent-glow);
+            color: var(--accent);
+            font-size: 0.75rem;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+
+        .emergency-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+        .emergency-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px 18px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .emergency-card .em-icon {
+            width: 44px; height: 44px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; flex-shrink: 0;
+        }
+        .emergency-card .em-icon.red { background: #991b1b33; color: #f87171; }
+        .emergency-card .em-icon.blue { background: #1e3a5f33; color: #60a5fa; }
+        .emergency-card .em-icon.green { background: #14532d33; color: #4ade80; }
+        .emergency-card .em-icon.purple { background: #581c8733; color: #c084fc; }
+        .emergency-card .em-icon.amber { background: #78350f33; color: #fbbf24; }
+        .emergency-card .em-info h4 { margin: 0; font-size: 0.9rem; color: var(--text-primary); }
+        .emergency-card .em-info p { margin: 2px 0 0; font-size: 0.82rem; color: var(--text-secondary); }
+        .emergency-card .em-info a { color: var(--accent); text-decoration: none; font-weight: 600; }
+        .emergency-card .em-info a:hover { text-decoration: underline; }
+
+        .checklist { list-style: none; padding: 0; margin: 0; }
+        .checklist li {
+            display: flex; align-items: flex-start; gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-secondary);
+            font-size: 0.92rem;
+            line-height: 1.5;
+        }
+        .checklist li:last-child { border-bottom: none; }
+        .checklist li i { color: var(--accent); margin-top: 3px; flex-shrink: 0; }
+        .checklist li strong { color: var(--text-primary); }
+
+        .scenario-wrap { margin-top: 16px; }
+        .scenario {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+        .scenario summary {
+            padding: 14px 18px;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            user-select: none;
+            list-style: none;
+        }
+        .scenario summary::-webkit-details-marker { display: none; }
+        .scenario summary::after {
+            content: '\f054';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            font-size: 0.75rem;
+            margin-left: auto;
+            color: var(--text-muted);
+            transition: transform 0.2s;
+        }
+        .scenario[open] summary::after { transform: rotate(90deg); }
+        .scenario .scenario-body {
+            padding: 0 18px 16px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.7;
+        }
+        .scenario .scenario-body ul { padding-left: 20px; margin: 8px 0; }
+        .scenario .scenario-body li { margin-bottom: 6px; }
+        .scenario summary i { color: var(--accent); }
+
+        .resource-links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+        .resource-link {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 10px 18px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 0.88rem;
+            font-weight: 500;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .resource-link:hover { border-color: var(--accent); background: var(--accent-glow); }
+        .resource-link i { color: var(--accent); }
+
+        .printable { display: none; }
+        @media print {
+            .printable { display: block !important; }
+            .tool-wrap { padding: 0; }
+            .site-footer, .pill-tabs, .alert-banner { display: none; }
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+    </style>
+</head>
+<body>
+    <div class="tool-wrap">
+        <div class="page-header">
+            <h1><i class="fas fa-shield-halved"></i> ICE Alerts</h1>
+            <p class="subtitle">Know your rights. Protect your community. Stay prepared.</p>
+        </div>
+
+        <div class="alert-banner">
+            <i class="fas fa-triangle-exclamation"></i>
+            <p><strong>This is not legal advice.</strong> This page provides general educational information about your constitutional rights. For legal counsel specific to your situation, contact an immigration attorney or a legal aid organization listed below.</p>
+        </div>
+
+        <div class="tool-section">
+            <div class="pill-tabs">
+                <button class="pill-tab active" onclick="setTab('rights')">🛡️ Know Your Rights</button>
+                <button class="pill-tab" onclick="setTab('scenarios')">🚨 If ICE Comes</button>
+                <button class="pill-tab" onclick="setTab('prepare')">📋 Preparedness</button>
+                <button class="pill-tab" onclick="setTab('resources')">📞 Resources</button>
+            </div>
+        </div>
+
+        <!-- ═══ TAB: KNOW YOUR RIGHTS ═══ -->
+        <div class="tab-content active" id="tab-rights">
+            <div class="tool-section">
+                <h2><i class="fas fa-landmark"></i> Your Constitutional Rights</h2>
+                <p style="color:var(--text-secondary); margin-bottom:16px;">Regardless of immigration status, the U.S. Constitution guarantees these rights to all people on U.S. soil.</p>
+
+                <div class="rights-grid">
+                    <div class="rights-card">
+                        <h3><i class="fas fa-volume-xmark"></i> Right to Remain Silent</h3>
+                        <p>You have the right to remain silent—the 5th Amendment protects you. You do not have to answer questions about where you were born, your immigration status, or how you entered the country. Say: <strong>"I am exercising my right to remain silent."</strong></p>
+                    </div>
+                    <div class="rights-card">
+                        <h3><i class="fas fa-gavel"></i> Right to a Lawyer</h3>
+                        <p>You have the right to speak with an attorney. If detained, say: <strong>"I want to speak with a lawyer before answering any questions."</strong> You have the right to make a phone call. Immigration detainees must be given a list of free legal service providers.</p>
+                    </div>
+                    <div class="rights-card">
+                        <h3><i class="fas fa-house-lock"></i> Protection in Your Home</h3>
+                        <p>ICE generally <strong>cannot enter your home without a judicial warrant</strong> signed by a judge. An ICE administrative warrant (Form I-200) does NOT give them permission to enter. You are not required to open the door. Ask them to slip the warrant under the door.</p>
+                    </div>
+                    <div class="rights-card">
+                        <h3><i class="fas fa-ban"></i> Right to Refuse Consent</h3>
+                        <p>You can refuse a search of yourself, your car, or your home. Say clearly: <strong>"I do not consent to a search."</strong> This does not guarantee they won't search, but it protects your legal rights.</p>
+                    </div>
+                    <div class="rights-card">
+                        <h3><i class="fas fa-file-signature"></i> Don't Sign Anything</h3>
+                        <p><strong>Do not sign any documents</strong> without reading them carefully and speaking to a lawyer first. Signing voluntary departure papers waives your right to appear before an immigration judge and could result in a 10-year bar on re-entry.</p>
+                    </div>
+                    <div class="rights-card">
+                        <h3><i class="fas fa-camera"></i> Right to Record</h3>
+                        <p>You have the First Amendment right to <strong>record law enforcement</strong> in public places as long as you do not interfere. This includes recording ICE agents. Keep recordings safely backed up.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tool-section">
+                <h2><i class="fas fa-hand"></i> What NOT to Do</h2>
+                <ul class="checklist">
+                    <li><i class="fas fa-xmark" style="color:#f87171"></i> <span><strong>Don't run or resist.</strong> Running from agents can be used against you and may result in additional charges.</span></li>
+                    <li><i class="fas fa-xmark" style="color:#f87171"></i> <span><strong>Don't lie or provide false documents.</strong> This is a federal crime and can permanently bar you from immigration relief.</span></li>
+                    <li><i class="fas fa-xmark" style="color:#f87171"></i> <span><strong>Don't open the door.</strong> You have no obligation to open your door. Communicate through the closed door and ask for a judicial warrant.</span></li>
+                    <li><i class="fas fa-xmark" style="color:#f87171"></i> <span><strong>Don't sign voluntary departure.</strong> This waives your right to a hearing and could bar re-entry for years.</span></li>
+                    <li><i class="fas fa-xmark" style="color:#f87171"></i> <span><strong>Don't carry documents from another country.</strong> Carrying a foreign passport can be used to establish alienage.</span></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- ═══ TAB: IF ICE COMES ═══ -->
+        <div class="tab-content" id="tab-scenarios">
+            <div class="tool-section">
+                <h2><i class="fas fa-door-open"></i> What to Do — Step by Step</h2>
+
+                <div class="scenario-wrap">
+                    <details class="scenario" open>
+                        <summary><i class="fas fa-house"></i> ICE is at Your Door</summary>
+                        <div class="scenario-body">
+                            <ul>
+                                <li><strong>Do NOT open the door.</strong> You have no obligation to open for ICE agents.</li>
+                                <li>Ask (through the closed door): <em>"Are you immigration agents? Do you have a judicial warrant signed by a judge?"</em></li>
+                                <li>If they say yes, ask them to <strong>slide the warrant under the door</strong>. Check that it's signed by a federal <em>judge</em> (not just an ICE officer) and that your name and address are correct.</li>
+                                <li>An <strong>ICE administrative warrant (Form I-200 or I-205)</strong> does NOT give agents the right to enter your home.</li>
+                                <li>If they do NOT have a judicial warrant: <em>"I do not consent to your entry. Please leave any paperwork at the door."</em></li>
+                                <li>Stay calm. Do not answer questions. Record if possible.</li>
+                                <li><strong>Call your emergency contact and an immigration lawyer immediately.</strong></li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <details class="scenario">
+                        <summary><i class="fas fa-car"></i> Stopped While Driving</summary>
+                        <div class="scenario-body">
+                            <ul>
+                                <li>Pull over safely. Keep your hands visible on the steering wheel.</li>
+                                <li>You must show your <strong>driver's license, registration, and proof of insurance</strong> if asked by a police officer.</li>
+                                <li>You do NOT have to answer questions about your birthplace, immigration status, or where you're traveling to/from.</li>
+                                <li>Say: <em>"I am exercising my right to remain silent. I do not consent to a search."</em></li>
+                                <li>If at an interior <strong>immigration checkpoint</strong> (within 100 miles of a border): agents can briefly stop your car but you still have the right to remain silent.</li>
+                                <li>You may ask: <em>"Am I free to go?"</em> If yes, calmly drive away.</li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <details class="scenario">
+                        <summary><i class="fas fa-building"></i> ICE at Your Workplace</summary>
+                        <div class="scenario-body">
+                            <ul>
+                                <li>Your employer should ask to see a <strong>judicial warrant</strong> before allowing ICE into non-public areas.</li>
+                                <li>You have the right to remain silent. You don't have to answer questions about your immigration status.</li>
+                                <li>Do not run. Stay calm. If you can, move to a non-public area.</li>
+                                <li>You have the right to call a lawyer. Ask for your union representative if you have one.</li>
+                                <li>Your employer <strong>cannot retaliate against you</strong> for exercising your rights.</li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <details class="scenario">
+                        <summary><i class="fas fa-road"></i> Stopped on the Street</summary>
+                        <div class="scenario-body">
+                            <ul>
+                                <li>Stay calm. You can ask: <em>"Am I being detained, or am I free to go?"</em></li>
+                                <li>If you are free to go, <strong>walk away calmly</strong>.</li>
+                                <li>If detained, exercise your right to remain silent: <em>"I am exercising my right to remain silent and want to speak with a lawyer."</em></li>
+                                <li>Do not provide false information. Do not show foreign documents.</li>
+                                <li>Remember badge numbers, officer names, and vehicle numbers if possible.</li>
+                            </ul>
+                        </div>
+                    </details>
+
+                    <details class="scenario">
+                        <summary><i class="fas fa-handcuffs"></i> If You Are Detained</summary>
+                        <div class="scenario-body">
+                            <ul>
+                                <li>Stay calm and repeat: <em>"I wish to remain silent. I want to speak with a lawyer."</em></li>
+                                <li><strong>Do not sign anything</strong> without a lawyer reviewing it—especially voluntary departure forms.</li>
+                                <li>Memorize or carry your emergency contact number. You have the right to make a phone call.</li>
+                                <li>Give your full legal name if asked, but nothing more without a lawyer.</li>
+                                <li>If you have valid immigration documents, inform your lawyer—not the agents—about them.</li>
+                                <li>You have the right to a hearing before an immigration judge. Do not waive this right.</li>
+                                <li>Ask for a list of free legal service providers (detention facilities are required to provide one).</li>
+                            </ul>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ TAB: PREPAREDNESS ═══ -->
+        <div class="tab-content" id="tab-prepare">
+            <div class="tool-section">
+                <h2><i class="fas fa-clipboard-check"></i> Emergency Preparedness Checklist</h2>
+                <p style="color:var(--text-secondary); margin-bottom:16px;">Prepare now so you're ready if anything happens. Share this with your family.</p>
+
+                <ul class="checklist">
+                    <li><i class="fas fa-check"></i> <span><strong>Memorize key phone numbers.</strong> Know by heart the number of at least one trusted person (family, friend, or attorney) who can help in an emergency.</span></li>
+                    <li><i class="fas fa-check"></i> <span><strong>Designate a trusted person.</strong> Choose someone (ideally a U.S. citizen or legal resident) who can care for your children, access your bank account, and communicate with a lawyer on your behalf.</span></li>
+                    <li><i class="fas fa-check"></i> <span><strong>Prepare a power of attorney.</strong> Have a signed, notarized document giving your trusted person the authority to make decisions about your children, finances, and property.</span></li>
+                    <li><i class="fas fa-check"></i> <span><strong>Gather important documents.</strong> Keep copies (physical and digital) of: birth certificates, passports, immigration papers, IDs, school records, medical records, lease/mortgage documents, car title, tax returns, bank information.</span></li>
+                    <li><i class="fas fa-check"></i> <span><strong>Know your A-number.</strong> If you have one, memorize your Alien Registration Number (A-Number). This is crucial if you're detained.</span></li>
+                    <li><i class="fas fa-check"></i> <span><strong>Download the Signal app.</strong> Use encrypted messaging (Signal) to communicate with your emergency network. Create a group with your trusted contacts.</span></li>
+                    <li><i class="fas fa-check"></i> <span><strong>Have emergency funds accessible.</strong> Keep some cash where your trusted person can access it. Know your bank account numbers.</span></li>
+                    <li><i class="fas fa-check"></i> <span><strong>Talk to your children.</strong> Have an age-appropriate conversation. Make sure they know who to call and where to go if you're not there.</span></li>
+                    <li><i class="fas fa-check"></i> <span><strong>Know a lawyer.</strong> Research immigration attorneys or legal aid organizations before an emergency. Many offer free consultations. See the Resources tab.</span></li>
+                    <li><i class="fas fa-check"></i> <span><strong>Practice the plan.</strong> Role-play what to do if ICE knocks on the door. Make sure everyone in your household knows the plan and the key phrases to say.</span></li>
+                </ul>
+            </div>
+
+            <div class="tool-section">
+                <h2><i class="fas fa-print"></i> Printable Wallet Card</h2>
+                <p style="color:var(--text-secondary); margin-bottom:16px;">Print this card, cut it out, and keep it in your wallet. Present it to agents if confronted.</p>
+                <div style="background:var(--bg-secondary); border:2px dashed var(--border-accent); border-radius:12px; padding:24px; max-width:500px; font-size:0.9rem; line-height:1.7; color:var(--text-primary);">
+                    <p style="font-weight:700; text-align:center; margin:0 0 12px; font-size:1rem;">🛡️ KNOW YOUR RIGHTS CARD</p>
+                    <p style="margin:0 0 8px;">I am exercising my right to remain silent. I do not consent to a search of my person or property. I want to speak with a lawyer before answering any questions.</p>
+                    <p style="margin:0 0 8px;">If I am being detained, I request to know the reason and to speak with an attorney. I will not sign any documents without my attorney present.</p>
+                    <hr style="border:none; border-top:1px dashed var(--border); margin:12px 0;">
+                    <p style="margin:0; font-size:0.82rem; color:var(--text-secondary);">Emergency Contact: ___________________________<br>Attorney: ___________________________<br>A-Number: ___________________________</p>
+                </div>
+                <div class="btn-row" style="margin-top:16px;">
+                    <button class="btn btn-primary" onclick="window.print()"><i class="fas fa-print"></i> Print Card</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ TAB: RESOURCES ═══ -->
+        <div class="tab-content" id="tab-resources">
+            <div class="tool-section">
+                <h2><i class="fas fa-phone-volume"></i> Emergency Hotlines</h2>
+                <div class="emergency-grid">
+                    <div class="emergency-card">
+                        <div class="em-icon red"><i class="fas fa-phone"></i></div>
+                        <div class="em-info">
+                            <h4>ICE Detainee Hotline</h4>
+                            <p><a href="tel:1-888-351-4024">1-888-351-4024</a> — 24/7</p>
+                        </div>
+                    </div>
+                    <div class="emergency-card">
+                        <div class="em-icon blue"><i class="fas fa-balance-scale"></i></div>
+                        <div class="em-info">
+                            <h4>National Immigrant Legal Hotline</h4>
+                            <p><a href="tel:1-800-354-0365">1-800-354-0365</a></p>
+                        </div>
+                    </div>
+                    <div class="emergency-card">
+                        <div class="em-icon green"><i class="fas fa-hands-holding-child"></i></div>
+                        <div class="em-info">
+                            <h4>RAICES Texas</h4>
+                            <p><a href="tel:1-800-732-4237">1-800-732-4237</a> — Free legal help</p>
+                        </div>
+                    </div>
+                    <div class="emergency-card">
+                        <div class="em-icon purple"><i class="fas fa-shield-halved"></i></div>
+                        <div class="em-info">
+                            <h4>ACLU Immigrants' Rights</h4>
+                            <p><a href="https://www.aclu.org/know-your-rights/immigrants-rights" target="_blank" rel="noopener">aclu.org/know-your-rights</a></p>
+                        </div>
+                    </div>
+                    <div class="emergency-card">
+                        <div class="em-icon amber"><i class="fas fa-users"></i></div>
+                        <div class="em-info">
+                            <h4>United We Dream</h4>
+                            <p><a href="https://unitedwedream.org/protect-yourself/" target="_blank" rel="noopener">unitedwedream.org</a></p>
+                        </div>
+                    </div>
+                    <div class="emergency-card">
+                        <div class="em-icon blue"><i class="fas fa-book-open"></i></div>
+                        <div class="em-info">
+                            <h4>Informed Immigrant</h4>
+                            <p><a href="https://www.informedimmigrant.com/guides/ice-raids/" target="_blank" rel="noopener">informedimmigrant.com</a></p>
+                        </div>
+                    </div>
+                    <div class="emergency-card">
+                        <div class="em-icon green"><i class="fas fa-globe"></i></div>
+                        <div class="em-info">
+                            <h4>NILC — Know Your Rights</h4>
+                            <p><a href="https://www.nilc.org/get-involved/community-education-and-engagement/know-your-rights/" target="_blank" rel="noopener">nilc.org</a></p>
+                        </div>
+                    </div>
+                    <div class="emergency-card">
+                        <div class="em-icon red"><i class="fas fa-comment-dots"></i></div>
+                        <div class="em-info">
+                            <h4>ICE Reporting Tip Line</h4>
+                            <p><a href="tel:1-866-347-2423">1-866-DHS-2-ICE</a> — Report abuse</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tool-section">
+                <h2><i class="fas fa-link"></i> Legal Aid Organizations</h2>
+                <div class="resource-links">
+                    <a class="resource-link" href="https://www.immigrationadvocates.org/legaldirectory/" target="_blank" rel="noopener"><i class="fas fa-search"></i> Find Free Legal Help Near You</a>
+                    <a class="resource-link" href="https://www.aclu.org/know-your-rights/immigrants-rights" target="_blank" rel="noopener"><i class="fas fa-shield-halved"></i> ACLU Know Your Rights</a>
+                    <a class="resource-link" href="https://www.raicestexas.org/know-your-rights/" target="_blank" rel="noopener"><i class="fas fa-hands-holding-child"></i> RAICES Texas</a>
+                    <a class="resource-link" href="https://unitedwedream.org/our-work/deportation-defense/know-your-rights/" target="_blank" rel="noopener"><i class="fas fa-fist-raised"></i> United We Dream</a>
+                    <a class="resource-link" href="https://www.nilc.org/" target="_blank" rel="noopener"><i class="fas fa-landmark"></i> National Immigration Law Center</a>
+                    <a class="resource-link" href="https://cliniclegal.org/" target="_blank" rel="noopener"><i class="fas fa-scale-balanced"></i> CLINIC Legal</a>
+                    <a class="resource-link" href="https://www.informedimmigrant.com/" target="_blank" rel="noopener"><i class="fas fa-book"></i> Informed Immigrant</a>
+                </div>
+            </div>
+
+            <div class="tool-section">
+                <h2><i class="fas fa-mobile-screen"></i> Apps & Tools</h2>
+                <div class="rights-grid">
+                    <div class="rights-card">
+                        <h3><i class="fab fa-app-store"></i> Know Your Rights App (NAKASEC)</h3>
+                        <p>Mobile app for immigrants to understand their legal rights. Available on iOS.</p>
+                        <div class="rights-lang"><span class="lang-tag">English</span><span class="lang-tag">Español</span><span class="lang-tag">한국어</span></div>
+                    </div>
+                    <div class="rights-card">
+                        <h3><i class="fas fa-lock"></i> Signal Messenger</h3>
+                        <p>Encrypted messaging app recommended for secure communication with your emergency network. Free and open source.</p>
+                        <div class="rights-lang"><span class="lang-tag">All Languages</span></div>
+                    </div>
+                    <div class="rights-card">
+                        <h3><i class="fas fa-video"></i> Mobile Justice (ACLU)</h3>
+                        <p>Record interactions with law enforcement. Automatically uploads to ACLU servers so recordings can't be deleted.</p>
+                        <div class="rights-lang"><span class="lang-tag">English</span><span class="lang-tag">Español</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ ESPAÑOL QUICK REFERENCE ═══ -->
+        <div class="tool-section">
+            <h2><i class="fas fa-language"></i> Frases Clave — Key Phrases</h2>
+            <p style="color:var(--text-secondary); margin-bottom:16px;">Memorize these phrases in both languages.</p>
+            <div class="rights-grid">
+                <div class="rights-card">
+                    <h3><i class="fas fa-comment"></i> English</h3>
+                    <p>"I am exercising my right to remain silent."</p>
+                    <p>"I do not consent to a search."</p>
+                    <p>"I want to speak with a lawyer."</p>
+                    <p>"Am I free to go?"</p>
+                </div>
+                <div class="rights-card">
+                    <h3><i class="fas fa-comment-dots"></i> Español</h3>
+                    <p>"Estoy ejerciendo mi derecho a guardar silencio."</p>
+                    <p>"No doy mi consentimiento para un registro."</p>
+                    <p>"Quiero hablar con un abogado."</p>
+                    <p>"¿Soy libre de irme?"</p>
+                </div>
+            </div>
+        </div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://text.openvibe.tools">Text.OpenVibe Hub</a>
+                <a href="https://peso.openvibe.tools">OpenVibePeso</a>
+                <a href="https://spanish.openvibe.tools">OpenVibeSpanish</a>
+                <a href="https://slang.openvibe.tools">OpenVibeSlang</a>
+            </div>
+            <p>&copy; 2025 OpenVibe &mdash; This is informational only, not legal advice.</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+
+        function setTab(name) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.pill-tab').forEach(el => el.classList.remove('active'));
+            document.getElementById('tab-' + name).classList.add('active');
+            const tabs = ['rights', 'scenarios', 'prepare', 'resources'];
+            const idx = tabs.indexOf(name);
+            if (idx >= 0) document.querySelectorAll('.pill-tab')[idx].classList.add('active');
+        }
+    </script>
+</body>
+</html>

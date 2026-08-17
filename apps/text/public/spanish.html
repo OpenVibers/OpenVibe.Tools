@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spanish ↔ English Phrasebook | spanish.openvibe.tools</title>
+    <meta name="description" content="Essential Spanish-English phrasebook with survival phrases, daily conversation, emergency expressions, and pronunciation tips.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+    <style>
+        .phrase-search {
+            width: 100%;
+            padding: 14px 18px 14px 46px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .phrase-search:focus { border-color: var(--accent); }
+        .search-wrap {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        .search-wrap i {
+            position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+            color: var(--text-muted); font-size: 1rem;
+        }
+
+        .category-pills {
+            display: flex; flex-wrap: wrap; gap: 8px;
+            margin-bottom: 20px;
+        }
+        .cat-pill {
+            padding: 7px 16px; border-radius: 20px;
+            background: var(--bg-secondary); border: 1px solid var(--border);
+            color: var(--text-secondary); cursor: pointer; font-size: 0.82rem;
+            font-weight: 600; transition: all 0.2s; font-family: 'Inter', sans-serif;
+        }
+        .cat-pill:hover { border-color: var(--accent); color: var(--text-primary); }
+        .cat-pill.active { background: var(--accent); color: #0b0c12; border-color: var(--accent); }
+
+        .phrase-list { display: flex; flex-direction: column; gap: 6px; }
+        .phrase-item {
+            display: grid; grid-template-columns: 1fr 1fr auto;
+            gap: 16px; align-items: center;
+            padding: 14px 18px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            transition: border-color 0.2s;
+            cursor: pointer;
+        }
+        .phrase-item:hover { border-color: var(--border-accent); }
+        .phrase-item.copied { border-color: #4ade80; }
+        .phrase-en { color: var(--text-primary); font-weight: 500; font-size: 0.92rem; }
+        .phrase-es { color: var(--accent); font-weight: 600; font-size: 0.92rem; }
+        .phrase-pron { color: var(--text-muted); font-size: 0.78rem; font-style: italic; display: block; margin-top: 2px; }
+        .phrase-copy {
+            background: none; border: 1px solid var(--border); border-radius: 6px;
+            color: var(--text-muted); cursor: pointer; padding: 6px 10px; font-size: 0.78rem;
+            transition: all 0.2s; font-family: 'Inter', sans-serif;
+        }
+        .phrase-copy:hover { color: var(--accent); border-color: var(--accent); }
+
+        .section-label {
+            font-size: 0.82rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.06em; color: var(--text-muted);
+            margin: 20px 0 10px; padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .section-label:first-child { margin-top: 0; }
+
+        .count-bar {
+            font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px;
+        }
+        .count-bar strong { color: var(--text-secondary); }
+
+        @media (max-width: 600px) {
+            .phrase-item { grid-template-columns: 1fr; gap: 6px; }
+            .phrase-copy { justify-self: start; }
+        }
+    </style>
+</head>
+<body>
+    <div class="tool-wrap">
+        <div class="page-header">
+            <h1><i class="fas fa-language"></i> Spanish ↔ English</h1>
+            <p class="subtitle">Essential phrases for everyday life, emergencies, and getting around.</p>
+        </div>
+
+        <div class="tool-section">
+            <div class="search-wrap">
+                <i class="fas fa-search"></i>
+                <input type="text" class="phrase-search" id="search" placeholder="Search phrases in English or Spanish…" autofocus>
+            </div>
+            <div class="category-pills" id="cat-pills"></div>
+            <div class="count-bar" id="count-bar"></div>
+            <div class="phrase-list" id="phrase-list"></div>
+        </div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://ice.openvibe.tools">ICE Alerts</a>
+                <a href="https://peso.openvibe.tools">OpenVibePeso</a>
+                <a href="https://slang.openvibe.tools">OpenVibeSlang</a>
+                <a href="https://text.openvibe.tools">Text.OpenVibe Hub</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+
+        const PHRASES = [
+            // ── Greetings & Basics ──
+            { cat: 'Greetings', en: 'Hello', es: 'Hola', pron: 'OH-lah' },
+            { cat: 'Greetings', en: 'Good morning', es: 'Buenos días', pron: 'BWEH-nos DEE-as' },
+            { cat: 'Greetings', en: 'Good afternoon', es: 'Buenas tardes', pron: 'BWEH-nas TAR-des' },
+            { cat: 'Greetings', en: 'Good evening / Good night', es: 'Buenas noches', pron: 'BWEH-nas NO-ches' },
+            { cat: 'Greetings', en: 'How are you?', es: '¿Cómo estás?', pron: 'KOH-mo es-TAS' },
+            { cat: 'Greetings', en: "I'm fine, thank you", es: 'Estoy bien, gracias', pron: 'es-TOY bee-EN, GRAH-see-as' },
+            { cat: 'Greetings', en: 'What is your name?', es: '¿Cómo te llamas?', pron: 'KOH-mo teh YAH-mas' },
+            { cat: 'Greetings', en: 'My name is…', es: 'Me llamo…', pron: 'meh YAH-mo' },
+            { cat: 'Greetings', en: 'Nice to meet you', es: 'Mucho gusto', pron: 'MOO-cho GOOS-toh' },
+            { cat: 'Greetings', en: 'Goodbye', es: 'Adiós', pron: 'ah-dee-OHS' },
+            { cat: 'Greetings', en: 'See you later', es: 'Hasta luego', pron: 'AH-stah LWEH-go' },
+            { cat: 'Greetings', en: 'Please', es: 'Por favor', pron: 'por fah-VOR' },
+            { cat: 'Greetings', en: 'Thank you', es: 'Gracias', pron: 'GRAH-see-as' },
+            { cat: 'Greetings', en: 'Thank you very much', es: 'Muchas gracias', pron: 'MOO-chas GRAH-see-as' },
+            { cat: 'Greetings', en: "You're welcome", es: 'De nada', pron: 'deh NAH-dah' },
+            { cat: 'Greetings', en: 'Excuse me / Sorry', es: 'Disculpe / Perdón', pron: 'dees-KOOL-peh / per-DOHN' },
+            { cat: 'Greetings', en: 'Yes', es: 'Sí', pron: 'SEE' },
+            { cat: 'Greetings', en: 'No', es: 'No', pron: 'NOH' },
+
+            // ── Survival / Getting By ──
+            { cat: 'Survival', en: 'I don\'t speak Spanish', es: 'No hablo español', pron: 'no AH-blo es-pahn-YOL' },
+            { cat: 'Survival', en: 'Do you speak English?', es: '¿Hablas inglés?', pron: 'AH-blas een-GLES' },
+            { cat: 'Survival', en: 'I don\'t understand', es: 'No entiendo', pron: 'no en-tee-EN-doh' },
+            { cat: 'Survival', en: 'Can you repeat that?', es: '¿Puede repetir?', pron: 'PWEH-deh reh-peh-TEER' },
+            { cat: 'Survival', en: 'Speak more slowly, please', es: 'Hable más despacio, por favor', pron: 'AH-bleh mas des-PAH-see-oh' },
+            { cat: 'Survival', en: 'How much does it cost?', es: '¿Cuánto cuesta?', pron: 'KWAN-toh KWES-tah' },
+            { cat: 'Survival', en: 'Where is the bathroom?', es: '¿Dónde está el baño?', pron: 'DOHN-deh es-TAH el BAHN-yoh' },
+            { cat: 'Survival', en: 'I need help', es: 'Necesito ayuda', pron: 'neh-seh-SEE-toh ah-YOO-dah' },
+            { cat: 'Survival', en: 'Where is…?', es: '¿Dónde está…?', pron: 'DOHN-deh es-TAH' },
+            { cat: 'Survival', en: 'I\'m lost', es: 'Estoy perdido/a', pron: 'es-TOY per-DEE-doh/dah' },
+            { cat: 'Survival', en: 'Can you help me?', es: '¿Me puede ayudar?', pron: 'meh PWEH-deh ah-yoo-DAR' },
+            { cat: 'Survival', en: 'I\'m looking for…', es: 'Estoy buscando…', pron: 'es-TOY boos-KAHN-doh' },
+
+            // ── Emergency ──
+            { cat: 'Emergency', en: 'Help!', es: '¡Ayuda!', pron: 'ah-YOO-dah' },
+            { cat: 'Emergency', en: 'Call the police', es: 'Llame a la policía', pron: 'YAH-meh ah lah poh-lee-SEE-ah' },
+            { cat: 'Emergency', en: 'Call an ambulance', es: 'Llame una ambulancia', pron: 'YAH-meh OO-nah am-boo-LAN-see-ah' },
+            { cat: 'Emergency', en: 'I need a doctor', es: 'Necesito un doctor', pron: 'neh-seh-SEE-toh oon dok-TOR' },
+            { cat: 'Emergency', en: 'It\'s an emergency', es: 'Es una emergencia', pron: 'es OO-nah eh-mer-HEN-see-ah' },
+            { cat: 'Emergency', en: 'I\'m hurt / I\'m sick', es: 'Estoy herido/a / Estoy enfermo/a', pron: 'es-TOY eh-REE-doh / en-FER-moh' },
+            { cat: 'Emergency', en: 'Fire!', es: '¡Fuego!', pron: 'FWEH-goh' },
+            { cat: 'Emergency', en: 'I want to call a lawyer', es: 'Quiero llamar a un abogado', pron: 'kee-EH-roh yah-MAR ah oon ah-boh-GAH-doh' },
+            { cat: 'Emergency', en: 'I have the right to remain silent', es: 'Tengo el derecho a guardar silencio', pron: 'TEN-go el deh-REH-cho ah gwar-DAR see-LEN-see-oh' },
+            { cat: 'Emergency', en: 'I do not consent to a search', es: 'No doy mi consentimiento para un registro', pron: 'no doy mee kon-sen-tee-mee-EN-toh PAH-rah oon reh-HEES-troh' },
+
+            // ── Food & Dining ──
+            { cat: 'Food', en: 'I\'m hungry', es: 'Tengo hambre', pron: 'TEN-go AHM-breh' },
+            { cat: 'Food', en: 'I\'m thirsty', es: 'Tengo sed', pron: 'TEN-go SED' },
+            { cat: 'Food', en: 'Water', es: 'Agua', pron: 'AH-gwah' },
+            { cat: 'Food', en: 'Beer', es: 'Cerveza', pron: 'ser-VEH-sah' },
+            { cat: 'Food', en: 'The check, please', es: 'La cuenta, por favor', pron: 'lah KWEN-tah, por fah-VOR' },
+            { cat: 'Food', en: 'It\'s delicious', es: 'Está delicioso', pron: 'es-TAH deh-lee-see-OH-soh' },
+            { cat: 'Food', en: 'No spicy, please', es: 'Sin picante, por favor', pron: 'seen pee-KAHN-teh' },
+            { cat: 'Food', en: 'Extra spicy, please', es: 'Muy picante, por favor', pron: 'MOO-ee pee-KAHN-teh' },
+            { cat: 'Food', en: 'A table for two', es: 'Una mesa para dos', pron: 'OO-nah MEH-sah PAH-rah dohs' },
+            { cat: 'Food', en: 'What do you recommend?', es: '¿Qué recomienda?', pron: 'keh reh-koh-mee-EN-dah' },
+            { cat: 'Food', en: 'To go / Takeout', es: 'Para llevar', pron: 'PAH-rah yeh-VAR' },
+            { cat: 'Food', en: 'Breakfast', es: 'Desayuno', pron: 'deh-sah-YOO-noh' },
+            { cat: 'Food', en: 'Lunch', es: 'Comida / Almuerzo', pron: 'koh-MEE-dah / al-MWER-soh' },
+            { cat: 'Food', en: 'Dinner', es: 'Cena', pron: 'SEH-nah' },
+
+            // ── Numbers ──
+            { cat: 'Numbers', en: 'One / Two / Three', es: 'Uno / Dos / Tres', pron: 'OO-noh / DOHS / TRES' },
+            { cat: 'Numbers', en: 'Four / Five / Six', es: 'Cuatro / Cinco / Seis', pron: 'KWAH-troh / SEEN-koh / SAYS' },
+            { cat: 'Numbers', en: 'Seven / Eight / Nine / Ten', es: 'Siete / Ocho / Nueve / Diez', pron: 'see-EH-teh / OH-cho / NWEH-veh / dee-ES' },
+            { cat: 'Numbers', en: 'Twenty', es: 'Veinte', pron: 'VAYN-teh' },
+            { cat: 'Numbers', en: 'Fifty', es: 'Cincuenta', pron: 'seen-KWEN-tah' },
+            { cat: 'Numbers', en: 'One hundred', es: 'Cien', pron: 'see-EN' },
+            { cat: 'Numbers', en: 'One thousand', es: 'Mil', pron: 'MEEL' },
+
+            // ── Work ──
+            { cat: 'Work', en: 'I\'m looking for work', es: 'Estoy buscando trabajo', pron: 'es-TOY boos-KAHN-doh trah-BAH-ho' },
+            { cat: 'Work', en: 'What time do I start?', es: '¿A qué hora empiezo?', pron: 'ah keh OH-rah em-pee-EH-soh' },
+            { cat: 'Work', en: 'How much do you pay?', es: '¿Cuánto pagan?', pron: 'KWAN-toh PAH-gan' },
+            { cat: 'Work', en: 'I can do that', es: 'Yo puedo hacer eso', pron: 'yoh PWEH-doh ah-SER EH-soh' },
+            { cat: 'Work', en: 'Day off', es: 'Día libre', pron: 'DEE-ah LEE-breh' },
+            { cat: 'Work', en: 'Boss', es: 'Jefe / Jefa', pron: 'HEH-feh / HEH-fah' },
+            { cat: 'Work', en: 'I finished', es: 'Ya terminé', pron: 'yah ter-mee-NEH' },
+
+            // ── Transportation ──
+            { cat: 'Transport', en: 'Where is the bus stop?', es: '¿Dónde está la parada de autobús?', pron: 'DOHN-deh es-TAH lah pah-RAH-dah deh ow-toh-BOOS' },
+            { cat: 'Transport', en: 'How do I get to…?', es: '¿Cómo llego a…?', pron: 'KOH-mo YEH-go ah' },
+            { cat: 'Transport', en: 'Turn left / Turn right', es: 'Gire a la izquierda / Gire a la derecha', pron: 'HEE-reh ah lah ees-kee-ER-dah / deh-REH-chah' },
+            { cat: 'Transport', en: 'Go straight', es: 'Siga derecho', pron: 'SEE-gah deh-REH-cho' },
+            { cat: 'Transport', en: 'How far is it?', es: '¿Qué tan lejos está?', pron: 'keh tan LEH-hos es-TAH' },
+            { cat: 'Transport', en: 'Stop here, please', es: 'Pare aquí, por favor', pron: 'PAH-reh ah-KEE' },
+
+            // ── Time & Days ──
+            { cat: 'Time', en: 'What time is it?', es: '¿Qué hora es?', pron: 'keh OH-rah es' },
+            { cat: 'Time', en: 'Today / Tomorrow / Yesterday', es: 'Hoy / Mañana / Ayer', pron: 'OY / mahn-YAH-nah / ah-YER' },
+            { cat: 'Time', en: 'Monday / Tuesday / Wednesday', es: 'Lunes / Martes / Miércoles', pron: 'LOO-nes / MAR-tes / mee-ER-koh-les' },
+            { cat: 'Time', en: 'Thursday / Friday', es: 'Jueves / Viernes', pron: 'HWEH-ves / vee-ER-nes' },
+            { cat: 'Time', en: 'Saturday / Sunday', es: 'Sábado / Domingo', pron: 'SAH-bah-doh / doh-MEEN-goh' },
+            { cat: 'Time', en: 'Morning / Afternoon / Night', es: 'Mañana / Tarde / Noche', pron: 'mahn-YAH-nah / TAR-deh / NO-cheh' },
+
+            // ── Family ──
+            { cat: 'Family', en: 'Mother / Father', es: 'Madre (Mamá) / Padre (Papá)', pron: 'MAH-dreh (mah-MAH) / PAH-dreh (pah-PAH)' },
+            { cat: 'Family', en: 'Son / Daughter', es: 'Hijo / Hija', pron: 'EE-hoh / EE-hah' },
+            { cat: 'Family', en: 'Brother / Sister', es: 'Hermano / Hermana', pron: 'er-MAH-noh / er-MAH-nah' },
+            { cat: 'Family', en: 'Husband / Wife', es: 'Esposo / Esposa', pron: 'es-POH-soh / es-POH-sah' },
+            { cat: 'Family', en: 'Children', es: 'Hijos / Niños', pron: 'EE-hos / NEEN-yos' },
+            { cat: 'Family', en: 'Grandmother / Grandfather', es: 'Abuela / Abuelo', pron: 'ah-BWEH-lah / ah-BWEH-loh' },
+
+            // ── Expressions ──
+            { cat: 'Expressions', en: "What's up? (informal)", es: '¿Qué onda?', pron: 'keh OHN-dah' },
+            { cat: 'Expressions', en: 'Cool / Awesome', es: '¡Qué chido! / ¡Qué padre!', pron: 'keh CHEE-doh / keh PAH-dreh' },
+            { cat: 'Expressions', en: 'No way!', es: '¡No manches!', pron: 'no MAHN-ches' },
+            { cat: 'Expressions', en: 'Cheers!', es: '¡Salud!', pron: 'sah-LOOD' },
+            { cat: 'Expressions', en: 'Bless you (after a sneeze)', es: '¡Salud!', pron: 'sah-LOOD' },
+            { cat: 'Expressions', en: 'Happy birthday!', es: '¡Feliz cumpleaños!', pron: 'feh-LEES koom-pleh-AHN-yos' },
+            { cat: 'Expressions', en: 'I love you', es: 'Te quiero / Te amo', pron: 'teh kee-EH-roh / teh AH-moh' },
+            { cat: 'Expressions', en: "Let's go!", es: '¡Vámonos!', pron: 'VAH-moh-nos' },
+            { cat: 'Expressions', en: "That's life", es: 'Así es la vida', pron: 'ah-SEE es lah VEE-dah' },
+        ];
+
+        const CATEGORIES = [...new Set(PHRASES.map(p => p.cat))];
+        let activeCat = 'all';
+
+        function renderPills() {
+            const el = document.getElementById('cat-pills');
+            el.innerHTML = `<button class="cat-pill ${activeCat === 'all' ? 'active' : ''}" onclick="filterCat('all')">All</button>` +
+                CATEGORIES.map(c => `<button class="cat-pill ${activeCat === c ? 'active' : ''}" onclick="filterCat('${c}')">${c}</button>`).join('');
+        }
+
+        function filterCat(cat) {
+            activeCat = cat;
+            renderPills();
+            render();
+        }
+
+        function render() {
+            const q = document.getElementById('search').value.toLowerCase().trim();
+            const list = document.getElementById('phrase-list');
+            const countBar = document.getElementById('count-bar');
+
+            let filtered = PHRASES;
+            if (activeCat !== 'all') filtered = filtered.filter(p => p.cat === activeCat);
+            if (q) filtered = filtered.filter(p =>
+                p.en.toLowerCase().includes(q) ||
+                p.es.toLowerCase().includes(q) ||
+                p.pron.toLowerCase().includes(q)
+            );
+
+            countBar.innerHTML = `Showing <strong>${filtered.length}</strong> of ${PHRASES.length} phrases`;
+
+            // Group by category
+            const grouped = {};
+            filtered.forEach(p => {
+                if (!grouped[p.cat]) grouped[p.cat] = [];
+                grouped[p.cat].push(p);
+            });
+
+            let html = '';
+            for (const [cat, phrases] of Object.entries(grouped)) {
+                if (activeCat === 'all') html += `<div class="section-label">${cat}</div>`;
+                phrases.forEach(p => {
+                    html += `<div class="phrase-item" onclick="copyPhrase(this, '${escHtml(p.es)}')">
+                        <div><span class="phrase-en">${escHtml(p.en)}</span></div>
+                        <div><span class="phrase-es">${escHtml(p.es)}</span><span class="phrase-pron">${escHtml(p.pron)}</span></div>
+                        <button class="phrase-copy" onclick="event.stopPropagation(); copyPhrase(this.closest('.phrase-item'), '${escHtml(p.es)}')" title="Copy Spanish"><i class="fas fa-copy"></i></button>
+                    </div>`;
+                });
+            }
+
+            if (!filtered.length) html = '<p style="text-align:center; color:var(--text-muted); padding:40px 0;">No phrases found. Try a different search.</p>';
+            list.innerHTML = html;
+        }
+
+        function escHtml(s) {
+            return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        }
+
+        function copyPhrase(row, text) {
+            navigator.clipboard.writeText(text).then(() => {
+                row.classList.add('copied');
+                OpenVibeUI.showToast('Copied: ' + text);
+                setTimeout(() => row.classList.remove('copied'), 1200);
+            });
+        }
+
+        document.getElementById('search').addEventListener('input', render);
+        renderPills();
+        render();
+    </script>
+</body>
+</html>

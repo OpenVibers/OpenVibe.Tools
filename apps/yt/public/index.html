@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YT.OpenVibe — Free YouTube Downloader</title>
+    <meta name="description" content="Download YouTube videos and audio for free. MP4, WebM, MP3, M4A, OPUS, FLAC. No sign-up required.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <!-- Navbar injected by OpenVibeNavbar.init() -->
+
+    <div id="app">
+        <!-- Hero -->
+        <section class="hero">
+            <div class="hero-icon"><i class="fa-solid fa-circle-play"></i></div>
+            <h1>YT.OpenVibe</h1>
+            <p class="hero-subtitle">Free YouTube Downloader</p>
+        </section>
+
+        <!-- URL Input -->
+        <section class="url-section">
+            <div class="url-input-wrap">
+                <i class="fa-solid fa-link url-icon"></i>
+                <input type="url" id="url-input" class="url-input" placeholder="Paste YouTube URL here..." autocomplete="off">
+                <button class="btn btn-primary" id="fetch-btn"><i class="fa-solid fa-magnifying-glass"></i> <span class="btn-label">Fetch</span></button>
+            </div>
+            <p class="url-hint">Supports youtube.com and youtu.be links</p>
+        </section>
+
+        <!-- Loading -->
+        <section class="loading" id="loading" style="display:none">
+            <div class="spinner"></div>
+            <p>Fetching video info...</p>
+        </section>
+
+        <!-- Video Info -->
+        <section class="video-card" id="video-card" style="display:none">
+            <div class="video-thumb" id="video-thumb"></div>
+            <div class="video-info" id="video-info"></div>
+        </section>
+
+        <!-- Format Selection -->
+        <section class="format-section" id="format-section" style="display:none">
+            <h3>Choose Format</h3>
+            <div class="format-groups">
+                <div class="format-group">
+                    <h4><i class="fa-solid fa-video"></i> Video</h4>
+                    <div class="format-list" id="video-formats"></div>
+                </div>
+                <div class="format-group">
+                    <h4><i class="fa-solid fa-music"></i> Audio Only</h4>
+                    <div class="format-list" id="audio-formats"></div>
+                </div>
+            </div>
+            <button class="btn btn-primary btn-lg" id="download-btn">
+                <i class="fa-solid fa-download"></i> Download
+            </button>
+        </section>
+
+        <!-- Download Progress -->
+        <section class="progress-section" id="progress-section" style="display:none">
+            <h3 id="progress-title">Downloading...</h3>
+            <div class="progress-bar-wrap">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <div class="progress-stats" id="progress-stats"></div>
+        </section>
+
+        <!-- Download Ready -->
+        <section class="done-section" id="done-section" style="display:none">
+            <div class="done-icon"><i class="fa-solid fa-circle-check"></i></div>
+            <h3>Ready!</h3>
+            <p id="done-info"></p>
+            <div class="done-actions">
+                <a class="btn btn-primary btn-lg" id="save-btn" href="#" download>
+                    <i class="fa-solid fa-download"></i> Save File
+                </a>
+                <button class="btn btn-secondary" id="new-btn">
+                    <i class="fa-solid fa-arrow-rotate-left"></i> Download Another
+                </button>
+            </div>
+        </section>
+
+        <!-- Error -->
+        <section class="error-section" id="error-section" style="display:none">
+            <div class="error-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
+            <p id="error-msg"></p>
+            <button class="btn btn-secondary" id="retry-btn"><i class="fa-solid fa-arrow-rotate-left"></i> Try Again</button>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="footer-inner">
+            <span><i class="fa-solid fa-circle-nodes"></i> YT.OpenVibe &mdash; Part of the <a href="https://openvibe.network">OpenVibe Network</a></span>
+            <span class="footer-links">
+                <a href="https://openvibe.tools">OpenVibe.Tools</a>
+                <a href="https://openvibe.live">OpenVibe.Live</a>
+                <a href="https://openvibe.games">Scraplandia</a>
+                <a href="https://img.openvibe.tools">Img.OpenVibe</a>
+                <a href="https://audio.openvibe.tools">Audio.OpenVibe</a>
+                <a href="https://maps.openvibe.tools">Maps.OpenVibe</a>
+                <a href="https://food.openvibe.tools">Food.OpenVibe</a>
+            </span>
+        </div>
+    </footer>
+
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>
