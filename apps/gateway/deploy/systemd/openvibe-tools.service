@@ -1,0 +1,23 @@
+[Unit]
+Description=OpenVibe.Tools — Gateway (apex directory, net/dev/paste tools)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/openvibe.tools/apps/gateway
+EnvironmentFile=/etc/openvibe/tools.env
+# tools.env is shared by all tools services and must NOT set PORT
+Environment=NODE_ENV=production
+Environment=PORT=4001
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env node /opt/openvibe.tools/apps/gateway/server/index.js
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

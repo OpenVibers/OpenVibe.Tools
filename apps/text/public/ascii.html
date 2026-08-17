@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Art Text Generator | ascii.openvibe.tools</title>
+    <meta name="description" content="Convert text into large ASCII art banners using block characters. Perfect for code comments, READMEs, and chat.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+</head>
+<body>
+    <div class="tool-wrap">
+        <div class="page-header">
+            <h1><i class="fas fa-text-height"></i> ASCII Art Generator</h1>
+            <p class="subtitle">Convert text into large ASCII art banners. Customize block character and spacing.</p>
+        </div>
+
+        <div class="tool-section">
+            <div class="input-group">
+                <input type="text" id="input" value="HELLO" placeholder="Type your text (A-Z, 0-9)" autofocus maxlength="20">
+            </div>
+            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                <div class="input-group" style="flex: 1; min-width: 120px;">
+                    <label>Block Character</label>
+                    <input type="text" id="blockChar" value="█" maxlength="2">
+                </div>
+                <div class="input-group" style="flex: 1; min-width: 120px;">
+                    <label>Space Character</label>
+                    <input type="text" id="spaceChar" value=" " maxlength="2" placeholder="(space)">
+                </div>
+            </div>
+            <div class="pill-tabs">
+                <button class="pill-tab active" data-block="█" data-space=" ">█ Block</button>
+                <button class="pill-tab" data-block="#" data-space=".">## Hash</button>
+                <button class="pill-tab" data-block="*" data-space=" ">** Star</button>
+                <button class="pill-tab" data-block="@" data-space=" ">@ At</button>
+                <button class="pill-tab" data-block="0" data-space=" ">00 Zero</button>
+                <button class="pill-tab" data-block="▓" data-space="░">▓░ Shade</button>
+            </div>
+            <div class="live-hint"><span class="live-dot"></span> Results update as you type</div>
+            <div class="generate-row">
+                <button class="btn btn-primary generate-btn" onclick="document.querySelector('#input, input[type=text]').dispatchEvent(new Event('input', {bubbles:true}))"><i class="fas fa-bolt"></i> Generate</button>
+            </div>
+        </div>
+
+        <div class="tool-section">
+            <h2><i class="fas fa-terminal"></i> Output</h2>
+            <div id="output" class="output-box mono" style="font-size: 0.7rem; line-height: 1.15; letter-spacing: 0.05em; overflow-x: auto;"></div>
+            <div class="btn-row">
+                <button class="btn btn-primary" onclick="OpenVibeUI.copyText(lastOutput)"><i class="fas fa-copy"></i> Copy</button>
+                <button class="btn btn-secondary" onclick="OpenVibeUI.downloadText(lastOutput, 'ascii-art.txt')"><i class="fas fa-download"></i> Download .txt</button>
+            </div>
+        </div>
+
+        <div class="tool-section">
+            <h2><i class="fas fa-lightbulb"></i> Tips</h2>
+            <ul style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.8; list-style: none;">
+                <li>• Supports A-Z, 0-9, and basic punctuation</li>
+                <li>• Use monospace fonts when pasting (code editors, Discord code blocks)</li>
+                <li>• Wrap in triple backticks for Discord/Markdown: <code style="background: var(--bg-tertiary); padding: 2px 6px; border-radius: 3px;">```</code></li>
+                <li>• Shorter text works best (1-8 characters)</li>
+            </ul>
+        </div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://text.openvibe.tools">Text.OpenVibe Hub</a>
+                <a href="https://fancy.openvibe.tools">Fancy Text</a>
+                <a href="https://zalgo.openvibe.tools">Zalgo Text</a>
+                <a href="https://symbols.openvibe.tools">Symbols</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/text-engine.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+        let lastOutput = '';
+
+        function update() {
+            const text = document.getElementById('input').value;
+            const blockChar = document.getElementById('blockChar').value || '█';
+            const spaceChar = document.getElementById('spaceChar').value || ' ';
+            if (!text.trim()) {
+                document.getElementById('output').textContent = 'Type something above...';
+                return;
+            }
+            lastOutput = TextOpenVibeEngine.asciiArt(text, { blockChar, spaceChar });
+            document.getElementById('output').textContent = lastOutput;
+        }
+
+        document.getElementById('input').addEventListener('input', update);
+        document.getElementById('blockChar').addEventListener('input', update);
+        document.getElementById('spaceChar').addEventListener('input', update);
+
+        document.querySelectorAll('.pill-tab').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.pill-tab').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('blockChar').value = btn.dataset.block;
+                document.getElementById('spaceChar').value = btn.dataset.space;
+                update();
+            });
+        });
+
+        update();
+    </script>
+</body>
+</html>

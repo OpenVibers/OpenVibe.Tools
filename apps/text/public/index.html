@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text.OpenVibe — Fancy Text, Unicode, Symbols & More | openvibe.tools</title>
+    <meta name="description" content="Free text tools: fancy Unicode fonts, Zalgo glitch text, ASCII art, symbols, kaomoji, case converters, bio generators, and more. Part of the OpenVibe Network.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+</head>
+<body>
+    <div class="hub-hero">
+        <h1><i class="fas fa-font"></i> Text.OpenVibe</h1>
+        <p class="hero-sub">Free text tools for streamers, creators, and internet wanderers. Fancy fonts, glitch text, ASCII art, symbols, and more — all in your browser.</p>
+        <div class="hero-tags">
+            <span class="hero-tag">100% Free</span>
+            <span class="hero-tag">No Sign-Up</span>
+            <span class="hero-tag">Client-Side</span>
+            <span class="hero-tag">Part of the OpenVibe Network</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Quick try -->
+        <div class="tool-section" style="max-width: 700px; margin: 0 auto 40px;">
+            <h2><i class="fas fa-keyboard"></i> Quick Try</h2>
+            <div class="input-group">
+                <textarea id="quickInput" class="large" placeholder="Type something to see it transformed...">Hello World</textarea>
+            </div>
+            <div id="quickPreview" class="output-grid" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));"></div>
+        </div>
+
+        <!-- Text Tools -->
+        <div class="section-header">
+            <i class="fas fa-wand-magic-sparkles"></i>
+            <h2>Text Tools</h2>
+        </div>
+        <div class="tool-grid">
+            <a href="https://fancy.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
+                <h3>Fancy Text</h3>
+                <p>Transform text into 30+ Unicode styles — bold, italic, script, fraktur, double-struck, circled, squared, and more.</p>
+                <span class="card-domain">fancy.openvibe.tools</span>
+            </a>
+            <a href="https://zalgo.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-ghost"></i></div>
+                <h3>Zalgo / Glitch Text</h3>
+                <p>Generate creepy glitch text with adjustable intensity. Control above, middle, and below combining characters.</p>
+                <span class="card-domain">zalgo.openvibe.tools</span>
+            </a>
+            <a href="https://ascii.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-text-height"></i></div>
+                <h3>ASCII Art</h3>
+                <p>Convert text into large ASCII art banners using block characters. Perfect for comments and READMEs.</p>
+                <span class="card-domain">ascii.openvibe.tools</span>
+            </a>
+            <a href="https://case.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-text-slash"></i></div>
+                <h3>Case Converter</h3>
+                <p>UPPER, lower, Title, camelCase, snake_case, kebab-case, PascalCase, mOcKiNg, and more.</p>
+                <span class="card-domain">case.openvibe.tools</span>
+            </a>
+            <a href="https://symbols.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-icons"></i></div>
+                <h3>Symbols & Special Characters</h3>
+                <p>Browse and click-to-copy arrows, stars, hearts, math, currency, bullets, boxes, and more.</p>
+                <span class="card-domain">symbols.openvibe.tools</span>
+            </a>
+            <a href="https://bubble.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-circle"></i></div>
+                <h3>Bubble Text</h3>
+                <p>Circled, negative circled, squared, negative squared, and regional indicator letters.</p>
+                <span class="card-domain">bubble.openvibe.tools</span>
+            </a>
+            <a href="https://count.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-calculator"></i></div>
+                <h3>Text Counter</h3>
+                <p>Count characters, words, sentences, paragraphs, bytes. Reading time and speaking time estimates.</p>
+                <span class="card-domain">count.openvibe.tools</span>
+            </a>
+            <a href="https://clean.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-broom"></i></div>
+                <h3>Text Cleaner</h3>
+                <p>Fix smart quotes, remove invisible characters, strip Zalgo, normalize spacing, clean HTML tags.</p>
+                <span class="card-domain">clean.openvibe.tools</span>
+            </a>
+            <a href="https://reverse.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-rotate-left"></i></div>
+                <h3>Reverse & Flip Text</h3>
+                <p>Reverse, flip upside down, mirror text. Works with full Unicode support.</p>
+                <span class="card-domain">reverse.openvibe.tools</span>
+            </a>
+            <a href="https://kaomoji.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-face-smile-beam"></i></div>
+                <h3>Kaomoji & Emoticons</h3>
+                <p>Browse and copy Japanese text emoticons sorted by mood: happy, sad, angry, love, shrug, lenny, and more.</p>
+                <span class="card-domain">kaomoji.openvibe.tools</span>
+            </a>
+            <a href="https://unicode.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-code"></i></div>
+                <h3>Unicode Inspector</h3>
+                <p>Inspect text: see code points, character names, byte counts. Detect invisible characters and zero-width joiners.</p>
+                <span class="card-domain">unicode.openvibe.tools</span>
+            </a>
+            <a href="https://bio.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-address-card"></i></div>
+                <h3>Bio Generator</h3>
+                <p>Generate creative social media bios with fancy borders, symbols, emoji. Perfect for Twitch, YouTube, Discord.</p>
+                <span class="card-domain">bio.openvibe.tools</span>
+            </a>
+            <a href="https://nickname.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-user-tag"></i></div>
+                <h3>Nickname Generator</h3>
+                <p>Generate unique gaming tags, usernames, and screen names in multiple styles.</p>
+                <span class="card-domain">nickname.openvibe.tools</span>
+            </a>
+            <a href="https://morse.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-signal"></i></div>
+                <h3>Morse Code</h3>
+                <p>Translate text to Morse code and back. Dots and dashes for your inner telegraph operator.</p>
+                <span class="card-domain">morse.openvibe.tools</span>
+            </a>
+            <a href="https://binary.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-microchip"></i></div>
+                <h3>Binary / Hex</h3>
+                <p>Convert text to binary, hexadecimal, decimal, and back. See the raw bytes.</p>
+                <span class="card-domain">binary.openvibe.tools</span>
+            </a>
+            <a href="https://markdown.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fab fa-markdown"></i></div>
+                <h3>Markdown Preview</h3>
+                <p>Write Markdown on the left, see rendered HTML on the right. Export as HTML.</p>
+                <span class="card-domain">markdown.openvibe.tools</span>
+            </a>
+            <a href="https://sort.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-sort-alpha-down"></i></div>
+                <h3>Sort & Dedupe Lines</h3>
+                <p>Sort lines alphabetically, numerically, or randomly. Remove duplicates instantly.</p>
+                <span class="card-domain">sort.openvibe.tools</span>
+            </a>
+            <a href="https://slug.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-link"></i></div>
+                <h3>Slug Generator</h3>
+                <p>Convert titles into URL-friendly slugs. Strip diacritics, normalize whitespace, clean special chars.</p>
+                <span class="card-domain">slug.openvibe.tools</span>
+            </a>
+            <a href="https://escape.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-shield-halved"></i></div>
+                <h3>Escape / Unescape</h3>
+                <p>HTML encode/decode, URL encode/decode, JSON stringify/parse, regex escape.</p>
+                <span class="card-domain">escape.openvibe.tools</span>
+            </a>
+        </div>
+
+        <!-- Logo & Design Tools -->
+        <div class="section-header">
+            <i class="fas fa-palette"></i>
+            <h2>Logo & Design Tools</h2>
+        </div>
+        <div class="tool-grid">
+            <a href="https://logo.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-palette"></i></div>
+                <h3>Logo Hub</h3>
+                <p>Browse all logo and design tools. Title cards, wordmarks, badges, thumbnails, watermarks, and more.</p>
+                <span class="card-domain">logo.openvibe.tools</span>
+            </a>
+            <a href="https://title.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-heading"></i></div>
+                <h3>Title Card Maker</h3>
+                <p>Create eye-catching title cards with text effects, gradients, shadows, and transparent PNG export.</p>
+                <span class="card-domain">title.openvibe.tools</span>
+            </a>
+            <a href="https://wordmark.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-pen-nib"></i></div>
+                <h3>Wordmark Generator</h3>
+                <p>Design text-only logos with Google Fonts selections, colors, effects, and transparent backgrounds.</p>
+                <span class="card-domain">wordmark.openvibe.tools</span>
+            </a>
+            <a href="https://badge.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-certificate"></i></div>
+                <h3>Badge & Sticker Maker</h3>
+                <p>Create badges, stickers, and labels with rounded shapes, bold text, and vibrant colors.</p>
+                <span class="card-domain">badge.openvibe.tools</span>
+            </a>
+            <a href="https://watermark.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-droplet"></i></div>
+                <h3>Watermark Tool</h3>
+                <p>Add text watermarks to images. Adjustable position, opacity, tiling, and font settings.</p>
+                <span class="card-domain">watermark.openvibe.tools</span>
+            </a>
+            <a href="https://thumbnail.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-image"></i></div>
+                <h3>Thumbnail Text</h3>
+                <p>Add bold text overlays to images for stream thumbnails, YouTube covers, and social media.</p>
+                <span class="card-domain">thumbnail.openvibe.tools</span>
+            </a>
+        </div>
+
+        <!-- Interconnect banner -->
+        <div class="interconnect-banner">
+            <i class="fas fa-network-wired"></i>
+            <div class="ic-text">
+                <h3>Part of the OpenVibe Network</h3>
+                <p>Free tools by streamers, for streamers. Text, images, audio, streaming — all connected.</p>
+            </div>
+            <div class="ic-links">
+                <a href="https://openvibe.network" class="btn btn-secondary btn-sm"><i class="fas fa-globe"></i> openvibe.tools</a>
+                <a href="https://img.openvibe.tools" class="btn btn-secondary btn-sm"><i class="fas fa-image"></i> Img.OpenVibe</a>
+                <a href="https://audio.openvibe.tools" class="btn btn-secondary btn-sm"><i class="fas fa-headphones"></i> Audio.OpenVibe</a>
+                <a href="https://openvibe.live" class="btn btn-secondary btn-sm"><i class="fas fa-video"></i> OpenVibe.Live</a>
+            </div>
+        </div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://openvibe.network">openvibe.tools</a>
+                <a href="https://openvibe.live">openvibe.live</a>
+                <a href="https://openvibe.games">openvibe.games</a>
+                <a href="https://img.openvibe.tools">Img.OpenVibe</a>
+                <a href="https://audio.openvibe.tools">Audio.OpenVibe</a>
+            </div>
+            <p>&copy; 2025 OpenVibe — Free tools for the internet.</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/text-engine.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+        const input = document.getElementById('quickInput');
+        const preview = document.getElementById('quickPreview');
+
+        const quickStyles = ['bold', 'script', 'boldScript', 'fraktur', 'doubleStruck', 'fullwidth', 'circled', 'smallCaps', 'strikethrough', 'upsideDown'];
+        let cards = {};
+
+        function updatePreview() {
+            const text = input.value || '';
+            if (!text.trim()) {
+                preview.innerHTML = '<div style="color: var(--text-muted); text-align: center; grid-column: 1/-1; padding: 20px;">Start typing to see your text transformed...</div>';
+                return;
+            }
+            if (Object.keys(cards).length === 0) {
+                preview.innerHTML = '';
+                quickStyles.forEach(key => {
+                    const style = TextOpenVibeEngine.styles[key];
+                    if (style) {
+                        const card = OpenVibeUI.createOutputCard(style.name, style.fn(text), preview);
+                        cards[key] = card;
+                    }
+                });
+            } else {
+                quickStyles.forEach(key => {
+                    const style = TextOpenVibeEngine.styles[key];
+                    if (style && cards[key]) {
+                        OpenVibeUI.updateOutputCard(cards[key], style.fn(text));
+                    }
+                });
+            }
+        }
+
+        input.addEventListener('input', updatePreview);
+        updatePreview();
+    </script>
+</body>
+</html>

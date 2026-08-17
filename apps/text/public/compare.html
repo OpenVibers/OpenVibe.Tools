@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Diff / Compare | compare.openvibe.tools</title>
+    <meta name="description" content="Compare two texts side by side and see the differences highlighted. Paste your original and modified text to find what changed.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+    <style>
+        .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .compare-pane label { display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+        .compare-pane textarea { width: 100%; min-height: 200px; resize: vertical; }
+        .diff-output { background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; font-family: var(--font-mono); font-size: 0.88rem; line-height: 1.7; white-space: pre-wrap; min-height: 120px; }
+        .diff-add { background: rgba(34,197,94,0.15); color: #4ade80; text-decoration: none; }
+        .diff-del { background: rgba(239,68,68,0.15); color: #f87171; text-decoration: line-through; }
+        .diff-stats { display: flex; gap: 16px; margin-bottom: 12px; font-size: 0.85rem; font-weight: 600; }
+        .diff-stats .added { color: #4ade80; }
+        .diff-stats .removed { color: #f87171; }
+        .diff-stats .unchanged { color: var(--text-muted); }
+        @media (max-width: 640px) { .compare-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="tool-wrap" style="max-width: 1000px;">
+        <div class="page-header">
+            <h1><i class="fas fa-code-compare"></i> Text Compare</h1>
+            <p class="subtitle">Paste two texts side by side and see the differences highlighted line by line.</p>
+        </div>
+
+        <div class="tool-section">
+            <div class="compare-grid">
+                <div class="compare-pane">
+                    <label><i class="fas fa-file-lines"></i> Original</label>
+                    <textarea id="textA" class="mono" placeholder="Paste original text...">The quick brown fox jumps over the lazy dog.
+This line stays the same.
+Remove this line entirely.
+The weather is sunny today.</textarea>
+                </div>
+                <div class="compare-pane">
+                    <label><i class="fas fa-file-pen"></i> Modified</label>
+                    <textarea id="textB" class="mono" placeholder="Paste modified text...">The quick brown cat jumps over the lazy dog.
+This line stays the same.
+The weather is rainy today.
+A brand new line was added.</textarea>
+                </div>
+            </div>
+            <div class="live-hint"><span class="live-dot"></span> Diff updates as you type</div>
+            <div class="generate-row">
+                <button class="btn btn-primary generate-btn" onclick="compare()"><i class="fas fa-bolt"></i> Compare</button>
+                <button class="btn btn-secondary" onclick="swap()"><i class="fas fa-right-left"></i> Swap</button>
+            </div>
+        </div>
+
+        <div class="tool-section">
+            <h2><i class="fas fa-magnifying-glass"></i> Diff Result</h2>
+            <div class="diff-stats" id="stats"></div>
+            <div class="diff-output" id="output"></div>
+        </div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://text.openvibe.tools">Text.OpenVibe Hub</a>
+                <a href="https://clean.openvibe.tools">Clean Text</a>
+                <a href="https://sort.openvibe.tools">Sort Lines</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+
+        function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+        // Simple line-based diff (LCS)
+        function diffLines(a, b) {
+            const linesA = a.split('\n'), linesB = b.split('\n');
+            const m = linesA.length, n = linesB.length;
+            // Build LCS table
+            const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+            for (let i = 1; i <= m; i++)
+                for (let j = 1; j <= n; j++)
+                    dp[i][j] = linesA[i-1] === linesB[j-1] ? dp[i-1][j-1] + 1 : Math.max(dp[i-1][j], dp[i][j-1]);
+            // Backtrack
+            const result = [];
+            let i = m, j = n;
+            while (i > 0 || j > 0) {
+                if (i > 0 && j > 0 && linesA[i-1] === linesB[j-1]) {
+                    result.unshift({ type: 'same', text: linesA[i-1] });
+                    i--; j--;
+                } else if (j > 0 && (i === 0 || dp[i][j-1] >= dp[i-1][j])) {
+                    result.unshift({ type: 'add', text: linesB[j-1] });
+                    j--;
+                } else {
+                    result.unshift({ type: 'del', text: linesA[i-1] });
+                    i--;
+                }
+            }
+            return result;
+        }
+
+        function compare() {
+            const a = document.getElementById('textA').value;
+            const b = document.getElementById('textB').value;
+            const diff = diffLines(a, b);
+            let added = 0, removed = 0, unchanged = 0;
+            const html = diff.map(d => {
+                if (d.type === 'add') { added++; return `<span class="diff-add">+ ${escHtml(d.text)}</span>`; }
+                if (d.type === 'del') { removed++; return `<span class="diff-del">- ${escHtml(d.text)}</span>`; }
+                unchanged++;
+                return `  ${escHtml(d.text)}`;
+            }).join('\n');
+            document.getElementById('output').innerHTML = html || '<span style="color:var(--text-muted)">No differences found — texts are identical.</span>';
+            document.getElementById('stats').innerHTML =
+                `<span class="added">+${added} added</span>` +
+                `<span class="removed">-${removed} removed</span>` +
+                `<span class="unchanged">${unchanged} unchanged</span>`;
+        }
+
+        function swap() {
+            const a = document.getElementById('textA');
+            const b = document.getElementById('textB');
+            [a.value, b.value] = [b.value, a.value];
+            compare();
+        }
+
+        document.getElementById('textA').addEventListener('input', compare);
+        document.getElementById('textB').addEventListener('input', compare);
+        compare();
+    </script>
+</body>
+</html>

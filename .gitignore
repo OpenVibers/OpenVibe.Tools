@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Runtime data (SQLite DBs, uploads, downloads, generated output)
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Environment / secrets
+.env
+.env.local
+.env.production
+
+# Logs & OS noise
+*.log
+.DS_Store

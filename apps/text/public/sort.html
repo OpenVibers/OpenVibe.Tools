@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sort & Dedupe Lines | sort.openvibe.tools</title>
+    <meta name="description" content="Sort lines alphabetically, numerically, or randomly. Remove duplicates instantly.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+</head>
+<body>
+    <div class="tool-wrap">
+        <div class="page-header">
+            <h1><i class="fas fa-sort-alpha-down"></i> Sort & Dedupe Lines</h1>
+            <p class="subtitle">Sort lines alphabetically or reverse. Remove duplicate lines instantly.</p>
+        </div>
+
+        <div class="tool-section">
+            <div class="input-group">
+                <label>Input (one item per line)</label>
+                <textarea id="input" class="large mono" style="min-height: 200px;" placeholder="Enter lines to sort..." autofocus>banana
+apple
+cherry
+apple
+date
+banana
+elderberry</textarea>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-primary" onclick="sortAsc()"><i class="fas fa-sort-alpha-down"></i> Sort A→Z</button>
+                <button class="btn btn-secondary" onclick="sortDesc()"><i class="fas fa-sort-alpha-up"></i> Sort Z→A</button>
+                <button class="btn btn-secondary" onclick="shuffle()"><i class="fas fa-shuffle"></i> Shuffle</button>
+                <button class="btn btn-secondary" onclick="dedupe()"><i class="fas fa-filter"></i> Remove Duplicates</button>
+                <button class="btn btn-ghost" onclick="reverseLines()"><i class="fas fa-retweet"></i> Reverse Order</button>
+            </div>
+        </div>
+
+        <div class="tool-section">
+            <h2><i class="fas fa-terminal"></i> Result</h2>
+            <div id="output" class="output-box mono" style="min-height: 120px;"></div>
+            <div class="btn-row">
+                <button class="btn btn-primary" onclick="OpenVibeUI.copyText(document.getElementById('output').textContent)"><i class="fas fa-copy"></i> Copy</button>
+                <button class="btn btn-ghost" onclick="applyResult()"><i class="fas fa-arrow-up"></i> Use as Input</button>
+            </div>
+        </div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://text.openvibe.tools">Text.OpenVibe Hub</a>
+                <a href="https://clean.openvibe.tools">Text Cleaner</a>
+                <a href="https://count.openvibe.tools">Text Counter</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/text-engine.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+        const input = document.getElementById('input');
+        const output = document.getElementById('output');
+
+        function sortAsc() { output.textContent = TextOpenVibeEngine.sortLines(input.value); }
+        function sortDesc() { output.textContent = TextOpenVibeEngine.sortLines(input.value, { reverse: true }); }
+        function shuffle() {
+            const lines = input.value.split('\n');
+            for (let i = lines.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [lines[i], lines[j]] = [lines[j], lines[i]]; }
+            output.textContent = lines.join('\n');
+        }
+        function dedupe() { output.textContent = TextOpenVibeEngine.dedupeLines(input.value); }
+        function reverseLines() { output.textContent = input.value.split('\n').reverse().join('\n'); }
+        function applyResult() { input.value = output.textContent; }
+    </script>
+</body>
+</html>

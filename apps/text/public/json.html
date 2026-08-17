@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Formatter & Validator | json.openvibe.tools</title>
+    <meta name="description" content="Paste JSON to beautify, minify, and validate it instantly. Syntax highlighting, error detection, and tree view.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+    <style>
+        .json-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; min-height: 400px; }
+        .json-pane { display: flex; flex-direction: column; }
+        .json-pane label { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+        .json-pane textarea { flex: 1; resize: none; font-family: var(--font-mono); font-size: 0.88rem; line-height: 1.6; min-height: 350px; }
+        .json-output { flex: 1; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; overflow: auto; font-family: var(--font-mono); font-size: 0.88rem; line-height: 1.6; white-space: pre-wrap; min-height: 350px; }
+        .json-key { color: #93c5fd; }
+        .json-str { color: #86efac; }
+        .json-num { color: #fbbf24; }
+        .json-bool { color: #c084fc; }
+        .json-null { color: #94a3b8; font-style: italic; }
+        .json-brace { color: var(--text-secondary); }
+        .json-error { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); }
+        .json-status { font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+        .json-status.valid { color: #4ade80; }
+        .json-status.invalid { color: #f87171; }
+        .json-meta { display: flex; gap: 16px; margin-top: 8px; font-size: 0.82rem; color: var(--text-muted); font-weight: 500; }
+        @media (max-width: 768px) { .json-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="tool-wrap" style="max-width: 1100px;">
+        <div class="page-header">
+            <h1><i class="fas fa-code"></i> JSON Formatter</h1>
+            <p class="subtitle">Paste JSON to beautify, minify, and validate. Syntax-highlighted output with error detection.</p>
+        </div>
+
+        <div class="tool-section">
+            <div class="json-grid">
+                <div class="json-pane">
+                    <label><i class="fas fa-keyboard"></i> Input</label>
+                    <textarea id="input" class="mono" placeholder='Paste your JSON here...' autofocus>{"name":"OpenVibe","services":["OpenVibe.Live","Scraplandia","Img.OpenVibe","Audio.OpenVibe","Text.OpenVibe"],"stats":{"tools":118,"themes":34,"free":true},"nested":{"deep":{"value":[1,2,3]}}}</textarea>
+                </div>
+                <div class="json-pane">
+                    <label><i class="fas fa-eye"></i> Output</label>
+                    <div id="output" class="json-output"></div>
+                </div>
+            </div>
+            <div class="json-status" id="status"></div>
+            <div class="json-meta" id="meta"></div>
+            <div class="btn-row" style="margin-top: 12px;">
+                <button class="btn btn-primary" onclick="beautify()"><i class="fas fa-wand-magic-sparkles"></i> Beautify</button>
+                <button class="btn btn-secondary" onclick="minify()"><i class="fas fa-compress"></i> Minify</button>
+                <button class="btn btn-secondary" onclick="OpenVibeUI.copyText(lastFormatted)"><i class="fas fa-copy"></i> Copy Output</button>
+                <button class="btn btn-secondary" onclick="sortKeys()"><i class="fas fa-arrow-down-a-z"></i> Sort Keys</button>
+            </div>
+        </div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://text.openvibe.tools">Text.OpenVibe Hub</a>
+                <a href="https://escape.openvibe.tools">Escape / Unescape</a>
+                <a href="https://markdown.openvibe.tools">Markdown Preview</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+        let lastFormatted = '';
+
+        function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+        function syntaxHighlight(json) {
+            return json.replace(/("(\\.|[^"\\])*")\s*:/g, '<span class="json-key">$1</span>:')
+                       .replace(/:\s*("(\\.|[^"\\])*")/g, ': <span class="json-str">$1</span>')
+                       .replace(/:\s*(-?\d+\.?\d*([eE][+-]?\d+)?)/g, ': <span class="json-num">$1</span>')
+                       .replace(/:\s*(true|false)/g, ': <span class="json-bool">$1</span>')
+                       .replace(/:\s*(null)/g, ': <span class="json-null">$1</span>')
+                       // values in arrays
+                       .replace(/(?<=[\[,]\s*)("(\\.|[^"\\])*")(?=\s*[,\]])/g, '<span class="json-str">$1</span>')
+                       .replace(/(?<=[\[,]\s*)(-?\d+\.?\d*([eE][+-]?\d+)?)(?=\s*[,\]])/g, '<span class="json-num">$1</span>')
+                       .replace(/(?<=[\[,]\s*)(true|false)(?=\s*[,\]])/g, '<span class="json-bool">$1</span>')
+                       .replace(/(?<=[\[,]\s*)(null)(?=\s*[,\]])/g, '<span class="json-null">$1</span>');
+        }
+
+        function countKeys(obj) {
+            let count = 0;
+            if (typeof obj === 'object' && obj !== null) {
+                if (Array.isArray(obj)) { obj.forEach(v => count += countKeys(v)); }
+                else { for (const k of Object.keys(obj)) { count++; count += countKeys(obj[k]); } }
+            }
+            return count;
+        }
+
+        function maxDepth(obj, d) {
+            d = d || 0;
+            if (typeof obj !== 'object' || obj === null) return d;
+            if (Array.isArray(obj)) return obj.length ? Math.max(...obj.map(v => maxDepth(v, d + 1))) : d + 1;
+            const vals = Object.values(obj);
+            return vals.length ? Math.max(...vals.map(v => maxDepth(v, d + 1))) : d + 1;
+        }
+
+        function sortKeysDeep(obj) {
+            if (Array.isArray(obj)) return obj.map(sortKeysDeep);
+            if (typeof obj === 'object' && obj !== null) {
+                const sorted = {};
+                Object.keys(obj).sort().forEach(k => sorted[k] = sortKeysDeep(obj[k]));
+                return sorted;
+            }
+            return obj;
+        }
+
+        function format(indent) {
+            const raw = document.getElementById('input').value.trim();
+            const out = document.getElementById('output');
+            const status = document.getElementById('status');
+            const meta = document.getElementById('meta');
+            if (!raw) {
+                out.innerHTML = '<span style="color:var(--text-muted)">Paste some JSON to get started.</span>';
+                status.innerHTML = '';
+                meta.innerHTML = '';
+                lastFormatted = '';
+                return null;
+            }
+            try {
+                const obj = JSON.parse(raw);
+                const formatted = JSON.stringify(obj, null, indent);
+                lastFormatted = formatted;
+                out.innerHTML = indent ? syntaxHighlight(escHtml(formatted)) : escHtml(formatted);
+                out.classList.remove('json-error');
+                status.className = 'json-status valid';
+                status.innerHTML = '<i class="fas fa-circle-check"></i> Valid JSON';
+                const keys = countKeys(obj);
+                const depth = maxDepth(obj);
+                const bytes = new Blob([formatted]).size;
+                meta.innerHTML = `<span>${keys} keys</span><span>Depth ${depth}</span><span>${bytes.toLocaleString()} bytes</span>`;
+                return obj;
+            } catch (e) {
+                lastFormatted = '';
+                out.innerHTML = `<span style="color:#f87171">${escHtml(e.message)}</span>`;
+                out.classList.add('json-error');
+                status.className = 'json-status invalid';
+                status.innerHTML = '<i class="fas fa-circle-xmark"></i> Invalid JSON';
+                meta.innerHTML = '';
+                return null;
+            }
+        }
+
+        function beautify() { format(2); }
+        function minify() { format(0); }
+        function sortKeys() {
+            const raw = document.getElementById('input').value.trim();
+            try {
+                const obj = sortKeysDeep(JSON.parse(raw));
+                document.getElementById('input').value = JSON.stringify(obj, null, 2);
+                format(2);
+            } catch {}
+        }
+
+        document.getElementById('input').addEventListener('input', () => format(2));
+        format(2);
+    </script>
+</body>
+</html>

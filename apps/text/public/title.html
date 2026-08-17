@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Title Card Maker | title.openvibe.tools</title>
+    <meta name="description" content="Generate stylish title cards with preset effects, custom fonts, colors, and transparent PNG export.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+    <style>
+        .editor-layout { display: grid; grid-template-columns: 1fr 360px; gap: 2rem; align-items: start; }
+        .preview-col { position: sticky; top: 100px; }
+        .controls-panel { display: flex; flex-direction: column; gap: 1.25rem; }
+        .control-group { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; }
+        .control-group h3 { margin: 0 0 1rem; color: var(--accent); font-size: .95rem; }
+        .control-row { display: flex; gap: .75rem; align-items: center; margin-bottom: .75rem; }
+        .control-row label { min-width: 80px; font-size: .85rem; color: var(--text-secondary); }
+        .control-row input[type="range"] { flex: 1; }
+        .control-row input[type="color"] { width: 40px; height: 32px; border: 1px solid var(--border); background: var(--bg-secondary); border-radius: 8px; cursor: pointer; padding: 2px; }
+        .control-row select { flex: 1; }
+        .control-row .val { min-width: 36px; text-align: right; font-size: .8rem; color: var(--text-muted); font-family: monospace; }
+        .preset-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; }
+        .preset-btn { padding: .5rem .25rem; font-size: .7rem; border-radius: 10px; cursor: pointer; border: 2px solid var(--border); background: var(--bg-tertiary); color: var(--text-primary); text-align: center; transition: all .2s; }
+        .preset-btn:hover, .preset-btn.active { border-color: var(--accent); background: rgba(192,150,92,0.1); }
+        .canvas-wrap { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; text-align: center; }
+        .canvas-wrap canvas { max-width: 100%; height: auto; border-radius: 8px; background-image: linear-gradient(45deg, #1a1a1a 25%, transparent 25%), linear-gradient(-45deg, #1a1a1a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1a1a1a 75%), linear-gradient(-45deg, transparent 75%, #1a1a1a 75%); background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0; }
+        .download-row { display: flex; gap: .75rem; margin-top: 1rem; justify-content: center; }
+        @media (max-width: 900px) { .editor-layout { grid-template-columns: 1fr; } .preview-col { position: static; } }
+    </style>
+</head>
+<body>
+    <div class="tool-wrap" style="max-width: 1100px;">
+        <div class="page-header">
+            <h1><i class="fas fa-heading"></i> Title Card Maker</h1>
+            <p class="subtitle">Create stunning title cards with presets, custom fonts, and effects. Export as transparent PNG.</p>
+        </div>
+
+        <div class="editor-layout">
+            <div class="controls-panel">
+                <div class="control-group">
+                    <h3><i class="fas fa-keyboard"></i> Text</h3>
+                    <textarea id="text" rows="2" placeholder="Your title here..." style="width:100%;">OPENVIBE TOOLS</textarea>
+                </div>
+
+                <div class="control-group">
+                    <h3><i class="fas fa-palette"></i> Presets</h3>
+                    <div class="preset-grid" id="presetGrid"></div>
+                </div>
+
+                <div class="control-group">
+                    <h3><i class="fas fa-font"></i> Typography</h3>
+                    <div class="control-row">
+                        <label>Font</label>
+                        <select id="font"></select>
+                    </div>
+                    <div class="control-row">
+                        <label>Size</label>
+                        <input type="range" id="fontSize" min="16" max="200" value="72">
+                        <span class="val" id="fontSizeVal">72</span>
+                    </div>
+                    <div class="control-row">
+                        <label>Weight</label>
+                        <select id="fontWeight">
+                            <option value="400">Regular</option>
+                            <option value="700" selected>Bold</option>
+                            <option value="900">Black</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h3><i class="fas fa-fill-drip"></i> Colors</h3>
+                    <div class="control-row">
+                        <label>Text Color</label>
+                        <input type="color" id="color" value="#ffffff">
+                    </div>
+                    <div class="control-row">
+                        <label>Background</label>
+                        <input type="color" id="bgColor" value="#0b0c12">
+                        <label style="min-width:auto;"><input type="checkbox" id="bgTransparent" checked> Transparent</label>
+                    </div>
+                    <div class="control-row">
+                        <label>Stroke</label>
+                        <input type="color" id="strokeColor" value="#000000">
+                        <input type="range" id="strokeWidth" min="0" max="10" value="0" style="flex:.6;">
+                        <span class="val" id="strokeWidthVal">0</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <h3><i class="fas fa-sun"></i> Effects</h3>
+                    <div class="control-row">
+                        <label>Shadow</label>
+                        <input type="color" id="shadowColor" value="#000000">
+                        <input type="range" id="shadowBlur" min="0" max="50" value="0" style="flex:.6;">
+                        <span class="val" id="shadowBlurVal">0</span>
+                    </div>
+                    <div class="control-row">
+                        <label>Padding</label>
+                        <input type="range" id="padding" min="10" max="120" value="40">
+                        <span class="val" id="paddingVal">40</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="preview-col">
+                <div class="canvas-wrap">
+                    <canvas id="canvas" width="600" height="200"></canvas>
+                </div>
+                <div class="download-row">
+                    <button class="btn btn-primary" onclick="dl('png')"><i class="fas fa-download"></i> PNG</button>
+                    <button class="btn btn-secondary" onclick="dl('webp')"><i class="fas fa-download"></i> WebP</button>
+                </div>
+            </div>
+        </div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://logo.openvibe.tools">Logo Hub</a>
+                <a href="https://wordmark.openvibe.tools">Wordmark</a>
+                <a href="https://badge.openvibe.tools">Badge Maker</a>
+                <a href="https://text.openvibe.tools">Text.OpenVibe</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/logo-engine.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+
+        const canvas = document.getElementById('canvas');
+        const E = LogoOpenVibeEngine;
+
+        // Populate font select
+        const fontSel = document.getElementById('font');
+        E.fonts.forEach(f => { const o = document.createElement('option'); o.value = f; o.textContent = f; fontSel.appendChild(o); });
+
+        // Populate presets
+        const presetGrid = document.getElementById('presetGrid');
+        let activePreset = 'neon';
+        Object.entries(E.presets).forEach(([key, p]) => {
+            const btn = document.createElement('button');
+            btn.className = 'preset-btn' + (key === activePreset ? ' active' : '');
+            btn.textContent = p.name;
+            btn.dataset.key = key;
+            btn.onclick = () => applyPreset(key);
+            presetGrid.appendChild(btn);
+        });
+
+        function applyPreset(key) {
+            activePreset = key;
+            const p = E.presets[key];
+            document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.key === key));
+            if (p.font) fontSel.value = p.font;
+            if (p.color && p.color !== 'transparent') document.getElementById('color').value = p.color.startsWith('#') ? p.color : '#ffffff';
+            if (p.strokeColor) { document.getElementById('strokeColor').value = p.strokeColor.startsWith('#') ? p.strokeColor : '#000000'; document.getElementById('strokeWidth').value = p.strokeWidth || 0; }
+            else { document.getElementById('strokeWidth').value = 0; }
+            if (p.shadowColor && p.shadowColor !== 'transparent') { document.getElementById('shadowColor').value = p.shadowColor.startsWith('#') ? p.shadowColor : '#000000'; document.getElementById('shadowBlur').value = p.shadowBlur || 0; }
+            else { document.getElementById('shadowBlur').value = 0; }
+            if (p.fontWeight) document.getElementById('fontWeight').value = p.fontWeight;
+            updateVals();
+            renderPreview();
+        }
+
+        function getOpts() {
+            const bgT = document.getElementById('bgTransparent').checked;
+            return {
+                ...E.presets[activePreset],
+                font: fontSel.value,
+                fontSize: +document.getElementById('fontSize').value,
+                fontWeight: document.getElementById('fontWeight').value,
+                color: document.getElementById('color').value,
+                bg: bgT ? 'transparent' : document.getElementById('bgColor').value,
+                strokeColor: document.getElementById('strokeColor').value,
+                strokeWidth: +document.getElementById('strokeWidth').value,
+                shadowColor: document.getElementById('shadowColor').value,
+                shadowBlur: +document.getElementById('shadowBlur').value,
+                padding: +document.getElementById('padding').value,
+            };
+        }
+
+        function updateVals() {
+            document.getElementById('fontSizeVal').textContent = document.getElementById('fontSize').value;
+            document.getElementById('strokeWidthVal').textContent = document.getElementById('strokeWidth').value;
+            document.getElementById('shadowBlurVal').textContent = document.getElementById('shadowBlur').value;
+            document.getElementById('paddingVal').textContent = document.getElementById('padding').value;
+        }
+
+        let renderTimeout;
+        function renderPreview() {
+            clearTimeout(renderTimeout);
+            renderTimeout = setTimeout(() => {
+                const text = document.getElementById('text').value || 'OPENVIBE TOOLS';
+                E.render(canvas, text, getOpts());
+            }, 50);
+        }
+
+        function dl(fmt) {
+            const text = document.getElementById('text').value || 'OPENVIBE TOOLS';
+            const name = text.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase().slice(0, 40);
+            E.download(canvas, `${name}.${fmt}`, fmt);
+        }
+
+        // Bind all controls
+        document.querySelectorAll('input, select, textarea').forEach(el => {
+            el.addEventListener('input', () => { updateVals(); renderPreview(); });
+        });
+
+        applyPreset('neon');
+    </script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reverse & Flip Text — Upside Down, Mirror | reverse.openvibe.tools</title>
+    <meta name="description" content="Reverse text, flip it upside down, or mirror it. Full Unicode support with combining character awareness.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+</head>
+<body>
+    <div class="tool-wrap">
+        <div class="page-header">
+            <h1><i class="fas fa-rotate-left"></i> Reverse & Flip Text</h1>
+            <p class="subtitle">Reverse, flip upside down, or mirror your text. Click any result to copy.</p>
+        </div>
+
+        <div class="tool-section">
+            <div class="input-group">
+                <textarea id="input" class="large" placeholder="Type your text here..." autofocus>Hello World</textarea>
+            </div>
+            <div class="live-hint"><span class="live-dot"></span> Results update as you type</div>
+            <div class="generate-row">
+                <button class="btn btn-primary generate-btn" onclick="document.querySelector('#input, textarea').dispatchEvent(new Event('input', {bubbles:true}))"><i class="fas fa-bolt"></i> Generate</button>
+            </div>
+        </div>
+
+        <div id="output" class="output-grid"></div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://text.openvibe.tools">Text.OpenVibe Hub</a>
+                <a href="https://fancy.openvibe.tools">Fancy Text</a>
+                <a href="https://zalgo.openvibe.tools">Zalgo Text</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/text-engine.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+        const input = document.getElementById('input');
+        const output = document.getElementById('output');
+        const styles = ['upsideDown', 'mirrored', 'strikethrough', 'underline', 'doubleUnderline', 'overline', 'slashed', 'dotted', 'spaced'];
+        const cards = {};
+
+        function updateAll() {
+            const text = input.value || '';
+            if (!text.trim()) {
+                output.innerHTML = '<div style="color: var(--text-muted); text-align: center; grid-column: 1/-1; padding: 40px;">Type text above...</div>';
+                return;
+            }
+            if (Object.keys(cards).length === 0) {
+                output.innerHTML = '';
+                styles.forEach(key => {
+                    const style = TextOpenVibeEngine.styles[key];
+                    if (style) cards[key] = OpenVibeUI.createOutputCard(style.name, style.fn(text), output);
+                });
+            } else {
+                styles.forEach(key => {
+                    const style = TextOpenVibeEngine.styles[key];
+                    if (style && cards[key]) OpenVibeUI.updateOutputCard(cards[key], style.fn(text));
+                });
+            }
+        }
+
+        input.addEventListener('input', updateAll);
+        updateAll();
+    </script>
+</body>
+</html>

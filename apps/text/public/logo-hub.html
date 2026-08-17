@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logo.OpenVibe — Free Logo, Title Card & Badge Maker | openvibe.tools</title>
+    <meta name="description" content="Create logos, title cards, wordmarks, badges, stickers, watermarks, and thumbnails. Transparent PNG export, Google Fonts, presets. Free and browser-based.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+</head>
+<body>
+    <div class="hub-hero">
+        <h1><i class="fas fa-palette"></i> Logo.OpenVibe</h1>
+        <p class="hero-sub">Free logo and design tools for streamers and creators. Title cards, wordmarks, badges, watermarks, thumbnails — all in your browser with transparent PNG export.</p>
+        <div class="hero-tags">
+            <span class="hero-tag">Transparent PNG</span>
+            <span class="hero-tag">Google Fonts</span>
+            <span class="hero-tag">No Watermarks</span>
+            <span class="hero-tag">100% Free</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Quick preview -->
+        <div class="tool-section" style="max-width: 700px; margin: 0 auto 40px;">
+            <h2><i class="fas fa-eye"></i> Quick Preview</h2>
+            <div class="input-group">
+                <input type="text" id="quickInput" value="Logo.OpenVibe" placeholder="Type your text...">
+            </div>
+            <div class="preset-grid" id="presetGrid"></div>
+            <div class="canvas-preview">
+                <canvas id="previewCanvas"></canvas>
+            </div>
+            <div class="btn-row" style="justify-content: center; margin-top: 16px;">
+                <button class="btn btn-primary" onclick="downloadPreview()"><i class="fas fa-download"></i> Download PNG</button>
+                <a href="https://title.openvibe.tools" class="btn btn-secondary"><i class="fas fa-expand"></i> Open Full Editor</a>
+            </div>
+        </div>
+
+        <!-- Tools grid -->
+        <div class="section-header">
+            <i class="fas fa-tools"></i>
+            <h2>Design Tools</h2>
+        </div>
+        <div class="tool-grid">
+            <a href="https://title.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-heading"></i></div>
+                <h3>Title Card Maker</h3>
+                <p>Full-featured title card editor with presets, gradients, shadows, glow, glitch effects, and multi-line support. Export transparent PNG or WebP.</p>
+                <span class="card-domain">title.openvibe.tools</span>
+            </a>
+            <a href="https://wordmark.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-pen-nib"></i></div>
+                <h3>Wordmark Generator</h3>
+                <p>Design clean text-only logos. Pick from 40+ Google Fonts, adjust weight, spacing, colors. Perfect for branding.</p>
+                <span class="card-domain">wordmark.openvibe.tools</span>
+            </a>
+            <a href="https://badge.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-certificate"></i></div>
+                <h3>Badge & Sticker Maker</h3>
+                <p>Create rounded badges, stickers, and labels. Choose background shapes, colors, and text styles.</p>
+                <span class="card-domain">badge.openvibe.tools</span>
+            </a>
+            <a href="https://watermark.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-droplet"></i></div>
+                <h3>Watermark Tool</h3>
+                <p>Upload an image and add text watermarks. Position, tile, adjust opacity, set font and color.</p>
+                <span class="card-domain">watermark.openvibe.tools</span>
+            </a>
+            <a href="https://transparent.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-eraser"></i></div>
+                <h3>Transparent Text PNG</h3>
+                <p>Generate text as a transparent PNG — nothing else. Perfect for overlays, compositing, OBS sources.</p>
+                <span class="card-domain">transparent.openvibe.tools</span>
+            </a>
+            <a href="https://thumbnail.openvibe.tools" class="tool-card">
+                <div class="card-icon"><i class="fas fa-image"></i></div>
+                <h3>Thumbnail Text Overlay</h3>
+                <p>Add bold text overlays to images for stream thumbnails, YouTube covers, and social media posts.</p>
+                <span class="card-domain">thumbnail.openvibe.tools</span>
+            </a>
+        </div>
+
+        <!-- Text tools link -->
+        <div class="interconnect-banner">
+            <i class="fas fa-font"></i>
+            <div class="ic-text">
+                <h3>Looking for Text Tools?</h3>
+                <p>Fancy fonts, Zalgo text, ASCII art, symbols — check out Text.OpenVibe for all the Unicode magic.</p>
+            </div>
+            <div class="ic-links">
+                <a href="https://text.openvibe.tools" class="btn btn-secondary btn-sm"><i class="fas fa-font"></i> Text.OpenVibe</a>
+                <a href="https://fancy.openvibe.tools" class="btn btn-secondary btn-sm"><i class="fas fa-wand-magic-sparkles"></i> Fancy Text</a>
+            </div>
+        </div>
+
+        <!-- Network banner -->
+        <div class="interconnect-banner">
+            <i class="fas fa-network-wired"></i>
+            <div class="ic-text">
+                <h3>Part of the OpenVibe Network</h3>
+                <p>Free tools by streamers, for streamers. Text, images, audio, streaming — all connected.</p>
+            </div>
+            <div class="ic-links">
+                <a href="https://openvibe.network" class="btn btn-secondary btn-sm"><i class="fas fa-globe"></i> openvibe.tools</a>
+                <a href="https://img.openvibe.tools" class="btn btn-secondary btn-sm"><i class="fas fa-image"></i> Img.OpenVibe</a>
+                <a href="https://audio.openvibe.tools" class="btn btn-secondary btn-sm"><i class="fas fa-headphones"></i> Audio.OpenVibe</a>
+            </div>
+        </div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://openvibe.network">openvibe.tools</a>
+                <a href="https://text.openvibe.tools">Text.OpenVibe</a>
+                <a href="https://img.openvibe.tools">Img.OpenVibe</a>
+                <a href="https://audio.openvibe.tools">Audio.OpenVibe</a>
+                <a href="https://openvibe.live">OpenVibe.Live</a>
+            </div>
+            <p>&copy; 2025 OpenVibe — Free tools for the internet.</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/logo-engine.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+        const input = document.getElementById('quickInput');
+        const canvas = document.getElementById('previewCanvas');
+        const presetGrid = document.getElementById('presetGrid');
+        let currentPreset = 'gold';
+
+        // Build preset buttons
+        Object.entries(LogoOpenVibeEngine.presets).forEach(([key, preset]) => {
+            const btn = document.createElement('button');
+            btn.className = 'preset-btn' + (key === currentPreset ? ' active' : '');
+            btn.textContent = preset.name;
+            btn.addEventListener('click', () => {
+                currentPreset = key;
+                document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                renderPreview();
+            });
+            presetGrid.appendChild(btn);
+        });
+
+        async function renderPreview() {
+            const text = input.value || 'Logo.OpenVibe';
+            const preset = LogoOpenVibeEngine.presets[currentPreset];
+            await LogoOpenVibeEngine.render(canvas, text, { ...preset, fontSize: 64 });
+        }
+
+        function downloadPreview() {
+            LogoOpenVibeEngine.download(canvas, 'openvibe-logo.png');
+        }
+
+        input.addEventListener('input', renderPreview);
+        renderPreview();
+    </script>
+</body>
+</html>

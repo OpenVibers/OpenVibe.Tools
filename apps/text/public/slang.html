@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mexican Slang Dictionary | slang.openvibe.tools</title>
+    <meta name="description" content="The ultimate Mexican Spanish slang dictionary. Learn the real street Spanish — cabrón, chido, neta, güey and 100+ more with meanings, examples, and usage tips.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+    <style>
+        .search-wrap {
+            position: relative; margin-bottom: 20px;
+        }
+        .search-wrap i {
+            position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+            color: var(--text-muted); font-size: 1rem;
+        }
+        .slang-search {
+            width: 100%; padding: 14px 18px 14px 46px;
+            background: var(--bg-secondary); border: 1px solid var(--border);
+            border-radius: 12px; color: var(--text-primary);
+            font-size: 1rem; font-family: 'Inter', sans-serif; outline: none;
+        }
+        .slang-search:focus { border-color: var(--accent); }
+
+        .vibe-pills {
+            display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px;
+        }
+        .vibe-pill {
+            padding: 7px 16px; border-radius: 20px;
+            background: var(--bg-secondary); border: 1px solid var(--border);
+            color: var(--text-secondary); cursor: pointer; font-size: 0.82rem;
+            font-weight: 600; transition: all 0.2s; font-family: 'Inter', sans-serif;
+        }
+        .vibe-pill:hover { border-color: var(--accent); color: var(--text-primary); }
+        .vibe-pill.active { background: var(--accent); color: #0b0c12; border-color: var(--accent); }
+
+        .count-bar { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px; }
+        .count-bar strong { color: var(--text-secondary); }
+
+        .slang-list { display: flex; flex-direction: column; gap: 10px; }
+        .slang-card {
+            background: var(--bg-secondary); border: 1px solid var(--border);
+            border-radius: 12px; padding: 18px 20px;
+            transition: border-color 0.2s;
+        }
+        .slang-card:hover { border-color: var(--border-accent); }
+
+        .slang-header {
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 8px; flex-wrap: wrap;
+        }
+        .slang-word {
+            font-size: 1.15rem; font-weight: 800;
+            color: var(--accent);
+        }
+        .slang-pron {
+            font-size: 0.8rem; color: var(--text-muted); font-style: italic;
+        }
+        .slang-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+        .slang-tag {
+            font-size: 0.7rem; padding: 2px 10px; border-radius: 20px;
+            font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+        }
+        .slang-tag.friendly { background: #14532d44; color: #4ade80; }
+        .slang-tag.casual { background: #1e3a5f44; color: #60a5fa; }
+        .slang-tag.vulgar { background: #7f1d1d44; color: #f87171; }
+        .slang-tag.funny { background: #78350f44; color: #fbbf24; }
+        .slang-tag.affection { background: #581c8744; color: #c084fc; }
+        .slang-tag.street { background: #3f3f4644; color: #d4d4d8; }
+
+        .slang-meaning {
+            color: var(--text-primary); font-size: 0.92rem;
+            line-height: 1.6; margin-bottom: 8px;
+        }
+        .slang-example {
+            background: var(--bg-primary); border: 1px solid var(--border);
+            border-radius: 8px; padding: 10px 14px;
+            font-size: 0.85rem; color: var(--text-secondary);
+            line-height: 1.6;
+        }
+        .slang-example .ex-es { color: var(--accent); font-weight: 600; }
+        .slang-example .ex-en { color: var(--text-muted); font-style: italic; }
+
+        .alpha-bar {
+            display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 16px;
+            justify-content: center;
+        }
+        .alpha-btn {
+            width: 32px; height: 32px; border-radius: 6px;
+            background: var(--bg-secondary); border: 1px solid var(--border);
+            color: var(--text-secondary); cursor: pointer; font-size: 0.82rem;
+            font-weight: 700; display: flex; align-items: center; justify-content: center;
+            transition: all 0.15s; font-family: 'Inter', sans-serif;
+        }
+        .alpha-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .alpha-btn.active { background: var(--accent); color: #0b0c12; border-color: var(--accent); }
+        .alpha-btn.disabled { opacity: 0.3; cursor: default; }
+    </style>
+</head>
+<body>
+    <div class="tool-wrap">
+        <div class="page-header">
+            <h1><i class="fas fa-pepper-hot"></i> Mexican Slang</h1>
+            <p class="subtitle">Real Mexican Spanish — the words they don't teach you in class. ¡No mames, güey!</p>
+        </div>
+
+        <div class="tool-section">
+            <div class="search-wrap">
+                <i class="fas fa-search"></i>
+                <input type="text" class="slang-search" id="search" placeholder="Search slang, meanings, examples…" autofocus>
+            </div>
+            <div class="vibe-pills" id="vibe-pills"></div>
+            <div class="alpha-bar" id="alpha-bar"></div>
+            <div class="count-bar" id="count-bar"></div>
+            <div class="slang-list" id="slang-list"></div>
+        </div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://ice.openvibe.tools">ICE Alerts</a>
+                <a href="https://peso.openvibe.tools">OpenVibePeso</a>
+                <a href="https://spanish.openvibe.tools">OpenVibeSpanish</a>
+                <a href="https://text.openvibe.tools">Text.OpenVibe Hub</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+
+        const SLANG = [
+            // ── A ──
+            { word: 'Aguas', pron: 'AH-gwas', meaning: 'Watch out! Be careful! Originally a warning shout when emptying chamber pots from windows.', example: { es: '¡Aguas con el escalón!', en: 'Watch out for the step!' }, vibes: ['casual'] },
+            { word: 'A huevo', pron: 'ah WEH-voh', meaning: 'Hell yeah! Absolutely! Strong agreement or affirmation.', example: { es: '¿Vienes a la fiesta? —¡A huevo!', en: 'Coming to the party? —Hell yeah!' }, vibes: ['vulgar', 'street'] },
+            { word: 'A poco', pron: 'ah POH-koh', meaning: 'Really? No way! Used to express disbelief or surprise.', example: { es: '¿A poco te corrieron? ¡No mames!', en: 'They really fired you? No way!' }, vibes: ['casual'] },
+            { word: 'A toda madre', pron: 'ah TOH-dah MAH-dreh', meaning: 'Awesome, excellent, the best. Can be abbreviated as ATM.', example: { es: 'La fiesta estuvo a toda madre.', en: 'The party was awesome.' }, vibes: ['casual', 'vulgar'] },
+
+            // ── B ──
+            { word: 'Bronca', pron: 'BRON-kah', meaning: 'Problem, fight, trouble. "No hay bronca" = "No problem."', example: { es: 'No hay bronca, carnal. Yo te ayudo.', en: "No problem, bro. I'll help you." }, vibes: ['casual'] },
+            { word: 'Buena onda', pron: 'BWEH-nah OHN-dah', meaning: 'Good vibes, cool person, chill. One of the most important phrases in Mexican Spanish.', example: { es: 'Tu jefa es muy buena onda.', en: 'Your mom is really cool.' }, vibes: ['friendly'] },
+
+            // ── C ──
+            { word: 'Cabrón / Cabrona', pron: 'kah-BROHN / kah-BROH-nah', meaning: 'Can mean badass, tough, jerk, or dude — completely context-dependent. Among friends = respect. Otherwise = insult.', example: { es: '¡Eres un cabrón! ¡Ganaste otra vez!', en: 'You beast! You won again!' }, vibes: ['vulgar', 'street'] },
+            { word: 'Caguama', pron: 'kah-GWAH-mah', meaning: 'A 40oz (1.2L) beer bottle. Named after the sea turtle for its size. Essential Mexican cultural artifact.', example: { es: 'Vamos por unas caguamas a la tienda.', en: "Let's go grab some 40s from the store." }, vibes: ['casual', 'funny'] },
+            { word: 'Carnal', pron: 'kar-NAL', meaning: 'Bro, blood brother, close friend. From "carne" (flesh) — someone who is your people.', example: { es: '¿Qué onda, carnal? ¿Cómo has estado?', en: "What's up, bro? How you been?" }, vibes: ['friendly', 'street'] },
+            { word: 'Chafa', pron: 'CHAH-fah', meaning: 'Cheap, crappy, low quality, bootleg.', example: { es: 'No compres eso, está bien chafa.', en: "Don't buy that, it's really crappy." }, vibes: ['casual'] },
+            { word: 'Chamba', pron: 'CHAHM-bah', meaning: 'Work, job, hustle. "Chambear" = to work.', example: { es: 'Ya me voy a la chamba.', en: "I'm heading to work." }, vibes: ['casual'] },
+            { word: 'Chela', pron: 'CHEH-lah', meaning: 'Beer. One of the most common Mexican slang words.', example: { es: '¿Echamos unas chelas después del trabajo?', en: 'Wanna grab some beers after work?' }, vibes: ['casual', 'friendly'] },
+            { word: 'Chido / Chida', pron: 'CHEE-doh / CHEE-dah', meaning: 'Cool, awesome, great. The quintessential Mexican word for something good.', example: { es: '¡Qué chido tu carro nuevo, güey!', en: 'Your new car is sick, dude!' }, vibes: ['friendly', 'casual'] },
+            { word: 'Chingar', pron: 'cheen-GAR', meaning: 'Mexico\'s most versatile verb. Can mean to annoy, to mess up, to fight, to drink, or used in "chingón" (badass) and many more. Context is everything.', example: { es: 'No me chingues, estoy ocupado.', en: "Don't bother me, I'm busy." }, vibes: ['vulgar', 'street'] },
+            { word: 'Chingón / Chingona', pron: 'cheen-GOHN / cheen-GOH-nah', meaning: 'Badass, amazing, incredibly good at something. Despite vulgar origins, used widely as high praise.', example: { es: 'La comida de tu abuela está bien chingona.', en: "Your grandma's food is amazing." }, vibes: ['vulgar', 'street'] },
+            { word: 'Compa', pron: 'KOHM-pah', meaning: 'Short for "compadre" — buddy, pal, homie.', example: { es: 'Ese es mi compa desde la primaria.', en: "That's my buddy since elementary school." }, vibes: ['friendly'] },
+            { word: 'Crudo / Cruda', pron: 'KROO-doh / KROO-dah', meaning: 'Hungover. Literally "raw." Also "la cruda" = the hangover itself.', example: { es: 'No puedo trabajar hoy, ando bien crudo.', en: "I can't work today, I'm super hungover." }, vibes: ['casual', 'funny'] },
+            { word: 'Cuate', pron: 'KWAH-teh', meaning: 'Friend, buddy, dude. Originally Nahuatl for "twin."', example: { es: 'Mis cuates vienen a cenar.', en: 'My buddies are coming over for dinner.' }, vibes: ['friendly'] },
+
+            // ── D ──
+            { word: 'Desmadre', pron: 'des-MAH-dreh', meaning: 'A total mess, chaos, wild party, disaster. "Hacer desmadre" = to cause chaos / party hard.', example: { es: 'La fiesta se convirtió en un desmadre.', en: 'The party turned into total chaos.' }, vibes: ['vulgar', 'funny'] },
+
+            // ── E ──
+            { word: 'Está cañón', pron: 'es-TAH kahn-YOHN', meaning: 'It\'s intense, difficult, or hardcore. Like saying "that\'s heavy."', example: { es: 'El examen está cañón, estudia mucho.', en: 'The exam is brutal, study hard.' }, vibes: ['casual'] },
+
+            // ── F ──
+            { word: 'Feria', pron: 'FEH-ree-ah', meaning: 'Money, cash. Not the fair/festival meaning — straight up "dinero."', example: { es: 'No traigo feria. ¿Me prestas?', en: "I don't have cash. Can you lend me some?" }, vibes: ['casual', 'street'] },
+            { word: 'Fresa', pron: 'FREH-sah', meaning: 'Preppy, snobby, bougie. Someone stuck-up who thinks they\'re better than everyone.', example: { es: 'No seas fresa, vamos a los tacos de la esquina.', en: "Don't be bougie, let's go to the corner taco stand." }, vibes: ['casual', 'funny'] },
+
+            // ── G ──
+            { word: 'Gacho / Gacha', pron: 'GAH-cho / GAH-chah', meaning: 'Mean, ugly, shitty, not cool. The opposite of "chido."', example: { es: 'No seas gacho, invítame.', en: "Don't be mean, invite me." }, vibes: ['casual'] },
+            { word: 'Güey / Wey', pron: 'WEH', meaning: 'Dude, bro, man. The most used word in Mexican Spanish. Can be used for anyone. Originally meant "ox" (stupid), now just means "person."', example: { es: '¡No mames, güey! ¿Neta?', en: 'No way, dude! For real?' }, vibes: ['casual', 'friendly'] },
+
+            // ── H ──
+            { word: 'Huevón / Huevona', pron: 'weh-VOHN / weh-VOH-nah', meaning: 'Lazy person. From "huevos" (eggs/balls) — someone sitting on their eggs doing nothing.', example: { es: 'No seas huevón, levántate ya.', en: "Don't be lazy, get up already." }, vibes: ['vulgar', 'funny'] },
+
+            // ── J ──
+            { word: 'Jefe / Jefa', pron: 'HEH-feh / HEH-fah', meaning: 'Dad / Mom. Literally "boss" but used affectionately for parents.', example: { es: 'Voy a casa de mis jefes para la comida.', en: "I'm going to my parents' house for dinner." }, vibes: ['friendly', 'affection'] },
+
+            // ── L ──
+            { word: 'La neta', pron: 'la NEH-tah', meaning: 'The truth, for real, honestly. Can mean both "the truth is…" and "for real?"', example: { es: 'La neta, tu mole está mejor que el de mi mamá.', en: 'Honestly, your mole is better than my mom\'s.' }, vibes: ['casual'] },
+            { word: 'Lana', pron: 'LAH-nah', meaning: 'Money, cash. Literally "wool." One of many Mexican words for money.', example: { es: 'Necesito lana para la renta.', en: 'I need money for rent.' }, vibes: ['casual'] },
+
+            // ── M ──
+            { word: 'Maje', pron: 'MAH-heh', meaning: 'Fool, sucker, gullible person. "Hacerle al maje" = to play dumb.', example: { es: 'No te hagas el maje, tú sabes qué pasó.', en: "Don't play dumb, you know what happened." }, vibes: ['casual', 'funny'] },
+            { word: 'Mala copa', pron: 'MAH-lah KOH-pah', meaning: 'Someone who gets aggressive or annoying when drunk.', example: { es: 'No lo invites, es bien mala copa.', en: "Don't invite him, he's a mean drunk." }, vibes: ['casual'] },
+            { word: 'Mande', pron: 'MAHN-deh', meaning: 'Pardon? What did you say? Used instead of "¿Qué?" which is considered rude. Shows good Mexican manners.', example: { es: '—Juan, ven acá. —¿Mande?', en: '—Juan, come here. —Pardon?' }, vibes: ['friendly'] },
+            { word: 'Morro / Morra', pron: 'MOH-rro / MOH-rrah', meaning: 'Kid, young person, teenager. Also used for boyfriend/girlfriend among young people.', example: { es: '¿Quién es esa morra? Está bonita.', en: "Who's that girl? She's cute." }, vibes: ['casual', 'street'] },
+
+            // ── N ──
+            { word: 'Naco / Naca', pron: 'NAH-koh / NAH-kah', meaning: 'Tacky, lowbrow, classless. Can be offensive — be careful with this one.', example: { es: 'Esas luces de Navidad se ven bien nacas.', en: 'Those Christmas lights look really tacky.' }, vibes: ['casual'] },
+            { word: 'Neta', pron: 'NEH-tah', meaning: 'For real, seriously, truthfully. "¿Neta?" = "Really/For real?"', example: { es: '¿Neta güey? ¡No lo puedo creer!', en: 'For real, dude? I can\'t believe it!' }, vibes: ['casual'] },
+            { word: 'No manches', pron: 'no MAHN-ches', meaning: 'No way! You\'re kidding! The polite version of "no mames." Safe for all audiences.', example: { es: '¡No manches! ¿Te ganaste la lotería?', en: 'No way! You won the lottery?' }, vibes: ['casual', 'friendly'] },
+            { word: 'No mames', pron: 'no MAH-mes', meaning: 'No f***ing way! Stronger version of "no manches." Universal Mexican expression of shock, disbelief, or protest.', example: { es: '¡No mames! ¡Me cobraron 500 pesos por un taco!', en: 'No f***ing way! They charged me 500 pesos for a taco!' }, vibes: ['vulgar', 'street'] },
+            { word: 'Nomas', pron: 'NOH-mas', meaning: 'Just, only. Short for "nada más." Super common filler.', example: { es: 'Ando nomás viendo.', en: "I'm just looking." }, vibes: ['casual'] },
+
+            // ── O ──
+            { word: 'Órale', pron: 'OH-rah-leh', meaning: 'All-purpose exclamation — can mean "hell yeah," "come on," "alright," "wow," or "let\'s do it" depending on tone.', example: { es: '¿Vamos por tacos? —¡Órale!', en: "Let's go get tacos? —Let's go!" }, vibes: ['casual', 'friendly'] },
+
+            // ── P ──
+            { word: 'Padre', pron: 'PAH-dreh', meaning: 'Cool, awesome, great. "¡Qué padre!" is one of the most Mexican ways to say "how cool."', example: { es: '¡Qué padre tu playera, güey!', en: 'Your shirt is so cool, dude!' }, vibes: ['friendly', 'casual'] },
+            { word: 'Peda', pron: 'PEH-dah', meaning: 'Drinking party, getting drunk. "Ponerse peda" = to get drunk.', example: { es: 'Ayer nos pusimos una peda bien loca.', en: 'We got so hammered last night.' }, vibes: ['casual', 'vulgar'] },
+            { word: 'Pedo', pron: 'PEH-doh', meaning: 'Problem, situation, or drunk — extremely versatile. "¿Qué pedo?" = "What\'s up?/What\'s the deal?" "Andar pedo" = to be drunk.', example: { es: '¿Qué pedo, güey? ¿Por qué no viniste?', en: "What's the deal, dude? Why didn't you come?" }, vibes: ['vulgar', 'casual'] },
+            { word: 'Pinche', pron: 'PEEN-cheh', meaning: 'F***ing, damn. Intensifier used before nouns. Vulgar but extremely common.', example: { es: '¡Pinche calor! Está de la chingada.', en: 'This f***ing heat! It\'s unbearable.' }, vibes: ['vulgar', 'street'] },
+            { word: 'Pisto', pron: 'PEES-toh', meaning: 'Alcohol, booze, drinks. "Echarse un pisto" = to have a drink.', example: { es: '¿Quieres ir por un pisto?', en: 'Want to go get a drink?' }, vibes: ['casual'] },
+
+            // ── Q ──
+            { word: 'Qué onda', pron: 'keh OHN-dah', meaning: 'What\'s up? What\'s going on? The standard Mexican greeting among friends.', example: { es: 'Hey, ¿qué onda? ¿Todo bien?', en: "Hey, what's up? Everything good?" }, vibes: ['casual', 'friendly'] },
+            { word: 'Qué poca', pron: 'keh POH-kah', meaning: 'That\'s messed up, that\'s cold, how could you. Short for "qué poca madre."', example: { es: 'Le quitó el novio a su amiga. ¡Qué poca!', en: 'She stole her friend\'s boyfriend. That\'s cold!' }, vibes: ['casual'] },
+
+            // ── R ──
+            { word: 'Rajarse', pron: 'rah-HAR-seh', meaning: 'To chicken out, to bail, to flake. "No te rajes" = "don\'t bail on me."', example: { es: 'Dijiste que ibas a venir. ¡No te rajes!', en: "You said you were coming. Don't flake!" }, vibes: ['casual'] },
+            { word: 'Rata', pron: 'RAH-tah', meaning: 'Thief, snitch, or stingy person. Literally "rat."', example: { es: 'Cuidado con tu teléfono, aquí hay mucha rata.', en: 'Watch your phone, there are a lot of thieves here.' }, vibes: ['casual', 'street'] },
+            { word: 'Reventón', pron: 'reh-ven-TOHN', meaning: 'Big party, blowout. When the party is going to be legendary.', example: { es: 'El sábado va a ser un reventón en casa de Luis.', en: "Saturday's going to be a blowout at Luis's place." }, vibes: ['casual', 'funny'] },
+
+            // ── S ──
+            { word: 'Simón', pron: 'see-MOHN', meaning: 'Yeah, yep, that\'s right. Slang alternative to "sí."', example: { es: '¿Vas a ir mañana? —Simón, ahí nos vemos.', en: "You going tomorrow? —Yeah, see you there." }, vibes: ['casual', 'friendly'] },
+
+            // ── T ──
+            { word: 'Tener huevos', pron: 'teh-NER WEH-vos', meaning: 'To have balls / courage. "¡Échale huevos!" = "Go hard! Give it your all!"', example: { es: '¡Échale huevos al examen!', en: 'Give that exam everything you\'ve got!' }, vibes: ['vulgar'] },
+            { word: 'Tirar la onda', pron: 'tee-RAR lah OHN-dah', meaning: 'To flirt, to hit on someone, to make a move.', example: { es: '¿Viste cómo le tiraba la onda a la mesera?', en: 'Did you see how he was hitting on the waitress?' }, vibes: ['casual', 'funny'] },
+            { word: 'Transa', pron: 'TRAHN-sah', meaning: 'Scammer, con artist, dishonest person. Also an adjective: "muy transa" = very shady.', example: { es: 'No compres ahí, el señor es bien transa.', en: "Don't buy there, the guy is a total scammer." }, vibes: ['casual', 'street'] },
+
+            // ── V ──
+            { word: 'Valedores', pron: 'vah-leh-DOH-res', meaning: 'Homies, friends, people you\'re ride or die with.', example: { es: 'Ahí vienen mis valedores.', en: 'Here come my homies.' }, vibes: ['friendly', 'street'] },
+            { word: 'Verga', pron: 'VER-gah', meaning: 'Dick. But used in countless expressions: "a la verga" (wow/get out), "de la verga" (terrible/awesome), "me vale verga" (I don\'t give a f***). Extremely vulgar, extremely common.', example: { es: '¡A la verga! ¡Qué golazo!', en: 'Holy sh*t! What a goal!' }, vibes: ['vulgar', 'street'] },
+            { word: 'Vete a la fregada', pron: 'VEH-teh ah lah freh-GAH-dah', meaning: 'Go to hell / Get lost. The politer cousin of "vete a la chingada."', example: { es: 'Si no te gusta, vete a la fregada.', en: "If you don't like it, get lost." }, vibes: ['vulgar'] },
+
+            // ── Food slang ──
+            { word: 'Antojitos', pron: 'an-toh-HEE-tos', meaning: 'Street food snacks / Mexican appetizers. Literally "little cravings." Tacos, elotes, esquites, tlayudas, etc.', example: { es: 'Vamos por unos antojitos al mercado.', en: "Let's go get some street food at the market." }, vibes: ['friendly'] },
+            { word: 'Birria', pron: 'BEE-rree-ah', meaning: 'Slow-cooked spiced meat stew (traditionally goat, now often beef). Also slang for something messy or poorly done.', example: { es: '¿Ya probaste los tacos de birria del nuevo lugar?', en: 'Have you tried the birria tacos from the new place?' }, vibes: ['friendly'] },
+            { word: 'Botanear', pron: 'boh-tah-neh-AR', meaning: 'To snack, to munch. "Botana" = snacks/appetizers, especially with drinking.', example: { es: 'Trae unas papitas para botanear.', en: 'Bring some chips to snack on.' }, vibes: ['casual', 'friendly'] },
+            { word: 'Changarro', pron: 'chan-GAH-rro', meaning: 'Small business, street stall, little shop. Mom-and-pop operation.', example: { es: 'Mi tío tiene un changarro de tacos afuera del estadio.', en: 'My uncle has a little taco stand outside the stadium.' }, vibes: ['casual'] },
+        ];
+
+        const ALL_VIBES = [...new Set(SLANG.flatMap(s => s.vibes))].sort();
+        let activeVibe = 'all';
+        let activeLetter = 'all';
+
+        function renderVibes() {
+            const el = document.getElementById('vibe-pills');
+            el.innerHTML = `<button class="vibe-pill ${activeVibe === 'all' ? 'active' : ''}" onclick="filterVibe('all')">All Vibes</button>` +
+                ALL_VIBES.map(v => `<button class="vibe-pill ${activeVibe === v ? 'active' : ''}" onclick="filterVibe('${v}')">${v.charAt(0).toUpperCase() + v.slice(1)}</button>`).join('');
+        }
+
+        function renderAlpha() {
+            const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+            const available = new Set(SLANG.map(s => s.word[0].toUpperCase()));
+            const el = document.getElementById('alpha-bar');
+            el.innerHTML = `<button class="alpha-btn ${activeLetter === 'all' ? 'active' : ''}" onclick="filterLetter('all')">*</button>` +
+                letters.map(l => {
+                    const has = available.has(l);
+                    return `<button class="alpha-btn ${activeLetter === l ? 'active' : ''} ${!has ? 'disabled' : ''}" onclick="${has ? `filterLetter('${l}')` : 'void(0)'}">${l}</button>`;
+                }).join('');
+        }
+
+        function filterVibe(v) { activeVibe = v; renderVibes(); render(); }
+        function filterLetter(l) { activeLetter = l; renderAlpha(); render(); }
+
+        function render() {
+            const q = document.getElementById('search').value.toLowerCase().trim();
+            const list = document.getElementById('slang-list');
+            const countBar = document.getElementById('count-bar');
+
+            let filtered = SLANG;
+            if (activeVibe !== 'all') filtered = filtered.filter(s => s.vibes.includes(activeVibe));
+            if (activeLetter !== 'all') filtered = filtered.filter(s => s.word[0].toUpperCase() === activeLetter);
+            if (q) filtered = filtered.filter(s =>
+                s.word.toLowerCase().includes(q) ||
+                s.meaning.toLowerCase().includes(q) ||
+                s.example.es.toLowerCase().includes(q) ||
+                s.example.en.toLowerCase().includes(q)
+            );
+
+            countBar.innerHTML = `Showing <strong>${filtered.length}</strong> of ${SLANG.length} entries`;
+
+            if (!filtered.length) {
+                list.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:40px 0;">No slang found. Try a different search, güey.</p>';
+                return;
+            }
+
+            list.innerHTML = filtered.map(s => `
+                <div class="slang-card">
+                    <div class="slang-header">
+                        <span class="slang-word">${esc(s.word)}</span>
+                        <span class="slang-pron">[${esc(s.pron)}]</span>
+                        <div class="slang-tags">${s.vibes.map(v => `<span class="slang-tag ${v}">${v}</span>`).join('')}</div>
+                    </div>
+                    <div class="slang-meaning">${esc(s.meaning)}</div>
+                    <div class="slang-example">
+                        <span class="ex-es">${esc(s.example.es)}</span><br>
+                        <span class="ex-en">${esc(s.example.en)}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function esc(s) {
+            return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        document.getElementById('search').addEventListener('input', render);
+        renderVibes();
+        renderAlpha();
+        render();
+    </script>
+</body>
+</html>

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unicode Inspector — Code Points & Character Info | unicode.openvibe.tools</title>
+    <meta name="description" content="Inspect text character by character: see Unicode code points, character names, byte counts. Detect invisible characters.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+    <style>
+        .char-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+        .char-table th { text-align: left; padding: 8px 12px; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .char-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+        .char-table tr:hover td { background: var(--bg-hover); }
+        .char-display { font-size: 1.4rem; min-width: 40px; text-align: center; }
+        .char-mono { font-family: var(--font-mono); font-size: 0.82rem; color: var(--accent); }
+        .char-invisible { background: rgba(255, 0, 0, 0.1); }
+        .char-invisible .char-display { color: #ff6b6b; }
+    </style>
+</head>
+<body>
+    <div class="tool-wrap" style="max-width: 1000px;">
+        <div class="page-header">
+            <h1><i class="fas fa-code"></i> Unicode Inspector</h1>
+            <p class="subtitle">See every character's code point, hex value, and byte count. Spot invisible characters.</p>
+        </div>
+
+        <div class="tool-section">
+            <div class="input-group">
+                <textarea id="input" class="large" placeholder="Paste text to inspect..." autofocus>Hello 👋 World</textarea>
+            </div>
+            <div class="live-hint"><span class="live-dot"></span> Results update as you type</div>
+            <div class="generate-row">
+                <button class="btn btn-primary generate-btn" onclick="document.querySelector('#input, textarea').dispatchEvent(new Event('input', {bubbles:true}))"><i class="fas fa-bolt"></i> Generate</button>
+            </div>
+        </div>
+
+        <div class="tool-section">
+            <h2><i class="fas fa-table"></i> Character Breakdown</h2>
+            <div style="overflow-x: auto;">
+                <table class="char-table" id="output">
+                    <thead><tr><th>#</th><th>Char</th><th>Code Point</th><th>Hex</th><th>UTF-8 Bytes</th><th>Category</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://text.openvibe.tools">Text.OpenVibe Hub</a>
+                <a href="https://clean.openvibe.tools">Text Cleaner</a>
+                <a href="https://binary.openvibe.tools">Binary</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/text-engine.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+
+        const INVISIBLE_CHARS = new Set([0x200B,0x200C,0x200D,0xFEFF,0x00AD,0x034F,0x180E,0x2060,0x2061,0x2062,0x2063,0x2064,0x200E,0x200F,0x202A,0x202B,0x202C,0x202D,0x202E]);
+
+        function utf8Bytes(cp) {
+            if (cp <= 0x7F) return 1;
+            if (cp <= 0x7FF) return 2;
+            if (cp <= 0xFFFF) return 3;
+            return 4;
+        }
+
+        function charCategory(cp) {
+            if (cp <= 0x1F || (cp >= 0x7F && cp <= 0x9F)) return 'Control';
+            if (INVISIBLE_CHARS.has(cp)) return 'Invisible';
+            if (cp >= 0x0300 && cp <= 0x036F) return 'Combining';
+            if (cp >= 0x1F600 && cp <= 0x1F64F) return 'Emoji';
+            if (cp >= 0x1F300 && cp <= 0x1F5FF) return 'Emoji Symbol';
+            if (cp >= 0x1F680 && cp <= 0x1F6FF) return 'Emoji Transport';
+            if (cp >= 0x1F900 && cp <= 0x1F9FF) return 'Emoji Supplement';
+            if (cp >= 0x2600 && cp <= 0x26FF) return 'Misc Symbol';
+            if (cp >= 0x2700 && cp <= 0x27BF) return 'Dingbat';
+            if (cp >= 65 && cp <= 90) return 'Latin Upper';
+            if (cp >= 97 && cp <= 122) return 'Latin Lower';
+            if (cp >= 48 && cp <= 57) return 'Digit';
+            if (cp === 32) return 'Space';
+            if (cp === 10) return 'Newline';
+            return 'Other';
+        }
+
+        function update() {
+            const chars = [...document.getElementById('input').value];
+            const tbody = document.querySelector('#output tbody');
+            tbody.innerHTML = '';
+            chars.forEach((ch, i) => {
+                const cp = ch.codePointAt(0);
+                const isInvis = INVISIBLE_CHARS.has(cp) || (cp <= 0x1F && cp !== 10) || (cp >= 0x7F && cp <= 0x9F);
+                const tr = document.createElement('tr');
+                if (isInvis) tr.className = 'char-invisible';
+                tr.innerHTML = `
+                    <td>${i + 1}</td>
+                    <td class="char-display">${isInvis ? '⬚' : OpenVibeUI.escapeHtml(ch)}</td>
+                    <td class="char-mono">U+${cp.toString(16).toUpperCase().padStart(4, '0')}</td>
+                    <td class="char-mono">0x${cp.toString(16).toUpperCase()}</td>
+                    <td>${utf8Bytes(cp)}</td>
+                    <td>${charCategory(cp)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        document.getElementById('input').addEventListener('input', update);
+        update();
+    </script>
+</body>
+</html>

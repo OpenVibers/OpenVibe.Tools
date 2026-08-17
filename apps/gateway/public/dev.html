@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dev.OpenVibe — Developer & SEO Tools</title>
+<meta name="description" content="Free online developer tools — JSON formatter, Base64 encoder, JWT decoder, UUID generator, regex tester, diff checker, cron parser, curl converter, webhook inspector, and more.">
+<meta property="og:title" content="Dev.OpenVibe — Developer & SEO Tools">
+<meta property="og:description" content="Free developer tools — JSON formatter, Base64, JWT decoder, UUID generator, regex tester, diff checker, cron parser, curl converter, and more.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://dev.openvibe.tools">
+<link rel="canonical" href="https://dev.openvibe.tools">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+:root{--bg:#0b0c12;--bg2:#12131c;--bg3:#1a1b28;--card:rgba(22,24,36,.85);--tx:#f1f4fb;--tx2:#a0a8c4;--tx3:#5e6580;--ac:#a78bfa;--acl:#c4b5fd;--brd:rgba(255,255,255,.07);--r:16px}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--bg)}
+body{min-height:100vh;font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--tx);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.bg-glow{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.bg-glow::before,.bg-glow::after{content:'';position:absolute;border-radius:50%;filter:blur(120px);opacity:.35;animation:gd 20s ease-in-out infinite alternate}
+.bg-glow::before{width:500px;height:500px;top:-10%;left:20%;background:radial-gradient(circle,rgba(167,139,250,.3),transparent 70%)}
+.bg-glow::after{width:400px;height:400px;bottom:10%;right:10%;background:radial-gradient(circle,rgba(99,102,241,.2),transparent 70%);animation-delay:-10s}
+@keyframes gd{0%{transform:translate(0,0) scale(1)}100%{transform:translate(40px,-30px) scale(1.15)}}
+.page{position:relative;z-index:1;padding:0 20px 60px}.shell{max-width:1100px;margin:0 auto}
+.hero{text-align:center;padding:40px 0 24px}
+.hero-icon{font-size:2.4rem;color:var(--ac);margin-bottom:10px}
+.hero h1{font-size:clamp(1.7rem,4vw,2.6rem);font-weight:800;letter-spacing:-.03em;margin-bottom:6px}
+.hero p{color:var(--tx2);font-size:.95rem}
+.modes{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.mb{padding:7px 15px;border-radius:8px;background:var(--bg3);color:var(--tx2);font-size:.82rem;font-weight:600;cursor:pointer;border:1px solid var(--brd);transition:.15s}
+.mb:hover{background:#252738;color:var(--tx)}.mb.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.io{display:flex;gap:12px;margin-bottom:12px}
+.io textarea{flex:1;min-height:200px;padding:14px;background:var(--bg2);color:var(--tx);border:1px solid var(--brd);border-radius:var(--r);font-family:'JetBrains Mono',monospace;font-size:.85rem;resize:vertical;outline:none;transition:border .2s}
+.io textarea:focus{border-color:var(--ac)}.io textarea::placeholder{color:var(--tx3)}
+.acts{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.ab{padding:8px 18px;border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;transition:.15s;border:none}
+.ab-go{background:var(--ac);color:#fff}.ab-go:hover{filter:brightness(1.15)}
+.ab-s{background:var(--bg3);color:var(--tx2);border:1px solid var(--brd)}.ab-s:hover{background:#252738;color:var(--tx)}
+#out{min-height:100px;padding:16px;background:var(--bg2);border:1px solid var(--brd);border-radius:var(--r);font-family:'JetBrains Mono',monospace;font-size:.85rem;white-space:pre-wrap;word-break:break-all;overflow-x:auto;line-height:1.6}
+#out:empty::before{content:'Output will appear here...';color:var(--tx3)}
+#out .err{color:#f87171}#out .ok{color:#34d399}
+.dl{display:flex;font-size:.82rem;line-height:1.7}.dl .ln{width:34px;text-align:right;padding:0 6px;color:var(--tx3);user-select:none;flex-shrink:0}
+.dl .lc{flex:1;padding:0 8px;white-space:pre-wrap}
+.dl.da{background:rgba(52,211,153,.1);color:#6ee7b7}.dl.dd{background:rgba(248,113,113,.1);color:#fca5a5}
+.mh{background:rgba(250,204,21,.22);border-radius:2px;padding:0 1px}
+.sw{display:inline-block;width:56px;height:56px;border-radius:10px;border:2px solid var(--brd);margin:4px}
+.js{margin:8px 0;padding:10px;border-radius:8px;background:var(--bg3)}.jl{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ac);margin-bottom:4px}
+.og-card{max-width:500px;background:var(--bg3);border:1px solid var(--brd);border-radius:12px;overflow:hidden}
+.og-card img{width:100%;max-height:260px;object-fit:cover}.og-body{padding:14px}
+.og-dm{font-size:.75rem;color:var(--tx3);text-transform:uppercase}.og-tt{font-weight:700;margin:4px 0}.og-ds{color:var(--tx2);font-size:.85rem}
+.hg{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-bottom:20px}
+.tc{display:flex;align-items:center;gap:14px;padding:16px;background:var(--card);border:1px solid var(--brd);border-radius:var(--r);cursor:pointer;transition:.2s}
+.tc:hover{background:var(--bg3);border-color:rgba(167,139,250,.3);transform:translateY(-2px)}
+.tc-i{width:42px;height:42px;border-radius:10px;background:rgba(167,139,250,.12);display:flex;align-items:center;justify-content:center;color:var(--ac);font-size:1.1rem;flex-shrink:0}
+.tc-n{font-weight:700;font-size:.9rem}.tc-d{color:var(--tx2);font-size:.78rem;margin-top:2px}
+.ch{display:flex;align-items:center;gap:10px;margin:28px 0 14px;color:var(--ac);font-weight:700;font-size:1rem}
+.rel{display:flex;gap:8px;flex-wrap:wrap;margin-top:24px;padding-top:18px;border-top:1px solid var(--brd)}
+.rel a{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;background:var(--bg3);color:var(--tx2);font-size:.78rem;font-weight:600;border:1px solid var(--brd);transition:.15s}
+.rel a:hover{color:var(--ac);border-color:rgba(167,139,250,.3)}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--bg3);color:var(--tx);padding:10px 24px;border-radius:10px;font-size:.85rem;font-weight:600;border:1px solid var(--brd);opacity:0;transition:.3s;z-index:9999;pointer-events:none}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+@media(max-width:640px){.io{flex-direction:column}.hg{grid-template-columns:1fr}}
+</style>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  "name": "Dev.OpenVibe — Developer & SEO Tools",
+  "description": "Free online developer tools for formatting, encoding, decoding, and converting code. Includes JSON formatter, Base64 encoder, JWT decoder, UUID generator, regex tester, and more.",
+  "url": "https://dev.openvibe.tools",
+  "inLanguage": "en-US",
+  "isPartOf": {
+    "@type": "Website",
+    "name": "OpenVibe",
+    "url": "https://openvibe.network"
+  },
+  "mainEntity": {
+    "@type": "SoftwareApplication",
+    "name": "Dev.OpenVibe Toolkit",
+    "description": "Collection of 25+ free developer and SEO tools",
+    "url": "https://dev.openvibe.tools",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Any",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "tools": [
+      {"@type": "SoftwareApplication", "name": "JSON Formatter"},
+      {"@type": "SoftwareApplication", "name": "YAML Parser"},
+      {"@type": "SoftwareApplication", "name": "XML Tools"},
+      {"@type": "SoftwareApplication", "name": "Base64 Encoder/Decoder"},
+      {"@type": "SoftwareApplication", "name": "URL Encoder/Decoder"},
+      {"@type": "SoftwareApplication", "name": "JWT Decoder"},
+      {"@type": "SoftwareApplication", "name": "UUID Generator"},
+      {"@type": "SoftwareApplication", "name": "Timestamp Converter"},
+      {"@type": "SoftwareApplication", "name": "Cron Schedule Parser"},
+      {"@type": "SoftwareApplication", "name": "Regex Tester"},
+      {"@type": "SoftwareApplication", "name": "Diff Checker"},
+      {"@type": "SoftwareApplication", "name": "Code Beautifier"},
+      {"@type": "SoftwareApplication", "name": "Code Minifier"},
+      {"@type": "SoftwareApplication", "name": "SQL Formatter"},
+      {"@type": "SoftwareApplication", "name": "cURL Builder"},
+      {"@type": "SoftwareApplication", "name": "Webhook Tester"},
+      {"@type": "SoftwareApplication", "name": "Markdown Preview"},
+      {"@type": "SoftwareApplication", "name": "OpenGraph Preview"},
+      {"@type": "SoftwareApplication", "name": "Color Converter"},
+      {"@type": "SoftwareApplication", "name": "Slug Generator"},
+      {"@type": "SoftwareApplication", "name": "Lorem Ipsum Generator"},
+      {"@type": "SoftwareApplication", "name": "Escape Sequences"},
+      {"@type": "SoftwareApplication", "name": "Hash Generator"},
+      {"@type": "SoftwareApplication", "name": "Hex Converter"},
+      {"@type": "SoftwareApplication", "name": "CSV Converter"}
+    ]
+  }
+}
+</script>
+</head>
+<body>
+<div class="bg-glow"></div>
+<div id="navbar-mount"></div>
+<div class="page"><div class="shell">
+    <div class="hero"><div class="hero-icon" id="hi"><i class="fa-solid fa-code"></i></div><h1 id="ht">Dev.OpenVibe</h1><p id="hd">Developer & SEO Tools Hub</p></div>
+    <div id="tool" style="display:none">
+        <div class="modes" id="modes"></div>
+        <div class="io" id="io"><textarea id="in1" spellcheck="false"></textarea></div>
+        <div class="acts" id="acts"></div>
+        <div id="out"></div>
+    </div>
+    <div id="hub"></div>
+    <div class="rel" id="rel"></div>
+</div></div>
+<div class="toast" id="toast"></div>
+<script src="https://openvibe.network/shared/navbar.js"></script>
+<script>
+'use strict';
+const API='https://openvibe.tools/api/dev',$=s=>document.getElementById(s),
+H=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+const T={
+dev:{n:'Dev.OpenVibe',i:'fa-code',c:'hub',d:'Developer & SEO Tools Hub',hub:1},
+json:{n:'OpenVibeJSON',i:'fa-code',c:'data',d:'Format, validate & minify JSON',p:'{"name":"openvibe","version":1,"active":true}',m:['Format','Validate','Minify']},
+yaml:{n:'OpenVibeYAML',i:'fa-file-code',c:'data',d:'YAML \u2194 JSON converter',p:'name: openvibe\nversion: 1\nactive: true',m:['YAML\u2192JSON','JSON\u2192YAML']},
+xml:{n:'OpenVibeXML',i:'fa-file-code',c:'data',d:'XML formatter & validator',p:'<root><item id="1"><name>OpenVibe</name></item></root>',m:['Format','Validate','Minify']},
+csv:{n:'OpenVibeCSV',i:'fa-table',c:'data',d:'CSV viewer & JSON converter',p:'name,age,city\nAlice,30,NYC\nBob,25,LA',m:['Table','To JSON']},
+sql:{n:'OpenVibeSQL',i:'fa-database',c:'data',d:'SQL formatter & highlighter',p:'select u.id, u.name, o.total from users u join orders o on u.id = o.user_id where o.total > 100 order by o.total desc limit 10',m:['Format','Uppercase','Compact']},
+markdown:{n:'OpenVibeMarkdown',i:'fa-file-lines',c:'data',d:'Markdown editor with live preview',p:'# Hello World\n\nThis is **bold** and *italic* text.\n\n- Item one\n- Item two\n\n> A blockquote\n\n`inline code`\n\n[Link](https://openvibe.network)',m:['Preview','To HTML']},
+html:{n:'OpenVibeHTML',i:'fa-file-code',c:'data',d:'HTML formatter, minifier & entity encoder',p:'<div><p>Hello <strong>World</strong></p></div>',m:['Format','Minify','Entities','Unescape']},
+base64:{n:'OpenVibeBase64',i:'fa-lock',c:'enc',d:'Base64 encode & decode',p:'Hello, World!',m:['Encode','Decode']},
+url:{n:'OpenVibeURL',i:'fa-link',c:'enc',d:'URL encode, decode & parser',p:'https://openvibe.tools/search?q=hello world&lang=en#results',m:['Encode','Decode','Parse']},
+jwt:{n:'OpenVibeJWT',i:'fa-key',c:'enc',d:'JWT decoder \u2014 header, payload & expiry',p:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkhvYm8iLCJpYXQiOjE1MTYyMzkwMjJ9.4S5J5Z5mSp5F8Kv3K5qFJpQ5Y5jF5p5t5m5k5e5h5d4',m:['Decode']},
+uuid:{n:'OpenVibeUUID',i:'fa-fingerprint',c:'enc',d:'UUID v4 generator & validator',p:'',m:['Generate','Bulk 10','Bulk 100','Validate']},
+hash:{n:'OpenVibeHash',i:'fa-hashtag',c:'enc',d:'SHA-256, SHA-1 & SHA-512 hash generator',p:'Hello, World!',m:['SHA-256','SHA-1','SHA-512']},
+hex:{n:'OpenVibeHex',i:'fa-barcode',c:'enc',d:'Hex encoder / decoder',p:'Hello',m:['To Hex','From Hex']},
+escape:{n:'OpenVibeEscape',i:'fa-shield-halved',c:'enc',d:'HTML, JS & URL escape / unescape',p:'<script>alert("hello")</script>',m:['HTML Enc','HTML Dec','JS Esc','JS Unesc','URL Enc','URL Dec']},
+timestamp:{n:'OpenVibeTimestamp',i:'fa-clock',c:'time',d:'Unix timestamp \u2194 date converter',p:'',m:['Now','To Date','To Unix']},
+cron:{n:'OpenVibeCron',i:'fa-calendar-check',c:'time',d:'Cron expression parser & next runs',p:'*/15 9-17 * * 1-5',m:['Parse']},
+beautify:{n:'OpenVibeBeautify',i:'fa-wand-magic-sparkles',c:'qual',d:'Beautify JS, CSS, HTML & JSON',p:'{"a":1,"b":[2,3],"c":{"d":true}}',m:['JSON','HTML','CSS']},
+minify:{n:'OpenVibeMinify',i:'fa-compress',c:'qual',d:'Minify JS, CSS, HTML & JSON',p:'{\n  "name": "openvibe",\n  "version": 1\n}',m:['JSON','HTML','CSS']},
+diff:{n:'OpenVibeDiff',i:'fa-code-compare',c:'qual',d:'Side-by-side text diff checker',p:'Line one\nLine two\nLine three\nLine four',p2:'Line one\nLine 2 modified\nLine three\nLine five\nLine six',dual:1,m:['Compare']},
+regex:{n:'OpenVibeRegex',i:'fa-magnifying-glass',c:'qual',d:'Regex tester with match highlighting',p:'\\b[A-Z][a-z]+\\b',p2:'Hello World from OpenVibe.Tools today',dual:1,m:['Test']},
+slug:{n:'OpenVibeSlug',i:'fa-link',c:'qual',d:'URL slug generator',p:'Hello World! This is a Test -- 2024',m:['Generate']},
+lorem:{n:'OpenVibeLorem',i:'fa-paragraph',c:'qual',d:'Lorem ipsum generator',p:'',m:['1 Para','3 Para','5 Para','10 Sent','50 Words']},
+curl:{n:'OpenVibeCurl',i:'fa-terminal',c:'http',d:'Parse curl \u2192 fetch, Python, Node.js',p:"curl -X POST https://api.example.com/users -H 'Content-Type: application/json' -H 'Authorization: Bearer tok123' -d '{\"name\":\"openvibe\"}'",m:['To fetch','To Python','To Node','Parsed']},
+webhook:{n:'OpenVibeWebhook',i:'fa-satellite-dish',c:'http',d:'Webhook request inspector bin',p:'',m:['Create Bin']},
+color:{n:'OpenVibeColor',i:'fa-palette',c:'fe',d:'Color picker & HEX/RGB/HSL converter',p:'#a78bfa',m:['Convert']},
+opengraph:{n:'OpenVibeOpenGraph',i:'fa-share-nodes',c:'fe',d:'Open Graph & Twitter Card preview',p:'https://openvibe.live',m:['Preview']}
+};
+
+const CATS={data:{l:'Data & Formats',i:'fa-database'},enc:{l:'Encoding & Crypto',i:'fa-lock'},time:{l:'Time & Scheduling',i:'fa-clock'},qual:{l:'Code Quality',i:'fa-wand-magic-sparkles'},http:{l:'HTTP & API',i:'fa-terminal'},fe:{l:'Frontend & SEO',i:'fa-palette'}};
+const host=location.hostname,sub=host.replace(/\.openvibe\.tools$/,'');
+let ACT=T[sub]?sub:'dev',MODE='';
+
+document.addEventListener('DOMContentLoaded',()=>{
+    const tok=localStorage.getItem('ov_token');
+    if(window.OpenVibeNavbar)try{OpenVibeNavbar.init({service:'dev',apiBase:'https://openvibe.network',token:tok})}catch(e){}
+    ACT==='dev'?showHub():showTool();
+});
+
+function showHub(){
+    $('hub').style.display='';$('tool').style.display='none';
+    let h='';
+    for(const[cid,cat]of Object.entries(CATS)){
+        const tools=Object.entries(T).filter(([,t])=>t.c===cid);
+        if(!tools.length)continue;
+        h+='<div class="ch"><i class="fa-solid '+cat.i+'"></i> '+cat.l+'</div><div class="hg">';
+        for(const[id,t]of tools) h+='<a class="tc" href="https://'+id+'.openvibe.tools"><div class="tc-i"><i class="fa-solid '+t.i+'"></i></div><div><div class="tc-n">'+t.n+'</div><div class="tc-d">'+t.d+'</div></div></a>';
+        h+='</div>';
+    }
+    $('hub').innerHTML=h;
+    buildRel();
+}
+
+function showTool(){
+    $('hub').style.display='none';$('tool').style.display='';
+    const t=T[ACT];if(!t)return showHub();
+    $('hi').innerHTML='<i class="fa-solid '+t.i+'"></i>';
+    $('ht').textContent=t.n;$('hd').textContent=t.d;
+    document.title=t.n+' \u2014 Free Online '+t.d;
+    let mh='';
+    if(t.m)t.m.forEach((m,i)=>{mh+='<button class="mb'+(i===0?' on':'')+'" data-m="'+m+'" onclick="setMode(this)">'+m+'</button>'});
+    $('modes').innerHTML=mh;MODE=t.m?t.m[0]:'';
+    let ioh='<textarea id="in1" spellcheck="false" placeholder="'+H(t.p||'Paste here...')+'"></textarea>';
+    if(t.dual)ioh+='<textarea id="in2" spellcheck="false" placeholder="'+H(t.p2||'')+'"></textarea>';
+    $('io').innerHTML=ioh;
+    let ah='<button class="ab ab-go" onclick="run()"><i class="fa-solid fa-play"></i> Run</button>';
+    ah+='<button class="ab ab-s" onclick="copyOut()"><i class="fa-solid fa-copy"></i> Copy</button>';
+    ah+='<button class="ab ab-s" onclick="clr()"><i class="fa-solid fa-trash"></i> Clear</button>';
+    ah+='<button class="ab ab-s" onclick="sample()"><i class="fa-solid fa-flask"></i> Sample</button>';
+    $('acts').innerHTML=ah;
+    buildRel();
+    const q=new URLSearchParams(location.search).get('q');
+    if(q){$('in1').value=q;run()}
+    else if(['uuid','lorem','timestamp','color'].includes(ACT)){if(t.p)$('in1').value=t.p;run()}
+}
+
+function setMode(el){document.querySelectorAll('.mb').forEach(b=>b.classList.remove('on'));el.classList.add('on');MODE=el.dataset.m;run()}
+
+function buildRel(){
+    const cat=T[ACT]?.c;let h='';
+    for(const[id,t]of Object.entries(T)){if(id===ACT||t.hub||t.c!==cat)continue;h+='<a href="https://'+id+'.openvibe.tools"><i class="fa-solid '+t.i+'"></i> '+t.n+'</a>'}
+    if(['curl','webhook'].includes(ACT))h+='<a href="https://headers.openvibe.tools"><i class="fa-solid fa-heading"></i> Headers</a><a href="https://ssl.openvibe.tools"><i class="fa-solid fa-lock"></i> SSL</a>';
+    if(ACT==='opengraph')h+='<a href="https://logo.openvibe.tools"><i class="fa-solid fa-wand-magic-sparkles"></i> Logo.OpenVibe</a>';
+    $('rel').innerHTML=h;
+}
+
+// ═══════════════ PROCESSORS ═══════════════
+async function run(){
+    const i1=$('in1')?.value||'',i2=$('in2')?.value||'',o=$('out');
+    try{const r=await P[ACT](i1,MODE,i2);if(r==null)return;o.innerHTML=typeof r==='object'?r.html:H(String(r))}
+    catch(e){o.innerHTML='<span class="err">\u2717 '+H(e.message)+'</span>'}
+}
+const P={};
+
+P.json=(s,m)=>{const o=JSON.parse(s);if(m==='Minify')return JSON.stringify(o);if(m==='Validate')return'\u2713 Valid JSON \u2014 '+(Array.isArray(o)?o.length+' items':typeof o==='object'?Object.keys(o).length+' keys':typeof o);return JSON.stringify(o,null,2)};
+
+P.yaml=(s,m)=>{
+    if(m.includes('JSON\u2192')){const o=JSON.parse(s);return j2y(o,'')}
+    const ln=s.split('\n').filter(l=>l.trim()&&!l.trim().startsWith('#')),r={};
+    for(const l of ln){const mt=l.match(/^(\s*)([^:]+):\s*(.*)$/);if(mt){let v=mt[3].trim();v=v===''||v==='~'||v==='null'?null:v==='true'?true:v==='false'?false:/^-?\d+(\.\d+)?$/.test(v)?Number(v):v.replace(/^["']|["']$/g,'');r[mt[2].trim()]=v}}
+    return JSON.stringify(r,null,2);
+};
+function j2y(o,ind){let r='';if(Array.isArray(o))o.forEach(v=>{r+=ind+'- '+(typeof v==='object'&&v?'\n'+j2y(v,ind+'  '):v)+'\n'});
+else if(typeof o==='object'&&o)for(const[k,v]of Object.entries(o))r+=typeof v==='object'&&v?ind+k+':\n'+j2y(v,ind+'  '):ind+k+': '+v+'\n';
+else r+=ind+o+'\n';return r}
+
+P.xml=(s,m)=>{
+    if(m==='Validate'){const d=new DOMParser().parseFromString(s,'text/xml');if(d.querySelector('parsererror'))throw new Error(d.querySelector('parsererror').textContent);return'\u2713 Valid XML'}
+    if(m==='Minify')return s.replace(/>\s+</g,'><').replace(/\s{2,}/g,' ').trim();
+    let f='',ind=0;s.replace(/>\s*</g,'><').split(/(<[^>]+>)/g).filter(Boolean).forEach(n=>{if(n.match(/^<\//))ind--;f+='  '.repeat(Math.max(0,ind))+n.trim()+'\n';if(n.match(/^<[^\/!?]/)&&!n.match(/\/>/))ind++});return f.trim();
+};
+
+P.csv=(s,m)=>{
+    const rows=s.trim().split('\n').map(r=>{const c=[];let cur='',q=false;for(let i=0;i<r.length;i++){if(r[i]==='"')q=!q;else if(r[i]===','&&!q){c.push(cur.trim());cur=''}else cur+=r[i]}c.push(cur.trim());return c});
+    if(m==='To JSON'){const hd=rows[0];return JSON.stringify(rows.slice(1).map(r=>{const o={};hd.forEach((h,i)=>o[h]=r[i]||'');return o}),null,2)}
+    return{html:'<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:.82rem">'+rows.map((r,ri)=>'<tr>'+r.map(c=>'<'+(ri?'td':'th')+' style="border:1px solid var(--brd);padding:6px 10px;text-align:left;'+(ri?'':'background:var(--bg3);font-weight:700')+'">'+H(c)+'</'+(ri?'td':'th')+'>').join('')+'</tr>').join('')+'</table></div>'};
+};
+
+P.sql=(s,m)=>{
+    if(m==='Compact')return s.replace(/\s+/g,' ').trim();
+    const kw=['SELECT','DISTINCT','FROM','WHERE','JOIN','LEFT JOIN','RIGHT JOIN','INNER JOIN','ON','AND','OR','ORDER BY','GROUP BY','HAVING','LIMIT','OFFSET','INSERT INTO','VALUES','UPDATE','SET','DELETE FROM','CREATE TABLE','ALTER TABLE','UNION','CASE','WHEN','THEN','ELSE','END'];
+    let r=s;if(m==='Uppercase')kw.forEach(k=>{r=r.replace(new RegExp('\\b'+k.replace(/ /g,'\\s+')+'\\b','gi'),k)});
+    kw.slice(0,20).forEach(k=>{r=r.replace(new RegExp('(\\b)('+k.replace(/ /g,'\\s+')+')(\\b)','gi'),'\n$1$2$3')});
+    return r.replace(/^\n+/,'').replace(/\n{2,}/g,'\n');
+};
+
+P.markdown=(s,m)=>{
+    let h=s.replace(/^######\s(.+)/gm,'<h6>$1</h6>').replace(/^#####\s(.+)/gm,'<h5>$1</h5>').replace(/^####\s(.+)/gm,'<h4>$1</h4>')
+    .replace(/^###\s(.+)/gm,'<h3>$1</h3>').replace(/^##\s(.+)/gm,'<h2>$1</h2>').replace(/^#\s(.+)/gm,'<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/`([^`]+)`/g,'<code style="background:var(--bg3);padding:2px 5px;border-radius:4px">$1</code>')
+    .replace(/^\- (.+)/gm,'<li>$1</li>').replace(/^> (.+)/gm,'<blockquote style="border-left:3px solid var(--ac);padding-left:12px;color:var(--tx2)">$1</blockquote>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" style="color:var(--ac)">$1</a>')
+    .replace(/^---$/gm,'<hr style="border:none;border-top:1px solid var(--brd);margin:16px 0">');
+    if(m==='To HTML')return h;
+    return{html:'<div style="line-height:1.8;font-family:Inter,sans-serif;font-size:.92rem">'+h+'</div>'};
+};
+
+P.html=(s,m)=>{
+    if(m==='Entities')return s.replace(/[\u00A0-\u9999<>&'"]/g,c=>'&#'+c.charCodeAt(0)+';');
+    if(m==='Unescape'){const d=document.createElement('div');d.innerHTML=s;return d.textContent}
+    if(m==='Minify')return s.replace(/\s+/g,' ').replace(/>\s+</g,'><').trim();
+    let f='',ind=0;s.replace(/>\s*</g,'><').split(/(<[^>]+>)/g).filter(Boolean).forEach(n=>{if(n.match(/^<\//))ind--;f+='  '.repeat(Math.max(0,ind))+n.trim()+'\n';if(n.match(/^<[^\/!?]/)&&!n.match(/\/>/))ind++});return f.trim();
+};
+
+P.base64=(s,m)=>m==='Decode'?decodeURIComponent(escape(atob(s.trim()))):btoa(unescape(encodeURIComponent(s)));
+
+P.url=(s,m)=>{if(m==='Encode')return encodeURIComponent(s);if(m==='Decode')return decodeURIComponent(s);
+    try{const u=new URL(s);return'Protocol: '+u.protocol+'\nHost:     '+u.host+'\nPath:     '+u.pathname+'\nSearch:   '+u.search+'\nHash:     '+u.hash+'\nOrigin:   '+u.origin}catch{return'Invalid URL \u2014 include protocol (https://)'}};
+
+P.jwt=(s)=>{
+    const p=s.trim().split('.');if(p.length!==3)throw new Error('JWT must have 3 dot-separated parts');
+    const d=v=>JSON.parse(decodeURIComponent(escape(atob(v.replace(/-/g,'+').replace(/_/g,'/')))));
+    const hdr=d(p[0]),pay=d(p[1]);let ex='';
+    if(pay.exp){const dt=new Date(pay.exp*1000),left=dt-Date.now();ex=left>0?'\n\u23f1 Expires: '+dt.toISOString()+' ('+Math.floor(left/36e5)+'h '+Math.floor(left%36e5/6e4)+'m left)':'\n\u26a0 EXPIRED: '+dt.toISOString()}
+    return{html:'<div class="js"><div class="jl">Header</div>'+H(JSON.stringify(hdr,null,2))+'</div><div class="js"><div class="jl">Payload</div>'+H(JSON.stringify(pay,null,2))+(ex?'<div style="margin-top:6px;color:'+(ex.includes('EXPIRED')?'#f87171':'#34d399')+'">'+H(ex)+'</div>':'')+'</div><div class="js"><div class="jl">Signature</div>'+H(p[2])+'</div>'};
+};
+
+P.uuid=(s,m)=>{
+    if(m==='Validate')return/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s.trim())?'\u2713 Valid UUID v4':'\u2717 Invalid UUID v4';
+    const n=m.includes('100')?100:m.includes('10')?10:1;return Array.from({length:n},()=>crypto.randomUUID()).join('\n');
+};
+
+P.hash=async(s,m)=>{const a=m==='SHA-1'?'SHA-1':m==='SHA-512'?'SHA-512':'SHA-256';
+    const buf=await crypto.subtle.digest(a,new TextEncoder().encode(s));return a+': '+Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('')};
+
+P.hex=(s,m)=>{if(m==='From Hex')return s.trim().replace(/\s+/g,'').match(/.{2}/g).map(h=>String.fromCharCode(parseInt(h,16))).join('');
+    return[...s].map(c=>c.charCodeAt(0).toString(16).padStart(2,'0')).join(' ')};
+
+P.escape=(s,m)=>{
+    if(m==='HTML Enc')return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    if(m==='HTML Dec'){const d=document.createElement('div');d.innerHTML=s;return d.textContent}
+    if(m==='JS Esc')return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"').replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/\t/g,'\\t');
+    if(m==='JS Unesc')return s.replace(/\\n/g,'\n').replace(/\\r/g,'\r').replace(/\\t/g,'\t').replace(/\\"/g,'"').replace(/\\'/g,"'").replace(/\\\\/g,'\\');
+    if(m==='URL Enc')return encodeURIComponent(s);return decodeURIComponent(s);
+};
+
+P.timestamp=(s,m)=>{
+    if(m==='Now'){const n=Date.now();return'Unix (s):  '+Math.floor(n/1000)+'\nUnix (ms): '+n+'\nISO 8601:  '+new Date(n).toISOString()+'\nLocal:     '+new Date(n).toLocaleString()+'\nUTC:       '+new Date(n).toUTCString()}
+    if(m==='To Date'){const v=Number(s.trim()),d=new Date(v<1e12?v*1000:v);if(isNaN(d.getTime()))throw new Error('Invalid timestamp');return'ISO 8601:  '+d.toISOString()+'\nLocal:     '+d.toLocaleString()+'\nUTC:       '+d.toUTCString()+'\nUnix (s):  '+Math.floor(d/1000)+'\nUnix (ms): '+Number(d)}
+    const d=new Date(s.trim());if(isNaN(d.getTime()))throw new Error('Invalid date string');return'Unix (s):  '+Math.floor(d/1000)+'\nUnix (ms): '+Number(d)+'\nISO 8601:  '+d.toISOString()+'\nUTC:       '+d.toUTCString();
+};
+
+P.cron=(s)=>{
+    const p=s.trim().split(/\s+/);if(p.length<5)throw new Error('Need 5 fields: minute hour day month weekday');
+    const N=[['minute',0,59],['hour',0,23],['day',1,31],['month',1,12],['weekday',0,6]];
+    function desc(v,i){if(v==='*')return'every '+N[i][0];if(v.includes('/'))return'every '+v.split('/')[1]+' '+N[i][0]+'s';return N[i][0]+' '+v}
+    function expand(v,mn,mx){if(v==='*')return Array.from({length:mx-mn+1},(_,i)=>i+mn);if(v.includes('/')){const[b,st]=v.split('/');const start=b==='*'?mn:+b;const r=[];for(let i=start;i<=mx;i+=+st)r.push(i);return r}
+    if(v.includes(','))return v.split(',').map(Number);if(v.includes('-')){const[a,b]=v.split('-').map(Number);return Array.from({length:b-a+1},(_,i)=>i+a)}return[+v]}
+    const mins=expand(p[0],0,59),hrs=expand(p[1],0,23),doms=expand(p[2],1,31),mos=expand(p[3],1,12),dws=expand(p[4],0,6);
+    const nx=[];const d=new Date();d.setSeconds(0,0);d.setMinutes(d.getMinutes()+1);
+    for(let i=0;i<525600&&nx.length<5;i++){if(mins.includes(d.getMinutes())&&hrs.includes(d.getHours())&&doms.includes(d.getDate())&&mos.includes(d.getMonth()+1)&&dws.includes(d.getDay()))nx.push(new Date(d));d.setMinutes(d.getMinutes()+1)}
+    return'Schedule: '+p.map((v,i)=>desc(v,i)).join(', ')+'\n\nNext 5 runs:\n'+nx.map((d,i)=>'  '+(i+1)+'. '+d.toLocaleString()).join('\n');
+};
+
+P.beautify=(s,m)=>{
+    if(m==='JSON')return JSON.stringify(JSON.parse(s),null,2);
+    if(m==='CSS'){let r='',ind=0;for(const c of s){if(c==='{'){r+=' {\n';ind++;r+='  '.repeat(ind)}else if(c==='}'){ind--;r+='\n'+'  '.repeat(ind)+'}\n'+'  '.repeat(ind)}else if(c===';')r+=';\n'+'  '.repeat(ind);else r+=c}return r.trim()}
+    let f='',ind=0;s.replace(/>\s*</g,'><').split(/(<[^>]+>)/g).filter(Boolean).forEach(n=>{if(n.match(/^<\//))ind--;f+='  '.repeat(Math.max(0,ind))+n.trim()+'\n';if(n.match(/^<[^\/!?]/)&&!n.match(/\/>/))ind++});return f.trim();
+};
+
+P.minify=(s,m)=>{if(m==='JSON')return JSON.stringify(JSON.parse(s));if(m==='CSS')return s.replace(/\/\*[\s\S]*?\*\//g,'').replace(/\s+/g,' ').replace(/\s*([{}:;,])\s*/g,'$1').trim();
+    if(m==='HTML')return s.replace(/\s+/g,' ').replace(/>\s+</g,'><').trim();return s.replace(/\/\/.*$/gm,'').replace(/\/\*[\s\S]*?\*\//g,'').replace(/\s+/g,' ').trim()};
+
+P.diff=(a,m,b)=>{
+    const al=a.split('\n'),bl=b.split('\n'),r=[];let ai=0,bi=0;
+    while(ai<al.length||bi<bl.length){
+        if(ai<al.length&&bi<bl.length&&al[ai]===bl[bi]){r.push({t:'c',n:ai+1,l:al[ai]});ai++;bi++}
+        else if(bi<bl.length&&(ai>=al.length||bl.slice(bi,bi+4).includes(al[ai])===false)){r.push({t:'a',n:bi+1,l:bl[bi]});bi++}
+        else{r.push({t:'d',n:ai+1,l:al[ai]});ai++}
+    }
+    const st={a:r.filter(x=>x.t==='a').length,d:r.filter(x=>x.t==='d').length,c:r.filter(x=>x.t==='c').length};
+    return{html:'<div style="margin-bottom:8px;font-size:.82rem;color:var(--tx2)"><span class="ok">+'+st.a+' added</span> \u00b7 <span class="err">-'+st.d+' removed</span> \u00b7 '+st.c+' unchanged</div>'+r.map(x=>'<div class="dl d'+x.t+'"><span class="ln">'+x.n+'</span><span class="lc">'+H(x.l)+'</span></div>').join('')};
+};
+
+P.regex=(pat,m,test)=>{
+    if(!pat)throw new Error('Enter a regex pattern');
+    const re=new RegExp(pat,'gm');let match,matches=[],last=0,html='';
+    while((match=re.exec(test))!==null){if(match.index>last)html+=H(test.slice(last,match.index));html+='<span class="mh">'+H(match[0])+'</span>';matches.push({m:match[0],i:match.index,g:match.slice(1)});last=match.index+match[0].length;if(!match[0].length){re.lastIndex++;if(re.lastIndex>test.length)break}}
+    if(last<test.length)html+=H(test.slice(last));
+    let info='<div style="margin-bottom:8px;font-size:.82rem;color:var(--tx2)">'+matches.length+' match'+(matches.length!==1?'es':'')+' found</div><div style="white-space:pre-wrap;line-height:1.8">'+(html||H(test))+'</div>';
+    if(matches.some(x=>x.g.length)){info+='<div style="margin-top:10px;font-size:.82rem;color:var(--tx2)">Groups:</div>';matches.forEach((x,i)=>{if(x.g.length)info+='<div style="font-size:.82rem">#'+(i+1)+': '+x.g.map((g,j)=>'<span style="color:var(--ac)">$'+(j+1)+'</span>='+H(g||'')).join(', ')+'</div>'})}
+    return{html:info};
+};
+
+P.slug=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+
+P.lorem=(s,m)=>{
+    const W='lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua enim ad minim veniam quis nostrud exercitation ullamco laboris nisi aliquip ex ea commodo consequat duis aute irure in reprehenderit voluptate velit esse cillum fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt culpa qui officia deserunt mollit anim id est laborum'.split(' ');
+    const rw=()=>W[Math.random()*W.length|0];
+    const sent=()=>{const n=8+(Math.random()*10|0);let s=Array.from({length:n},rw).join(' ');return s[0].toUpperCase()+s.slice(1)+'.'};
+    const para=()=>Array.from({length:4+(Math.random()*4|0)},sent).join(' ');
+    if(m.includes('Words'))return Array.from({length:50},rw).join(' ');
+    if(m.includes('Sent'))return Array.from({length:10},sent).join(' ');
+    return Array.from({length:parseInt(m)||3},para).join('\n\n');
+};
+
+P.curl=(s,m)=>{
+    const cmd=s.trim().replace(/\\\n/g,' ');let method='GET',url='',hd={},body='';
+    const tok=[];let cur='',inQ=false,qc='';
+    for(let i=0;i<cmd.length;i++){const c=cmd[i];if(!inQ&&(c==="'"||c==='"')){inQ=true;qc=c}else if(inQ&&c===qc){inQ=false}else if(!inQ&&c===' '){if(cur){tok.push(cur);cur=''}continue}else cur+=c}
+    if(cur)tok.push(cur);
+    for(let i=0;i<tok.length;i++){const t=tok[i];if(t==='-X'||t==='--request')method=tok[++i];else if(t==='-H'||t==='--header'){const h=tok[++i];const ci=h.indexOf(':');if(ci>0)hd[h.slice(0,ci).trim()]=h.slice(ci+1).trim()}
+    else if(t==='-d'||t==='--data'||t==='--data-raw')body=tok[++i];else if(!t.startsWith('-')&&t!=='curl')url=t}
+    if(body&&method==='GET')method='POST';
+    if(m==='Parsed')return'Method:  '+method+'\nURL:     '+url+'\nHeaders:\n'+Object.entries(hd).map(([k,v])=>'  '+k+': '+v).join('\n')+'\nBody:    '+(body||'(none)');
+    if(m==='To fetch')return"fetch('"+url+"', {\n  method: '"+method+"',\n  headers: "+JSON.stringify(hd,null,4).replace(/\n/g,'\n  ')+','+(body?"\n  body: '"+body+"',":'')+'\n});';
+    if(m==='To Python')return"import requests\n\nresponse = requests."+method.toLowerCase()+"(\n    '"+url+"',\n    headers="+JSON.stringify(hd)+","+(body?"\n    data='"+body+"',":'')+"\n)\nprint(response.json())";
+    return"const https = require('https');\n\nconst req = https.request('"+url+"', {\n  method: '"+method+"',\n  headers: "+JSON.stringify(hd,null,4).replace(/\n/g,'\n  ')+"\n}, res => {\n  let data = '';\n  res.on('data', c => data += c);\n  res.on('end', () => console.log(data));\n});\n"+(body?"req.write('"+body+"');\n":"")+"req.end();";
+};
+
+P.webhook=async()=>{
+    const o=$('out');
+    const r=await fetch(API+'/webhook/bins',{method:'POST'});const d=await r.json();if(!d.ok)throw new Error(d.error||'Failed');
+    const binUrl=API+'/webhook/bins/'+d.binId+'/in';
+    o.innerHTML='<div style="margin-bottom:12px"><div class="jl">Your Webhook URL</div><div style="font-size:1rem;word-break:break-all;color:var(--ac);cursor:pointer" onclick="navigator.clipboard.writeText(\''+binUrl+"');toast('Copied!')\">"+binUrl+'</div><div style="color:var(--tx3);font-size:.78rem;margin-top:4px">Click to copy \u00b7 Polling for requests...</div></div><div id="whr">Waiting for requests...</div>';
+    const iv=setInterval(async()=>{try{const r2=await fetch(API+'/webhook/bins/'+d.binId);const d2=await r2.json();
+        if(d2.ok&&d2.requests.length){$('whr').innerHTML=d2.requests.map((rq,i)=>'<div class="js"><div class="jl">#'+(i+1)+' '+rq.method+' \u00b7 '+new Date(rq.timestamp).toLocaleTimeString()+'</div>Headers:\n'+Object.entries(rq.headers||{}).map(([k,v])=>k+': '+v).join('\n')+'\n\nBody:\n'+H(typeof rq.body==='object'?JSON.stringify(rq.body,null,2):String(rq.body||'(empty)'))+'</div>').join('')}}catch{}},2000);
+    setTimeout(()=>clearInterval(iv),3600000);return null;
+};
+
+P.color=(s)=>{
+    let r,g,b;const v=s.trim();
+    if(v.startsWith('#')){const hx=v.slice(1);r=parseInt(hx.slice(0,2),16);g=parseInt(hx.slice(2,4),16);b=parseInt(hx.slice(4,6),16)}
+    else if(v.startsWith('rgb')){[r,g,b]=v.match(/\d+/g).map(Number)}
+    else throw new Error('Enter HEX (#ff0000) or RGB (rgb(255,0,0))');
+    if([r,g,b].some(x=>isNaN(x)))throw new Error('Invalid color value');
+    const mx=Math.max(r,g,b)/255,mn=Math.min(r,g,b)/255,d=mx-mn;let h=0,s2=0,l=(mx+mn)/2;
+    if(d){s2=l>.5?d/(2-mx-mn):d/(mx+mn);if(mx===r/255)h=((g/255-b/255)/d+(g<b?6:0))*60;else if(mx===g/255)h=((b/255-r/255)/d+2)*60;else h=((r/255-g/255)/d+4)*60}
+    const hex='#'+[r,g,b].map(c=>c.toString(16).padStart(2,'0')).join('');
+    const hsl='hsl('+Math.round(h)+', '+Math.round(s2*100)+'%, '+Math.round(l*100)+'%)';
+    const comp='#'+[255-r,255-g,255-b].map(c=>c.toString(16).padStart(2,'0')).join('');
+    return{html:'<div><div class="sw" style="background:'+hex+'" title="'+hex+'"></div><div class="sw" style="background:'+comp+'" title="Complement"></div></div><div style="line-height:2.2;margin-top:8px">HEX: <strong>'+hex+'</strong>\nRGB: <strong>rgb('+r+', '+g+', '+b+')</strong>\nHSL: <strong>'+hsl+'</strong>\nComplement: <strong>'+comp+'</strong></div><div style="margin-top:12px;color:var(--tx2);font-size:.82rem">CSS:\n  --color: '+hex+';\n  --color-rgb: '+r+', '+g+', '+b+';</div>'};
+};
+
+P.opengraph=async(s)=>{
+    const r=await fetch(API+'/opengraph?url='+encodeURIComponent(s.trim()));const d=await r.json();if(!d.ok)throw new Error(d.error||'Failed to fetch');
+    const og=d.tags||{};let u;try{u=new URL(s.trim()).hostname}catch{u=''}
+    return{html:'<div class="og-card">'+(og['og:image']?'<img src="'+H(og['og:image'])+'" onerror="this.style.display=\'none\'">':'')+'<div class="og-body"><div class="og-dm">'+H(og['og:site_name']||u)+'</div><div class="og-tt">'+H(og['og:title']||og.title||'No title')+'</div><div class="og-ds">'+H(og['og:description']||og.description||'No description')+'</div></div></div>'
+    +'<div style="margin-top:14px"><div class="jl">All Meta Tags</div>'+Object.entries(og).map(([k,v])=>'<div><span style="color:var(--ac)">'+H(k)+'</span>: '+H(String(v))+'</div>').join('')+'</div>'
+    +(d.seo?'<div style="margin-top:14px"><div class="jl">SEO Recommendations</div>'+d.seo.map(x=>'<div style="color:'+(x.type==='error'?'#f87171':x.type==='warning'?'#fbbf24':'#34d399')+'">'+(x.type==='error'?'\u2717':x.type==='warning'?'\u26a0':'\u2713')+' '+H(x.message)+'</div>').join('')+'</div>':'')};
+};
+
+// ═══════════════ UTILITY ═══════════════
+function copyOut(){navigator.clipboard.writeText(($('out').innerText||'')).then(()=>toast('Copied!')).catch(()=>{})}
+function clr(){const a=$('in1');if(a)a.value='';const b=$('in2');if(b)b.value='';$('out').innerHTML=''}
+function sample(){const t=T[ACT];if(t?.p){$('in1').value=t.p;if(t.p2&&$('in2'))$('in2').value=t.p2}run()}
+function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000)}
+</script>
+  <script src="https://openvibe.live/live-notify.js" async></script>
+</body>
+</html>

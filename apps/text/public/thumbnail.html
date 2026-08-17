@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thumbnail Maker | thumbnail.openvibe.tools</title>
+    <meta name="description" content="Create stream and video thumbnails with bold text overlays. Upload a background, add text, download.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+    <style>
+        .thumb-layout { display: grid; grid-template-columns: 1fr 320px; gap: 2rem; align-items: start; }
+        .thumb-preview { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+        .thumb-canvas-wrap { position: relative; width: 100%; aspect-ratio: 16/9; background: #0b0c12; display: flex; align-items: center; justify-content: center; }
+        .thumb-canvas-wrap canvas { width: 100%; height: 100%; display: block; }
+        .thumb-canvas-wrap .placeholder { position: absolute; color: var(--text-muted); text-align: center; pointer-events: none; }
+        .thumb-canvas-wrap .placeholder i { font-size: 3rem; display: block; margin-bottom: .75rem; color: var(--border); }
+        .thumb-actions { padding: 1rem 1.25rem; display: flex; gap: .75rem; border-top: 1px solid var(--border); }
+        .thumb-controls { display: flex; flex-direction: column; gap: 1rem; }
+        .ctrl-group { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.15rem; }
+        .ctrl-group h3 { margin: 0 0 .75rem; color: var(--accent); font-size: .9rem; }
+        .ctrl-row { display: flex; gap: .75rem; align-items: center; margin-bottom: .6rem; }
+        .ctrl-row label { min-width: 70px; font-size: .82rem; color: var(--text-secondary); }
+        .ctrl-row select, .ctrl-row input[type="text"] { flex: 1; }
+        .ctrl-row input[type="color"] { width: 36px; height: 30px; border: 1px solid var(--border); background: var(--bg-secondary); border-radius: 8px; cursor: pointer; padding: 2px; }
+        .ctrl-row input[type="range"] { flex: 1; }
+        .ctrl-row .val { min-width: 32px; text-align: right; font-size: .78rem; color: var(--text-muted); font-family: monospace; }
+        .upload-btn { width: 100%; padding: .75rem; border-radius: 12px; border: 2px dashed var(--border); background: var(--bg-tertiary); color: var(--text-secondary); cursor: pointer; text-align: center; transition: all .2s; font-size: .9rem; }
+        .upload-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .upload-btn input { display: none; }
+        .size-pills { display: flex; gap: .4rem; flex-wrap: wrap; }
+        .size-pill { padding: .35rem .7rem; border-radius: 16px; border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-secondary); font-size: .75rem; cursor: pointer; transition: all .15s; }
+        .size-pill:hover, .size-pill.active { border-color: var(--accent); color: var(--accent); background: rgba(192,150,92,0.1); }
+        @media (max-width: 768px) { .thumb-layout { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="tool-wrap" style="max-width: 1050px;">
+        <div class="page-header">
+            <h1><i class="fas fa-photo-film"></i> Thumbnail Maker</h1>
+            <p class="subtitle">Create eye-catching stream and video thumbnails with bold text overlays.</p>
+        </div>
+
+        <div class="thumb-layout">
+            <div>
+                <div class="thumb-preview">
+                    <div class="thumb-canvas-wrap" id="canvasWrap">
+                        <canvas id="canvas" width="1280" height="720"></canvas>
+                    </div>
+                    <div class="thumb-actions">
+                        <button class="btn btn-primary" onclick="dl('png')"><i class="fas fa-download"></i> PNG</button>
+                        <button class="btn btn-secondary" onclick="dl('webp')"><i class="fas fa-download"></i> WebP</button>
+                        <button class="btn btn-ghost" onclick="dl('jpeg')"><i class="fas fa-download"></i> JPEG</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="thumb-controls">
+                <div class="ctrl-group">
+                    <h3><i class="fas fa-image"></i> Background</h3>
+                    <label class="upload-btn" id="uploadBtn">
+                        <input type="file" id="fileInput" accept="image/*">
+                        <i class="fas fa-cloud-upload-alt"></i> Upload Background Image
+                    </label>
+                    <div class="ctrl-row" style="margin-top: .75rem;">
+                        <label>BG Color</label>
+                        <input type="color" id="bgColor" value="#0b0c12">
+                    </div>
+                    <div class="ctrl-row">
+                        <label>Darken</label>
+                        <input type="range" id="darken" min="0" max="80" value="40">
+                        <span class="val" id="darkenVal">40%</span>
+                    </div>
+                </div>
+
+                <div class="ctrl-group">
+                    <h3><i class="fas fa-heading"></i> Title Text</h3>
+                    <div class="ctrl-row"><label>Text</label><input type="text" id="titleText" value="EPIC STREAM" placeholder="Title..."></div>
+                    <div class="ctrl-row"><label>Font</label><select id="titleFont"></select></div>
+                    <div class="ctrl-row"><label>Size</label><input type="range" id="titleSize" min="24" max="160" value="80"><span class="val" id="titleSizeVal">80</span></div>
+                    <div class="ctrl-row"><label>Color</label><input type="color" id="titleColor" value="#ffffff"></div>
+                    <div class="ctrl-row">
+                        <label>Stroke</label>
+                        <input type="color" id="titleStroke" value="#000000">
+                        <input type="range" id="titleStrokeW" min="0" max="10" value="4" style="flex:.5;">
+                        <span class="val" id="titleStrokeWVal">4</span>
+                    </div>
+                    <div class="ctrl-row"><label>Y Pos</label><input type="range" id="titleY" min="5" max="95" value="50"><span class="val" id="titleYVal">50%</span></div>
+                </div>
+
+                <div class="ctrl-group">
+                    <h3><i class="fas fa-font"></i> Subtitle</h3>
+                    <div class="ctrl-row"><label>Text</label><input type="text" id="subText" value="" placeholder="Optional subtitle..."></div>
+                    <div class="ctrl-row"><label>Size</label><input type="range" id="subSize" min="12" max="80" value="28"><span class="val" id="subSizeVal">28</span></div>
+                    <div class="ctrl-row"><label>Color</label><input type="color" id="subColor" value="#c0965c"></div>
+                </div>
+
+                <div class="ctrl-group">
+                    <h3><i class="fas fa-expand"></i> Output Size</h3>
+                    <div class="size-pills" id="sizePills">
+                        <button class="size-pill active" data-w="1280" data-h="720">1280×720</button>
+                        <button class="size-pill" data-w="1920" data-h="1080">1920×1080</button>
+                        <button class="size-pill" data-w="1280" data-h="1280">1280×1280</button>
+                        <button class="size-pill" data-w="800" data-h="450">800×450</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://logo.openvibe.tools">Logo Hub</a>
+                <a href="https://title.openvibe.tools">Title Cards</a>
+                <a href="https://watermark.openvibe.tools">Watermark</a>
+                <a href="https://openvibe.live">OpenVibe.Live</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/logo-engine.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+        const E = LogoOpenVibeEngine;
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let bgImg = null;
+        let outW = 1280, outH = 720;
+
+        // Populate fonts
+        const fontSel = document.getElementById('titleFont');
+        const boldFonts = ['Bangers', 'Bebas Neue', 'Anton', 'Black Ops One', 'Impact', 'Oswald', 'Montserrat', 'Alfa Slab One', 'Bungee', 'Luckiest Guy', 'Concert One', 'Staatliches'];
+        const allFonts = [...new Set([...boldFonts, ...E.fonts])];
+        allFonts.forEach(f => { const o = document.createElement('option'); o.value = f; o.textContent = f; if (f === 'Bangers') o.selected = true; fontSel.appendChild(o); });
+
+        // Size pills
+        document.querySelectorAll('.size-pill').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll('.size-pill').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                outW = +btn.dataset.w;
+                outH = +btn.dataset.h;
+                renderThumb();
+            };
+        });
+
+        // File upload
+        document.getElementById('fileInput').addEventListener('change', e => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = ev => {
+                const img = new Image();
+                img.onload = () => { bgImg = img; renderThumb(); };
+                img.src = ev.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        async function renderThumb() {
+            canvas.width = outW;
+            canvas.height = outH;
+            ctx.clearRect(0, 0, outW, outH);
+
+            // Background
+            if (bgImg) {
+                // Cover-fit the image
+                const ir = bgImg.width / bgImg.height;
+                const cr = outW / outH;
+                let sw, sh, sx, sy;
+                if (ir > cr) { sh = bgImg.height; sw = sh * cr; sx = (bgImg.width - sw) / 2; sy = 0; }
+                else { sw = bgImg.width; sh = sw / cr; sx = 0; sy = (bgImg.height - sh) / 2; }
+                ctx.drawImage(bgImg, sx, sy, sw, sh, 0, 0, outW, outH);
+                // Darken overlay
+                const darken = +document.getElementById('darken').value / 100;
+                if (darken > 0) { ctx.fillStyle = `rgba(0,0,0,${darken})`; ctx.fillRect(0, 0, outW, outH); }
+            } else {
+                ctx.fillStyle = document.getElementById('bgColor').value;
+                ctx.fillRect(0, 0, outW, outH);
+            }
+
+            // Title text
+            const titleText = document.getElementById('titleText').value;
+            if (titleText) {
+                const titleFont = fontSel.value;
+                const titleSize = +document.getElementById('titleSize').value;
+                const titleYPct = +document.getElementById('titleY').value / 100;
+                await E.loadFont(titleFont);
+                ctx.font = `900 ${titleSize}px "${titleFont}", sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                const x = outW / 2;
+                const y = outH * titleYPct;
+
+                // Stroke
+                const strokeW = +document.getElementById('titleStrokeW').value;
+                if (strokeW > 0) {
+                    ctx.strokeStyle = document.getElementById('titleStroke').value;
+                    ctx.lineWidth = strokeW;
+                    ctx.lineJoin = 'round';
+                    ctx.strokeText(titleText, x, y);
+                }
+
+                ctx.fillStyle = document.getElementById('titleColor').value;
+                ctx.fillText(titleText, x, y);
+            }
+
+            // Subtitle
+            const subText = document.getElementById('subText').value;
+            if (subText) {
+                const subSize = +document.getElementById('subSize').value;
+                ctx.font = `700 ${subSize}px "Inter", sans-serif`;
+                ctx.fillStyle = document.getElementById('subColor').value;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const titleYPct = +document.getElementById('titleY').value / 100;
+                const titleSize = +document.getElementById('titleSize').value;
+                ctx.fillText(subText, outW / 2, outH * titleYPct + titleSize * 0.7);
+            }
+
+            ctx.textAlign = 'start';
+        }
+
+        function dl(fmt) {
+            const mt = { png: 'image/png', webp: 'image/webp', jpeg: 'image/jpeg' };
+            const url = canvas.toDataURL(mt[fmt] || 'image/png', 0.92);
+            const link = document.createElement('a');
+            link.download = `thumbnail-${outW}x${outH}.${fmt}`;
+            link.href = url;
+            link.click();
+        }
+
+        function updateVals() {
+            ['titleSize', 'titleStrokeW', 'subSize'].forEach(id => {
+                const v = document.getElementById(id + 'Val');
+                if (v) v.textContent = document.getElementById(id).value;
+            });
+            document.getElementById('titleYVal').textContent = document.getElementById('titleY').value + '%';
+            document.getElementById('darkenVal').textContent = document.getElementById('darken').value + '%';
+        }
+
+        document.querySelectorAll('input, select').forEach(el => {
+            el.addEventListener('input', () => { updateVals(); renderThumb(); });
+        });
+
+        updateVals();
+        renderThumb();
+    </script>
+</body>
+</html>

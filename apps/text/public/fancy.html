@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fancy Text Generator — Unicode Fonts & Styles | fancy.openvibe.tools</title>
+    <meta name="description" content="Transform text into 30+ Unicode font styles: bold, italic, script, fraktur, double-struck, circled, squared, small caps, and more. Copy and paste anywhere.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+</head>
+<body>
+    <div class="tool-wrap">
+        <div class="page-header">
+            <h1><i class="fas fa-wand-magic-sparkles"></i> Fancy Text Generator</h1>
+            <p class="subtitle">Type or paste your text and instantly see it in 30+ Unicode font styles. Click any to copy.</p>
+        </div>
+
+        <div class="tool-section">
+            <div class="input-group">
+                <textarea id="input" class="large" placeholder="Type your text here..." autofocus>Hello World</textarea>
+            </div>
+            <div class="live-hint"><span class="live-dot"></span> Results update as you type</div>
+            <div class="generate-row">
+                <button class="btn btn-primary generate-btn" onclick="document.querySelector('#input, textarea').dispatchEvent(new Event('input', {bubbles:true}))"><i class="fas fa-bolt"></i> Generate</button>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-ghost btn-sm" onclick="document.getElementById('input').value=''; updateAll()"><i class="fas fa-xmark"></i> Clear</button>
+                <button class="btn btn-ghost btn-sm" onclick="OpenVibeUI.copyText(getAllText())"><i class="fas fa-copy"></i> Copy All</button>
+            </div>
+        </div>
+
+        <div id="output" class="output-grid"></div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://text.openvibe.tools">Text.OpenVibe Hub</a>
+                <a href="https://zalgo.openvibe.tools">Zalgo Text</a>
+                <a href="https://ascii.openvibe.tools">ASCII Art</a>
+                <a href="https://case.openvibe.tools">Case Converter</a>
+                <a href="https://logo.openvibe.tools">Logo Maker</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/text-engine.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+        const input = document.getElementById('input');
+        const output = document.getElementById('output');
+        const cards = {};
+
+        function updateAll() {
+            const text = input.value || '';
+            if (!text.trim()) {
+                output.innerHTML = '<div style="color: var(--text-muted); text-align: center; grid-column: 1/-1; padding: 40px;">Start typing to see your text in fancy Unicode fonts...</div>';
+                return;
+            }
+            const results = TextOpenVibeEngine.transformAll(text);
+            if (Object.keys(cards).length === 0) {
+                output.innerHTML = '';
+                for (const [key, r] of Object.entries(results)) {
+                    cards[key] = OpenVibeUI.createOutputCard(r.name, r.text, output);
+                }
+            } else {
+                for (const [key, r] of Object.entries(results)) {
+                    if (cards[key]) OpenVibeUI.updateOutputCard(cards[key], r.text);
+                }
+            }
+        }
+
+        function getAllText() {
+            const text = input.value || '';
+            const results = TextOpenVibeEngine.transformAll(text);
+            return Object.entries(results).map(([k, r]) => `${r.name}:\n${r.text}`).join('\n\n');
+        }
+
+        input.addEventListener('input', updateAll);
+        updateAll();
+    </script>
+</body>
+</html>

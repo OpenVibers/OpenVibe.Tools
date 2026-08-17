@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Braille Translator | braille.openvibe.tools</title>
+    <meta name="description" content="Convert text to Braille Unicode characters and back. Supports A–Z, 0–9, and common punctuation.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+</head>
+<body>
+    <div class="tool-wrap">
+        <div class="page-header">
+            <h1><i class="fas fa-braille"></i> Braille Translator</h1>
+            <p class="subtitle">Convert text to Braille Unicode dots and decode Braille back to text.</p>
+        </div>
+
+        <div class="tool-section">
+            <div class="pill-tabs">
+                <button class="pill-tab active" id="tabEncode" onclick="setMode('encode')">Text → Braille</button>
+                <button class="pill-tab" id="tabDecode" onclick="setMode('decode')">Braille → Text</button>
+            </div>
+            <div class="input-group">
+                <label id="inputLabel">Text</label>
+                <textarea id="input" class="large" placeholder="Type your text..." autofocus>Hello World</textarea>
+            </div>
+            <div class="live-hint"><span class="live-dot"></span> Results update as you type</div>
+            <div class="generate-row">
+                <button class="btn btn-primary generate-btn" onclick="document.querySelector('#input, textarea').dispatchEvent(new Event('input', {bubbles:true}))"><i class="fas fa-bolt"></i> Generate</button>
+            </div>
+        </div>
+
+        <div class="tool-section">
+            <h2><i class="fas fa-braille"></i> Output</h2>
+            <div id="output" class="output-box mono" style="font-size: 1.4rem; letter-spacing: 0.2em;"></div>
+            <div class="btn-row">
+                <button class="btn btn-primary" onclick="OpenVibeUI.copyText(document.getElementById('output').textContent)"><i class="fas fa-copy"></i> Copy</button>
+            </div>
+        </div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://text.openvibe.tools">Text.OpenVibe Hub</a>
+                <a href="https://morse.openvibe.tools">Morse Code</a>
+                <a href="https://binary.openvibe.tools">Binary</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/text-engine.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+        const BRAILLE_MAP = {
+            'a':'⠁','b':'⠃','c':'⠉','d':'⠙','e':'⠑','f':'⠋','g':'⠛','h':'⠓','i':'⠊','j':'⠚',
+            'k':'⠅','l':'⠇','m':'⠍','n':'⠝','o':'⠕','p':'⠏','q':'⠟','r':'⠗','s':'⠎','t':'⠞',
+            'u':'⠥','v':'⠧','w':'⠺','x':'⠭','y':'⠽','z':'⠵',
+            '1':'⠼⠁','2':'⠼⠃','3':'⠼⠉','4':'⠼⠙','5':'⠼⠑',
+            '6':'⠼⠋','7':'⠼⠛','8':'⠼⠓','9':'⠼⠊','0':'⠼⠚',
+            ' ':'⠀','.':'⠲',',':'⠂','?':'⠦','!':'⠖',';':'⠆',':':'⠒',
+            '-':'⠤','(':'⠶',')':'⠶','\'':'⠄','"':'⠐⠂','/':'⠌'
+        };
+        const REVERSE_MAP = {};
+        Object.entries(BRAILLE_MAP).forEach(([k, v]) => { if (!REVERSE_MAP[v]) REVERSE_MAP[v] = k; });
+
+        let mode = 'encode';
+        function setMode(m) {
+            mode = m;
+            document.getElementById('tabEncode').classList.toggle('active', m === 'encode');
+            document.getElementById('tabDecode').classList.toggle('active', m === 'decode');
+            document.getElementById('inputLabel').textContent = m === 'encode' ? 'Text' : 'Braille';
+            document.getElementById('input').placeholder = m === 'encode' ? 'Type your text...' : 'Paste Braille dots here...';
+            update();
+        }
+        function encode(text) {
+            return [...text.toLowerCase()].map(c => BRAILLE_MAP[c] || c).join('');
+        }
+        function decode(braille) {
+            let out = '', i = 0;
+            const chars = [...braille];
+            while (i < chars.length) {
+                const two = chars[i] + (chars[i+1] || '');
+                if (REVERSE_MAP[two]) { out += REVERSE_MAP[two]; i += 2; }
+                else if (REVERSE_MAP[chars[i]]) { out += REVERSE_MAP[chars[i]]; i++; }
+                else { out += chars[i]; i++; }
+            }
+            return out;
+        }
+        function update() {
+            const text = document.getElementById('input').value;
+            document.getElementById('output').textContent = mode === 'encode' ? encode(text) : decode(text);
+        }
+        document.getElementById('input').addEventListener('input', update);
+        update();
+    </script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+[Unit]
+Description=Maps.OpenVibe — Survival Map for North America
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/openvibe.tools/apps/maps
+EnvironmentFile=/etc/openvibe/tools.env
+# tools.env is shared by all tools services and must NOT set PORT
+Environment=NODE_ENV=production
+Environment=PORT=4010
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/env node /opt/openvibe.tools/apps/maps/server/index.js
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/openvibe.tools/apps/maps/data
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docs.OpenVibe — Free Online PDF & Document Tools</title>
+    <meta name="description" content="Merge, split, compress, convert, rotate, reorder, watermark, and sign PDFs online for free. No sign-up required.">
+    <meta property="og:title" content="Docs.OpenVibe — Free Online PDF & Document Tools">
+    <meta property="og:type" content="website">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <!-- Navbar injected by OpenVibeNavbar.init() -->
+
+    <div id="app">
+        <!-- Hero -->
+        <section class="hero" id="hero">
+            <div class="hero-icon" id="hero-icon"><i class="fa-solid fa-file-pdf"></i></div>
+            <h1 id="hero-title">Docs.OpenVibe</h1>
+            <p class="hero-subtitle" id="hero-subtitle">Free Online PDF & Document Tools</p>
+        </section>
+
+        <!-- Tool Selector (visible on hub domain) -->
+        <nav class="tool-tabs" id="tool-tabs">
+            <button class="tool-tab active" data-tool="merge"><i class="fa-solid fa-object-group"></i> Merge</button>
+            <button class="tool-tab" data-tool="split"><i class="fa-solid fa-scissors"></i> Split</button>
+            <button class="tool-tab" data-tool="compress"><i class="fa-solid fa-compress"></i> Compress</button>
+            <button class="tool-tab" data-tool="rotate"><i class="fa-solid fa-rotate"></i> Rotate</button>
+            <button class="tool-tab" data-tool="reorder"><i class="fa-solid fa-sort"></i> Reorder</button>
+            <button class="tool-tab" data-tool="watermark"><i class="fa-solid fa-stamp"></i> Watermark</button>
+            <button class="tool-tab" data-tool="img2pdf"><i class="fa-solid fa-file-image"></i> IMG→PDF</button>
+            <button class="tool-tab" data-tool="pdf2img"><i class="fa-solid fa-image"></i> PDF→IMG</button>
+        </nav>
+
+        <!-- Upload Zone -->
+        <section class="upload-zone" id="upload-zone">
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                <p class="upload-text">Drag & drop files here</p>
+                <p class="upload-hint" id="upload-hint">or click to browse — PDF, PNG, JPG, WebP, TIFF, BMP, GIF</p>
+                <input type="file" id="file-input" accept=".pdf,image/*" hidden>
+                <button class="btn btn-primary" id="browse-btn"><i class="fa-solid fa-folder-open"></i> Choose Files</button>
+            </div>
+
+            <!-- Single file info -->
+            <div class="upload-info" id="upload-info" style="display:none">
+                <div class="file-preview" id="file-preview"><i class="fa-solid fa-file-pdf"></i></div>
+                <div class="file-details" id="file-details"></div>
+                <button class="btn btn-ghost" id="clear-btn"><i class="fa-solid fa-xmark"></i> Clear</button>
+            </div>
+
+            <!-- Multi-file list -->
+            <div id="multi-file-zone" style="display:none">
+                <ul class="file-list" id="file-list"></ul>
+                <div style="display:flex;gap:8px;justify-content:center;margin-top:8px">
+                    <button class="btn btn-ghost" id="add-more-btn"><i class="fa-solid fa-plus"></i> Add More</button>
+                    <button class="btn btn-ghost" id="clear-all-btn"><i class="fa-solid fa-xmark"></i> Clear All</button>
+                </div>
+                <input type="file" id="multi-file-input" accept=".pdf,image/*" multiple hidden>
+            </div>
+        </section>
+
+        <!-- Tool Options -->
+        <section class="options-panel" id="options-panel" style="display:none">
+            <!-- Split Options -->
+            <div class="option-group" id="opt-split" style="display:none">
+                <label class="option-label">Split Mode</label>
+                <select id="split-mode" class="select-input">
+                    <option value="ranges">By Page Ranges</option>
+                    <option value="all">Every Page Separate</option>
+                    <option value="half">Split in Half</option>
+                </select>
+                <div id="split-ranges-input" style="margin-top:12px">
+                    <label class="option-label">Page Ranges</label>
+                    <input type="text" id="split-ranges" class="text-input" placeholder="e.g. 1-3, 5, 7-9">
+                    <p class="option-hint">Comma-separated page numbers or ranges</p>
+                </div>
+            </div>
+
+            <!-- Compress Options -->
+            <div class="option-group" id="opt-compress" style="display:none">
+                <label class="option-label">Compression Level</label>
+                <select id="compress-level" class="select-input">
+                    <option value="low">Low (best quality)</option>
+                    <option value="medium" selected>Medium (balanced)</option>
+                    <option value="high">High (smallest file)</option>
+                </select>
+            </div>
+
+            <!-- Rotate Options -->
+            <div class="option-group" id="opt-rotate" style="display:none">
+                <label class="option-label">Rotation Angle</label>
+                <div class="tool-tabs" style="margin-bottom:12px">
+                    <button class="tool-tab active" data-angle="90">90° CW</button>
+                    <button class="tool-tab" data-angle="180">180°</button>
+                    <button class="tool-tab" data-angle="270">90° CCW</button>
+                </div>
+                <label class="option-label">Pages</label>
+                <input type="text" id="rotate-pages" class="text-input" placeholder="all (or e.g. 1,3,5-7)">
+            </div>
+
+            <!-- Reorder Options -->
+            <div class="option-group" id="opt-reorder" style="display:none">
+                <label class="option-label">New Page Order</label>
+                <input type="text" id="reorder-order" class="text-input" placeholder="e.g. 3,1,2,5,4">
+                <p class="option-hint">Comma-separated page numbers in the desired order. Omit pages to remove them.</p>
+            </div>
+
+            <!-- Watermark Options -->
+            <div class="option-group" id="opt-watermark" style="display:none">
+                <label class="option-label">Watermark Text</label>
+                <input type="text" id="wm-text" class="text-input" placeholder="CONFIDENTIAL" value="CONFIDENTIAL">
+                <div class="page-inputs" style="margin-top:12px">
+                    <div class="dim-field">
+                        <label class="option-label">Font Size</label>
+                        <input type="number" id="wm-fontsize" class="num-input" value="48" min="8" max="200">
+                    </div>
+                    <div class="dim-field">
+                        <label class="option-label">Opacity <span id="wm-opacity-val">15</span>%</label>
+                        <input type="range" id="wm-opacity" class="slider" min="1" max="100" value="15">
+                    </div>
+                    <div class="dim-field">
+                        <label class="option-label">Rotation</label>
+                        <input type="number" id="wm-rotation" class="num-input" value="-45" min="-180" max="180">
+                    </div>
+                    <div class="dim-field">
+                        <label class="option-label">Color</label>
+                        <input type="color" id="wm-color" value="#888888" style="width:100%;height:38px;padding:2px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-sm);">
+                    </div>
+                </div>
+                <label class="option-label" style="margin-top:12px">Pages</label>
+                <input type="text" id="wm-pages" class="text-input" placeholder="all (or e.g. 1,3,5-7)">
+            </div>
+
+            <!-- Image to PDF Options -->
+            <div class="option-group" id="opt-img2pdf" style="display:none">
+                <label class="option-label">Page Size</label>
+                <select id="img2pdf-pagesize" class="select-input">
+                    <option value="a4" selected>A4</option>
+                    <option value="letter">US Letter</option>
+                    <option value="legal">US Legal</option>
+                    <option value="fit">Fit to Image</option>
+                </select>
+            </div>
+
+            <!-- PDF to Image Options -->
+            <div class="option-group" id="opt-pdf2img" style="display:none">
+                <label class="option-label">Output Format</label>
+                <div class="tool-tabs" style="margin-bottom:12px">
+                    <button class="tool-tab active" data-imgfmt="png">PNG</button>
+                    <button class="tool-tab" data-imgfmt="jpg">JPG</button>
+                </div>
+                <label class="option-label">DPI</label>
+                <input type="number" id="pdf2img-dpi" class="num-input num-input-sm" value="150" min="72" max="600">
+                <label class="option-label" style="margin-top:12px">Pages</label>
+                <input type="text" id="pdf2img-pages" class="text-input" placeholder="all (or e.g. 1,3,5-7)">
+            </div>
+
+            <!-- Protect Options -->
+            <div class="option-group" id="opt-protect" style="display:none">
+                <label class="option-label">Password</label>
+                <input type="password" id="protect-password" class="text-input" placeholder="Enter a password">
+            </div>
+
+            <!-- Unlock Options -->
+            <div class="option-group" id="opt-unlock" style="display:none">
+                <label class="option-label">Current Password</label>
+                <input type="password" id="unlock-password" class="text-input" placeholder="Enter the PDF password">
+            </div>
+
+            <!-- Process Button -->
+            <button class="btn btn-primary btn-lg" id="process-btn" disabled style="margin-top:20px;width:100%">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> <span id="process-text">Process Document</span>
+            </button>
+        </section>
+
+        <!-- Processing State -->
+        <section class="processing" id="processing" style="display:none">
+            <div class="spinner"></div>
+            <p>Processing your document...</p>
+        </section>
+
+        <!-- Result -->
+        <section class="result-panel" id="result-panel" style="display:none">
+            <h2><i class="fa-solid fa-circle-check"></i> Done!</h2>
+            <div class="result-info" id="result-info"></div>
+            <div class="result-actions">
+                <a class="btn btn-primary btn-lg" id="download-btn" href="#" download>
+                    <i class="fa-solid fa-download"></i> Download
+                </a>
+                <button class="btn btn-secondary" id="another-btn">
+                    <i class="fa-solid fa-arrow-rotate-left"></i> Process Another
+                </button>
+            </div>
+        </section>
+
+        <!-- Subdomains Grid (hub only) -->
+        <section class="subdomains" id="subdomains">
+            <h2>All Document Tools</h2>
+            <div class="subdomain-grid" id="subdomain-grid"></div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="footer-inner">
+            <span><i class="fa-solid fa-file-pdf"></i> Docs.OpenVibe &mdash; Part of the <a href="https://openvibe.network">OpenVibe Network</a></span>
+            <span class="footer-links">
+                <a href="https://openvibe.tools">OpenVibe.Tools</a>
+                <a href="https://openvibe.live">OpenVibe.Live</a>
+                <a href="https://openvibe.games">Scraplandia</a>
+                <a href="https://img.openvibe.tools">Img.OpenVibe</a>
+                <a href="https://audio.openvibe.tools">Audio.OpenVibe</a>
+                <a href="https://yt.openvibe.tools">YT.OpenVibe</a>
+            </span>
+        </div>
+    </footer>
+
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>

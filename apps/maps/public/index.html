@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maps.OpenVibe — Survival Map for North America</title>
+  <meta name="description" content="Find free camping, dispersed campsites, shelters, resources, food banks, and survival information across North America.">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Font Awesome 6 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Leaflet MarkerCluster -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <!-- Leaflet Heat -->
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Toastify -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js@1.12.0/src/toastify.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/toastify-js@1.12.0/src/toastify.min.js"></script>
+
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<!-- ═══ Splash Screen ═══ -->
+<div id="splash-screen">
+  <div class="splash-content">
+    <div class="splash-icon"><i class="fa-solid fa-person-shelter"></i></div>
+    <h1 class="splash-title">OPENVIBE<span class="green">MAPS</span></h1>
+    <p class="splash-subtitle"><i class="fa-solid fa-map-location-dot"></i> Survival Map for North America</p>
+    <div class="splash-loader">
+      <div class="loader-bar"><div class="loader-fill" id="loader-fill"></div></div>
+      <p class="splash-status" id="splash-status"><i class="fa-solid fa-satellite-dish"></i> Loading map...</p>
+    </div>
+    <div class="splash-sources">
+      <span><i class="fa-solid fa-database"></i> RIDB</span>
+      <span><i class="fa-brands fa-openstreetmap"></i> OSM</span>
+      <span><i class="fa-solid fa-campground"></i> FreeCampsites</span>
+      <span><i class="fa-solid fa-globe"></i> iOverlander</span>
+      <span><i class="fa-solid fa-bridge"></i> Bridges</span>
+      <span><i class="fa-solid fa-restroom"></i> Restrooms</span>
+      <span><i class="fa-solid fa-hand-holding-heart"></i> Resources</span>
+      <span><i class="fa-solid fa-tree"></i> USFS</span>
+      <span><i class="fa-solid fa-mountain-sun"></i> NPS</span>
+      <span><i class="fa-solid fa-cloud-sun"></i> Weather</span>
+      <span><i class="fa-solid fa-water"></i> Waterways</span>
+      <span><i class="fa-solid fa-umbrella"></i> Rain Cover</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Disclaimer ═══ -->
+<div id="disclaimer-overlay" class="hidden">
+  <div class="disclaimer-box">
+    <div class="disclaimer-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    <h1 class="disclaimer-title">IMPORTANT DISCLAIMER</h1>
+    <div class="disclaimer-body">
+      <p><strong>READ CAREFULLY BEFORE USING MAPS.OPENVIBE</strong></p>
+      <p>Maps.OpenVibe is provided <strong>strictly for informational and educational purposes only</strong>.</p>
+      <ul>
+        <li><strong>No Guarantee of Safety.</strong> Location data may be inaccurate, outdated, or dangerous.</li>
+        <li><strong>Use at Your Own Risk.</strong> Camping, sleeping outdoors, and accessing remote locations carries inherent risks including injury, illness, exposure, wildlife encounters, and death.</li>
+        <li><strong>Not Legal Advice.</strong> You are solely responsible for understanding and complying with all local, state, and federal laws.</li>
+        <li><strong>No Warranty.</strong> This software is provided "AS IS" without warranty of any kind.</li>
+        <li><strong>Limitation of Liability.</strong> Under no circumstances shall the developers be liable for any damages arising from your use of this software.</li>
+      </ul>
+      <p class="disclaimer-final"><i class="fa-solid fa-skull-crossbones"></i> <strong>People have died in the outdoors. This software cannot protect you. Only you can.</strong></p>
+    </div>
+    <div class="disclaimer-actions">
+      <label class="disclaimer-checkbox-label">
+        <input type="checkbox" id="disclaimer-check">
+        <span>I have read and understand this disclaimer. I accept all risks.</span>
+      </label>
+      <button id="btn-disclaimer-agree" class="disclaimer-agree-btn" disabled>
+        <i class="fa-solid fa-shield-halved"></i> I Agree — Enter Maps.OpenVibe
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Main App ═══ -->
+<div id="app" class="hidden">
+
+  <!-- Header -->
+  <header id="header">
+    <div class="header-left">
+      <div class="brand">
+        <i class="fa-solid fa-person-shelter brand-icon"></i>
+        <span class="brand-text">OPENVIBE<span class="green">MAPS</span></span>
+      </div>
+      <div class="header-divider"></div>
+      <span class="header-tagline"><i class="fa-solid fa-map-location-dot"></i> Survival Map</span>
+    </div>
+
+    <div class="search-container">
+      <div class="search-box">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input type="text" id="search-input" placeholder="Address, city, or coordinates..." autocomplete="off">
+        <button id="btn-my-location" title="Use GPS"><i class="fa-solid fa-crosshairs"></i></button>
+        <select id="search-radius" title="Search radius">
+          <option value="5">5 mi</option>
+          <option value="10">10 mi</option>
+          <option value="15" selected>15 mi</option>
+          <option value="25">25 mi</option>
+          <option value="50">50 mi</option>
+        </select>
+        <button id="btn-search" class="btn-primary"><i class="fa-solid fa-person-shelter"></i><span>Search</span></button>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <button id="btn-weather" class="header-btn" title="Weather"><i class="fa-solid fa-cloud-sun"></i></button>
+      <button id="btn-food" class="header-btn" title="Food Banks & Grocery"><i class="fa-solid fa-utensils"></i></button>
+      <button id="btn-favorites" class="header-btn" title="Favorites"><i class="fa-solid fa-heart"></i></button>
+      <button id="btn-add-spot" class="header-btn" title="Add Custom Spot"><i class="fa-solid fa-plus"></i></button>
+      <button id="btn-guide" class="header-btn" title="Survival Guide"><i class="fa-solid fa-book-skull"></i></button>
+      <button id="btn-stats" class="header-btn" title="Statistics"><i class="fa-solid fa-chart-pie"></i></button>
+      <button id="btn-theme" class="header-btn" title="Toggle theme"><i class="fa-solid fa-moon"></i></button>
+    </div>
+  </header>
+
+  <!-- Filter Bar -->
+  <div id="filter-bar">
+    <div class="filter-section">
+      <span class="filter-label"><i class="fa-solid fa-filter"></i></span>
+      <div class="filter-chips">
+        <button class="filter-chip active" data-filter="all"><i class="fa-solid fa-layer-group"></i> All</button>
+        <button class="filter-chip" data-filter="dispersed"><i class="fa-solid fa-tree"></i> Dispersed</button>
+        <button class="filter-chip" data-filter="campground"><i class="fa-solid fa-campground"></i> Campgrounds</button>
+        <button class="filter-chip" data-filter="shelter"><i class="fa-solid fa-house-chimney"></i> Shelters</button>
+        <button class="filter-chip" data-filter="bridge"><i class="fa-solid fa-bridge"></i> Bridges</button>
+        <button class="filter-chip" data-filter="cover"><i class="fa-solid fa-umbrella"></i> Rain Cover</button>
+        <button class="filter-chip" data-filter="forest"><i class="fa-solid fa-leaf"></i> Forest</button>
+        <button class="filter-chip" data-filter="woods"><i class="fa-solid fa-tree"></i> Woods</button>
+        <button class="filter-chip" data-filter="urban"><i class="fa-solid fa-city"></i> Urban</button>
+        <button class="filter-chip" data-filter="restroom"><i class="fa-solid fa-restroom"></i> Restrooms</button>
+        <button class="filter-chip" data-filter="water"><i class="fa-solid fa-faucet-drip"></i> Water</button>
+        <button class="filter-chip" data-filter="free"><i class="fa-solid fa-hand-holding-heart"></i> Free</button>
+        <button class="filter-chip" data-filter="favorites"><i class="fa-solid fa-heart"></i> Favs</button>
+      </div>
+    </div>
+    <div class="filter-right">
+      <span id="results-summary"></span>
+      <select id="sort-by" class="hidden">
+        <option value="distance">Distance</option>
+        <option value="stealth">Stealth</option>
+        <option value="name">Name</option>
+      </select>
+      <button id="btn-heatmap" class="filter-tool-btn" title="Stealth heatmap"><i class="fa-solid fa-fire"></i></button>
+      <button id="btn-crime-heatmap" class="filter-tool-btn" title="Crime/sketch heatmap"><i class="fa-solid fa-skull-crossbones"></i></button>
+      <button id="btn-satellite" class="filter-tool-btn" title="Satellite view"><i class="fa-solid fa-satellite"></i></button>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <main id="main-content">
+    <!-- Sidebar -->
+    <aside id="sidebar">
+      <div id="welcome-card" class="welcome-card">
+        <div class="welcome-icon"><i class="fa-solid fa-person-shelter fa-3x"></i></div>
+        <h2><i class="fa-solid fa-person-hiking"></i> Welcome to Maps.OpenVibe</h2>
+        <p>Find stealth camping, dispersed campsites, shelters, and survival resources across North America.</p>
+        <div class="quick-searches">
+          <p class="quick-label"><i class="fa-solid fa-bolt"></i> Quick Search:</p>
+          <button class="quick-btn" data-query="Seattle, WA"><i class="fa-solid fa-city"></i> Seattle</button>
+          <button class="quick-btn" data-query="Portland, OR"><i class="fa-solid fa-tree"></i> Portland</button>
+          <button class="quick-btn" data-query="Denver, CO"><i class="fa-solid fa-mountain"></i> Denver</button>
+          <button class="quick-btn" data-query="Flagstaff, AZ"><i class="fa-solid fa-sun"></i> Flagstaff</button>
+          <button class="quick-btn" data-query="Asheville, NC"><i class="fa-solid fa-leaf"></i> Asheville</button>
+          <button class="quick-btn" data-query="Austin, TX"><i class="fa-solid fa-map-pin"></i> Austin</button>
+          <button class="quick-btn" data-query="Bozeman, MT"><i class="fa-solid fa-mountain-sun"></i> Bozeman</button>
+          <button class="quick-btn" data-query="Vancouver, BC"><i class="fa-solid fa-water"></i> Vancouver</button>
+        </div>
+        <div class="welcome-stats">
+          <div class="mini-stat"><i class="fa-solid fa-database"></i> 17+ Sources</div>
+          <div class="mini-stat"><i class="fa-solid fa-map-pin"></i> 100+ Spots</div>
+          <div class="mini-stat"><i class="fa-solid fa-cloud-sun"></i> Live Weather</div>
+          <div class="mini-stat"><i class="fa-solid fa-globe-americas"></i> North America</div>
+        </div>
+      </div>
+      <div id="results-list"></div>
+    </aside>
+
+    <!-- Map -->
+    <div id="map-container">
+      <div id="map"></div>
+      <div class="map-ctrl-group">
+        <button id="btn-map-locate" class="map-ctrl-btn" title="My location"><i class="fa-solid fa-street-view"></i></button>
+        <button id="btn-map-fullscreen" class="map-ctrl-btn" title="Fullscreen"><i class="fa-solid fa-expand"></i></button>
+      </div>
+      <button id="btn-search-area" class="search-area-btn hidden">
+        <i class="fa-solid fa-magnifying-glass-location"></i> Search This Area
+      </button>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer id="footer">
+    <span id="footer-status"><i class="fa-solid fa-person-shelter"></i> Ready</span>
+    <span id="footer-coords"></span>
+    <span id="footer-weather"></span>
+  </footer>
+</div>
+
+<!-- ═══ Detail Panel ═══ -->
+<div id="detail-panel" class="hidden">
+  <div class="detail-header">
+    <button id="btn-detail-close" class="detail-close"><i class="fa-solid fa-xmark"></i></button>
+    <h2 id="detail-name"></h2>
+    <div id="detail-type" class="detail-type"></div>
+    <button id="btn-favorite-detail" class="detail-fav-btn"><i class="fa-regular fa-heart"></i></button>
+  </div>
+  <div id="detail-body" class="detail-body"></div>
+</div>
+
+<!-- ═══ Weather Modal ═══ -->
+<div id="weather-modal" class="modal hidden">
+  <div class="modal-content modal-md">
+    <div class="modal-header">
+      <h2><i class="fa-solid fa-cloud-sun"></i> Weather & Conditions</h2>
+      <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="weather-content" class="modal-body">
+      <p class="muted-text">Search for a location first to see weather data.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Food Modal ═══ -->
+<div id="food-modal" class="modal hidden">
+  <div class="modal-content modal-lg">
+    <div class="modal-header">
+      <h2><i class="fa-solid fa-utensils"></i> Food Resources</h2>
+      <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="food-tabs">
+        <button class="food-tab active" data-tab="food-banks"><i class="fa-solid fa-hand-holding-heart"></i> Food Banks</button>
+        <button class="food-tab" data-tab="stores"><i class="fa-solid fa-cart-shopping"></i> Stores</button>
+        <button class="food-tab" data-tab="meal-plan"><i class="fa-solid fa-calendar-days"></i> Meal Plan</button>
+        <button class="food-tab" data-tab="food-db"><i class="fa-solid fa-apple-whole"></i> Food Database</button>
+      </div>
+      <div id="food-banks" class="food-panel active"></div>
+      <div id="stores" class="food-panel hidden"></div>
+      <div id="meal-plan" class="food-panel hidden"></div>
+      <div id="food-db" class="food-panel hidden"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Favorites Modal ═══ -->
+<div id="favorites-modal" class="modal hidden">
+  <div class="modal-content modal-md">
+    <div class="modal-header">
+      <h2><i class="fa-solid fa-heart"></i> Favorites</h2>
+      <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="favorites-content" class="modal-body">
+      <p class="muted-text"><i class="fa-regular fa-heart"></i> No favorites yet.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Add Spot Modal ═══ -->
+<div id="add-spot-modal" class="modal hidden">
+  <div class="modal-content modal-sm">
+    <div class="modal-header">
+      <h2><i class="fa-solid fa-plus"></i> Add Custom Spot</h2>
+      <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="spot-name" placeholder="My secret spot">
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Latitude</label><input type="text" id="spot-lat" placeholder="47.6062"></div>
+        <div class="form-group"><label>Longitude</label><input type="text" id="spot-lon" placeholder="-122.3321"></div>
+      </div>
+      <div class="form-group">
+        <label>Type</label>
+        <select id="spot-type">
+          <option value="Dispersed Camping">Dispersed Camping</option>
+          <option value="Stealth Spot">Stealth Spot</option>
+          <option value="Shelter">Shelter</option>
+          <option value="Bridge">Bridge</option>
+          <option value="Rain Cover">Rain Cover</option>
+          <option value="Water Source">Water Source</option>
+          <option value="Resource">Resource</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Stealth Rating</label>
+        <select id="spot-stealth">
+          <option value="1">1 — Exposed</option>
+          <option value="2">2 — Risky</option>
+          <option value="3" selected>3 — Moderate</option>
+          <option value="4">4 — Hidden</option>
+          <option value="5">5 — Ghost Mode</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea id="spot-description" rows="3" placeholder="Notes about this spot..."></textarea>
+      </div>
+      <button id="btn-save-spot" class="btn-primary" style="width:100%"><i class="fa-solid fa-floppy-disk"></i> Save Spot</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Guide Modal ═══ -->
+<div id="guide-modal" class="modal hidden">
+  <div class="modal-content modal-lg">
+    <div class="modal-header">
+      <h2><i class="fa-solid fa-book-skull"></i> Survival Guide</h2>
+      <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="guide-tabs">
+        <button class="guide-tab active" data-guide="stealth"><i class="fa-solid fa-eye-slash"></i> Stealth</button>
+        <button class="guide-tab" data-guide="rules"><i class="fa-solid fa-gavel"></i> Rules</button>
+        <button class="guide-tab" data-guide="gear"><i class="fa-solid fa-backpack"></i> Gear</button>
+        <button class="guide-tab" data-guide="safety"><i class="fa-solid fa-shield-heart"></i> Safety</button>
+        <button class="guide-tab" data-guide="fire"><i class="fa-solid fa-fire"></i> Fire</button>
+        <button class="guide-tab" data-guide="firstaid"><i class="fa-solid fa-kit-medical"></i> First Aid</button>
+      </div>
+      <div id="guide-content" class="guide-body"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Stats Modal ═══ -->
+<div id="stats-modal" class="modal hidden">
+  <div class="modal-content modal-md">
+    <div class="modal-header">
+      <h2><i class="fa-solid fa-chart-pie"></i> Statistics</h2>
+      <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-value" id="stat-total">0</div><div class="stat-label">Total Spots</div></div>
+        <div class="stat-card"><div class="stat-value" id="stat-dispersed">0</div><div class="stat-label">Dispersed</div></div>
+        <div class="stat-card"><div class="stat-value" id="stat-free">0</div><div class="stat-label">Free Spots</div></div>
+        <div class="stat-card"><div class="stat-value" id="stat-stealth">0</div><div class="stat-label">High Stealth</div></div>
+        <div class="stat-card"><div class="stat-value" id="stat-time">-</div><div class="stat-label">Query Time</div></div>
+        <div class="stat-card"><div class="stat-value" id="stat-favs">0</div><div class="stat-label">Favorites</div></div>
+      </div>
+      <canvas id="stats-chart" height="200"></canvas>
+      <canvas id="sources-chart" height="180" style="margin-top:16px"></canvas>
+    </div>
+  </div>
+</div>
+
+<script src="https://openvibe.network/shared/theme-loader.js"></script>
+<script src="https://openvibe.network/shared/navbar.js"></script>
+<script src="https://openvibe.network/shared/notification-ui.js"></script>
+<script src="https://openvibe.network/shared/account-switcher.js"></script>
+<script src="/js/app.js"></script>
+<script>
+(function () {
+    function getCookie(name) {
+        const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+        return m ? decodeURIComponent(m[1]) : null;
+    }
+    const token = getCookie('ov_token') || localStorage.getItem('ov_token');
+    let user = null;
+    if (token) { try { user = JSON.parse(atob(token.split('.')[1])); } catch {} }
+    if (typeof OpenVibeNavbar !== 'undefined') {
+        OpenVibeNavbar.init({ service: 'maps', brandName: 'Maps.OpenVibe', brandIcon: 'fa-person-shelter', token, user, apiBase: 'https://openvibe.network' });
+    }
+    if (typeof OpenVibeAccountSwitcher !== 'undefined') {
+        OpenVibeAccountSwitcher.init({ apiBase: 'https://openvibe.network' });
+    }
+    if (typeof OpenVibeNotifications !== 'undefined' && token) {
+        OpenVibeNotifications.init({ token, apiBase: 'https://openvibe.network' });
+        if (typeof OpenVibeNavbar !== 'undefined') {
+            var mount = OpenVibeNavbar.getBellMount();
+            if (mount) { var bell = OpenVibeNotifications.createBell(); if (bell) mount.appendChild(bell); }
+        }
+    }
+})();
+</script>
+</body>
+</html>

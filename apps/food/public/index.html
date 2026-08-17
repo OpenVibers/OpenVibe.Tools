@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Food.OpenVibe — Budget Grocery & Meal Planning</title>
+  <meta name="description" content="Budget grocery finder, meal planning optimizer, food bank locator, and nutrition database for survival on a budget.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js@1.12.0/src/toastify.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/toastify-js@1.12.0/src/toastify.min.js"></script>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <!-- Header -->
+  <header id="header">
+    <div class="header-left">
+      <div class="brand">
+        <i class="fa-solid fa-utensils brand-icon"></i>
+        <span class="brand-text">OPENVIBE<span class="green">FOOD</span></span>
+      </div>
+      <div class="header-divider"></div>
+      <span class="header-tagline"><i class="fa-solid fa-apple-whole"></i> Budget Grocery & Meal Planning</span>
+    </div>
+    <div class="header-right">
+      <a href="https://maps.openvibe.tools" class="header-btn" title="Maps.OpenVibe"><i class="fa-solid fa-map-location-dot"></i></a>
+      <button id="btn-theme" class="header-btn" title="Toggle theme"><i class="fa-solid fa-moon"></i></button>
+    </div>
+  </header>
+
+  <!-- Location Bar -->
+  <div id="loc-bar">
+    <div class="loc-search">
+      <i class="fa-solid fa-location-dot"></i>
+      <input type="text" id="loc-input" placeholder="Enter your city or zip code...">
+      <button id="btn-gps" title="Use GPS"><i class="fa-solid fa-crosshairs"></i></button>
+      <button id="btn-loc-search" class="btn-primary"><i class="fa-solid fa-magnifying-glass"></i> Find Food</button>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <main id="main">
+    <!-- Tabs -->
+    <nav id="tabs">
+      <button class="tab active" data-tab="food-banks"><i class="fa-solid fa-hand-holding-heart"></i> Food Banks</button>
+      <button class="tab" data-tab="stores"><i class="fa-solid fa-cart-shopping"></i> Stores</button>
+      <button class="tab" data-tab="meal-plan"><i class="fa-solid fa-calendar-days"></i> Meal Planner</button>
+      <button class="tab" data-tab="food-db"><i class="fa-solid fa-apple-whole"></i> Food Database</button>
+      <button class="tab" data-tab="map"><i class="fa-solid fa-map"></i> Map</button>
+    </nav>
+
+    <!-- Panels -->
+    <div id="content">
+      <!-- Food Banks Panel -->
+      <section id="food-banks" class="panel active">
+        <div class="panel-header">
+          <h2><i class="fa-solid fa-hand-holding-heart"></i> Food Banks & Pantries</h2>
+          <p class="panel-desc">Find free food distribution centers near you</p>
+        </div>
+        <div id="food-banks-list" class="card-grid">
+          <div class="empty-state">
+            <i class="fa-solid fa-location-dot fa-3x"></i>
+            <p>Enter your location above to find nearby food banks</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Stores Panel -->
+      <section id="stores" class="panel">
+        <div class="panel-header">
+          <h2><i class="fa-solid fa-cart-shopping"></i> Budget Grocery Stores</h2>
+          <p class="panel-desc">Find the cheapest stores near you — Walmart, Dollar Tree, Grocery Outlet & more</p>
+        </div>
+        <div class="store-legend">
+          <span class="legend-item"><span class="legend-dot" style="background:#0071dc"></span> Walmart</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#e21836"></span> Fred Meyer</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#e8351e"></span> Safeway</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#00a651"></span> Dollar Tree</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#ff6600"></span> Grocery Outlet</span>
+        </div>
+        <div id="stores-list" class="card-grid">
+          <div class="empty-state">
+            <i class="fa-solid fa-cart-shopping fa-3x"></i>
+            <p>Enter your location to find nearby stores</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Meal Planner Panel -->
+      <section id="meal-plan" class="panel">
+        <div class="panel-header">
+          <h2><i class="fa-solid fa-calendar-days"></i> Budget Meal Planner</h2>
+          <p class="panel-desc">Generate optimized meal plans that hit all nutritional groups on any budget</p>
+        </div>
+        <div class="planner-controls">
+          <div class="control-group">
+            <label><i class="fa-solid fa-dollar-sign"></i> Budget</label>
+            <div class="input-row">
+              <span class="input-prefix">$</span>
+              <input type="number" id="mp-budget" value="20" min="5" max="200" step="5">
+            </div>
+          </div>
+          <div class="control-group">
+            <label><i class="fa-solid fa-calendar"></i> Days</label>
+            <input type="number" id="mp-days" value="3" min="1" max="7">
+          </div>
+          <div class="control-group">
+            <label><i class="fa-solid fa-toggle-on"></i> Options</label>
+            <div class="toggle-row">
+              <label class="toggle"><input type="checkbox" id="mp-camp" checked> <span>Camp-friendly</span></label>
+              <label class="toggle"><input type="checkbox" id="mp-shelf"> <span>Shelf-stable only</span></label>
+            </div>
+          </div>
+          <button id="btn-generate" class="btn-primary btn-lg"><i class="fa-solid fa-dice"></i> Generate Plan</button>
+        </div>
+        <div id="meal-results"></div>
+      </section>
+
+      <!-- Food Database Panel -->
+      <section id="food-db" class="panel">
+        <div class="panel-header">
+          <h2><i class="fa-solid fa-apple-whole"></i> Budget Food Database</h2>
+          <p class="panel-desc">Browse 80+ budget items with prices from 5 stores, nutrition info, and camp-friendliness ratings</p>
+        </div>
+        <div class="db-controls">
+          <div class="db-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="food-search" placeholder="Search foods...">
+          </div>
+          <div class="db-filters">
+            <button class="chip active" data-group="all">All</button>
+            <button class="chip" data-group="protein"><i class="fa-solid fa-drumstick-bite"></i> Protein</button>
+            <button class="chip" data-group="grains"><i class="fa-solid fa-wheat-awn"></i> Grains</button>
+            <button class="chip" data-group="vegetables"><i class="fa-solid fa-carrot"></i> Veggies</button>
+            <button class="chip" data-group="fruits"><i class="fa-solid fa-apple-whole"></i> Fruits</button>
+            <button class="chip" data-group="dairy"><i class="fa-solid fa-glass-water"></i> Dairy</button>
+            <button class="chip" data-group="fats"><i class="fa-solid fa-oil-can"></i> Fats</button>
+          </div>
+          <div class="db-toggles">
+            <label class="toggle"><input type="checkbox" id="db-camp"> <span>Camp-friendly</span></label>
+            <label class="toggle"><input type="checkbox" id="db-shelf"> <span>Shelf-stable</span></label>
+          </div>
+        </div>
+        <div id="food-list" class="food-table-wrap"></div>
+      </section>
+
+      <!-- Map Panel -->
+      <section id="map" class="panel">
+        <div id="food-map" style="height:calc(100vh - 180px);border-radius:var(--radius)"></div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer id="footer">
+    <span><i class="fa-solid fa-utensils"></i> food.openvibe.tools</span>
+    <span>Data from USDA, OSM, store pricing research</span>
+    <a href="https://maps.openvibe.tools" style="color:var(--green);text-decoration:none"><i class="fa-solid fa-map"></i> maps.openvibe.tools</a>
+  </footer>
+
+  <script src="https://openvibe.network/shared/theme-loader.js"></script>
+  <script src="https://openvibe.network/shared/navbar.js"></script>
+  <script src="https://openvibe.network/shared/notification-ui.js"></script>
+  <script src="https://openvibe.network/shared/account-switcher.js"></script>
+  <script src="/js/app.js"></script>
+  <script>
+  (function () {
+      function getCookie(name) {
+          const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+          return m ? decodeURIComponent(m[1]) : null;
+      }
+      const token = getCookie('ov_token') || localStorage.getItem('ov_token');
+      let user = null;
+      if (token) { try { user = JSON.parse(atob(token.split('.')[1])); } catch {} }
+      if (typeof OpenVibeNavbar !== 'undefined') {
+          OpenVibeNavbar.init({ service: 'food', brandName: 'Food.OpenVibe', brandIcon: 'fa-utensils', token, user, apiBase: 'https://openvibe.network' });
+      }
+      if (typeof OpenVibeAccountSwitcher !== 'undefined') {
+          OpenVibeAccountSwitcher.init({ apiBase: 'https://openvibe.network' });
+      }
+      if (typeof OpenVibeNotifications !== 'undefined' && token) {
+          OpenVibeNotifications.init({ token, apiBase: 'https://openvibe.network' });
+          if (typeof OpenVibeNavbar !== 'undefined') {
+              var mount = OpenVibeNavbar.getBellMount();
+              if (mount) { var bell = OpenVibeNotifications.createBell(); if (bell) mount.appendChild(bell); }
+          }
+      }
+  })();
+  </script>
+</body>
+</html>

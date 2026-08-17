@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Counter — Characters, Words, Sentences | count.openvibe.tools</title>
+    <meta name="description" content="Count characters, words, sentences, paragraphs, and bytes. Estimate reading time and speaking time.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+</head>
+<body>
+    <div class="tool-wrap">
+        <div class="page-header">
+            <h1><i class="fas fa-calculator"></i> Text Counter</h1>
+            <p class="subtitle">Real-time character, word, sentence, and paragraph counting with reading & speaking time.</p>
+        </div>
+
+        <div class="tool-section">
+            <div class="stats-bar" id="stats"></div>
+        </div>
+
+        <div class="tool-section">
+            <div class="input-group">
+                <textarea id="input" class="large" style="min-height: 200px;" placeholder="Type or paste your text here..." autofocus></textarea>
+            </div>
+        </div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://text.openvibe.tools">Text.OpenVibe Hub</a>
+                <a href="https://clean.openvibe.tools">Text Cleaner</a>
+                <a href="https://sort.openvibe.tools">Sort Lines</a>
+                <a href="https://case.openvibe.tools">Case Converter</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/text-engine.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+        const input = document.getElementById('input');
+        const statsEl = document.getElementById('stats');
+
+        function update() {
+            const data = TextOpenVibeEngine.analyze(input.value);
+            statsEl.innerHTML = [
+                { label: 'Characters', value: data.characters },
+                { label: 'No Spaces', value: data.charactersNoSpaces },
+                { label: 'Words', value: data.words },
+                { label: 'Sentences', value: data.sentences },
+                { label: 'Paragraphs', value: data.paragraphs },
+                { label: 'Lines', value: data.lines },
+                { label: 'Avg Word', value: data.avgWordLength },
+                { label: 'Read Time', value: data.readingTimeMinutes + 'm' },
+                { label: 'Speak Time', value: data.speakingTimeMinutes + 'm' },
+                { label: 'Bytes', value: data.bytes },
+            ].map(s => `<div class="stat-item"><div class="stat-value">${s.value}</div><div class="stat-label">${s.label}</div></div>`).join('');
+        }
+
+        input.addEventListener('input', update);
+        update();
+    </script>
+</body>
+</html>

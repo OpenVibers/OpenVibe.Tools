@@ -1,0 +1,45 @@
+# openvibe.tools — General Index Rules
+User-agent: *
+Allow: /
+Allow: /api/brand
+Allow: /api/health
+
+# Disallow API and transient paths
+Disallow: /api/
+Disallow: /auth/
+Disallow: /.well-known/
+Disallow: /node_modules/
+Disallow: /tmp/
+Disallow: /temp/
+
+# Aggressive Bot Rate Limiting
+User-agent: AhrefsBot
+Disallow: /
+Crawl-delay: 10
+
+User-agent: SemrushBot
+Disallow: /
+Crawl-delay: 10
+
+User-agent: DotBot
+Disallow: /
+Crawl-delay: 10
+
+User-agent: MJ12bot
+Disallow: /
+Crawl-delay: 30
+
+# Friendly Bots — Normal Rate
+User-agent: Googlebot
+Crawl-delay: 0
+
+User-agent: Bingbot
+Crawl-delay: 1
+
+User-agent: DuckDuckBot
+Crawl-delay: 1
+
+# Sitemaps
+Sitemap: https://openvibe.tools/sitemap.xml
+
+Host: https://openvibe.tools

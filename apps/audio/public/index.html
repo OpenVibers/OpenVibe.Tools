@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio.OpenVibe — Free Online Audio Converter & Tools</title>
+    <meta name="description" content="Convert, trim, merge, pitch-shift, speed-change, and process audio files online for free. Supports MP3, WAV, FLAC, OGG, M4A, OPUS, AAC, WMA, AIFF, and more.">
+    <meta property="og:title" content="Audio.OpenVibe — Free Online Audio Converter & Tools">
+    <meta property="og:type" content="website">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <!-- Navbar injected by OpenVibeNavbar.init() -->
+
+    <div id="app">
+        <!-- Hero -->
+        <section class="hero" id="hero">
+            <div class="hero-icon" id="hero-icon"><i class="fa-solid fa-headphones"></i></div>
+            <h1 id="hero-title">Audio.OpenVibe</h1>
+            <p class="hero-subtitle" id="hero-subtitle">Free Online Audio Converter & Tools</p>
+        </section>
+
+        <!-- Tool Selector (visible on hub domain) -->
+        <nav class="tool-tabs" id="tool-tabs">
+            <button class="tool-tab active" data-tool="convert"><i class="fa-solid fa-arrows-rotate"></i> Convert</button>
+            <button class="tool-tab" data-tool="trim"><i class="fa-solid fa-scissors"></i> Trim</button>
+            <button class="tool-tab" data-tool="pitch"><i class="fa-solid fa-wave-square"></i> Pitch</button>
+            <button class="tool-tab" data-tool="speed"><i class="fa-solid fa-gauge-high"></i> Speed</button>
+            <button class="tool-tab" data-tool="reverse"><i class="fa-solid fa-backward"></i> Reverse</button>
+            <button class="tool-tab" data-tool="normalize"><i class="fa-solid fa-sliders"></i> Normalize</button>
+            <button class="tool-tab" data-tool="fade"><i class="fa-solid fa-volume-low"></i> Fade</button>
+            <button class="tool-tab" data-tool="bass"><i class="fa-solid fa-volume-high"></i> Bass</button>
+            <button class="tool-tab" data-tool="equalizer"><i class="fa-solid fa-bars-staggered"></i> EQ</button>
+            <button class="tool-tab" data-tool="voice"><i class="fa-solid fa-user-astronaut"></i> Voice FX</button>
+            <button class="tool-tab" data-tool="echo"><i class="fa-solid fa-tower-broadcast"></i> Echo</button>
+            <button class="tool-tab" data-tool="reverb"><i class="fa-solid fa-church"></i> Reverb</button>
+            <button class="tool-tab" data-tool="extract"><i class="fa-solid fa-music"></i> Extract</button>
+            <button class="tool-tab" data-tool="ringtone"><i class="fa-solid fa-bell"></i> Ringtone</button>
+        </nav>
+
+        <!-- Upload Zone -->
+        <section class="upload-zone" id="upload-zone">
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                <p class="upload-text">Drag & drop an audio file here</p>
+                <p class="upload-hint">or click to browse — MP3, WAV, FLAC, OGG, M4A, AAC, OPUS, WMA, AIFF, video files</p>
+                <input type="file" id="file-input" accept="audio/*,video/*" hidden>
+                <button class="btn btn-primary" id="browse-btn"><i class="fa-solid fa-folder-open"></i> Choose File</button>
+            </div>
+            <div class="upload-info" id="upload-info" style="display:none">
+                <div class="file-icon"><i class="fa-solid fa-file-audio"></i></div>
+                <div class="file-details" id="file-details"></div>
+                <button class="btn btn-ghost" id="clear-btn"><i class="fa-solid fa-xmark"></i> Clear</button>
+            </div>
+        </section>
+
+        <!-- Tool Options -->
+        <section class="options-panel" id="options-panel" style="display:none">
+            <!-- Convert Options -->
+            <div class="option-group" id="opt-convert">
+                <label class="option-label">Output Format</label>
+                <div class="format-grid" id="format-grid">
+                    <button class="format-btn active" data-format="mp3">MP3</button>
+                    <button class="format-btn" data-format="wav">WAV</button>
+                    <button class="format-btn" data-format="flac">FLAC</button>
+                    <button class="format-btn" data-format="ogg">OGG</button>
+                    <button class="format-btn" data-format="m4a">M4A</button>
+                    <button class="format-btn" data-format="aac">AAC</button>
+                    <button class="format-btn" data-format="opus">OPUS</button>
+                    <button class="format-btn" data-format="wma">WMA</button>
+                    <button class="format-btn" data-format="aiff">AIFF</button>
+                    <button class="format-btn" data-format="ac3">AC3</button>
+                </div>
+                <label class="option-label">Bitrate <span id="bitrate-val">192</span> kbps</label>
+                <input type="range" id="bitrate-slider" min="64" max="320" value="192" step="32" class="slider">
+                <p class="option-hint">Higher = better quality, larger file. Lossless formats (WAV, FLAC, AIFF) ignore bitrate.</p>
+            </div>
+
+            <!-- Trim Options -->
+            <div class="option-group" id="opt-trim" style="display:none">
+                <div class="time-inputs">
+                    <div class="time-field">
+                        <label class="option-label">Start Time</label>
+                        <input type="text" id="trim-start" class="text-input" placeholder="0:00" value="0">
+                    </div>
+                    <span class="time-arrow"><i class="fa-solid fa-arrow-right"></i></span>
+                    <div class="time-field">
+                        <label class="option-label">End Time</label>
+                        <input type="text" id="trim-end" class="text-input" placeholder="0:30">
+                    </div>
+                </div>
+                <p class="option-hint">Accepts seconds (30) or time format (1:30 or 0:01:30)</p>
+            </div>
+
+            <!-- Pitch Options -->
+            <div class="option-group" id="opt-pitch" style="display:none">
+                <label class="option-label">Pitch Shift: <span id="pitch-val">0</span> semitones</label>
+                <input type="range" id="pitch-slider" min="-12" max="12" value="0" class="slider">
+                <div class="pitch-presets">
+                    <button class="preset-btn" data-val="-12">-1 Octave</button>
+                    <button class="preset-btn" data-val="-5">-5 Semi</button>
+                    <button class="preset-btn" data-val="-2">-2 Semi</button>
+                    <button class="preset-btn" data-val="2">+2 Semi</button>
+                    <button class="preset-btn" data-val="5">+5 Semi</button>
+                    <button class="preset-btn" data-val="12">+1 Octave</button>
+                </div>
+            </div>
+
+            <!-- Speed Options -->
+            <div class="option-group" id="opt-speed" style="display:none">
+                <label class="option-label">Speed: <span id="speed-val">1.0</span>x</label>
+                <input type="range" id="speed-slider" min="0.25" max="4.0" value="1.0" step="0.05" class="slider">
+                <div class="speed-presets">
+                    <button class="preset-btn" data-val="0.5">0.5x</button>
+                    <button class="preset-btn" data-val="0.75">0.75x</button>
+                    <button class="preset-btn" data-val="1.25">1.25x</button>
+                    <button class="preset-btn" data-val="1.5">1.5x</button>
+                    <button class="preset-btn" data-val="2.0">2x</button>
+                    <button class="preset-btn" data-val="3.0">3x</button>
+                </div>
+            </div>
+
+            <!-- Reverse Options (no params) -->
+            <div class="option-group" id="opt-reverse" style="display:none">
+                <p class="option-info"><i class="fa-solid fa-info-circle"></i> Reverses the entire audio file. Hit Process to reverse!</p>
+            </div>
+
+            <!-- Normalize Options -->
+            <div class="option-group" id="opt-normalize" style="display:none">
+                <label class="option-label">Normalization Mode</label>
+                <div class="format-grid" id="norm-mode-grid">
+                    <button class="format-btn active" data-mode="loudness">Loudness (EBU R128)</button>
+                    <button class="format-btn" data-mode="peak">Peak</button>
+                    <button class="format-btn" data-mode="rms">RMS</button>
+                </div>
+            </div>
+
+            <!-- Fade Options -->
+            <div class="option-group" id="opt-fade" style="display:none">
+                <div class="time-inputs">
+                    <div class="time-field">
+                        <label class="option-label">Fade In (seconds)</label>
+                        <input type="number" id="fade-in" class="num-input" placeholder="0" min="0" max="30" step="0.5" value="2">
+                    </div>
+                    <div class="time-field">
+                        <label class="option-label">Fade Out (seconds)</label>
+                        <input type="number" id="fade-out" class="num-input" placeholder="0" min="0" max="30" step="0.5" value="3">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bass Options -->
+            <div class="option-group" id="opt-bass" style="display:none">
+                <label class="option-label">Bass Gain: <span id="bass-val">+6</span> dB</label>
+                <input type="range" id="bass-slider" min="-20" max="20" value="6" class="slider">
+                <label class="option-label">Frequency: <span id="bass-freq-val">100</span> Hz</label>
+                <input type="range" id="bass-freq-slider" min="20" max="300" value="100" class="slider">
+            </div>
+
+            <!-- Equalizer Options -->
+            <div class="option-group" id="opt-equalizer" style="display:none">
+                <label class="option-label">EQ Preset</label>
+                <div class="format-grid" id="eq-grid">
+                    <button class="format-btn active" data-preset="bass_boost">Bass Boost</button>
+                    <button class="format-btn" data-preset="treble_boost">Treble Boost</button>
+                    <button class="format-btn" data-preset="vocal_boost">Vocal Boost</button>
+                    <button class="format-btn" data-preset="rock">Rock</button>
+                    <button class="format-btn" data-preset="pop">Pop</button>
+                    <button class="format-btn" data-preset="jazz">Jazz</button>
+                    <button class="format-btn" data-preset="classical">Classical</button>
+                    <button class="format-btn" data-preset="electronic">Electronic</button>
+                    <button class="format-btn" data-preset="hip_hop">Hip Hop</button>
+                    <button class="format-btn" data-preset="podcast">Podcast</button>
+                    <button class="format-btn" data-preset="telephone">Telephone</button>
+                </div>
+            </div>
+
+            <!-- Voice FX Options -->
+            <div class="option-group" id="opt-voice" style="display:none">
+                <label class="option-label">Voice Effect</label>
+                <div class="format-grid" id="voice-grid">
+                    <button class="format-btn active" data-preset="chipmunk">🐿️ Chipmunk</button>
+                    <button class="format-btn" data-preset="deep">🎸 Deep</button>
+                    <button class="format-btn" data-preset="robot">🤖 Robot</button>
+                    <button class="format-btn" data-preset="echo">🔊 Echo</button>
+                    <button class="format-btn" data-preset="cave">🦇 Cave</button>
+                    <button class="format-btn" data-preset="radio">📻 Radio</button>
+                    <button class="format-btn" data-preset="underwater">🌊 Underwater</button>
+                    <button class="format-btn" data-preset="whisper">🤫 Whisper</button>
+                    <button class="format-btn" data-preset="megaphone">📢 Megaphone</button>
+                    <button class="format-btn" data-preset="demon">👹 Demon</button>
+                </div>
+            </div>
+
+            <!-- Echo Options -->
+            <div class="option-group" id="opt-echo" style="display:none">
+                <label class="option-label">Delay: <span id="echo-delay-val">250</span> ms</label>
+                <input type="range" id="echo-delay" min="50" max="2000" value="250" step="10" class="slider">
+                <label class="option-label">Decay: <span id="echo-decay-val">0.5</span></label>
+                <input type="range" id="echo-decay" min="0.1" max="0.9" value="0.5" step="0.05" class="slider">
+                <label class="option-label">Repeats: <span id="echo-repeats-val">3</span></label>
+                <input type="range" id="echo-repeats" min="1" max="10" value="3" class="slider">
+            </div>
+
+            <!-- Reverb Options -->
+            <div class="option-group" id="opt-reverb" style="display:none">
+                <label class="option-label">Reverb Type</label>
+                <div class="format-grid" id="reverb-grid">
+                    <button class="format-btn" data-preset="room">Room</button>
+                    <button class="format-btn active" data-preset="hall">Hall</button>
+                    <button class="format-btn" data-preset="cathedral">Cathedral</button>
+                    <button class="format-btn" data-preset="plate">Plate</button>
+                </div>
+                <label class="option-label">Wet/Dry Mix: <span id="reverb-mix-val">50</span>%</label>
+                <input type="range" id="reverb-mix" min="0" max="100" value="50" class="slider">
+            </div>
+
+            <!-- Extract Options -->
+            <div class="option-group" id="opt-extract" style="display:none">
+                <label class="option-label">Output Format</label>
+                <div class="format-grid" id="extract-format-grid">
+                    <button class="format-btn active" data-format="mp3">MP3</button>
+                    <button class="format-btn" data-format="wav">WAV</button>
+                    <button class="format-btn" data-format="flac">FLAC</button>
+                    <button class="format-btn" data-format="ogg">OGG</button>
+                    <button class="format-btn" data-format="m4a">M4A</button>
+                    <button class="format-btn" data-format="aac">AAC</button>
+                </div>
+                <p class="option-hint">Upload a video file (MP4, MKV, AVI, WebM, etc.) to extract its audio track.</p>
+            </div>
+
+            <!-- Ringtone Options -->
+            <div class="option-group" id="opt-ringtone" style="display:none">
+                <label class="option-label">Device</label>
+                <div class="format-grid" id="ringtone-device-grid">
+                    <button class="format-btn active" data-device="iphone">🍎 iPhone (M4R)</button>
+                    <button class="format-btn" data-device="android">🤖 Android (MP3)</button>
+                </div>
+                <div class="time-inputs" style="margin-top:16px">
+                    <div class="time-field">
+                        <label class="option-label">Start</label>
+                        <input type="text" id="ringtone-start" class="text-input" placeholder="0" value="0">
+                    </div>
+                    <span class="time-arrow"><i class="fa-solid fa-arrow-right"></i></span>
+                    <div class="time-field">
+                        <label class="option-label">End</label>
+                        <input type="text" id="ringtone-end" class="text-input" placeholder="30">
+                    </div>
+                </div>
+                <p class="option-hint">iPhone ringtones are max 40 seconds. 30 seconds is ideal.</p>
+            </div>
+
+            <!-- Process Button -->
+            <button class="btn btn-primary btn-lg" id="process-btn" disabled>
+                <i class="fa-solid fa-wand-magic-sparkles"></i> <span id="process-text">Process Audio</span>
+            </button>
+        </section>
+
+        <!-- Processing State -->
+        <section class="processing" id="processing" style="display:none">
+            <div class="spinner"></div>
+            <p>Processing your audio...</p>
+        </section>
+
+        <!-- Result -->
+        <section class="result-panel" id="result-panel" style="display:none">
+            <h2><i class="fa-solid fa-circle-check"></i> Done!</h2>
+            <div class="result-player" id="result-player"></div>
+            <div class="result-info" id="result-info"></div>
+            <div class="result-actions">
+                <a class="btn btn-primary btn-lg" id="download-btn" href="#" download>
+                    <i class="fa-solid fa-download"></i> Download
+                </a>
+                <button class="btn btn-secondary" id="another-btn">
+                    <i class="fa-solid fa-arrow-rotate-left"></i> Process Another
+                </button>
+            </div>
+        </section>
+
+        <!-- Format Subdomains Grid (hub only) -->
+        <section class="subdomains" id="subdomains">
+            <h2>All Audio Tools</h2>
+            <p class="subdomains-subtitle">Each tool has its own dedicated subdomain</p>
+            <div class="subdomain-grid" id="subdomain-grid"></div>
+        </section>
+
+        <!-- Cross-service links -->
+        <section class="cross-links" id="cross-links">
+            <h2>More OpenVibe Tools</h2>
+            <div class="cross-grid">
+                <a class="cross-card" href="https://img.openvibe.tools">
+                    <span class="cross-icon"><i class="fa-solid fa-images"></i></span>
+                    <span class="cross-info"><span class="cross-name">Img.OpenVibe</span><span class="cross-desc">Image converter & tools</span></span>
+                </a>
+                <a class="cross-card" href="https://yt.openvibe.tools">
+                    <span class="cross-icon"><i class="fa-brands fa-youtube"></i></span>
+                    <span class="cross-info"><span class="cross-name">YT.OpenVibe</span><span class="cross-desc">YouTube downloader</span></span>
+                </a>
+                <a class="cross-card" href="https://openvibe.live">
+                    <span class="cross-icon"><i class="fa-solid fa-video"></i></span>
+                    <span class="cross-info"><span class="cross-name">OpenVibe.Live</span><span class="cross-desc">Live streaming platform</span></span>
+                </a>
+                <a class="cross-card" href="https://openvibe.games">
+                    <span class="cross-icon"><i class="fa-solid fa-dragon"></i></span>
+                    <span class="cross-info"><span class="cross-name">Scraplandia</span><span class="cross-desc">Multiplayer RPG</span></span>
+                </a>
+                <a class="cross-card" href="https://maps.openvibe.tools">
+                    <span class="cross-icon"><i class="fa-solid fa-map-location-dot"></i></span>
+                    <span class="cross-info"><span class="cross-name">Maps.OpenVibe</span><span class="cross-desc">Camps, resources & shelters</span></span>
+                </a>
+                <a class="cross-card" href="https://food.openvibe.tools">
+                    <span class="cross-icon"><i class="fa-solid fa-utensils"></i></span>
+                    <span class="cross-info"><span class="cross-name">Food.OpenVibe</span><span class="cross-desc">Food banks & meal planner</span></span>
+                </a>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="footer-inner">
+            <span><i class="fa-solid fa-circle-nodes"></i> Audio.OpenVibe &mdash; Part of the <a href="https://openvibe.network">OpenVibe Network</a></span>
+            <span class="footer-links">
+                <a href="https://openvibe.tools">OpenVibe.Tools</a>
+                <a href="https://openvibe.live">OpenVibe.Live</a>
+                <a href="https://openvibe.games">Scraplandia</a>
+                <a href="https://img.openvibe.tools">Img.OpenVibe</a>
+                <a href="https://yt.openvibe.tools">YT.OpenVibe</a>
+                <a href="https://maps.openvibe.tools">Maps.OpenVibe</a>
+                <a href="https://food.openvibe.tools">Food.OpenVibe</a>
+            </span>
+        </div>
+    </footer>
+
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>

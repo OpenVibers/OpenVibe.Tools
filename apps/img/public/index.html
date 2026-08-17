@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Img.OpenVibe — Free Online Image Converter & Tools</title>
+    <meta name="description" content="Convert, compress, resize, and crop images online for free. Supports PNG, JPG, WebP, AVIF, HEIC, SVG, GIF, ICO, TIFF, BMP and more.">
+    <meta property="og:title" content="Img.OpenVibe — Free Online Image Converter & Tools">
+    <meta property="og:type" content="website">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <!-- Navbar injected by OpenVibeNavbar.init() -->
+
+    <div id="app">
+        <!-- Hero -->
+        <section class="hero" id="hero">
+            <div class="hero-icon" id="hero-icon"><i class="fa-solid fa-images"></i></div>
+            <h1 id="hero-title">Img.OpenVibe</h1>
+            <p class="hero-subtitle" id="hero-subtitle">Free Online Image Converter & Tools</p>
+        </section>
+
+        <!-- Tool Selector (visible on hub domain) -->
+        <nav class="tool-tabs" id="tool-tabs">
+            <button class="tool-tab active" data-tool="convert"><i class="fa-solid fa-arrows-rotate"></i> Convert</button>
+            <button class="tool-tab" data-tool="compress"><i class="fa-solid fa-compress"></i> Compress</button>
+            <button class="tool-tab" data-tool="resize"><i class="fa-solid fa-up-right-and-down-left-from-center"></i> Resize</button>
+            <button class="tool-tab" data-tool="crop"><i class="fa-solid fa-crop-simple"></i> Crop</button>
+        </nav>
+
+        <!-- Upload Zone -->
+        <section class="upload-zone" id="upload-zone">
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                <p class="upload-text">Drag & drop an image here</p>
+                <p class="upload-hint">or click to browse — PNG, JPG, WebP, AVIF, HEIC, SVG, GIF, ICO, TIFF, BMP</p>
+                <input type="file" id="file-input" accept="image/*" hidden>
+                <button class="btn btn-primary" id="browse-btn"><i class="fa-solid fa-folder-open"></i> Choose File</button>
+            </div>
+            <div class="upload-info" id="upload-info" style="display:none">
+                <div class="file-preview" id="file-preview"></div>
+                <div class="file-details" id="file-details"></div>
+                <button class="btn btn-ghost" id="clear-btn"><i class="fa-solid fa-xmark"></i> Clear</button>
+            </div>
+        </section>
+
+        <!-- Tool Options -->
+        <section class="options-panel" id="options-panel" style="display:none">
+            <!-- Convert Options -->
+            <div class="option-group" id="opt-convert">
+                <label class="option-label">Output Format</label>
+                <div class="format-grid" id="format-grid">
+                    <button class="format-btn" data-format="png">PNG</button>
+                    <button class="format-btn" data-format="jpg">JPG</button>
+                    <button class="format-btn" data-format="webp">WebP</button>
+                    <button class="format-btn" data-format="avif">AVIF</button>
+                    <button class="format-btn" data-format="gif">GIF</button>
+                    <button class="format-btn" data-format="tiff">TIFF</button>
+                    <button class="format-btn" data-format="bmp">BMP</button>
+                    <button class="format-btn" data-format="ico">ICO</button>
+                </div>
+                <label class="option-label">Quality <span id="quality-val">80</span>%</label>
+                <input type="range" id="quality-slider" min="1" max="100" value="80" class="slider">
+            </div>
+
+            <!-- Compress Options -->
+            <div class="option-group" id="opt-compress" style="display:none">
+                <label class="option-label">Compression Level <span id="compress-val">75</span>%</label>
+                <input type="range" id="compress-slider" min="1" max="100" value="75" class="slider">
+                <p class="option-hint">Lower = smaller file size, higher = better quality</p>
+            </div>
+
+            <!-- Resize Options -->
+            <div class="option-group" id="opt-resize" style="display:none">
+                <div class="dimension-inputs">
+                    <div class="dim-field">
+                        <label class="option-label">Width (px)</label>
+                        <input type="number" id="resize-w" class="num-input" placeholder="auto" min="1" max="16384">
+                    </div>
+                    <span class="dim-x"><i class="fa-solid fa-xmark"></i></span>
+                    <div class="dim-field">
+                        <label class="option-label">Height (px)</label>
+                        <input type="number" id="resize-h" class="num-input" placeholder="auto" min="1" max="16384">
+                    </div>
+                </div>
+                <label class="option-label">Or scale by percentage</label>
+                <input type="number" id="resize-pct" class="num-input num-input-sm" placeholder="e.g. 50" min="1" max="1000"> %
+                <label class="option-label">Fit Mode</label>
+                <select id="resize-fit" class="select-input">
+                    <option value="inside" selected>Inside (fit within bounds)</option>
+                    <option value="cover">Cover (fill & crop)</option>
+                    <option value="contain">Contain (fit with padding)</option>
+                    <option value="fill">Fill (stretch)</option>
+                    <option value="outside">Outside (cover minimum)</option>
+                </select>
+            </div>
+
+            <!-- Crop Options -->
+            <div class="option-group" id="opt-crop" style="display:none">
+                <label class="option-label">Aspect Ratio Preset</label>
+                <div class="aspect-grid" id="aspect-grid">
+                    <button class="aspect-btn" data-aspect="1:1">1:1</button>
+                    <button class="aspect-btn" data-aspect="16:9">16:9</button>
+                    <button class="aspect-btn" data-aspect="4:3">4:3</button>
+                    <button class="aspect-btn" data-aspect="3:2">3:2</button>
+                    <button class="aspect-btn" data-aspect="21:9">21:9</button>
+                    <button class="aspect-btn" data-aspect="9:16">9:16</button>
+                    <button class="aspect-btn" data-aspect="3:4">3:4</button>
+                    <button class="aspect-btn active" data-aspect="">Custom</button>
+                </div>
+                <div class="crop-coords" id="crop-coords">
+                    <div class="dim-field"><label class="option-label">Left</label><input type="number" id="crop-left" class="num-input" placeholder="0" min="0"></div>
+                    <div class="dim-field"><label class="option-label">Top</label><input type="number" id="crop-top" class="num-input" placeholder="0" min="0"></div>
+                    <div class="dim-field"><label class="option-label">Width</label><input type="number" id="crop-w" class="num-input" placeholder="auto" min="1"></div>
+                    <div class="dim-field"><label class="option-label">Height</label><input type="number" id="crop-h" class="num-input" placeholder="auto" min="1"></div>
+                </div>
+            </div>
+
+            <!-- Process Button -->
+            <button class="btn btn-primary btn-lg" id="process-btn" disabled>
+                <i class="fa-solid fa-wand-magic-sparkles"></i> <span id="process-text">Process Image</span>
+            </button>
+        </section>
+
+        <!-- Processing State -->
+        <section class="processing" id="processing" style="display:none">
+            <div class="spinner"></div>
+            <p>Processing your image...</p>
+        </section>
+
+        <!-- Result -->
+        <section class="result-panel" id="result-panel" style="display:none">
+            <h2><i class="fa-solid fa-circle-check"></i> Done!</h2>
+            <div class="result-preview" id="result-preview"></div>
+            <div class="result-info" id="result-info"></div>
+            <div class="result-actions">
+                <a class="btn btn-primary btn-lg" id="download-btn" href="#" download>
+                    <i class="fa-solid fa-download"></i> Download
+                </a>
+                <button class="btn btn-secondary" id="another-btn">
+                    <i class="fa-solid fa-arrow-rotate-left"></i> Process Another
+                </button>
+            </div>
+        </section>
+
+        <!-- Format Subdomains Grid (hub only) -->
+        <section class="subdomains" id="subdomains">
+            <h2>All Image Tools</h2>
+            <div class="subdomain-grid" id="subdomain-grid"></div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="footer-inner">
+            <span><i class="fa-solid fa-circle-nodes"></i> Img.OpenVibe &mdash; Part of the <a href="https://openvibe.network">OpenVibe Network</a></span>
+            <span class="footer-links">
+                <a href="https://openvibe.tools">OpenVibe.Tools</a>
+                <a href="https://openvibe.live">OpenVibe.Live</a>
+                <a href="https://openvibe.games">Scraplandia</a>
+                <a href="https://audio.openvibe.tools">Audio.OpenVibe</a>
+                <a href="https://yt.openvibe.tools">YT.OpenVibe</a>
+                <a href="https://maps.openvibe.tools">Maps.OpenVibe</a>
+            </span>
+        </div>
+    </footer>
+
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Preview — Live Editor | markdown.openvibe.tools</title>
+    <meta name="description" content="Write Markdown on the left, see rendered HTML on the right. Export as HTML.">
+    <meta name="theme-color" content="#0b0c12">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/shared.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
+    <style>
+        .md-editor { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; min-height: 500px; }
+        .md-pane { display: flex; flex-direction: column; }
+        .md-pane label { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+        .md-pane textarea { flex: 1; resize: none; font-family: var(--font-mono); font-size: 0.9rem; line-height: 1.6; }
+        .md-preview { flex: 1; background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; overflow: auto; line-height: 1.7; }
+        .md-preview h1, .md-preview h2, .md-preview h3 { margin: 16px 0 8px; color: var(--accent); }
+        .md-preview h1 { font-size: 1.8rem; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+        .md-preview h2 { font-size: 1.4rem; }
+        .md-preview h3 { font-size: 1.1rem; }
+        .md-preview p { margin: 8px 0; }
+        .md-preview code { background: var(--bg-tertiary); padding: 2px 6px; border-radius: 3px; font-family: var(--font-mono); font-size: 0.88em; }
+        .md-preview pre { background: var(--bg-tertiary); padding: 16px; border-radius: 8px; overflow-x: auto; margin: 12px 0; }
+        .md-preview pre code { background: none; padding: 0; }
+        .md-preview blockquote { border-left: 3px solid var(--accent); padding-left: 16px; margin: 12px 0; color: var(--text-secondary); }
+        .md-preview ul, .md-preview ol { padding-left: 24px; margin: 8px 0; }
+        .md-preview a { color: var(--accent); }
+        .md-preview img { max-width: 100%; border-radius: 8px; }
+        .md-preview hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+        .md-preview table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+        .md-preview th, .md-preview td { border: 1px solid var(--border); padding: 8px; text-align: left; }
+        .md-preview th { background: var(--bg-tertiary); }
+        @media (max-width: 768px) { .md-editor { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="tool-wrap" style="max-width: 1100px;">
+        <div class="page-header">
+            <h1><i class="fab fa-markdown"></i> Markdown Preview</h1>
+            <p class="subtitle">Write Markdown on the left, see it rendered on the right. Export as HTML.</p>
+        </div>
+
+        <div class="tool-section">
+            <div class="md-editor">
+                <div class="md-pane">
+                    <label><i class="fas fa-code"></i> Markdown</label>
+                    <textarea id="input" placeholder="# Hello World&#10;&#10;Write **Markdown** here..."># Hello World
+
+This is a **Markdown** preview tool.
+
+## Features
+- Real-time preview
+- **Bold**, *italic*, ~~strikethrough~~
+- `inline code` and code blocks
+- [Links](https://openvibe.network)
+- Lists and quotes
+
+> "The best tools are the ones that stay out of your way." — A Wanderer
+
+```
+code block here
+```
+
+---
+
+Made with ♥ by the OpenVibe Network</textarea>
+                </div>
+                <div class="md-pane">
+                    <label><i class="fas fa-eye"></i> Preview</label>
+                    <div id="preview" class="md-preview"></div>
+                </div>
+            </div>
+            <div class="btn-row" style="margin-top: 16px;">
+                <button class="btn btn-primary" onclick="copyHtml()"><i class="fas fa-code"></i> Copy HTML</button>
+                <button class="btn btn-secondary" onclick="OpenVibeUI.copyText(document.getElementById('input').value)"><i class="fas fa-copy"></i> Copy Markdown</button>
+                <button class="btn btn-secondary" onclick="OpenVibeUI.downloadText(document.getElementById('input').value, 'document.md')"><i class="fas fa-download"></i> Download .md</button>
+            </div>
+        </div>
+
+        <footer class="site-footer">
+            <div class="footer-links">
+                <a href="https://text.openvibe.tools">Text.OpenVibe Hub</a>
+                <a href="https://escape.openvibe.tools">Escape / Unescape</a>
+                <a href="https://count.openvibe.tools">Text Counter</a>
+            </div>
+            <p>&copy; 2025 OpenVibe</p>
+        </footer>
+    </div>
+
+    <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/notification-ui.js"></script>
+    <script src="https://openvibe.network/shared/account-switcher.js"></script>
+    <script src="/js/shared.js"></script>
+    <script>
+        OpenVibeUI.initPage();
+
+        // Simple Markdown parser (no external deps)
+        function parseMd(md) {
+            let html = md;
+            // Code blocks
+            html = html.replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+            // Inline code
+            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+            // Headers
+            html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+            html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+            html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+            // Bold
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            // Italic
+            html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+            // Strikethrough
+            html = html.replace(/~~(.+?)~~/g, '<del>$1</del>');
+            // Images
+            html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
+            // Links
+            html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+            // Blockquotes
+            html = html.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+            // Unordered lists
+            html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+            html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+            // HR
+            html = html.replace(/^---$/gm, '<hr>');
+            // Paragraphs
+            html = html.replace(/^(?!<[hupblo]|<li|<hr|<img|<pre|<code|<del|<strong|<em|<a)(.+)$/gm, '<p>$1</p>');
+            return html;
+        }
+
+        function update() {
+            document.getElementById('preview').innerHTML = parseMd(document.getElementById('input').value);
+        }
+
+        function copyHtml() {
+            OpenVibeUI.copyText(parseMd(document.getElementById('input').value));
+        }
+
+        document.getElementById('input').addEventListener('input', update);
+        update();
+    </script>
+</body>
+</html>
