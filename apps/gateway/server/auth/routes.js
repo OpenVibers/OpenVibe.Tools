@@ -100,6 +100,8 @@ function createAuthRoutes(config, auth) {
     });
 
     const refreshCookieOpts = () => ({
+        // Domain-wide so same-origin /auth/refresh also works on net./dev./pastes. hosts.
+        domain: config.cookies.domain || undefined,
         sameSite: 'lax',
         secure: config.cookies.secure,
         httpOnly: true,
@@ -165,13 +167,17 @@ function createAuthRoutes(config, auth) {
     // ── GET /auth/login ──────────────────────────────────────
     router.get('/login', (req, res) => {
         const { url, state } = auth.client.getAuthorizationUrl(config.oauth.scope);
+        // Domain-wide: a login can start on net./dev./pastes. but the OAuth
+        // redirect_uri is pinned to the apex — the callback must see these cookies.
         res.cookie(STATE_COOKIE, state, {
+            domain: config.cookies.domain || undefined,
             sameSite: 'lax', secure: config.cookies.secure, httpOnly: true,
             path: '/auth', maxAge: 10 * 60 * 1000,
         });
         const next = sanitizeNext(req.query.next);
         if (next !== '/') {
             res.cookie(NEXT_COOKIE, next, {
+                domain: config.cookies.domain || undefined,
                 sameSite: 'lax', secure: config.cookies.secure, httpOnly: true,
                 path: '/auth', maxAge: 10 * 60 * 1000,
             });
