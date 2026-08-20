@@ -115,18 +115,28 @@ app.get('/api/health', (_req, res) => {
 
 app.get('/api/brand', (_req, res) => res.json(BRAND));
 
-// ── Paste.OpenVibe → OpenVibe.Media proxy ────────────────────
-// The paste front-end talks to /api/pastes/* on this gateway; we proxy
-// server-side to Media's tenant API (app_id 'live' — the pastes were
-// created on the streaming site and now live in Media). Keeping the
-// proxy avoids CORS headaches and hides MEDIA_URL from the browser.
+// ── Paste.OpenVibe → OpenVibe.Live proxy ─────────────────────
+// The paste front-end talks to /api/pastes/* on this gateway; we proxy server-side to
+// the same API the streaming site's own paste pages use. Keeping the proxy avoids CORS
+// headaches and hides the upstream from the browser.
+//
+// This used to call Media's tenant API directly, forwarding the visitor's JWT for Media
+// to identify them by. That was wrong: the JWT names the account by its NETWORK id,
+// while the user_id Media stores for these pastes is Live's own — different numbers for
+// the same person, so a comment posted here was filed under whichever unrelated Live
+// account happened to hold that number. Live resolves the visitor against its own
+// accounts before writing, which is a thing only Live can do, and this inherits its
+// author names and permission checks rather than reimplementing them.
 app.use('/api/pastes', rateLimit({ windowMs: 60_000, max: 120 }), async (req, res) => {
     try {
-        const target = `${config.mediaUrl}/api/v1/live/pastes${req.url}`;
+        const target = `${config.liveUrl}/api/pastes${req.url}`;
         const fetchOpts = { method: req.method, headers: {} };
-        // Forward the user's JWT as-is — Media verifies it offline itself.
+        // Forward the visitor's JWT — Live verifies it and maps it to a local account.
         const userToken = extractToken(req);
         if (userToken) fetchOpts.headers['Authorization'] = `Bearer ${userToken}`;
+        // Live rate-limits, bans and records by client address. Without this every
+        // visitor arriving through this gateway would share one bucket and one identity.
+        if (req.ip) fetchOpts.headers['X-Forwarded-For'] = req.ip;
         if (req.method !== 'GET' && req.method !== 'HEAD' && req.body && Object.keys(req.body).length) {
             fetchOpts.headers['Content-Type'] = 'application/json';
             fetchOpts.body = JSON.stringify(req.body);
@@ -217,6 +227,6 @@ app.listen(config.port, config.host, () => {
     console.log(`║  Port:    ${String(config.port).padEnd(32)}║`);
     console.log(`║  URL:     ${config.baseUrl.padEnd(32)}║`);
     console.log(`║  SSO:     ${config.networkUrl.padEnd(32)}║`);
-    console.log(`║  Media:   ${config.mediaUrl.padEnd(32)}║`);
+    console.log(`║  Live:    ${config.liveUrl.padEnd(32)}║`);
     console.log(`╚════════════════════════════════════════════╝\n`);
 });

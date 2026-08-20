@@ -32,7 +32,9 @@ module.exports = {
         secure: process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === 'true' : isProduction,
     },
 
-    // OpenVibe.Media — backs the Paste.OpenVibe front-end (app_id 'live')
-    mediaUrl: process.env.MEDIA_URL || 'http://127.0.0.1:4100',
-    mediaPublicUrl: process.env.MEDIA_PUBLIC_URL || 'https://openvibe.media',
+    // OpenVibe.Live — backs the Paste.OpenVibe front-end. The pastes themselves are
+    // stored in OpenVibe.Media, but we go through Live rather than straight to Media:
+    // Live owns the accounts these pastes belong to, so it is the only service that can
+    // turn a signed-in visitor into the user id Media files the write under.
+    liveUrl: process.env.LIVE_URL || 'http://127.0.0.1:3000',
 };
