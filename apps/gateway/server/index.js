@@ -202,6 +202,14 @@ app.use((req, res, next) => {
     return res.sendFile(path.join(__dirname, '..', 'public', 'dev.html'));
 });
 
+// ── Web-push service worker (same-origin, scope "/") ─────────
+app.get('/openvibe-sw.js', (req, res) => {
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    res.setHeader('Service-Worker-Allowed', '/');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.sendFile(path.resolve(__dirname, '..', '..', '..', 'vendor', 'openvibe-shared', 'openvibe-sw.js'));
+});
+
 // ── Static Files ─────────────────────────────────────────────
 app.use(express.static(path.join(__dirname, '..', 'public'), {
     setHeaders(res, filePath) {
