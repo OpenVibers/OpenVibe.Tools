@@ -27,7 +27,7 @@ const DEV = {
         desc: 'A fast, free developer toolbox: JSON, YAML and XML formatters, Base64 and JWT decoders, regex tester, diff checker, hash generator and more. No signup, nothing leaves your browser.',
         kw: 'developer tools, online tools, free dev tools, formatter, encoder, decoder, validator',
         about: 'A collection of small, fast developer utilities that run entirely in your browser. Nothing is uploaded, nothing is logged, and there is no account to create — open a tool, paste your data, get your answer.',
-        bullets: ['Every tool works client-side: your data never leaves the browser', 'No signup, no ads, no rate limits on the offline tools', 'Open source and part of the wider OpenVibe network'],
+        bullets: ['Every tool works client-side: your data never leaves the browser', 'No signup and no rate limits on the offline tools', 'Open source and part of the wider OpenVibe network'],
         faq: [['Are these developer tools really free?', 'Yes. Every tool here is free with no account, no trial and no usage cap. The project is community-run and open source.'], ['Is my data sent to a server?', 'The formatting, encoding and generation tools run entirely in your browser, so your data never leaves your machine. Only tools that must reach the network (like the Open Graph preview and webhook inspector) send a request, and they say so on the page.']],
     },
     json: {
