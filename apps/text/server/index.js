@@ -169,22 +169,26 @@ app.use(express.static(path.join(__dirname, '..', 'public'), {
 }));
 
 // ── Hostname-based routing ───────────────────────────────────
-app.get('/', (req, res) => {
-    const hostname = getHostname(req);
-    const file = HOSTNAME_MAP[hostname] || 'index.html';
-    res.setHeader('Cache-Control', 'no-cache');
-    res.sendFile(path.join(__dirname, '..', 'public', file));
+// Pages are stamped with a canonical + structured data on the way out (server/seo.js). Several
+// hosts deliberately share one file (smallcaps/fancy, glitch/zalgo); without a canonical those
+// are duplicate pages competing with each other in search results.
+const textSeo = require('./seo');
+const sendPage = textSeo.pageSender(HOSTNAME_MAP, getHostname);
+
+app.get('/sitemap.xml', (_req, res) => {
+    res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.send(textSeo.buildSitemap(HOSTNAME_MAP));
 });
+
+app.get('/', sendPage);
 
 // SPA fallback (all non-asset paths → root HTML for that host)
 app.get('*', (req, res) => {
     if (req.path.startsWith('/api/')) {
         return res.status(404).json({ error: 'Not found' });
     }
-    const hostname = getHostname(req);
-    const file = HOSTNAME_MAP[hostname] || 'index.html';
-    res.setHeader('Cache-Control', 'no-cache');
-    res.sendFile(path.join(__dirname, '..', 'public', file));
+    return sendPage(req, res);
 });
 
 // ── Start ────────────────────────────────────────────────────
