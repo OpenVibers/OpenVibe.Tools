@@ -1,5 +1,9 @@
 'use strict';
 
+// Tool names and descriptions live in server/seo/catalog.js so the UI, the page <title> and
+// the structured data can never disagree. Entries here keep their id/subdomain/icon/category.
+const { seoFor } = require('../seo/catalog');
+
 // ═══════════════════════════════════════════════════════════════
 // Dev.OpenVibe — Developer & SEO Tools Configuration
 // ═══════════════════════════════════════════════════════════════
@@ -46,6 +50,8 @@ const DEV_TOOLS = [
     { id: 'color',     subdomain: 'color',     name: 'OpenVibeColor',     icon: 'fa-palette',              desc: 'Color picker, HEX/RGB/HSL converter & palette generator', category: 'frontend' },
     { id: 'opengraph', subdomain: 'opengraph', name: 'OpenVibeOpenGraph', icon: 'fa-share-nodes',          desc: 'Open Graph & Twitter Card preview & validator', category: 'frontend' },
 ];
+
+for (const t of DEV_TOOLS) { const seo = seoFor(t.subdomain); if (seo) { t.name = seo.name; t.desc = seo.desc; t.seo = seo; } }
 
 const DEV_TOOL_MAP = new Map();
 for (const t of DEV_TOOLS) DEV_TOOL_MAP.set(t.subdomain, t);

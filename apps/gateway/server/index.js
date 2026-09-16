@@ -178,12 +178,36 @@ function isStaticPath(reqPath) {
     return /\.(js|css|ico|png|svg|jpg|xml|txt|woff2?)$/.test(reqPath);
 }
 
+// Every tool subdomain gets its OWN title, description, canonical, structured data and a
+// crawlable content block (server/seo). They used to share the hub's <head>, which told search
+// engines that ~65 distinct tools were one page.
+const { renderTool, buildSitemap, SATELLITES } = require('./seo/render');
+const NET_HTML = path.join(__dirname, '..', 'public', 'net.html');
+const DEV_HTML = path.join(__dirname, '..', 'public', 'dev.html');
+function sendTool(req, res, file) {
+    try {
+        res.set('Content-Type', 'text/html; charset=utf-8');
+        return res.send(renderTool(file, subdomainOf(req)));
+    } catch (err) {
+        console.error('[SEO] render failed:', err.message);
+        return res.sendFile(file);
+    }
+}
+
+// Generated sitemap — covers both hubs, every tool subdomain and the satellite apps, so it can
+// never drift from the tool catalogs the way a hand-maintained file does.
+app.get('/sitemap.xml', (_req, res) => {
+    res.set('Content-Type', 'application/xml; charset=utf-8');
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(buildSitemap(SATELLITES));
+});
+
 // Net tool subdomains → net.html SPA
 app.use((req, res, next) => {
     if (!isNetHost(req)) return next();
     if (req.path.startsWith('/api/') || req.path.startsWith('/auth/')) return next();
     if (isStaticPath(req.path)) return next();
-    return res.sendFile(path.join(__dirname, '..', 'public', 'net.html'));
+    return sendTool(req, res, NET_HTML);
 });
 
 // Paste subdomain → paste.html SPA
@@ -199,7 +223,7 @@ app.use((req, res, next) => {
     if (!isDevHost(req)) return next();
     if (req.path.startsWith('/api/') || req.path.startsWith('/auth/')) return next();
     if (isStaticPath(req.path)) return next();
-    return res.sendFile(path.join(__dirname, '..', 'public', 'dev.html'));
+    return sendTool(req, res, DEV_HTML);
 });
 
 // ── Web-push service worker (same-origin, scope "/") ─────────
