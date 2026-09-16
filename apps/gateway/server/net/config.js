@@ -1,5 +1,9 @@
 'use strict';
 
+// Tool names and descriptions live in server/seo/catalog.js so the UI, the page <title> and
+// the structured data can never disagree. Entries here keep their id/subdomain/icon/category.
+const { seoFor } = require('../seo/catalog');
+
 // ═══════════════════════════════════════════════════════════════
 // Net.OpenVibe — Network Tools Configuration
 // API keys, rate limits, probe regions, and tool definitions.
@@ -129,5 +133,7 @@ const NET_ALIASES = {
     'ipv4lookup': 'ipv4',
     'ipv6lookup': 'ipv6',
 };
+
+for (const t of NET_TOOLS) { const seo = seoFor(t.subdomain); if (seo) { t.name = seo.name; t.desc = seo.desc; t.seo = seo; } }
 
 module.exports = { getSetting, getNetConfig, NET_TOOLS, NET_TOOL_MAP, NET_ALIASES };
