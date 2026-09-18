@@ -18,6 +18,20 @@ const fileIndex = new Map();       // id → { filePath, mime, ext, size, expire
 let currentConcurrent = 0;
 
 // Ensure downloads dir
+/**
+ * Optional network identity for yt-dlp, set in the unit's environment (never in the repo):
+ *   YT_PROXY         e.g. socks5://127.0.0.1:1080 — used when YouTube refuses this server's address
+ *   YT_COOKIES_FILE  path to a Netscape cookies.txt readable by the service user
+ */
+function identityArgs() {
+    const out = [];
+    const proxy = String(process.env.YT_PROXY || '').trim();
+    if (/^(https?|socks[45]h?):\/\/[^\s]+$/i.test(proxy)) out.push('--proxy', proxy);
+    const cookies = String(process.env.YT_COOKIES_FILE || '').trim();
+    if (cookies && fs.existsSync(cookies)) out.push('--cookies', cookies);
+    return out;
+}
+
 function ensureDir() {
     const dir = path.resolve(config.downloadsDir);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -87,6 +101,7 @@ function getInfo(url) {
             '--dump-json',
             '--no-warnings',
             '--no-playlist',
+            ...identityArgs(),
             '--skip-download',
             cleanUrl,
         ];
@@ -156,7 +171,7 @@ function getAvailableFormats(info) {
 /** yt-dlp's last stderr line → something the person can act on (the raw line is logged). */
 function friendlyDownloadError(line) {
     const t = String(line || '');
-    if (/Sign in to confirm|not a bot|cookies/i.test(t)) return 'YouTube is asking this server to prove it is not a bot — try again in a few minutes';
+    if (/Sign in to confirm|not a bot|cookies/i.test(t)) return 'YouTube is refusing downloads from this server right now. This is on YouTube\'s side; please try again later.';
     if (/Private video|members-only|login required/i.test(t)) return 'This video is private or members-only';
     if (/Video unavailable|has been removed|not available/i.test(t)) return 'This video is unavailable';
     if (/\bage[- ]restrict|confirm your age/i.test(t)) return 'Age-restricted videos cannot be downloaded';
@@ -305,6 +320,7 @@ function startDownload(url, quality = 'best', opts = {}) {
             ...(preset.audio ? [] : ['--merge-output-format', preset.ext || 'mp4']),
             '-o', outputTemplate,
             '--no-playlist',
+            ...identityArgs(),
             '--no-warnings',
             '--no-simulate',
             '--progress',
