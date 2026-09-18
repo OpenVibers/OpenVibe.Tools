@@ -193,7 +193,7 @@ function isDevHost(req) {
 }
 
 function isStaticPath(reqPath) {
-    return /\.(js|css|ico|png|svg|jpg|xml|txt|woff2?)$/.test(reqPath);
+    return /\.(js|css|ico|png|svg|jpg|xml|txt|woff2?|webmanifest)$/.test(reqPath);
 }
 
 // Every tool subdomain gets its OWN title, description, canonical, structured data and a
