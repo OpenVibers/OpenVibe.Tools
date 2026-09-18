@@ -72,6 +72,14 @@ The full OAuth round-trip needs OpenVibe.Network running on port 4000
 - `GET /auth/callback` → server-side code exchange → sets `ov_token`
   (JS-readable, `Domain=.openvibe.tools`, SameSite=Lax, Secure) and
   `ov_refresh` (httpOnly, Path=/auth).
+- `GET /auth/login?silent=1&next=…` adds `prompt=none`: the shared navbar
+  uses it for one silent sign-in attempt per tab when the browser carries
+  `ov_sso_hint=account`. No Network session → straight back to `next` with
+  `?sso=none`. A successful callback sets `ov_sso_hint=account` (1 year,
+  JS-readable, `Domain=.openvibe.tools`); `/auth/logout` sets it to `guest`.
+- `next` must be a relative path, an `https://*.openvibe.tools` URL or an
+  `https://openvibe.network/...` URL (the Network's sign-in/sign-out
+  everywhere chain hops through the gateway).
 - `GET /auth/me`, `POST /auth/refresh`, `GET /auth/logout`.
 - Satellites never talk OAuth — they read `ov_token` and verify offline
   via the Network JWKS (`GET /api/.well-known/jwks`).
