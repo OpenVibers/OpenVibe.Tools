@@ -55,6 +55,20 @@ const DEV_TOOLS = [
     // Frontend & SEO
     { id: 'color',     subdomain: 'color',     name: 'OpenVibeColor',     icon: 'fa-palette',              desc: 'Color picker, HEX/RGB/HSL converter & palette generator', category: 'frontend' },
     { id: 'opengraph', subdomain: 'opengraph', name: 'OpenVibeOpenGraph', icon: 'fa-share-nodes',          desc: 'Open Graph & Twitter Card preview & validator', category: 'frontend' },
+
+    // Single-purpose tools: one job per address (search engines and people both look for the exact job).
+    { id: 'jsminify', subdomain: 'jsminify', name: "JavaScript Minifier", icon: 'fa-compress', desc: "Shrink JavaScript with a real parser, not regex", category: 'quality' },
+    { id: 'jsformat', subdomain: 'jsformat', name: "JavaScript Beautifier", icon: 'fa-wand-magic-sparkles', desc: "Turn minified or messy JavaScript into readable code", category: 'quality' },
+    { id: 'cssminify', subdomain: 'cssminify', name: "CSS Minifier", icon: 'fa-compress', desc: "Strip comments and whitespace from stylesheets", category: 'quality' },
+    { id: 'cssformat', subdomain: 'cssformat', name: "CSS Beautifier", icon: 'fa-wand-magic-sparkles', desc: "Re-indent minified or messy CSS", category: 'quality' },
+    { id: 'htmlminify', subdomain: 'htmlminify', name: "HTML Minifier", icon: 'fa-compress', desc: "Remove comments and whitespace from HTML", category: 'quality' },
+    { id: 'xmlminify', subdomain: 'xmlminify', name: "XML Minifier", icon: 'fa-compress', desc: "Collapse XML to a single compact line", category: 'quality' },
+    { id: 'jsonminify', subdomain: 'jsonminify', name: "JSON Minifier", icon: 'fa-compress', desc: "Compact JSON to the smallest valid form", category: 'data' },
+    { id: 'jsonparse', subdomain: 'jsonparse', name: "JSON Parser", icon: 'fa-sitemap', desc: "Explore JSON as a tree, a list of paths or a type map", category: 'data' },
+    { id: 'jsonvalidate', subdomain: 'jsonvalidate', name: "JSON Validator", icon: 'fa-circle-check', desc: "Check JSON and find the exact error", category: 'data' },
+    { id: 'jsonstringify', subdomain: 'jsonstringify', name: "JSON Stringify", icon: 'fa-quote-right', desc: "Turn JSON into an escaped string literal, and back", category: 'data' },
+    { id: 'html2md', subdomain: 'html2md', name: "HTML to Markdown", icon: 'fa-right-left', desc: "Convert HTML into clean Markdown", category: 'data' },
+    { id: 'md2html', subdomain: 'md2html', name: "Markdown to HTML", icon: 'fa-right-left', desc: "Convert Markdown into HTML you can paste anywhere", category: 'data' },
 ];
 
 for (const t of DEV_TOOLS) { const seo = seoFor(t.subdomain); if (seo) { t.name = seo.name; t.desc = seo.desc; t.seo = seo; } }

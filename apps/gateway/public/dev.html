@@ -171,6 +171,18 @@ entities:{n:'String Escape Tool',i:'fa-shield-halved',c:'enc',d:'HTML, JS & URL 
 timestamp:{n:'Unix Timestamp Converter',i:'fa-clock',c:'time',d:'Unix timestamp \u2194 date converter',p:'',m:['Now','To Date','To Unix']},
 cron:{n:'Cron Expression Parser',i:'fa-calendar-check',c:'time',d:'Cron expression parser & next runs',p:'*/15 9-17 * * 1-5',m:['Parse']},
 beautify:{n:'Code Beautifier',i:'fa-wand-magic-sparkles',c:'qual',d:'Beautify JS, CSS, HTML & JSON',p:'{"a":1,"b":[2,3],"c":{"d":true}}',m:['JSON','HTML','CSS']},
+jsminify:{n:"JavaScript Minifier",i:'fa-compress',c:'qual',d:"Shrink JavaScript with a real parser, not regex",p:"function greet(name) {\n  // say hello\n  const message = \"Hello, \" + name + \"!\";\n  console.log(message);\n  return message;\n}\ngreet(\"OpenVibe\");",m:["Minify", "Minify + mangle", "Whitespace only"]},
+jsformat:{n:"JavaScript Beautifier",i:'fa-wand-magic-sparkles',c:'qual',d:"Turn minified or messy JavaScript into readable code",p:"function greet(n){const m=\"Hello, \"+n+\"!\";console.log(m);return m}greet(\"OpenVibe\");",m:["Beautify"]},
+cssminify:{n:"CSS Minifier",i:'fa-compress',c:'qual',d:"Strip comments and whitespace from stylesheets",p:"/* card */\n.card {\n  color: #ffffff;\n  margin: 0px 0px 10px 0px;\n  padding: 12px;\n}\n\n.card:hover {\n  color: #3b82f6;\n}",m:["Minify"]},
+cssformat:{n:"CSS Beautifier",i:'fa-wand-magic-sparkles',c:'qual',d:"Re-indent minified or messy CSS",p:".card{color:#fff;margin:0 0 10px;padding:12px}.card:hover{color:#3b82f6}@media (max-width:600px){.card{padding:8px}}",m:["Beautify"]},
+htmlminify:{n:"HTML Minifier",i:'fa-compress',c:'qual',d:"Remove comments and whitespace from HTML",p:"<!-- header -->\n<div class=\"card\">\n    <p>Hello <strong>World</strong></p>\n</div>",m:["Minify"]},
+xmlminify:{n:"XML Minifier",i:'fa-compress',c:'qual',d:"Collapse XML to a single compact line",p:"<?xml version=\"1.0\"?>\n<!-- catalog -->\n<catalog>\n  <item id=\"1\">\n    <name>OpenVibe</name>\n  </item>\n</catalog>",m:["Minify"]},
+jsonminify:{n:"JSON Minifier",i:'fa-compress',c:'data',d:"Compact JSON to the smallest valid form",p:"{\n  \"name\": \"openvibe\",\n  \"version\": 1,\n  \"tags\": [\"open\", \"source\"]\n}",m:["Minify"]},
+jsonparse:{n:"JSON Parser",i:'fa-sitemap',c:'data',d:"Explore JSON as a tree, a list of paths or a type map",p:"{\"user\":{\"id\":7,\"name\":\"Ada\",\"roles\":[\"admin\",\"dev\"],\"active\":true},\"count\":2}",m:["Tree", "Paths", "Types"]},
+jsonvalidate:{n:"JSON Validator",i:'fa-circle-check',c:'data',d:"Check JSON and find the exact error",p:"{\n  \"name\": \"openvibe\",\n  \"version\": 1,\n}",m:["Validate"]},
+jsonstringify:{n:"JSON Stringify",i:'fa-quote-right',c:'data',d:"Turn JSON into an escaped string literal, and back",p:"{\"name\":\"openvibe\",\"note\":\"line one\\nline two\"}",m:["Stringify", "Parse string"]},
+html2md:{n:"HTML to Markdown",i:'fa-right-left',c:'data',d:"Convert HTML into clean Markdown",p:"<h1>Hello World</h1>\n<p>This is <strong>bold</strong>, <em>italic</em> and a <a href=\"https://openvibe.network\">link</a>.</p>\n<ul><li>Item one</li><li>Item two</li></ul>\n<pre><code>code block</code></pre>",m:["Convert"]},
+md2html:{n:"Markdown to HTML",i:'fa-right-left',c:'data',d:"Convert Markdown into HTML you can paste anywhere",p:"# Hello World\n\nThis is **bold** and *italic* with a [link](https://openvibe.network).\n\n- Item one\n- Item two\n\n> A quote\n\n`inline code`",m:["To HTML", "Preview"]},
 minify:{n:'Code Minifier',i:'fa-compress',c:'qual',d:'Minify JS, CSS, HTML & JSON',p:'{\n  "name": "openvibe",\n  "version": 1\n}',m:['JSON','HTML','CSS']},
 codediff:{n:'Diff Checker',i:'fa-code-compare',c:'qual',d:'Side-by-side text diff checker',p:'Line one\nLine two\nLine three\nLine four',p2:'Line one\nLine 2 modified\nLine three\nLine five\nLine six',dual:1,m:['Compare']},
 regex:{n:'Regex Tester',i:'fa-magnifying-glass',c:'qual',d:'Regex tester with match highlighting',p:'\\b[A-Z][a-z]+\\b',p2:'Hello World from OpenVibe.Tools today',dual:1,m:['Test']},
@@ -184,7 +196,8 @@ opengraph:{n:'Open Graph Preview',i:'fa-share-nodes',c:'fe',d:'Open Graph & Twit
 
 const CATS={data:{l:'Data & Formats',i:'fa-database'},enc:{l:'Encoding & Crypto',i:'fa-lock'},time:{l:'Time & Scheduling',i:'fa-clock'},qual:{l:'Code Quality',i:'fa-wand-magic-sparkles'},http:{l:'HTTP & API',i:'fa-terminal'},fe:{l:'Frontend & SEO',i:'fa-palette'}};
 const host=location.hostname,sub=host.replace(/\.openvibe\.tools$/,'');
-let ACT=T[sub]?sub:'dev',MODE='';
+const META=(document.querySelector('meta[name="ov-tool"]')||{}).content||'';
+let ACT=T[META]?META:(T[sub]?sub:'dev'),MODE='';
 
 document.addEventListener('DOMContentLoaded',()=>{
     const tok=localStorage.getItem('ov_token');
@@ -361,6 +374,65 @@ P.beautify=(s,m)=>{
     let f='',ind=0;s.replace(/>\s*</g,'><').split(/(<[^>]+>)/g).filter(Boolean).forEach(n=>{if(n.match(/^<\//))ind--;f+='  '.repeat(Math.max(0,ind))+n.trim()+'\n';if(n.match(/^<[^\/!?]/)&&!n.match(/\/>/))ind++});return f.trim();
 };
 
+// ── Single-purpose tools ─────────────────────────────────────
+const loadScript=(src)=>new Promise((ok,no)=>{const e=document.createElement('script');e.src=src;e.onload=ok;e.onerror=()=>no(new Error('Could not load the minifier. Check your connection and try again.'));document.head.appendChild(e)});
+const terser=async()=>{if(!window.Terser)await loadScript('https://cdn.jsdelivr.net/npm/terser@5/dist/bundle.min.js');return window.Terser};
+const saved=(a,b)=>{const x=new Blob([a]).size,y=new Blob([b]).size;return x?`${x.toLocaleString()} → ${y.toLocaleString()} bytes (${Math.max(0,Math.round((1-y/x)*100))}% smaller)`:''};
+const withNote=(code,note)=>({html:(note?'<div style="color:var(--tx2);font-size:.8rem;margin-bottom:8px">'+H(note)+'</div>':'')+'<pre style="margin:0;white-space:pre-wrap;word-break:break-word">'+H(code)+'</pre>'});
+P.jsminify=async(s,m)=>{const T=await terser();const r=await T.minify(s,m==='Whitespace only'?{compress:false,mangle:false}:{compress:true,mangle:m==='Minify + mangle'});return withNote(r.code||'',saved(s,r.code||''))};
+P.jsformat=async(s)=>{const T=await terser();const r=await T.minify(s,{compress:false,mangle:false,format:{beautify:true,comments:'all',indent_level:2}});return r.code||''};
+const cssMin=(s)=>{const keep=[];s=s.replace(/("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|url\([^)]*\))/g,(m)=>{keep.push(m);return'\u0000'+(keep.length-1)+'\u0000'});
+    s=s.replace(/\/\*[\s\S]*?\*\//g,'').replace(/\s+/g,' ').replace(/\s*([{}:;,>+~])\s*/g,'$1').replace(/;}/g,'}').replace(/(^|[\s:,(])0(?:px|em|rem|%|pt|vh|vw)(?=[\s;,)}]|$)/g,'$10').replace(/#([0-9a-f])\1([0-9a-f])\2([0-9a-f])\3\b/gi,'#$1$2$3').trim();
+    return s.replace(/\u0000(\d+)\u0000/g,(_,i)=>keep[+i])};
+P.cssminify=(s)=>{const o=cssMin(s);return withNote(o,saved(s,o))};
+P.cssformat=(s)=>{let out='',depth=0;const pad=()=>'  '.repeat(depth);const min=cssMin(s);let buf='';
+    for(let i=0;i<min.length;i++){const c=min[i];
+        if(c==='{'){out+=pad()+buf.trim()+' {\n';buf='';depth++}
+        else if(c==='}'){if(buf.trim())out+=pad()+buf.trim().replace(/:(?!\/\/)/,': ')+';\n';buf='';depth=Math.max(0,depth-1);out+=pad()+'}\n'+(depth?'':'\n')}
+        else if(c===';'){out+=pad()+buf.trim().replace(/:(?!\/\/)/,': ')+';\n';buf=''}
+        else buf+=c}
+    return out.trim()};
+P.htmlminify=(s)=>{const keep=[];let o=s.replace(/<(pre|textarea|script|style)\b[\s\S]*?<\/\1>/gi,(m)=>{keep.push(m);return'\u0000'+(keep.length-1)+'\u0000'});
+    o=o.replace(/<!--(?!\[if)[\s\S]*?-->/g,'').replace(/\s+/g,' ').replace(/>\s+</g,'> <').replace(/>\s<(\/?(?:html|head|body|div|p|ul|ol|li|table|tr|td|th|thead|tbody|section|article|header|footer|nav|main|h[1-6]|meta|link|title|br|hr)\b)/gi,'><$1').trim();
+    o=o.replace(/\u0000(\d+)\u0000/g,(_,i)=>keep[+i]);return withNote(o,saved(s,o))};
+P.xmlminify=(s)=>{const d=new DOMParser().parseFromString(s,'application/xml');const er=d.querySelector('parsererror');if(er)throw new Error(er.textContent.split('\n')[0]);
+    const keep=[];let o=s.replace(/<!\[CDATA\[[\s\S]*?\]\]>/g,(m)=>{keep.push(m);return'\u0000'+(keep.length-1)+'\u0000'}).replace(/<!--[\s\S]*?-->/g,'').replace(/>\s+</g,'><').trim().replace(/\u0000(\d+)\u0000/g,(_,i)=>keep[+i]);return withNote(o,saved(s,o))};
+const jsonWhere=(s,e)=>{const m=/position (\d+)/.exec(e.message);if(!m)return e.message;const pos=+m[1],pre=s.slice(0,pos),line=pre.split('\n').length,col=pos-pre.lastIndexOf('\n');
+    const near=s.slice(Math.max(0,pos-20),pos+1);let hint='';if(/,\s*[}\]]$/.test(s.slice(0,pos+1).replace(/\s+$/,''))||/,\s*$/.test(pre))hint=' A trailing comma is not allowed in JSON.';else if(/'/.test(near))hint=' JSON strings and keys need double quotes.';else if(/\/\/|\/\*/.test(near))hint=' JSON has no comments.';else if(/[{,]\s*[A-Za-z_]\w*\s*:?$/.test(pre+s[pos]))hint=' Keys must be in double quotes.';
+    return `Line ${line}, column ${col}: ${e.message.replace(/ in JSON at position \d+.*/,'')}.${hint}`};
+const jsonIn=(s)=>{try{return JSON.parse(s)}catch(e){throw new Error(jsonWhere(s,e))}};
+const kind=(v)=>v===null?'null':Array.isArray(v)?'array':typeof v;
+P.jsonminify=(s)=>{const o=JSON.stringify(jsonIn(s));return withNote(o,saved(s,o))};
+P.jsonvalidate=(s)=>{const v=jsonIn(s);let n=0,depth=0;(function walk(x,d){n++;depth=Math.max(depth,d);if(x&&typeof x==='object')for(const k in x)walk(x[k],d+1)})(v,0);
+    return'\u2713 Valid JSON\n\nTop level: '+kind(v)+(Array.isArray(v)?' with '+v.length+' items':v&&typeof v==='object'?' with '+Object.keys(v).length+' keys':'')+'\nValues: '+n.toLocaleString()+'\nDeepest nesting: '+depth};
+P.jsonparse=(s,m)=>{const v=jsonIn(s);if(m==='Tree')return JSON.stringify(v,null,2);const rows=[];
+    (function walk(x,p){if(x&&typeof x==='object'){if(m==='Types')rows.push((p||'$')+'  '+kind(x));const ks=Array.isArray(x)?x.map((_,i)=>i):Object.keys(x);if(!ks.length&&m!=='Types')rows.push((p||'$')+' = '+JSON.stringify(x));
+        for(const k of ks)walk(x[k],Array.isArray(x)?p+'['+k+']':(/^[A-Za-z_$][\w$]*$/.test(k)?(p?p+'.':'')+k:p+'['+JSON.stringify(k)+']'))}
+        else rows.push((p||'$')+(m==='Types'?'  '+kind(x):' = '+JSON.stringify(x)))})(v,'');
+    return rows.join('\n')};
+P.jsonstringify=(s,m)=>{if(m==='Parse string'){let t=s.trim();const inner=JSON.parse(/^"/.test(t)?t:'"'+t.replace(/"/g,'\\"')+'"');return JSON.stringify(jsonIn(inner),null,2)}return JSON.stringify(JSON.stringify(jsonIn(s)))};
+P.html2md=(s)=>{const doc=new DOMParser().parseFromString(s,'text/html');const esc=(t)=>t.replace(/([\\`*_{}\[\]#|])/g,'\\$1');
+    const inline=(n)=>[...n.childNodes].map(node).join('');
+    const list=(n,ord,depth)=>[...n.children].filter(c=>c.tagName==='LI').map((li,i)=>'  '.repeat(depth)+(ord?(i+1)+'. ':'- ')+[...li.childNodes].map(c=>c.nodeType===1&&/^(UL|OL)$/.test(c.tagName)?'\n'+list(c,c.tagName==='OL',depth+1):node(c)).join('').trim()).join('\n');
+    function node(n){if(n.nodeType===3)return esc(n.nodeValue.replace(/\s+/g,' '));if(n.nodeType!==1)return'';const t=n.tagName;
+        if(/^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|IFRAME|FORM|INPUT|BUTTON|SELECT|TEXTAREA|SVG|HEAD)$/.test(t))return'';
+        if(/^H[1-6]$/.test(t))return'\n\n'+'#'.repeat(+t[1])+' '+inline(n).trim()+'\n\n';
+        if(t==='P'||t==='DIV'||t==='SECTION'||t==='ARTICLE'||t==='HEADER'||t==='FOOTER'||t==='MAIN')return'\n\n'+inline(n).trim()+'\n\n';
+        if(t==='BR')return'  \n';if(t==='HR')return'\n\n---\n\n';
+        if(t==='STRONG'||t==='B'){const x=inline(n).trim();return x?'**'+x+'**':''}if(t==='EM'||t==='I'){const x=inline(n).trim();return x?'*'+x+'*':''}
+        if(t==='DEL'||t==='S')return'~~'+inline(n).trim()+'~~';
+        if(t==='CODE'&&n.parentNode.tagName!=='PRE')return'`'+n.textContent+'`';
+        if(t==='PRE'){const c=n.querySelector('code');const lang=c&&(/language-([\w-]+)/.exec(c.className)||[])[1]||'';return'\n\n```'+lang+'\n'+n.textContent.replace(/\n$/,'')+'\n```\n\n'}
+        if(t==='A'){const h=n.getAttribute('href')||'';const x=inline(n).trim();return h&&!/^javascript:/i.test(h)?'['+(x||h)+']('+h+')':x}
+        if(t==='IMG'){const src=n.getAttribute('src')||'';return src?'!['+esc(n.getAttribute('alt')||'')+']('+src+')':''}
+        if(t==='UL'||t==='OL')return'\n\n'+list(n,t==='OL',0)+'\n\n';
+        if(t==='BLOCKQUOTE')return'\n\n'+inline(n).trim().split('\n').map(l=>'> '+l).join('\n')+'\n\n';
+        if(t==='TABLE'){const rows=[...n.querySelectorAll('tr')].map(r=>[...r.children].map(c=>inline(c).trim().replace(/\|/g,'\\|').replace(/\n+/g,' ')));if(!rows.length)return'';const w=Math.max(...rows.map(r=>r.length));const line=(r)=>'| '+Array.from({length:w},(_,i)=>r[i]||'').join(' | ')+' |';return'\n\n'+line(rows[0])+'\n|'+' --- |'.repeat(w)+'\n'+rows.slice(1).map(line).join('\n')+'\n\n'}
+        return inline(n)}
+    return node(doc.body).replace(/[ \t]+\n/g,(m)=>m.startsWith('  ')?'  \n':'\n').replace(/\n{3,}/g,'\n\n').trim()};
+P.md2html=(s,m)=>{let h=P.md(s,'To HTML').replace(/ style="[^"]*"/g,'').replace(/((?:<li>.*<\/li>\n?)+)/g,'<ul>\n$1</ul>\n');
+    h=h.split(/\n{2,}/).map(b=>/^\s*<(h\d|ul|ol|li|blockquote|hr|pre|table)/.test(b)?b:'<p>'+b.trim().replace(/\n/g,'<br>\n')+'</p>').join('\n');
+    return m==='Preview'?{html:'<div style="line-height:1.8">'+h+'</div>'}:h};
 P.minify=(s,m)=>{if(m==='JSON')return JSON.stringify(JSON.parse(s));if(m==='CSS')return s.replace(/\/\*[\s\S]*?\*\//g,'').replace(/\s+/g,' ').replace(/\s*([{}:;,])\s*/g,'$1').trim();
     if(m==='HTML')return s.replace(/\s+/g,' ').replace(/>\s+</g,'><').trim();return s.replace(/\/\/.*$/gm,'').replace(/\/\*[\s\S]*?\*\//g,'').replace(/\s+/g,' ').trim()};
 

@@ -21,6 +21,18 @@ const HOST_RE = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63
 
 // Human-first defaults: the descriptive host is canonical, the one people already type is short.
 const HOST_DEFAULTS = {
+    jsminify: { canonical: 'js-minifier', short: 'jsminify', aliases: ["minifyjs", "javascript-minifier", "jsmin"] },
+    jsformat: { canonical: 'js-beautifier', short: 'jsformat', aliases: ["jsbeautify", "javascript-beautifier", "unminify"] },
+    cssminify: { canonical: 'css-minifier', short: 'cssminify', aliases: ["minifycss", "cssmin", "css-compressor"] },
+    cssformat: { canonical: 'css-beautifier', short: 'cssformat', aliases: ["cssbeautify", "css-formatter", "unminifycss"] },
+    htmlminify: { canonical: 'html-minifier', short: 'htmlminify', aliases: ["minifyhtml", "htmlmin", "html-compressor"] },
+    xmlminify: { canonical: 'xml-minifier', short: 'xmlminify', aliases: ["minifyxml", "xmlmin"] },
+    jsonminify: { canonical: 'json-minifier', short: 'jsonminify', aliases: ["minifyjson", "jsonmin", "json-compressor"] },
+    jsonparse: { canonical: 'json-parser', short: 'jsonparse', aliases: ["jsonviewer", "json-viewer", "jsontree", "parsejson"] },
+    jsonvalidate: { canonical: 'json-validator', short: 'jsonvalidate', aliases: ["jsonlint", "validatejson", "json-lint", "jsoncheck"] },
+    jsonstringify: { canonical: 'json-stringify', short: 'jsonstringify', aliases: ["jsonescape", "json-escape", "jsonunescape", "stringifyjson"] },
+    html2md: { canonical: 'html-to-markdown', short: 'html2md', aliases: ["htmltomarkdown", "html2markdown", "htmltomd"] },
+    md2html: { canonical: 'markdown-to-html', short: 'md2html', aliases: ["markdowntohtml", "md2htm", "mdtohtml"] },
     yt: { canonical: 'youtube-downloader', short: 'yt', aliases: ['youtube', 'ytdl', 'youtubedownloader', 'youtube-download'] },
 };
 // The same tool built twice (once in Text, once in Developer Tools). People see ONE entry, under the

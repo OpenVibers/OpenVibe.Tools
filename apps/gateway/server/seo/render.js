@@ -119,6 +119,7 @@ function renderTool(file, sub, canonicalHost) {
     html = html.replace(/<link\s+rel=["']canonical["'][^>]*>/i, `<link rel="canonical" href="${url}">`);
 
     const extraHead = [
+        `<meta name="ov-tool" content="${esc(sub)}">`,   // the page script reads this: the host may be descriptive, a mirror or a custom domain
         `<meta name="keywords" content="${esc(rec.kw || '')}">`,
         '<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">',
         '<meta name="twitter:card" content="summary_large_image">',
