@@ -139,34 +139,4 @@ function renderTool(file, sub, canonicalHost) {
     return html;
 }
 
-/** Hub pages list every tool, which gives crawlers a clean path into all of them. */
-function toolUrls() {
-    const { CATALOG } = require('./catalog');
-    const urls = [];
-    for (const [sub, rec] of CATALOG) {
-        urls.push({ loc: `https://${sub}.openvibe.tools/`, priority: rec.hub ? '0.9' : '0.8', changefreq: rec.hub ? 'weekly' : 'monthly' });
-    }
-    return urls;
-}
-
-/** Full sitemap: the hubs, every tool subdomain, and the satellite apps. */
-function buildSitemap(extraUrls = []) {
-    const today = new Date().toISOString().slice(0, 10);
-    const seen = new Set();
-    const all = [
-        { loc: `${SITE}/`, priority: '1.0', changefreq: 'weekly' },
-        ...toolUrls(),
-        ...extraUrls,
-    ].filter(u => { if (seen.has(u.loc)) return false; seen.add(u.loc); return true; });
-    const body = all.map(u => `  <url>\n    <loc>${u.loc}</loc>\n    <lastmod>${u.lastmod || today}</lastmod>\n    <changefreq>${u.changefreq || 'monthly'}</changefreq>\n    <priority>${u.priority || '0.7'}</priority>\n  </url>`).join('\n');
-    return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`;
-}
-
-/** Satellite apps that live outside the dev/net catalogs but belong in the sitemap. */
-const SATELLITES = [
-    'img', 'audio', 'docs', 'food', 'maps', 'yt', 'text', 'logo', 'pastes',
-    'case', 'braille', 'binary', 'fancy', 'json', 'markdown', 'escape', 'diff', 'slug',
-    'wordcount', 'reverse', 'reversetext',
-].map(sub => ({ loc: `https://${sub}.openvibe.tools/`, priority: '0.8', changefreq: 'weekly' }));
-
-module.exports = { renderTool, buildSitemap, SATELLITES, toolUrls, SITE };
+module.exports = { renderTool, SITE };
