@@ -7,6 +7,9 @@
 // This gateway is registered there as OAuth client `tools`.
 //
 //   GET  /auth/login     → redirect to Network /oauth/authorize
+//                          (?silent=1 adds prompt=none: no login UI, the
+//                          Network answers login_required when nobody is
+//                          signed in there)
 //   GET  /auth/callback  → server-side code exchange, set cookies
 //   GET  /auth/logout    → clear cookies (+ best-effort refresh revoke)
 //   GET  /auth/me        → offline-verify ov_token, return profile
@@ -17,6 +20,10 @@
 //                Secure, JS-readable (every tool subdomain reads it)
 //   ov_refresh — opaque refresh token, httpOnly, Path=/auth,
 //                host-only (never leaves the gateway)
+//   ov_sso_hint — 'account' after a sign-in, 'guest' after a sign-out.
+//                One year, JS-readable, Domain=.openvibe.tools. The shared
+//                navbar reads it: only when it says 'account' does a page
+//                with no session attempt ONE silent (prompt=none) login.
 // ═══════════════════════════════════════════════════════════════
 
 const express = require('express');
@@ -27,6 +34,17 @@ const ACCESS_COOKIE = 'ov_token';
 const REFRESH_COOKIE = 'ov_refresh';
 const STATE_COOKIE = 'ov_oauth_state';
 const NEXT_COOKIE = 'ov_oauth_next';
+const SILENT_COOKIE = 'ov_oauth_silent';
+const SSO_HINT_COOKIE = 'ov_sso_hint';
+
+// Origin of the identity provider's own "sign you in everywhere" chain. The Network hops
+// through /auth/login?silent=1&next=https://openvibe.network/sso/fanout?… and back, so
+// its URLs are valid post-login targets alongside our own hosts.
+const NETWORK_ORIGIN = 'https://openvibe.network';
+
+// OAuth errors that mean "nobody is signed in at the Network" rather than "something broke".
+// A silent attempt that ends here just goes back where it came from.
+const NO_SESSION_ERRORS = new Set(['login_required', 'interaction_required', 'consent_required']);
 
 /**
  * Create the auth client + JWKS fetcher shared by the whole gateway.
@@ -120,16 +138,61 @@ function createAuthRoutes(config, auth) {
         res.clearCookie(REFRESH_COOKIE, { ...refreshCookieOpts(), maxAge: undefined });
     }
 
-    /** Only allow same-site relative paths or *.openvibe.tools URLs as post-login targets. */
+    /**
+     * Remember across the whole *.openvibe.tools zone whether this browser has an account
+     * here ('account') or explicitly signed out ('guest'). Not a credential — just the hint
+     * that tells the navbar whether a silent login is worth one round trip.
+     */
+    function setSsoHint(res, value) {
+        res.cookie(SSO_HINT_COOKIE, value, {
+            domain: config.cookies.domain || undefined,
+            sameSite: 'lax',
+            secure: config.cookies.secure,
+            httpOnly: false, // read client-side by the shared navbar
+            path: '/',
+            maxAge: 365 * 24 * 60 * 60 * 1000,
+        });
+    }
+
+    /** Short-lived flags that carry login options across the OAuth round trip. */
+    function flowCookieOpts() {
+        return {
+            domain: config.cookies.domain || undefined,
+            sameSite: 'lax', secure: config.cookies.secure, httpOnly: true,
+            path: '/auth', maxAge: 10 * 60 * 1000,
+        };
+    }
+
+    /** A cookie only clears when domain and path match the ones it was set with. */
+    function clearFlowCookie(res, name) {
+        res.clearCookie(name, { ...flowCookieOpts(), maxAge: undefined });
+        res.clearCookie(name, { path: '/auth' }); // host-only leftovers from older sessions
+    }
+
+    /**
+     * Only allow same-site relative paths, *.openvibe.tools URLs, or the Network's own
+     * https://openvibe.network/... URLs as post-login / post-logout targets.
+     */
     function sanitizeNext(next) {
         if (!next || typeof next !== 'string') return '/';
         if (/^\/(?!\/)/.test(next)) return next; // relative path, not protocol-relative
         try {
             const u = new URL(next);
             const base = 'openvibe.tools';
-            if (u.protocol === 'https:' && (u.hostname === base || u.hostname.endsWith('.' + base))) return next;
+            if (u.protocol !== 'https:') return '/';
+            if (u.hostname === base || u.hostname.endsWith('.' + base)) return next;
+            if (u.origin === NETWORK_ORIGIN) return next;
         } catch { /* fall through */ }
         return '/';
+    }
+
+    /** Append a query parameter to a target that may already carry a query string or a hash. */
+    function withParam(target, key, value) {
+        const hashAt = target.indexOf('#');
+        const hash = hashAt >= 0 ? target.slice(hashAt) : '';
+        const base = hashAt >= 0 ? target.slice(0, hashAt) : target;
+        const sep = base.includes('?') ? '&' : '?';
+        return `${base}${sep}${encodeURIComponent(key)}=${encodeURIComponent(value)}${hash}`;
     }
 
     /** Exchange at the Network — internal URL first, public as fallback. */
@@ -166,33 +229,43 @@ function createAuthRoutes(config, auth) {
 
     // ── GET /auth/login ──────────────────────────────────────
     router.get('/login', (req, res) => {
-        const { url, state } = auth.client.getAuthorizationUrl(config.oauth.scope);
+        let { url, state } = auth.client.getAuthorizationUrl(config.oauth.scope);
+        // Silent mode (?silent=1): the shared navbar uses it when a page has no session but
+        // the browser carries an ov_sso_hint=account cookie. prompt=none tells the Network to
+        // answer without any UI — a code if the user is signed in there, login_required if not.
+        const silent = String(req.query.silent || '') === '1';
+        if (silent) url += '&prompt=none';
         // Domain-wide: a login can start on net./dev./pastes. but the OAuth
         // redirect_uri is pinned to the apex — the callback must see these cookies.
-        res.cookie(STATE_COOKIE, state, {
-            domain: config.cookies.domain || undefined,
-            sameSite: 'lax', secure: config.cookies.secure, httpOnly: true,
-            path: '/auth', maxAge: 10 * 60 * 1000,
-        });
+        res.cookie(STATE_COOKIE, state, flowCookieOpts());
         const next = sanitizeNext(req.query.next);
-        if (next !== '/') {
-            res.cookie(NEXT_COOKIE, next, {
-                domain: config.cookies.domain || undefined,
-                sameSite: 'lax', secure: config.cookies.secure, httpOnly: true,
-                path: '/auth', maxAge: 10 * 60 * 1000,
-            });
-        }
+        if (next !== '/') res.cookie(NEXT_COOKIE, next, flowCookieOpts());
+        else clearFlowCookie(res, NEXT_COOKIE);
+        if (silent) res.cookie(SILENT_COOKIE, '1', flowCookieOpts());
+        else clearFlowCookie(res, SILENT_COOKIE);
         res.redirect(url);
     });
 
     // ── GET /auth/callback ───────────────────────────────────
     router.get('/callback', async (req, res) => {
         const { code, state, error } = req.query;
-        if (error) return res.redirect(`/?auth_error=${encodeURIComponent(error)}`);
+        const silent = req.cookies?.[SILENT_COOKIE] === '1';
+        clearFlowCookie(res, SILENT_COOKIE);
+        if (error) {
+            // A prompt=none probe that found no Network session is the expected outcome, not
+            // a failure: send the page straight back with ?sso=none so it stops asking.
+            if (NO_SESSION_ERRORS.has(String(error)) || silent) {
+                const next = sanitizeNext(req.cookies?.[NEXT_COOKIE]);
+                clearFlowCookie(res, NEXT_COOKIE);
+                clearFlowCookie(res, STATE_COOKIE);
+                return res.redirect(withParam(next, 'sso', 'none'));
+            }
+            return res.redirect(`/?auth_error=${encodeURIComponent(error)}`);
+        }
         if (!code) return res.status(400).send('Missing authorization code');
 
         const expectedState = req.cookies?.[STATE_COOKIE];
-        res.clearCookie(STATE_COOKIE, { path: '/auth' });
+        clearFlowCookie(res, STATE_COOKIE);
         if (!expectedState || !state || !crypto.timingSafeEqual(
             Buffer.from(String(state).padEnd(64).slice(0, 64)),
             Buffer.from(String(expectedState).padEnd(64).slice(0, 64))
@@ -207,8 +280,9 @@ function createAuthRoutes(config, auth) {
                 code,
             });
             setSessionCookies(res, data.access_token, data.refresh_token);
+            setSsoHint(res, 'account');
             const next = sanitizeNext(req.cookies?.[NEXT_COOKIE]);
-            res.clearCookie(NEXT_COOKIE, { path: '/auth' });
+            clearFlowCookie(res, NEXT_COOKIE);
             return res.redirect(next);
         } catch (err) {
             console.error('[Auth] Code exchange failed:', err.message);
@@ -237,6 +311,9 @@ function createAuthRoutes(config, auth) {
             } catch { /* optional */ }
         }
         clearSessionCookies(res);
+        // 'guest' stops every tool page from probing the Network for a session it just ended.
+        setSsoHint(res, 'guest');
+        // next may be a Network URL: the sign-out-everywhere chain hops through here.
         res.redirect(sanitizeNext(req.query.next));
     });
 
