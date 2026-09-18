@@ -107,7 +107,7 @@ ${head}
 ${appIcon.headTags({ site: 'tools', iconBase: '/assets' })}
 <link rel="alternate" type="application/json" href="${SITE}/api/catalog.json" title="Tool catalog">
 <link rel="preconnect" href="https://openvibe.network">
-<script src="https://openvibe.network/shared/theme-loader.js"></script>
+<script src="https://openvibe.network/shared/theme-loader.js" defer></script>
 <style>${CSS}</style></head><body>
 <noscript><header class="topbar"><a href="${SITE}/">${NAME}</a><nav>${families.filter(f => f.path).map(f => `<a href="${esc(f.path)}">${esc(f.name)}</a>`).join('')}<a href="/all-tools">All tools</a></nav></header></noscript>
 <main class="wrap">${body}

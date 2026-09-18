@@ -261,7 +261,16 @@ app.use((req, res, next) => {
     if (getRequestHost(req) !== 'pastes.openvibe.tools') return next();
     if (req.path.startsWith('/api/') || req.path.startsWith('/auth/')) return next();
     if (isStaticPath(req.path)) return next();
-    return res.sendFile(path.join(__dirname, '..', 'public', 'paste.html'));
+    // Pastes live on openvibe.community. Old links keep their paste: /<slug> and /p/<slug> → /p/<slug> there
+    // (the page used to drop the slug and show the index). Signed-in visitors go through its silent sign-in.
+    const COMMUNITY = (process.env.OV_COMMUNITY_URL || 'https://openvibe.community').replace(/\/$/, '');
+    const m = /^\/(?:p\/)?([A-Za-z0-9][A-Za-z0-9_-]{1,80})\/?$/.exec(req.path);
+    const target = m && !['new', 'my', 'pastes'].includes(m[1]) ? `/p/${m[1]}` : (req.path === '/new' ? '/new' : req.path === '/my' ? '/my' : '/pastes');
+    if (/(?:^|;\s*)ov_sso_hint=account(?:;|$)/.test(String(req.headers.cookie || ''))) {
+        res.set({ 'Cache-Control': 'private, no-store', Vary: 'Cookie' });
+        return res.redirect(302, `${COMMUNITY}/auth/login?silent=1&next=${encodeURIComponent(target)}`);
+    }
+    return res.redirect(301, COMMUNITY + target);
 });
 
 // Dev tool subdomains → dev.html SPA
