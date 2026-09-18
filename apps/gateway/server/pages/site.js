@@ -21,7 +21,7 @@ const NAME = 'OpenVibe.Tools';
 const esc = seo.esc;
 const POPULAR = ['yt', 'convert', 'compress', 'mergepdf', 'jsonfmt', 'mp3', 'dns', 'whois', 'fancy', 'logo', 'ssl', 'resize', 'trim', 'regex', 'maps', 'food'];
 
-const icon = (name, size) => `<span class="ov-icon" data-icon="${esc(name)}" data-fx="none" style="--ovi-size:${size}px" aria-hidden="true">${icons.svg(name)}</span>`;
+const icon = (name, size) => `<span class="ov-icon" data-icon="${esc(name)}" data-ovi="${esc(icons.resolve(name))}" data-fx="none" style="--ovi-size:${size}px" aria-hidden="true">${icons.svg(name)}</span>`;
 const hostLabel = (h) => h.replace(/\.openvibe\.tools$/, '') === h ? h : h;
 
 function toolCard(t) {
@@ -70,6 +70,19 @@ details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px
 .az{columns:4 220px;column-gap:24px;padding:0;list-style:none}.az li{break-inside:avoid;padding:3px 0}.az a{text-decoration:none}.az small{color:var(--text-muted,#7d8aa0)}
 .empty{color:var(--text-secondary,#a8b3c4);padding:12px 0}
 .net{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.kicker{font-size:12.5px!important;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--accent-light,var(--accent,#60a5fa))!important;margin:0 auto 12px!important}
+.stats{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 26px;list-style:none;padding:0;margin:20px 0 0;color:var(--text-muted,#7d8aa0);font-size:14px}.stats b{color:var(--text-primary,#e6edf7);font-size:18px;margin-right:4px}
+.jump{position:sticky;top:56px;z-index:20;display:flex;gap:8px;overflow-x:auto;padding:10px 2px;margin:26px 0 0;background:color-mix(in srgb,var(--bg-primary,#0a0f18) 88%,transparent);backdrop-filter:blur(10px);scrollbar-width:none;border-bottom:1px solid var(--border,rgba(255,255,255,.06))}.jump::-webkit-scrollbar{display:none}
+.jump a{display:inline-flex;align-items:center;gap:7px;flex:none;padding:6px 12px 6px 7px;border-radius:999px;border:1px solid var(--border,rgba(255,255,255,.1));text-decoration:none;color:var(--text-primary,#e6edf7);font-size:13.5px;font-weight:600;background:var(--bg-secondary,#111826)}
+.jump a:hover{border-color:var(--accent,#3b82f6)}.jump i{font-style:normal;font-size:11.5px;color:var(--text-muted,#7d8aa0);font-weight:700}
+.fam{scroll-margin-top:120px}.fam h2 a{color:inherit;text-decoration:none}.fam h2 a:hover{color:var(--accent-light,var(--accent,#60a5fa))}.fam-tag{margin:2px 0 0;color:var(--text-secondary,#a8b3c4);font-size:14.5px}.fam .sec-h{margin-bottom:14px;align-items:center}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:8px}
+.tile{position:relative;display:flex;gap:10px;align-items:center;padding:9px 11px;border-radius:12px;border:1px solid var(--border,rgba(255,255,255,.07));background:var(--bg-secondary,#111826);text-decoration:none;color:inherit;min-width:0;transition:border-color .15s,background .15s}
+.tile:hover,.tile:focus-visible{border-color:var(--accent,#3b82f6);background:color-mix(in srgb,var(--accent,#3b82f6) 7%,var(--bg-secondary,#111826));outline:0}
+.tile>span:not(.ov-icon){min-width:0}.tile b{display:block;font-size:14px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tile small{display:block;font-size:12px;color:var(--text-muted,#7d8aa0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile.is-soon{border-style:dashed;background:none;opacity:.72;cursor:default}.tile.is-soon em{margin-left:auto;font-style:normal;font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--accent-light,var(--accent,#60a5fa));flex:none}
+.perks{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}.perks div{padding:16px;border-radius:14px;border:1px solid var(--border,rgba(255,255,255,.08));background:var(--bg-secondary,#111826)}.perks p{margin:6px 0 0;color:var(--text-secondary,#a8b3c4);font-size:14px}
+@media (max-width:560px){.tiles{grid-template-columns:1fr 1fr}.tile small{display:none}.jump{top:52px}}
 #ov-footer{margin-top:56px}
 @media (max-width:560px){.grid{grid-template-columns:1fr}.search button{padding:0 14px}}
 @media (prefers-reduced-motion:reduce){.tool{transition:none}}
@@ -119,17 +132,24 @@ function search(q) {
 
 // ── Pages ────────────────────────────────────────────────────
 function pageIndex() {
-    const { tools, families } = registry.get();
+    const { tools, families, planned } = registry.get();
     const byId = new Map(tools.map(t => [t.id, t]));
     const popular = POPULAR.map(id => byId.get(id)).filter(Boolean);
     const fams = families.filter(f => f.path);
-    const body = `<div class="hero"><h1>Online tools that <span>just work</span></h1>
-<p>${tools.length} tools for files, text, code and networks. Convert a video, merge a PDF, look up a domain or format JSON. Open source, community-run, and no account needed to start.</p>
+    const tile = (t) => `<a class="tile" href="${esc(t.url)}" title="${esc(t.tagline)}">${icon(t.icon, 28)}<span><b>${esc(t.name)}</b><small>${esc(t.tagline)}</small></span></a>`;
+    const soon = (t) => `<span class="tile is-soon" title="Planned">${icon(t.icon, 28)}<span><b>${esc(t.name)}</b><small>${esc(t.tagline)}</small></span><em>Soon</em></span>`;
+    const body = `<div class="hero"><p class="kicker">Open source · community-run · no account needed to start</p><h1>The toolbox for <span>everything you do online</span></h1>
+<p>Convert a video, squeeze an image, merge a PDF, debug DNS, format JSON. ${tools.length} tools that open instantly, each on an address you can remember, like <a href="https://yt.openvibe.tools/">yt.openvibe.tools</a>.</p>
 ${searchForm('')}
-<ul class="chips">${fams.map(f => `<li><a href="${esc(f.path)}">${icon(f.icon, 22)}${esc(f.name)}</a></li>`).join('')}</ul></div>
+<ul class="stats"><li><b>${tools.length}</b> tools</li><li><b>${fams.length}</b> families</li><li><b>0</b> installs</li><li><b>1</b> account for all of OpenVibe</li></ul></div>
+<nav class="jump" aria-label="Tool families">${fams.map(f => `<a href="#f-${f.id}">${icon(f.icon, 22)}${esc(f.name)}<i>${tools.filter(t => t.family === f.id).length}</i></a>`).join('')}</nav>
 <section id="results" hidden aria-live="polite"><div class="sec-h"><h2>Results</h2></div><div class="grid" id="results-grid"></div><p class="empty" id="results-empty" hidden>No tool matches that yet. <a href="/all-tools">Browse every tool</a>.</p></section>
-<section aria-labelledby="pop-h"><div class="sec-h"><h2 id="pop-h">Popular right now</h2><a class="more" href="/all-tools">All ${tools.length} tools</a></div><div class="grid">${popular.map(toolCard).join('')}</div></section>
-${fams.map(f => { const list = tools.filter(t => t.family === f.id); return `<section aria-labelledby="f-${f.id}"><div class="sec-h">${icon(f.icon, 34)}<h2 id="f-${f.id}"><a href="${esc(f.path)}" style="color:inherit;text-decoration:none">${esc(f.name)}</a></h2><a class="more" href="${esc(f.path)}">All ${list.length}</a></div><p class="sec-p">${esc(f.description)}</p><div class="grid">${list.slice(0, 8).map(toolCard).join('')}</div></section>`; }).join('')}`;
+<section aria-labelledby="pop-h"><div class="sec-h"><h2 id="pop-h">What people reach for</h2><a class="more" href="/all-tools">A to Z list</a></div><div class="grid">${popular.slice(0, 8).map(toolCard).join('')}</div></section>
+${fams.map(f => { const list = tools.filter(t => t.family === f.id); const next = planned.filter(t => t.family === f.id); return `<section class="fam" aria-labelledby="f-${f.id}"><div class="sec-h">${icon(f.icon, 40)}<div><h2 id="f-${f.id}"><a href="${esc(f.path)}">${esc(f.name)}</a></h2><p class="fam-tag">${esc(f.tagline)}</p></div><a class="more" href="${esc(f.path)}">About these ${list.length}</a></div><div class="tiles">${list.map(tile).join('')}${next.map(soon).join('')}</div></section>`; }).join('')}
+<section aria-labelledby="acct-h"><div class="sec-h"><h2 id="acct-h">Better with an account, fine without</h2></div><div class="perks">
+<div><b>Without signing in</b><p>Every tool works. Results stay available for an hour, then they are deleted.</p></div>
+<div><b>Signed in</b><p>Results keep for 24 hours, your recent tools follow you across devices, and your theme and notifications come along from the rest of OpenVibe.</p></div>
+<div><b>For developers</b><p>The whole catalog is public JSON at <a href="/api/catalog.json">/api/catalog.json</a>, with a plain-text map at <a href="/llms.txt">/llms.txt</a>.</p></div></div></section>`;
     return shell({ families, body, head: head({
         title: 'Online Tools for Files, Text, Code & Networks', description: `${tools.length} online tools in one place: video and audio converters, image and PDF tools, developer utilities and network diagnostics. Open source and community-run.`,
         canonical: SITE + '/', keywords: 'online tools, converter, pdf tools, image converter, developer tools, network tools, youtube downloader',

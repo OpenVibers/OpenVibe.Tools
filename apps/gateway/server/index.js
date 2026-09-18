@@ -212,6 +212,9 @@ function sendTool(req, res, file) {
     }
 }
 
+// Terms, Privacy and DMCA — the same documents on the apex and on every tool host.
+{ const legal = require('openvibe-shared/legal'); app.get(legal.PATHS, legal.handler({ id: 'tools', service: 'tools', host: 'openvibe.tools', name: 'OpenVibe.Tools', profile: 'tools' })); app.get('/tos', (_req, res) => res.redirect(301, '/terms')); }
+
 // The apex is server-rendered from the registry: index, families, tool pages, search,
 // sitemap.xml, robots.txt, llms.txt and /api/catalog.json (server/pages/site.js).
 app.use(require('./pages/site').createSiteRouter());
