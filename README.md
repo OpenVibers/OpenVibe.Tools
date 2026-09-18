@@ -13,7 +13,8 @@ offline against the Network's public key (JWKS).
 
 ```
 apps/
-├── gateway   # apex directory + Net.OpenVibe, Dev.OpenVibe, Paste.OpenVibe (Host routing)
+├── gateway   # apex (server-rendered index, family + tool pages, catalog.json), the tool registry
+│             # and host roles, Net.OpenVibe + Dev.OpenVibe tools, proxy to the satellites
 ├── maps      # Maps.OpenVibe  — survival map for North America
 ├── food      # Food.OpenVibe  — grocery / food bank finder (proxies maps backend)
 ├── img       # Img.OpenVibe   — image converter & processing tools
@@ -39,7 +40,23 @@ vendor/
 | docs | docs.openvibe.tools + pdf.openvibe.tools | **4016** |
 
 Related services: Network **4000** (SSO/JWKS/themes/shared assets),
-Media **4100** (backs Paste.OpenVibe, app_id `live`), Live **3000**.
+Media **4100**, Live **3000**, Community **4200** (pastes live on openvibe.community;
+`pastes.openvibe.tools` hands over to it).
+
+## Registry, hosts and domains
+
+`apps/gateway/server/registry` is the one list of tools and families. Each has a **canonical** host
+(links, sitemaps, `rel=canonical`), an optional **short** host people type, and **aliases** that 301
+to the short host. Unknown `*.openvibe.tools` hosts 301 to the index; unknown custom domains 404.
+The owner can attach hosts (including bought domains) to a tool in `openvibe.network/admin` →
+Domains; the gateway merges those overrides every minute. New custom domain on the host:
+`sudo deploy/scripts/add-custom-domain.sh <domain>`.
+
+Public, cacheable outputs on the apex: `/` (every tool by family, planned tools as placeholders),
+`/<family>-tools`, `/tool/<id>`, `/all-tools`, `/search?q=`, `/sitemap.xml`, `/robots.txt`,
+`/llms.txt`, `/api/catalog.json`, `/terms`, `/privacy`, `/dmca`. All of it renders without JavaScript.
+
+Deploy with `deploy/scripts/deploy.sh` (it refreshes the copied shared package inside each app).
 
 ## Dev quickstart
 
