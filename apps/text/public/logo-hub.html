@@ -120,25 +120,17 @@
             </div>
         </div>
 
-        <footer class="site-footer">
-            <div class="footer-links">
-                <a href="https://openvibe.network">openvibe.tools</a>
-                <a href="https://text.openvibe.tools">Text.OpenVibe</a>
-                <a href="https://img.openvibe.tools">Img.OpenVibe</a>
-                <a href="https://audio.openvibe.tools">Audio.OpenVibe</a>
-                <a href="https://openvibe.live">OpenVibe.Live</a>
-            </div>
-            <p>&copy; OpenVibe — tools for the internet, run by its community.</p>
-        </footer>
+        <div id="ov-footer"></div>
     </div>
 
     <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/footer.js"></script>
     <script src="https://openvibe.network/shared/notification-ui.js"></script>
     <script src="https://openvibe.network/shared/account-switcher.js"></script>
     <script src="/js/logo-engine.js"></script>
     <script src="/js/shared.js"></script>
     <script>
-        OpenVibeUI.initPage();
+        OpenVibeUI.initPage({ footer: 'full' });
         const input = document.getElementById('quickInput');
         const canvas = document.getElementById('previewCanvas');
         const presetGrid = document.getElementById('presetGrid');

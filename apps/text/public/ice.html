@@ -154,7 +154,7 @@
         @media print {
             .printable { display: block !important; }
             .tool-wrap { padding: 0; }
-            .site-footer, .pill-tabs, .alert-banner { display: none; }
+            .ovf, .site-note, .pill-tabs, .alert-banner { display: none; }
         }
 
         .tab-content { display: none; }
@@ -464,18 +464,12 @@
             </div>
         </div>
 
-        <footer class="site-footer">
-            <div class="footer-links">
-                <a href="https://text.openvibe.tools">Text.OpenVibe Hub</a>
-                <a href="https://peso.openvibe.tools">OpenVibePeso</a>
-                <a href="https://spanish.openvibe.tools">OpenVibeSpanish</a>
-                <a href="https://slang.openvibe.tools">OpenVibeSlang</a>
-            </div>
-            <p>&copy; 2025 OpenVibe &mdash; This is informational only, not legal advice.</p>
-        </footer>
+        <p class="site-note">This is informational only, not legal advice.</p>
+        <div id="ov-footer" data-related="OpenVibePeso|https://peso.openvibe.tools;OpenVibeSpanish|https://spanish.openvibe.tools;OpenVibeSlang|https://slang.openvibe.tools"></div>
     </div>
 
     <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/footer.js"></script>
     <script src="https://openvibe.network/shared/notification-ui.js"></script>
     <script src="https://openvibe.network/shared/account-switcher.js"></script>
     <script src="/js/shared.js"></script>

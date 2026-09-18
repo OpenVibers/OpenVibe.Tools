@@ -129,9 +129,107 @@ async function shareText(text, title = 'Text.OpenVibe') {
     }
 }
 
+// ── Shared chrome: navbar + footer ───────────────────────────
+// Every page loads navbar.js / footer.js from openvibe.network; this is the one place that
+// boots them, so a page only needs a <div id="ov-footer" data-related="Name|url;…"> mount.
+const NETWORK = 'https://openvibe.network';
+const SILENT_LOGIN = 'https://openvibe.tools/auth/login?silent=1&next={url}';
+const LOGO_HOSTS = /^(logo|title|wordmark|textlogo|transparent|badge|sticker|thumbnail|cover|channelart|watermark|neon|overlay|lowerthird)\./;
+
+// The site's own tool list — the footer columns on the hubs, the "more tools" row elsewhere.
+const TEXT_TOOLS = [
+    { name: 'Fancy Text', url: 'https://fancy.openvibe.tools' },
+    { name: 'Zalgo Text', url: 'https://zalgo.openvibe.tools' },
+    { name: 'ASCII Art', url: 'https://ascii.openvibe.tools' },
+    { name: 'Symbols', url: 'https://symbols.openvibe.tools' },
+    { name: 'Kaomoji', url: 'https://kaomoji.openvibe.tools' },
+    { name: 'Case Converter', url: 'https://case.openvibe.tools' },
+    { name: 'Text Counter', url: 'https://count.openvibe.tools' },
+    { name: 'JSON Formatter', url: 'https://json.openvibe.tools' },
+    { name: 'Markdown Preview', url: 'https://markdown.openvibe.tools' },
+    { name: 'Diff Checker', url: 'https://compare.openvibe.tools' },
+    { name: 'Bio Generator', url: 'https://bio.openvibe.tools' },
+];
+const LOGO_TOOLS = [
+    { name: 'Title Cards', url: 'https://title.openvibe.tools' },
+    { name: 'Wordmark', url: 'https://wordmark.openvibe.tools' },
+    { name: 'Transparent PNG', url: 'https://transparent.openvibe.tools' },
+    { name: 'Badges & Stickers', url: 'https://badge.openvibe.tools' },
+    { name: 'Thumbnail Text', url: 'https://thumbnail.openvibe.tools' },
+    { name: 'Watermark', url: 'https://watermark.openvibe.tools' },
+];
+
+function getCookie(name) {
+    const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+    return m ? decodeURIComponent(m[1]) : null;
+}
+
+function currentService() {
+    return LOGO_HOSTS.test(location.hostname) ? 'logo' : 'text';
+}
+
+/** The tool's name for history: "Case Converter — … | case.openvibe.tools" → "Case Converter — …". */
+function pageTitle() {
+    const h1 = document.querySelector('.page-header h1, .hub-hero h1');
+    const fromH1 = h1 ? h1.textContent.replace(/\s+/g, ' ').trim() : '';
+    return fromH1 || document.title.split('|')[0].trim();
+}
+
+function initNavbar() {
+    if (typeof OpenVibeNavbar === 'undefined') return;
+    const token = getCookie('ov_token') || localStorage.getItem('ov_token');
+    try {
+        OpenVibeNavbar.init({
+            service: currentService(),
+            apiBase: NETWORK,
+            token,
+            history: { type: 'tool', title: pageTitle() },
+            silentLogin: SILENT_LOGIN,
+        });
+    } catch (e) { /* the page works without the navbar */ }
+    if (typeof OpenVibeAccountSwitcher !== 'undefined') {
+        try { OpenVibeAccountSwitcher.init({ apiBase: NETWORK }); } catch (e) { /* optional */ }
+    }
+    if (token && typeof OpenVibeNotifications !== 'undefined') {
+        try {
+            OpenVibeNotifications.init({ token, apiBase: NETWORK });
+            const mount = OpenVibeNavbar.getBellMount && OpenVibeNavbar.getBellMount();
+            if (mount) { const bell = OpenVibeNotifications.createBell(); if (bell) mount.appendChild(bell); }
+        } catch (e) { /* optional */ }
+    }
+}
+
+/** Footer: related tools from the mount's data-related, then the site's own tool list. */
+function initFooter(opts = {}) {
+    if (typeof OpenVibeFooter === 'undefined') return;
+    const mount = document.getElementById('ov-footer');
+    if (!mount) return;
+    const related = (mount.dataset.related || '').split(';').map(s => s.trim()).filter(Boolean).map(pair => {
+        const [name, url] = pair.split('|');
+        return { name: (name || '').trim(), url: (url || '').trim() };
+    }).filter(l => l.name && l.url);
+    const service = currentService();
+    const links = [];
+    if (related.length) links.push({ heading: 'Related tools', items: related });
+    if (service === 'logo') {
+        links.push({ heading: 'Logo tools', items: LOGO_TOOLS });
+        links.push({ heading: 'Text tools', items: TEXT_TOOLS.slice(0, 6) });
+    } else {
+        links.push({ heading: 'Text tools', items: TEXT_TOOLS });
+        links.push({ heading: 'Logo tools', items: LOGO_TOOLS });
+    }
+    try {
+        OpenVibeFooter.init({ service, variant: opts.variant || 'compact', links, apiBase: NETWORK, mount: '#ov-footer' });
+    } catch (e) { /* optional */ }
+}
+
 // ── Common page init ─────────────────────────────────────────
-// Called on every page to set up keyboard shortcuts, etc.
-function initPage() {
+// Called on every page: shared chrome, keyboard shortcuts, live-tool affordances.
+//   opts.footer — 'full' on the hub pages, 'compact' (default) on tool pages
+function initPage(opts = {}) {
+    initNavbar();
+    initFooter({ variant: opts.footer });
+
     // "/" key focuses input (when not already in a field)
     document.addEventListener('keydown', (e) => {
         if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
