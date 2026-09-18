@@ -9,6 +9,13 @@
     try { if (window.OpenVibeNavbar) OpenVibeNavbar.init({ service: 'tools', apiBase: 'https://openvibe.network', token: token, history: { type: 'tool', title: document.title }, silentLogin: 'https://openvibe.tools/auth/login?silent=1&next={url}' }); } catch (e) { /* non-critical */ }
     try { if (window.OpenVibeFooter) OpenVibeFooter.init({ service: 'tools', variant: 'full', mount: '#ov-footer', apiBase: 'https://openvibe.network' }); } catch (e) { /* */ }
 
+    // Cards link to the search-friendly host; people go straight to the short one (no redirect hop).
+    document.addEventListener('click', function (e) {
+        var a = e.target.closest && e.target.closest('a[data-go]');
+        if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        e.preventDefault(); location.href = a.getAttribute('data-go');
+    });
+
     var input = document.getElementById('q'), results = document.getElementById('results');
     if (!input || !results) return;
     var grid = document.getElementById('results-grid'), empty = document.getElementById('results-empty');
@@ -32,7 +39,7 @@
         }).filter(Boolean).sort(function (a, b) { return b.s - a.s || a.t.name.localeCompare(b.t.name); }).slice(0, 24).map(function (x) { return x.t; });
     }
     function card(t) {
-        var a = document.createElement('a'); a.className = 'tool'; a.href = t.url;
+        var a = document.createElement('a'); a.className = 'tool'; a.href = t.url; if (t.hosts.short) a.setAttribute('data-go', 'https://' + t.hosts.short + '/');
         var ic = document.createElement('span'); ic.className = 'ov-icon'; ic.dataset.icon = t.icon; ic.dataset.fx = 'none'; ic.style.setProperty('--ovi-size', '36px');
         var box = document.createElement('span'); box.className = 'tool-t';
         var b = document.createElement('b'); b.textContent = t.name; var s = document.createElement('small'); s.textContent = t.tagline; var i = document.createElement('i'); i.textContent = t.hosts.short || t.hosts.canonical;
