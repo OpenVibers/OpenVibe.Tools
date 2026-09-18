@@ -152,6 +152,19 @@ function getAvailableFormats(info) {
     return formats;
 }
 
+/** yt-dlp's last stderr line → something the person can act on (the raw line is logged). */
+function friendlyDownloadError(line) {
+    const t = String(line || '');
+    if (/Sign in to confirm|not a bot|cookies/i.test(t)) return 'YouTube is asking this server to prove it is not a bot — try again in a few minutes';
+    if (/Private video|members-only|login required/i.test(t)) return 'This video is private or members-only';
+    if (/Video unavailable|has been removed|not available/i.test(t)) return 'This video is unavailable';
+    if (/age|confirm your age/i.test(t)) return 'Age-restricted videos cannot be downloaded';
+    if (/ffmpeg|ffprobe|Postprocessing/i.test(t)) return `Conversion failed on the server (${t.slice(0, 120)})`;
+    if (/Requested format is not available/i.test(t)) return 'That quality is not available for this video — try another';
+    if (/HTTP Error 4\d\d/i.test(t)) return `YouTube refused the request (${t.match(/HTTP Error \d+/)[0]})`;
+    return t.replace(/^ERROR:\s*/i, '').slice(0, 160) || 'Download failed';
+}
+
 // ── Download Video ───────────────────────────────────────────
 /**
  * Start a download and return a tracking ID.
@@ -222,8 +235,10 @@ function startDownload(url, quality = 'best') {
             }
         });
 
+        let stderrTail = '';
         proc.stderr.on('data', (data) => {
             const text = data.toString();
+            stderrTail = (stderrTail + text).slice(-2000);
             // Some progress info goes to stderr too
             const match = text.match(/([\d.]+)%/);
             if (match) entry.progress = parseFloat(match[1]);
@@ -232,8 +247,10 @@ function startDownload(url, quality = 'best') {
         proc.on('close', (code) => {
             currentConcurrent--;
             if (code !== 0) {
+                const last = stderrTail.split('\n').map(l => l.trim()).filter(l => l && !/^\[download\]/.test(l)).pop() || `yt-dlp exited with code ${code}`;
+                console.error(`[Download] ${id} (${quality}) failed: ${last}`);
                 entry.status = 'error';
-                entry.error = 'Download failed';
+                entry.error = friendlyDownloadError(last);
                 return;
             }
 
