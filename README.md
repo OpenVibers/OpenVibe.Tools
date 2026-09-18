@@ -58,6 +58,18 @@ Public, cacheable outputs on the apex: `/` (every tool by family, planned tools 
 
 Deploy with `deploy/scripts/deploy.sh` (it refreshes the copied shared package inside each app).
 
+## YouTube downloader: when YouTube refuses the server
+
+YouTube blocks some datacentre addresses outright ("Sign in to confirm you're not a bot"). The app
+checks every 30 minutes (`GET /api/health` → `youtube: ok | blocked | unknown`) and shows a banner
+while blocked. Player-client switches, IPv6, proof-of-origin tokens, the nightly yt-dlp and Cloudflare
+WARP were all tried on 2026-09-18 and all refused; what works is a different network identity, set in
+`/etc/openvibe/tools.env` and followed by `sudo systemctl restart openvibe-tools-yt`:
+
+- `YT_PROXY=socks5://user:pass@host:port` — a residential or mobile proxy (http, https, socks4/5).
+- `YT_COOKIES_FILE=/etc/openvibe/yt-cookies.txt` — a Netscape cookies.txt exported from a throwaway
+  YouTube account, readable by the service user. Accounts used this way can be suspended.
+
 ## Dev quickstart
 
 ```bash

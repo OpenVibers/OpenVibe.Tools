@@ -202,6 +202,23 @@
         return d.innerHTML;
     }
 
+    // --- Upstream status ---
+    // The server checks YouTube on a timer. When YouTube is refusing it, say so before anyone pastes a link.
+    (function upstreamBanner() {
+        fetch('/api/health', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (h) {
+            if (!h || h.youtube !== 'blocked' || document.getElementById('yt-upstream')) return;
+            var b = document.createElement('div'); b.id = 'yt-upstream'; b.setAttribute('role', 'status');
+            b.style.cssText = 'max-width:680px;margin:0 auto 16px;padding:12px 16px;border-radius:12px;border:1px solid color-mix(in srgb,var(--warning,#f59e0b) 45%,transparent);background:color-mix(in srgb,var(--warning,#f59e0b) 10%,transparent);color:var(--text-primary,#e6edf7);font-size:14px;line-height:1.5';
+            var t = document.createElement('b'); t.textContent = 'YouTube is refusing our server right now. ';
+            var m = document.createElement('span'); m.textContent = 'Downloads will fail until that clears. It is on YouTube\'s side and we re-check every 30 minutes. ';
+            var a = document.createElement('a'); a.href = 'https://openvibe.tools/audio-tools'; a.textContent = 'Audio tools'; a.style.color = 'var(--accent-light,#60a5fa)';
+            var a2 = document.createElement('a'); a2.href = 'https://openvibe.tools/'; a2.textContent = 'every other tool'; a2.style.color = 'var(--accent-light,#60a5fa)';
+            b.appendChild(t); b.appendChild(m); b.appendChild(a); b.appendChild(document.createTextNode(' and ')); b.appendChild(a2); b.appendChild(document.createTextNode(' work as usual.'));
+            var anchor = (typeof urlInput !== 'undefined' && urlInput && urlInput.closest('form, .input-row, .url-row, .search-box')) || document.querySelector('main') || document.body;
+            anchor.parentNode.insertBefore(b, anchor);
+        }).catch(function () {});
+    })();
+
     // --- Start Download ---
     // One reducer (download-state.js) turns SSE frames and polls into view state; render() paints it
     // on the page and mirrors it into the navbar activity island when that module is present.

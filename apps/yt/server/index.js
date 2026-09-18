@@ -98,7 +98,8 @@ app.use(hostGuard({ knows: seo.knowsHost, aliasOf: seo.aliasOf }));
 // Health check
 app.get('/api/health', (_req, res) => {
     const stats = downloader.getStats();
-    res.json({ status: 'ok', service: 'openvibe-yt', version: '1.0.0', stats });
+    const up = downloader.getUpstream();
+    res.set('Cache-Control', 'no-store').json({ status: 'ok', service: 'openvibe-yt', version: '1.0.0', stats, youtube: up.state, youtubeCheckedAt: up.checkedAt ? new Date(up.checkedAt).toISOString() : null });
 });
 
 // Get video info
@@ -256,6 +257,7 @@ app.use((req, res) => {
 // ── Start ────────────────────────────────────────────────────
 const server = app.listen(config.port, config.host, () => {
     downloader.startCleanup();
+    downloader.startUpstreamProbe();
     console.log(`\n╔═══════════════════════════════════════╗`);
     console.log(`║   📺 YT.OpenVibe — YouTube Downloader       ║`);
     console.log(`╠═══════════════════════════════════════╣`);

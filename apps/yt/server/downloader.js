@@ -382,6 +382,7 @@ function startDownload(url, quality = 'best', opts = {}) {
                 console.error(`[Download] ${id} (${quality}) failed: ${last}`);
                 entry.status = 'error';
                 entry.error = friendlyDownloadError(last);
+                if (/Sign in to confirm|not a bot/i.test(String(last))) noteUpstream('blocked');
                 removePartials(id);
                 return;
             }
@@ -573,8 +574,42 @@ function getStats() {
     };
 }
 
+// ── Upstream self-check ──────────────────────────────────────
+// YouTube sometimes refuses a whole server address ("confirm you're not a bot"). Rather than let
+// every visitor find out after a click, probe a known public video on a timer and say so up front.
+//   state: 'ok' | 'blocked' | 'unknown'   (GET /api/health → youtube, shown as a banner on the page)
+const PROBE_URL = 'https://www.youtube.com/watch?v=jNQXAC9IVRw';
+const PROBE_EVERY_MS = 30 * 60 * 1000;
+let upstream = { state: 'unknown', checkedAt: 0, detail: '' };
+let _probeTimer = null, _probing = false;
+
+function probeUpstream() {
+    if (_probing) return Promise.resolve(upstream);
+    _probing = true;
+    return new Promise((resolve) => {
+        const args = ['--no-playlist', ...identityArgs(), '--simulate', '--no-warnings', '--socket-timeout', '20', '-f', 'ba/b', '--print', 'id', PROBE_URL];
+        let err = '', out = '';
+        let child;
+        const done = (state, detail) => { _probing = false; upstream = { state, checkedAt: Date.now(), detail: String(detail || '').slice(0, 200) }; resolve(upstream); };
+        try { child = spawn(config.ytdlpPath, args, { stdio: ['ignore', 'pipe', 'pipe'] }); } catch (e) { return done('unknown', e.message); }
+        const killer = setTimeout(() => { try { child.kill('SIGKILL'); } catch { /* */ } }, 60000);
+        child.stdout.on('data', d => { out += d; }); child.stderr.on('data', d => { err += d; });
+        child.on('error', e => { clearTimeout(killer); done('unknown', e.message); });
+        child.on('close', (code) => {
+            clearTimeout(killer);
+            if (code === 0 && out.trim()) return done('ok', '');
+            if (/Sign in to confirm|not a bot|HTTP Error 429|HTTP Error 403/i.test(err)) return done('blocked', 'YouTube is refusing requests from this server address');
+            done('unknown', err.split('\n').filter(Boolean).pop() || 'probe failed');
+        });
+    });
+}
+function startUpstreamProbe() { if (_probeTimer) return; setTimeout(() => probeUpstream().catch(() => {}), 5000).unref(); _probeTimer = setInterval(() => probeUpstream().catch(() => {}), PROBE_EVERY_MS); _probeTimer.unref(); }
+function getUpstream() { return upstream; }
+/** A real request just told us more than the timer knows. */
+function noteUpstream(state) { if (state === 'ok' || state === 'blocked') upstream = { state, checkedAt: Date.now(), detail: state === 'blocked' ? 'YouTube is refusing requests from this server address' : '' }; }
+
 module.exports = {
     getInfo, startDownload, cancelDownload, getStatus, getFile, removeFile,
     sanitizeTitle, downloadFilename, contentDisposition, applyLine,
-    cleanup, startCleanup, stopCleanup, getStats, isValidUrl,
+    cleanup, startCleanup, stopCleanup, getStats, isValidUrl, probeUpstream, startUpstreamProbe, getUpstream,
 };
