@@ -47,3 +47,21 @@ console.log('registry + site: all checks passed');
     assert.equal(isPersonNavigating(req(chrome, 'text/html', { 'sec-fetch-dest': 'iframe' })), false);
     console.log('short-host redirect rule: ok');
 }
+
+// One entry per tool: builds that exist twice are folded, the second host serves as a mirror.
+{
+    const cat = registry.catalog();
+    assert.ok(!cat.tools.some(t => ['jsonfmt', 'md', 'codediff', 'slugify', 'entities'].includes(t.id)), 'folded builds are not listed');
+    const names = cat.tools.map(t => t.name); assert.equal(new Set(names).size, names.length, 'no two tools share a name');
+    const json = cat.tools.find(t => t.id === 'json');
+    assert.deepEqual(json.hosts.mirrors, ['jsonfmt.openvibe.tools']); assert.deepEqual(json.alsoIn, ['dev']);
+    const m = registry.resolveHost('jsonfmt.openvibe.tools');
+    assert.deepEqual([m.role, m.tool, m.canonicalHost], ['mirror', 'jsonfmt', 'json.openvibe.tools'], 'mirror serves its own build, canonical is the primary');
+    assert.ok(!site.sitemapEntries().some(u => u.loc.includes('jsonfmt.')), 'mirrors stay out of the sitemap');
+    assert.equal(site.search('json formatter').filter(t => /json formatter/i.test(t.name)).length, 1, 'search shows it once');
+    registry.setOverrides([{ tool_id: 'yt', host: 'youtubedownloader.example.com', role: 'mirror' }]);
+    const om = registry.resolveHost('youtubedownloader.example.com');
+    assert.deepEqual([om.role, om.port, om.canonicalHost], ['mirror', 4013, 'youtube-downloader.openvibe.tools'], 'owner mirrors are served by the tool and canonicalised');
+    registry.setOverrides([]);
+    console.log('no duplicates, mirrors canonicalised: ok');
+}

@@ -25,8 +25,12 @@ const POPULAR = ['yt', 'convert', 'compress', 'mergepdf', 'jsonfmt', 'mp3', 'dns
 const icon = (name, size) => `<span class="ov-icon" data-icon="${esc(name)}" data-ovi="${esc(icons.resolve(name))}" data-fx="none" style="--ovi-size:${size}px" aria-hidden="true">${icons.svg(name)}</span>`;
 const hostLabel = (h) => h.replace(/\.openvibe\.tools$/, '') === h ? h : h;
 
+// Links name the search-friendly host (what crawlers follow and index). A person's click goes straight to
+// the easy address instead of bouncing through a redirect: site.js reads data-go.
+const go = (t) => (t.hosts && t.hosts.short && !t.external ? ` data-go="https://${esc(t.hosts.short)}/"` : '');
+
 function toolCard(t) {
-    return `<a class="tool" href="${esc(t.url)}" data-k="${esc([t.name, t.tagline, ...(t.keywords || [])].join(' ').toLowerCase())}">
+    return `<a class="tool" href="${esc(t.url)}"${go(t)} data-k="${esc([t.name, t.tagline, ...(t.keywords || [])].join(' ').toLowerCase())}">
         ${icon(t.icon, 36)}<span class="tool-t"><b>${esc(t.name)}</b><small>${esc(t.tagline)}</small><i>${esc(hostLabel(t.hosts.short || t.hosts.canonical))}</i></span></a>`;
 }
 
@@ -137,7 +141,7 @@ function pageIndex() {
     const byId = new Map(tools.map(t => [t.id, t]));
     const popular = POPULAR.map(id => byId.get(id)).filter(Boolean);
     const fams = families.filter(f => f.path);
-    const tile = (t) => `<a class="tile" href="${esc(t.url)}" title="${esc(t.tagline)}">${icon(t.icon, 28)}<span><b>${esc(t.name)}</b><small>${esc(t.tagline)}</small></span></a>`;
+    const tile = (t) => `<a class="tile" href="${esc(t.url)}"${go(t)} title="${esc(t.tagline)}">${icon(t.icon, 28)}<span><b>${esc(t.name)}</b><small>${esc(t.tagline)}</small></span></a>`;
     const soon = (t) => `<span class="tile is-soon" title="Planned">${icon(t.icon, 28)}<span><b>${esc(t.name)}</b><small>${esc(t.tagline)}</small></span><em>Soon</em></span>`;
     const body = `<div class="hero"><p class="kicker">Open source · community-run · no account needed to start</p><h1>The toolbox for <span>everything you do online</span></h1>
 <p>Convert a video, squeeze an image, merge a PDF, debug DNS, format JSON. ${tools.length} tools that open instantly, each on an address you can remember, like <a href="https://yt.openvibe.tools/">yt.openvibe.tools</a>.</p>
@@ -160,7 +164,7 @@ ${fams.map(f => { const list = tools.filter(t => t.family === f.id); const next 
 
 function pageFamily(f) {
     const { tools, families } = registry.get();
-    const list = tools.filter(t => t.family === f.id);
+    const list = tools.filter(t => t.family === f.id || (t.alsoIn || []).includes(f.id));
     const url = SITE + f.path;
     const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> › ${esc(f.name)}</nav>
 <div class="page-h">${icon(f.icon, 56)}<h1>${esc(f.name)}</h1></div><p class="lead">${esc(f.description)}</p>
@@ -177,11 +181,11 @@ function pageTool(t) {
     const f = families.find(x => x.id === t.family);
     const url = `${SITE}/tool/${t.id}`;
     const related = tools.filter(x => x.family === t.family && x.id !== t.id).slice(0, 8);
-    const hosts = [[t.hosts.canonical, 'Primary'], ...(t.hosts.short ? [[t.hosts.short, 'Short link']] : []), ...t.hosts.aliases.map(a => [a, 'Mirror'])];
+    const hosts = [...(t.hosts.short ? [[t.hosts.short, 'Easiest to remember']] : []), [t.hosts.canonical, t.hosts.short ? 'Search-friendly address' : 'Primary'], ...(t.hosts.mirrors || []).map(a => [a, 'Mirror']), ...t.hosts.aliases.map(a => [a, 'Redirects here'])];
     const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> › ${f && f.path ? `<a href="${esc(f.path)}">${esc(f.name)}</a> › ` : ''}${esc(t.name)}</nav>
 <div class="page-h">${icon(t.icon, 56)}<h1>${esc(t.name)}</h1></div><p class="lead">${esc(t.description)}</p>
 <a class="cta" href="${esc(t.url)}">Open ${esc(t.name)}</a>
-<section><div class="sec-h"><h2>Where to find it</h2></div><p class="sec-p">Every address below opens the same tool. The primary address is the one to bookmark and share.</p>
+<section><div class="sec-h"><h2>Where to find it</h2></div><p class="sec-p">Every address below opens the same tool. The first address is the one to bookmark and share.</p>
 <ul class="hosts">${hosts.map(([h, tag], i) => `<li${i === 0 ? ' class="primary"' : ''}><a href="https://${esc(h)}/"${i === 0 ? '' : ' rel="nofollow"'}>${esc(h)}</a><span class="tag">${tag}</span></li>`).join('')}</ul></section>
 ${t.keywords && t.keywords.length ? `<section><div class="sec-h"><h2>People also call this</h2></div><ul class="kw">${t.keywords.map(k => `<li>${esc(k)}</li>`).join('')}</ul></section>` : ''}
 ${related.length ? `<section><div class="sec-h"><h2>Related tools</h2>${f && f.path ? `<a class="more" href="${esc(f.path)}">All ${esc(f.name)}</a>` : ''}</div><div class="grid">${related.map(toolCard).join('')}</div></section>` : ''}`;
