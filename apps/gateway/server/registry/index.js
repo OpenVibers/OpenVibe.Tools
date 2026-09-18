@@ -44,6 +44,19 @@ function baseTools() {
     return out;
 }
 
+// Planned tools: shown on the index as placeholders so people (and crawlers) can see where the
+// toolbox is going. They have no host and are never linked as if they worked.
+const PLANNED = [
+    { id: 'instagram', family: 'media', name: 'Instagram Downloader', tagline: 'Save reels, posts and stories you are allowed to keep', icon: 'download' },
+    { id: 'tiktok', family: 'media', name: 'TikTok Downloader', tagline: 'Save TikTok videos without the watermark dance', icon: 'download' },
+    { id: 'videoconvert', family: 'media', name: 'Video Converter', tagline: 'MP4, WebM, MOV and GIF, trimmed and resized', icon: 'video' },
+    { id: 'screenrecord', family: 'media', name: 'Screen Recorder', tagline: 'Record a tab or a window straight from the browser', icon: 'video' },
+    { id: 'qr', family: 'dev', name: 'QR Code Generator', tagline: 'Links, Wi-Fi logins and contact cards as QR codes', icon: 'code' },
+    { id: 'password', family: 'dev', name: 'Password Generator', tagline: 'Strong passwords and passphrases, made in your browser', icon: 'ssl' },
+    { id: 'speedtest', family: 'net', name: 'Speed Test', tagline: 'Download, upload and latency to the OpenVibe network', icon: 'ping' },
+    { id: 'ocr', family: 'img', name: 'Image to Text (OCR)', tagline: 'Pull the text out of screenshots and scans', icon: 'text' },
+];
+
 const familyById = new Map(FAMILIES.map(f => [f.id, f]));
 let overrides = [];            // [{ tool_id, host, role }]
 let overridesAt = 0;
@@ -88,7 +101,9 @@ function build() {
         claim(x.hosts.short, { kind, role: 'short', item: x });
         x.hosts.aliases.forEach(a => claim(a, { kind, role: 'alias', item: x }));
     }
-    built = { tools, families, byHost, updated: new Date().toISOString() };
+    const live = new Set(tools.map(t => t.id));
+    const planned = PLANNED.filter(t => !live.has(t.id));
+    built = { tools, families, planned, byHost, updated: new Date().toISOString() };
     return built;
 }
 
@@ -97,7 +112,8 @@ function get() { return built || build(); }
 /** What is this host? → { kind: 'apex'|'tool'|'family'|'unknown', role, item, tool, canonicalHost, shortHost, port, inZone } */
 function resolveHost(hostname) {
     const host = String(hostname || '').toLowerCase().replace(/:\d+$/, '').replace(/^www\./, '');
-    if (host === APEX) return { kind: 'apex', host };
+    // Loopback is the network's own services asking (catalog, health): that is the apex.
+    if (host === APEX || host === 'localhost' || host === '127.0.0.1' || host === '[::1]') return { kind: 'apex', host };
     const hit = get().byHost.get(host);
     const inZone = host.endsWith('.' + ZONE);
     if (!hit) return { kind: 'unknown', host, inZone };
@@ -111,6 +127,7 @@ function catalog() {
     return {
         updated: r.updated,
         families: r.families.map(f => ({ id: f.id, name: f.name, tagline: f.tagline, description: f.description, icon: f.icon, url: f.url, path: f.path, page: f.page, count: r.tools.filter(t => t.family === f.id).length })),
+        planned: r.planned.map(t => ({ id: t.id, family: t.family, name: t.name, tagline: t.tagline, icon: t.icon, status: 'planned' })),
         tools: r.tools.map(t => ({ id: t.id, family: t.family, name: t.name, tagline: t.tagline, description: t.description, keywords: t.keywords, icon: t.icon, hosts: t.hosts, url: t.url, page: `https://${APEX}/tool/${t.id}` })),
     };
 }
