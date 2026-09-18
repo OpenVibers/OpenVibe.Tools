@@ -151,12 +151,12 @@ H=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/
 
 const T={
 dev:{n:'Developer Tools',i:'fa-code',c:'hub',d:'Developer & SEO Tools Hub',hub:1},
-json:{n:'JSON Formatter',i:'fa-code',c:'data',d:'Format, validate & minify JSON',p:'{"name":"openvibe","version":1,"active":true}',m:['Format','Validate','Minify']},
+jsonfmt:{n:'JSON Formatter',i:'fa-code',c:'data',d:'Format, validate & minify JSON',p:'{"name":"openvibe","version":1,"active":true}',m:['Format','Validate','Minify']},
 yaml:{n:'YAML to JSON Converter',i:'fa-file-code',c:'data',d:'YAML \u2194 JSON converter',p:'name: openvibe\nversion: 1\nactive: true',m:['YAML\u2192JSON','JSON\u2192YAML']},
 xml:{n:'XML Formatter',i:'fa-file-code',c:'data',d:'XML formatter & validator',p:'<root><item id="1"><name>OpenVibe</name></item></root>',m:['Format','Validate','Minify']},
 csv:{n:'CSV to JSON Converter',i:'fa-table',c:'data',d:'CSV viewer & JSON converter',p:'name,age,city\nAlice,30,NYC\nBob,25,LA',m:['Table','To JSON']},
 sql:{n:'SQL Formatter',i:'fa-database',c:'data',d:'SQL formatter & highlighter',p:'select u.id, u.name, o.total from users u join orders o on u.id = o.user_id where o.total > 100 order by o.total desc limit 10',m:['Format','Uppercase','Compact']},
-markdown:{n:'Markdown Editor',i:'fa-file-lines',c:'data',d:'Markdown editor with live preview',p:'# Hello World\n\nThis is **bold** and *italic* text.\n\n- Item one\n- Item two\n\n> A blockquote\n\n`inline code`\n\n[Link](https://openvibe.network)',m:['Preview','To HTML']},
+md:{n:'Markdown Editor',i:'fa-file-lines',c:'data',d:'Markdown editor with live preview',p:'# Hello World\n\nThis is **bold** and *italic* text.\n\n- Item one\n- Item two\n\n> A blockquote\n\n`inline code`\n\n[Link](https://openvibe.network)',m:['Preview','To HTML']},
 html:{n:'HTML Formatter',i:'fa-file-code',c:'data',d:'HTML formatter, minifier & entity encoder',p:'<div><p>Hello <strong>World</strong></p></div>',m:['Format','Minify','Entities','Unescape']},
 base64:{n:'Base64 Encoder & Decoder',i:'fa-lock',c:'enc',d:'Base64 encode & decode',p:'Hello, World!',m:['Encode','Decode']},
 url:{n:'URL Encoder & Decoder',i:'fa-link',c:'enc',d:'URL encode, decode & parser',p:'https://openvibe.tools/search?q=hello world&lang=en#results',m:['Encode','Decode','Parse']},
@@ -164,16 +164,16 @@ jwt:{n:'JWT Decoder',i:'fa-key',c:'enc',d:'JWT decoder \u2014 header, payload & 
 uuid:{n:'UUID Generator',i:'fa-fingerprint',c:'enc',d:'UUID v4 generator & validator',p:'',m:['Generate','Bulk 10','Bulk 100','Validate']},
 hash:{n:'Hash Generator',i:'fa-hashtag',c:'enc',d:'SHA-256, SHA-1 & SHA-512 hash generator',p:'Hello, World!',m:['SHA-256','SHA-1','SHA-512']},
 hex:{n:'Hex Converter',i:'fa-barcode',c:'enc',d:'Hex encoder / decoder',p:'Hello',m:['To Hex','From Hex']},
-escape:{n:'String Escape Tool',i:'fa-shield-halved',c:'enc',d:'HTML, JS & URL escape / unescape',p:'<script>alert("hello")<\/script>',m:['HTML Enc','HTML Dec','JS Esc','JS Unesc','URL Enc','URL Dec']},
+entities:{n:'String Escape Tool',i:'fa-shield-halved',c:'enc',d:'HTML, JS & URL escape / unescape',p:'<script>alert("hello")<\/script>',m:['HTML Enc','HTML Dec','JS Esc','JS Unesc','URL Enc','URL Dec']},
 timestamp:{n:'Unix Timestamp Converter',i:'fa-clock',c:'time',d:'Unix timestamp \u2194 date converter',p:'',m:['Now','To Date','To Unix']},
 cron:{n:'Cron Expression Parser',i:'fa-calendar-check',c:'time',d:'Cron expression parser & next runs',p:'*/15 9-17 * * 1-5',m:['Parse']},
 beautify:{n:'Code Beautifier',i:'fa-wand-magic-sparkles',c:'qual',d:'Beautify JS, CSS, HTML & JSON',p:'{"a":1,"b":[2,3],"c":{"d":true}}',m:['JSON','HTML','CSS']},
 minify:{n:'Code Minifier',i:'fa-compress',c:'qual',d:'Minify JS, CSS, HTML & JSON',p:'{\n  "name": "openvibe",\n  "version": 1\n}',m:['JSON','HTML','CSS']},
-diff:{n:'Diff Checker',i:'fa-code-compare',c:'qual',d:'Side-by-side text diff checker',p:'Line one\nLine two\nLine three\nLine four',p2:'Line one\nLine 2 modified\nLine three\nLine five\nLine six',dual:1,m:['Compare']},
+codediff:{n:'Diff Checker',i:'fa-code-compare',c:'qual',d:'Side-by-side text diff checker',p:'Line one\nLine two\nLine three\nLine four',p2:'Line one\nLine 2 modified\nLine three\nLine five\nLine six',dual:1,m:['Compare']},
 regex:{n:'Regex Tester',i:'fa-magnifying-glass',c:'qual',d:'Regex tester with match highlighting',p:'\\b[A-Z][a-z]+\\b',p2:'Hello World from OpenVibe.Tools today',dual:1,m:['Test']},
-slug:{n:'Slug Generator',i:'fa-link',c:'qual',d:'URL slug generator',p:'Hello World! This is a Test -- 2024',m:['Generate']},
+slugify:{n:'Slug Generator',i:'fa-link',c:'qual',d:'URL slug generator',p:'Hello World! This is a Test -- 2024',m:['Generate']},
 lorem:{n:'Lorem Ipsum Generator',i:'fa-paragraph',c:'qual',d:'Lorem ipsum generator',p:'',m:['1 Para','3 Para','5 Para','10 Sent','50 Words']},
-curl:{n:'Online curl',i:'fa-terminal',c:'http',d:'Parse curl \u2192 fetch, Python, Node.js',p:"curl -X POST https://api.example.com/users -H 'Content-Type: application/json' -H 'Authorization: Bearer tok123' -d '{\"name\":\"openvibe\"}'",m:['To fetch','To Python','To Node','Parsed']},
+curlconvert:{n:'Online curl',i:'fa-terminal',c:'http',d:'Parse curl \u2192 fetch, Python, Node.js',p:"curl -X POST https://api.example.com/users -H 'Content-Type: application/json' -H 'Authorization: Bearer tok123' -d '{\"name\":\"openvibe\"}'",m:['To fetch','To Python','To Node','Parsed']},
 webhook:{n:'Webhook Tester',i:'fa-satellite-dish',c:'http',d:'Webhook request inspector bin',p:'',m:['Create Bin']},
 color:{n:'Color Converter',i:'fa-palette',c:'fe',d:'Color picker & HEX/RGB/HSL converter',p:'#a78bfa',m:['Convert']},
 opengraph:{n:'Open Graph Preview',i:'fa-share-nodes',c:'fe',d:'Open Graph & Twitter Card preview',p:'https://openvibe.live',m:['Preview']}
@@ -232,7 +232,7 @@ function setMode(el){document.querySelectorAll('.mb').forEach(b=>b.classList.rem
 function buildRel(){
     const cat=T[ACT]?.c;let h='';
     for(const[id,t]of Object.entries(T)){if(id===ACT||t.hub||t.c!==cat)continue;h+='<a href="https://'+id+'.openvibe.tools"><i class="fa-solid '+t.i+'"></i> '+t.n+'</a>'}
-    if(['curl','webhook'].includes(ACT))h+='<a href="https://headers.openvibe.tools"><i class="fa-solid fa-heading"></i> Headers</a><a href="https://ssl.openvibe.tools"><i class="fa-solid fa-lock"></i> SSL</a>';
+    if(['curlconvert','webhook'].includes(ACT))h+='<a href="https://headers.openvibe.tools"><i class="fa-solid fa-heading"></i> Headers</a><a href="https://ssl.openvibe.tools"><i class="fa-solid fa-lock"></i> SSL</a>';
     if(ACT==='opengraph')h+='<a href="https://logo.openvibe.tools"><i class="fa-solid fa-wand-magic-sparkles"></i> Logo.OpenVibe</a>';
     $('rel').innerHTML=h;
 }
@@ -245,7 +245,7 @@ async function run(){
 }
 const P={};
 
-P.json=(s,m)=>{const o=JSON.parse(s);if(m==='Minify')return JSON.stringify(o);if(m==='Validate')return'\u2713 Valid JSON \u2014 '+(Array.isArray(o)?o.length+' items':typeof o==='object'?Object.keys(o).length+' keys':typeof o);return JSON.stringify(o,null,2)};
+P.jsonfmt=(s,m)=>{const o=JSON.parse(s);if(m==='Minify')return JSON.stringify(o);if(m==='Validate')return'\u2713 Valid JSON \u2014 '+(Array.isArray(o)?o.length+' items':typeof o==='object'?Object.keys(o).length+' keys':typeof o);return JSON.stringify(o,null,2)};
 
 P.yaml=(s,m)=>{
     if(m.includes('JSON\u2192')){const o=JSON.parse(s);return j2y(o,'')}
@@ -277,7 +277,7 @@ P.sql=(s,m)=>{
     return r.replace(/^\n+/,'').replace(/\n{2,}/g,'\n');
 };
 
-P.markdown=(s,m)=>{
+P.md=(s,m)=>{
     let h=s.replace(/^######\s(.+)/gm,'<h6>$1</h6>').replace(/^#####\s(.+)/gm,'<h5>$1</h5>').replace(/^####\s(.+)/gm,'<h4>$1</h4>')
     .replace(/^###\s(.+)/gm,'<h3>$1</h3>').replace(/^##\s(.+)/gm,'<h2>$1</h2>').replace(/^#\s(.+)/gm,'<h1>$1</h1>')
     .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>')
@@ -320,7 +320,7 @@ P.hash=async(s,m)=>{const a=m==='SHA-1'?'SHA-1':m==='SHA-512'?'SHA-512':'SHA-256
 P.hex=(s,m)=>{if(m==='From Hex')return s.trim().replace(/\s+/g,'').match(/.{2}/g).map(h=>String.fromCharCode(parseInt(h,16))).join('');
     return[...s].map(c=>c.charCodeAt(0).toString(16).padStart(2,'0')).join(' ')};
 
-P.escape=(s,m)=>{
+P.entities=(s,m)=>{
     if(m==='HTML Enc')return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     if(m==='HTML Dec'){const d=document.createElement('div');d.innerHTML=s;return d.textContent}
     if(m==='JS Esc')return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"').replace(/\n/g,'\\n').replace(/\r/g,'\\r').replace(/\t/g,'\\t');
@@ -355,7 +355,7 @@ P.beautify=(s,m)=>{
 P.minify=(s,m)=>{if(m==='JSON')return JSON.stringify(JSON.parse(s));if(m==='CSS')return s.replace(/\/\*[\s\S]*?\*\//g,'').replace(/\s+/g,' ').replace(/\s*([{}:;,])\s*/g,'$1').trim();
     if(m==='HTML')return s.replace(/\s+/g,' ').replace(/>\s+</g,'><').trim();return s.replace(/\/\/.*$/gm,'').replace(/\/\*[\s\S]*?\*\//g,'').replace(/\s+/g,' ').trim()};
 
-P.diff=(a,m,b)=>{
+P.codediff=(a,m,b)=>{
     const al=a.split('\n'),bl=b.split('\n'),r=[];let ai=0,bi=0;
     while(ai<al.length||bi<bl.length){
         if(ai<al.length&&bi<bl.length&&al[ai]===bl[bi]){r.push({t:'c',n:ai+1,l:al[ai]});ai++;bi++}
@@ -376,7 +376,7 @@ P.regex=(pat,m,test)=>{
     return{html:info};
 };
 
-P.slug=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+P.slugify=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 
 P.lorem=(s,m)=>{
     const W='lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua enim ad minim veniam quis nostrud exercitation ullamco laboris nisi aliquip ex ea commodo consequat duis aute irure in reprehenderit voluptate velit esse cillum fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt culpa qui officia deserunt mollit anim id est laborum'.split(' ');
@@ -388,7 +388,7 @@ P.lorem=(s,m)=>{
     return Array.from({length:parseInt(m)||3},para).join('\n\n');
 };
 
-P.curl=(s,m)=>{
+P.curlconvert=(s,m)=>{
     const cmd=s.trim().replace(/\\\n/g,' ');let method='GET',url='',hd={},body='';
     const tok=[];let cur='',inQ=false,qc='';
     for(let i=0;i<cmd.length;i++){const c=cmd[i];if(!inQ&&(c==="'"||c==='"')){inQ=true;qc=c}else if(inQ&&c===qc){inQ=false}else if(!inQ&&c===' '){if(cur){tok.push(cur);cur=''}continue}else cur+=c}

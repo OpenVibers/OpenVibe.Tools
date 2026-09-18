@@ -62,6 +62,10 @@ app.use(analytics.middleware());
 
 // ── Hostname → HTML file mapping ─────────────────────────────
 // Each subdomain gets its own static HTML page for SEO + focused UX.
+// Every host here must also be in deploy/nginx/text.openvibe.tools.conf, and must not be
+// claimed by another app's vhost or by the gateway's net/dev catalogs: json., markdown.,
+// escape., diff., compare. and slug. are ours (the gateway's generic versions moved to
+// jsonfmt., md., entities., codediff. and slugify.).
 const HOSTNAME_MAP = {
     // Text hubs
     'text.openvibe.tools':       'index.html',
@@ -87,7 +91,10 @@ const HOSTNAME_MAP = {
     'case.openvibe.tools':       'case.html',
     'caps.openvibe.tools':       'case.html',
     'titlecase.openvibe.tools':  'case.html',
-    'reverse.openvibe.tools':    'reverse.html',
+    // reverse.openvibe.tools is the Audio app's (reverse an audio file); the text flipper
+    // lives on reversetext. + mirror. instead. Keep this in step with deploy/nginx.
+    'reversetext.openvibe.tools':'reverse.html',
+    'mirror.openvibe.tools':     'reverse.html',
     'clean.openvibe.tools':      'clean.html',
     'strip.openvibe.tools':      'clean.html',
     'count.openvibe.tools':      'count.html',
