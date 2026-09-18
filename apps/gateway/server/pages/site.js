@@ -14,6 +14,7 @@ const crypto = require('crypto');
 const express = require('express');
 const seo = require('openvibe-shared/seo');
 const icons = require('openvibe-shared/icons');
+const appIcon = require('openvibe-shared/app-icon');
 const registry = require('../registry');
 
 const SITE = 'https://openvibe.tools';
@@ -97,9 +98,9 @@ const NETWORK = [
 ];
 
 function shell({ head, body, families }) {
-    return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#3b82f6">
+    return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 ${head}
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Ccircle cx='24' cy='24' r='22' fill='%230b1220'/%3E%3Ccircle cx='24' cy='24' r='18' fill='none' stroke='%233b82f6' stroke-width='4'/%3E%3Cpath d='M14.5 17 24 34l9.5-17' fill='none' stroke='%23fff' stroke-width='4.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+${appIcon.headTags({ site: 'tools' })}
 <link rel="alternate" type="application/json" href="${SITE}/api/catalog.json" title="Tool catalog">
 <link rel="preconnect" href="https://openvibe.network">
 <script src="https://openvibe.network/shared/theme-loader.js"></script>
