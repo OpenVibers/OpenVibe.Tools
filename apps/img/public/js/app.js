@@ -119,16 +119,42 @@
             } catch { /* invalid token */ }
         }
 
+        // Brand name/icon come from the hostname now (png.openvibe.tools → "PNG.OpenVibe.Tools").
         if (typeof OpenVibeNavbar !== 'undefined') {
             OpenVibeNavbar.init({
                 service: 'img',
-                brandName: ctx?.brandName || undefined,
-                brandIcon: ctx?.faIcon || undefined,
                 token,
                 user: ctx?.user || user,
                 apiBase: 'https://openvibe.network',
+                history: { type: 'tool', title: ctx?.brandName || 'Img.OpenVibe' },
+                silentLogin: 'https://openvibe.tools/auth/login?silent=1&next={url}',
             });
         }
+        initFooter();
+    }
+
+    /* ---------- Footer (shared OpenVibeFooter) ---------- */
+    // Full footer on the hub host, the compact strip on the single-tool hosts.
+    function initFooter() {
+        if (typeof OpenVibeFooter === 'undefined') return;
+        try {
+            OpenVibeFooter.init({
+                service: 'img',
+                variant: (!ctx || ctx.toolId === 'hub') ? 'full' : 'compact',
+                mount: '#ov-footer',
+                apiBase: 'https://openvibe.network',
+                links: [{ heading: 'Img tools', items: [
+                    { name: 'Convert', url: 'https://convert.openvibe.tools' },
+                    { name: 'Compress', url: 'https://compress.openvibe.tools' },
+                    { name: 'Resize', url: 'https://resize.openvibe.tools' },
+                    { name: 'Crop', url: 'https://crop.openvibe.tools' },
+                    { name: 'Favicon', url: 'https://favicon.openvibe.tools' },
+                    { name: 'PNG', url: 'https://png.openvibe.tools' },
+                    { name: 'JPG', url: 'https://jpg.openvibe.tools' },
+                    { name: 'WebP', url: 'https://webp.openvibe.tools' },
+                ] }],
+            });
+        } catch { /* optional */ }
     }
 
     // ── Notifications (OpenVibe bell + toasts) ───────────

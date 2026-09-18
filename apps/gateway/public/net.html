@@ -280,12 +280,6 @@
         .tab-content.active { display: block; }
 
         /* ─── Footer ─── */
-        .footer {
-            text-align: center; padding: 32px 0; margin-top: 40px;
-            border-top: 1px solid var(--border); color: var(--text-muted); font-size: 12px;
-        }
-        .footer a { color: var(--text-secondary); }
-        .footer .footer-links { display: flex; gap: 16px; justify-content: center; margin-bottom: 8px; flex-wrap: wrap; }
 
         /* ─── Responsive ─── */
         @media (max-width: 640px) {
@@ -587,22 +581,14 @@
         <!-- Hub: tool directory (shown on net.openvibe.tools) -->
         <div class="shell" id="hub-directory" style="display:none"></div>
 
-        <!-- Footer -->
-        <div class="footer">
-            <div class="footer-links">
-                <a href="https://openvibe.network">OpenVibe</a>
-                <a href="https://net.openvibe.tools">Net.OpenVibe</a>
-                <a href="https://openvibe.live">OpenVibe.Live</a>
-                <a href="https://openvibe.games">Scraplandia</a>
-            </div>
-            <p>Part of the <a href="https://openvibe.network">OpenVibe</a>. Open source. Built in the open.</p>
-        </div>
+        <div id="ov-footer"></div>
     </div>
 
     <div class="toast-container" id="toasts"></div>
 
     <!-- Shared OpenVibe Navbar -->
     <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/footer.js"></script>
     <script src="https://openvibe.network/shared/theme-loader.js"></script>
     <script>
     'use strict';
@@ -709,10 +695,36 @@
 
     // ── Init ─────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', () => {
-        // Init navbar
+        // Shared navbar + footer (openvibe.network)
         try {
             const token = localStorage.getItem('ov_token') || getCookie('ov_token');
-            OpenVibeNavbar.init({ service: 'net', apiBase: 'https://openvibe.network', token });
+            OpenVibeNavbar.init({
+                service: 'net', apiBase: 'https://openvibe.network', token,
+                history: { type: 'tool', title: isHub ? 'Net.OpenVibe' : tool.name },
+                silentLogin: 'https://openvibe.tools/auth/login?silent=1&next={url}',
+            });
+        } catch {}
+        try {
+            OpenVibeFooter.init({
+                service: 'net', variant: isHub ? 'full' : 'compact', mount: '#ov-footer', apiBase: 'https://openvibe.network',
+                links: [
+                    { heading: 'Network tools', items: [
+                        { name: 'Domain & IP lookup', url: 'https://lookup.openvibe.tools' },
+                        { name: 'DNS lookup', url: 'https://dns.openvibe.tools' },
+                        { name: 'Ping', url: 'https://ping.openvibe.tools' },
+                        { name: 'SSL checker', url: 'https://ssl.openvibe.tools' },
+                        { name: 'Whois', url: 'https://whois.openvibe.tools' },
+                        { name: 'HTTP headers', url: 'https://headers.openvibe.tools' },
+                    ] },
+                    { heading: 'Email & uptime', items: [
+                        { name: 'SPF checker', url: 'https://spf.openvibe.tools' },
+                        { name: 'DMARC checker', url: 'https://dmarc.openvibe.tools' },
+                        { name: 'Blacklist check', url: 'https://blacklist.openvibe.tools' },
+                        { name: 'Uptime check', url: 'https://uptime.openvibe.tools' },
+                        { name: 'All network tools', url: 'https://net.openvibe.tools' },
+                    ] },
+                ],
+            });
         } catch {}
 
         setupUI();

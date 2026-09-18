@@ -137,8 +137,11 @@ a{color:inherit;text-decoration:none}
     <div id="hub"></div>
     <div class="rel" id="rel"></div>
 </div></div>
+<div id="ov-footer"></div>
 <div class="toast" id="toast"></div>
 <script src="https://openvibe.network/shared/navbar.js"></script>
+<script src="https://openvibe.network/shared/footer.js"></script>
+<script src="https://openvibe.network/shared/theme-loader.js"></script>
 <script>
 'use strict';
 const API='https://openvibe.tools/api/dev',$=s=>document.getElementById(s),
@@ -180,7 +183,13 @@ let ACT=T[sub]?sub:'dev',MODE='';
 
 document.addEventListener('DOMContentLoaded',()=>{
     const tok=localStorage.getItem('ov_token');
-    if(window.OpenVibeNavbar)try{OpenVibeNavbar.init({service:'dev',apiBase:'https://openvibe.network',token:tok})}catch(e){}
+    const cur=T[ACT]||T.dev;
+    if(window.OpenVibeNavbar)try{OpenVibeNavbar.init({service:'dev',apiBase:'https://openvibe.network',token:tok,history:{type:'tool',title:ACT==='dev'?'Dev.OpenVibe':cur.n},silentLogin:'https://openvibe.tools/auth/login?silent=1&next={url}'})}catch(e){}
+    if(window.OpenVibeFooter)try{
+        // Footer columns come from the same catalog as the hub, one column per category.
+        const links=Object.entries(CATS).map(([cid,cat])=>({heading:cat.l,items:Object.entries(T).filter(([,t])=>t.c===cid).map(([id,t])=>({name:t.n,url:'https://'+id+'.openvibe.tools'}))})).filter(g=>g.items.length);
+        OpenVibeFooter.init({service:'dev',variant:ACT==='dev'?'full':'compact',mount:'#ov-footer',apiBase:'https://openvibe.network',links});
+    }catch(e){}
     ACT==='dev'?showHub():showTool();
 });
 

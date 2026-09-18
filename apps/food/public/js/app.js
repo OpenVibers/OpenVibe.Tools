@@ -280,7 +280,7 @@
     $('#db-shelf')?.addEventListener('change', filterFoods);
 
     // Theme
-    $('#btn-theme').addEventListener('click', toggleTheme);
+    $('#btn-theme')?.addEventListener('click', toggleTheme); // theme switching lives in the shared navbar now
   }
 
   // ═══ Init ═══

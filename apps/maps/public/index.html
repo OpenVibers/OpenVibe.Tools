@@ -236,6 +236,7 @@
     <span id="footer-coords"></span>
     <span id="footer-weather"></span>
   </footer>
+  <div id="ov-footer"></div>
 </div>
 
 <!-- ═══ Detail Panel ═══ -->
@@ -390,6 +391,7 @@
 
 <script src="https://openvibe.network/shared/theme-loader.js"></script>
 <script src="https://openvibe.network/shared/navbar.js"></script>
+<script src="https://openvibe.network/shared/footer.js"></script>
 <script src="https://openvibe.network/shared/notification-ui.js"></script>
 <script src="https://openvibe.network/shared/account-switcher.js"></script>
 <script src="/js/app.js"></script>
@@ -403,7 +405,19 @@
     let user = null;
     if (token) { try { user = JSON.parse(atob(token.split('.')[1])); } catch {} }
     if (typeof OpenVibeNavbar !== 'undefined') {
-        OpenVibeNavbar.init({ service: 'maps', brandName: 'Maps.OpenVibe', brandIcon: 'fa-person-shelter', token, user, apiBase: 'https://openvibe.network' });
+        OpenVibeNavbar.init({ service: 'maps', token, user, apiBase: 'https://openvibe.network', history: { type: 'tool', title: 'Maps.OpenVibe' }, silentLogin: 'https://openvibe.tools/auth/login?silent=1&next={url}' });
+    }
+    if (typeof OpenVibeFooter !== 'undefined') {
+        try {
+            OpenVibeFooter.init({
+                service: 'maps', variant: 'compact', mount: '#ov-footer', apiBase: 'https://openvibe.network',
+                links: [{ heading: 'Maps.OpenVibe', items: [
+                    { name: 'Survival map', url: 'https://maps.openvibe.tools' },
+                    { name: 'Food.OpenVibe', url: 'https://food.openvibe.tools' },
+                    { name: 'All tools', url: 'https://openvibe.tools' },
+                ] }],
+            });
+        } catch (e) { /* optional */ }
     }
     if (typeof OpenVibeAccountSwitcher !== 'undefined') {
         OpenVibeAccountSwitcher.init({ apiBase: 'https://openvibe.network' });

@@ -107,16 +107,42 @@
             } catch { /* invalid token */ }
         }
 
+        // Brand name/icon come from the hostname now (png.openvibe.tools → "PNG.OpenVibe.Tools").
         if (typeof OpenVibeNavbar !== 'undefined') {
             OpenVibeNavbar.init({
                 service: 'audio',
-                brandName: ctx?.brandName || undefined,
-                brandIcon: ctx?.faIcon || undefined,
                 token,
                 user: ctx?.user || user,
                 apiBase: 'https://openvibe.network',
+                history: { type: 'tool', title: ctx?.brandName || 'Audio.OpenVibe' },
+                silentLogin: 'https://openvibe.tools/auth/login?silent=1&next={url}',
             });
         }
+        initFooter();
+    }
+
+    /* ---------- Footer (shared OpenVibeFooter) ---------- */
+    // Full footer on the hub host, the compact strip on the single-tool hosts.
+    function initFooter() {
+        if (typeof OpenVibeFooter === 'undefined') return;
+        try {
+            OpenVibeFooter.init({
+                service: 'audio',
+                variant: (!ctx || ctx.toolId === 'hub') ? 'full' : 'compact',
+                mount: '#ov-footer',
+                apiBase: 'https://openvibe.network',
+                links: [{ heading: 'Audio tools', items: [
+                    { name: 'Convert', url: 'https://convert.audio.openvibe.tools' },
+                    { name: 'Trim', url: 'https://trim.openvibe.tools' },
+                    { name: 'Merge', url: 'https://merge.openvibe.tools' },
+                    { name: 'Pitch', url: 'https://pitch.openvibe.tools' },
+                    { name: 'Speed', url: 'https://speed.openvibe.tools' },
+                    { name: 'Normalize', url: 'https://normalize.openvibe.tools' },
+                    { name: 'MP3', url: 'https://mp3.openvibe.tools' },
+                    { name: 'WAV', url: 'https://wav.openvibe.tools' },
+                ] }],
+            });
+        } catch { /* optional */ }
     }
 
     /* ---------- Notifications (OpenVibe bell + toasts) ---------- */
