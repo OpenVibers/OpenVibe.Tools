@@ -16,6 +16,8 @@ const fs = require('fs');
 const config = require('./config');
 const { optionalAuth } = require('./auth');
 const downloader = require('./downloader');
+const seo = require('./seo');
+const { hostGuard } = require('../../_shared/host-role');
 
 // ── Analytics ────────────────────────────────────────────────
 const Database = require('better-sqlite3');
@@ -31,6 +33,8 @@ const app = express();
 
 // ── Security ─────────────────────────────────────────────────
 app.set('trust proxy', 2);
+// API answers are live state, never revalidated: a 304 on /api/status froze the progress poll.
+app.set('etag', false);
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
@@ -60,7 +64,12 @@ app.use(cors({
 }));
 
 // ── Rate Limiting ────────────────────────────────────────────
-app.use('/api/', rateLimit({ windowMs: 60_000, max: 60 }));
+// Progress is one SSE connection, or a poll every 1–3 s when SSE is unavailable; the poll must
+// not eat the general budget (60/min would cut a download off after a minute).
+const isStatusRoute = (req) => req.method === 'GET' && /^\/status\/[a-f0-9]+(\/stream)?$/.test(req.path);
+app.use('/api/', rateLimit({ windowMs: 60_000, max: 60, skip: isStatusRoute }));
+app.use('/api/status/', rateLimit({ windowMs: 60_000, max: 240 }));
+app.use('/api/', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
 
 // ── Analytics Middleware ─────────────────────────────────────
 app.use(analytics.middleware());
@@ -74,6 +83,11 @@ const downloadLimiter = rateLimit({
 
 // ── Auth ─────────────────────────────────────────────────────
 app.use(optionalAuth);
+
+// ── Hosts ────────────────────────────────────────────────────
+// Pages are only rendered for hosts this tool serves (or that the gateway vouches for with
+// X-OV-Tool); aliases go to the short host, anything else to the tools index.
+app.use(hostGuard({ knows: seo.knowsHost, aliasOf: seo.aliasOf }));
 
 // ── API Routes ───────────────────────────────────────────────
 
@@ -100,13 +114,13 @@ app.post('/api/info', async (req, res) => {
 
 // Start download
 app.post('/api/download', downloadLimiter, async (req, res) => {
-    const { url, quality } = req.body;
+    const { url, quality, title } = req.body;
     if (!url) return res.status(400).json({ error: 'URL is required' });
     if (!downloader.isValidUrl(url)) return res.status(400).json({ error: 'Only YouTube URLs are supported' });
 
     try {
-        const { id } = await downloader.startDownload(url, quality || 'best');
-        res.json({ success: true, id, statusUrl: `/api/status/${id}` });
+        const { id } = await downloader.startDownload(url, quality || 'best', { title: typeof title === 'string' ? title : '' });
+        res.json({ success: true, id, statusUrl: `/api/status/${id}`, streamUrl: `/api/status/${id}/stream` });
     } catch (err) {
         console.error('[Download] Error:', err.message);
         res.status(422).json({ error: err.message });
@@ -120,35 +134,70 @@ app.get('/api/status/:id', (req, res) => {
     res.json(status);
 });
 
-// Download status via SSE (real-time progress)
+// Download status via SSE (real-time progress).
+//
+// Protocol (the poll endpoint above answers the same JSON):
+//   event: progress   status "downloading" — phase starting|downloading|processing, progress 0–100|null
+//   event: complete   status "done"        — download { url, size, ext, filename }
+//   event: failed     status "error"       — error text (cancelled: true after DELETE)
+// Every frame is also sent once as an unnamed message (`data:` only) for clients that predate
+// the named events. The stream closes itself after a terminal event.
+const SSE_EVENT = { downloading: 'progress', done: 'complete', error: 'failed' };
+
 app.get('/api/status/:id/stream', (req, res) => {
     const id = req.params.id;
 
     res.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-store, no-transform',
         'Connection': 'keep-alive',
         'X-Accel-Buffering': 'no',
     });
+    res.write('retry: 3000\n\n');
 
-    const interval = setInterval(() => {
+    let timer = null;
+    let lastFrame = '';
+    let lastWrite = 0;
+    const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
+    const send = (event, payload) => {
+        const json = JSON.stringify(payload);
+        res.write(`data: ${json}\n\n`);
+        res.write(`event: ${event}\ndata: ${json}\n\n`);
+        lastWrite = Date.now();
+    };
+
+    const tick = () => {
         const status = downloader.getStatus(id);
         if (!status) {
-            res.write(`data: ${JSON.stringify({ error: 'Not found' })}\n\n`);
-            clearInterval(interval);
-            res.end();
-            return;
+            send('failed', { id, status: 'error', error: 'Download not found or expired' });
+            stop();
+            return res.end();
         }
-
-        res.write(`data: ${JSON.stringify(status)}\n\n`);
-
-        if (status.status === 'done' || status.status === 'error') {
-            clearInterval(interval);
-            setTimeout(() => res.end(), 500);
+        const json = JSON.stringify(status);
+        const terminal = status.status === 'done' || status.status === 'error';
+        if (json !== lastFrame || terminal) {
+            lastFrame = json;
+            send(SSE_EVENT[status.status] || 'progress', status);
+        } else if (Date.now() - lastWrite > 15000) {
+            res.write(': keep-alive\n\n');
+            lastWrite = Date.now();
         }
-    }, 1000);
+        if (terminal) {
+            stop();
+            setTimeout(() => res.end(), 250);
+        }
+    };
 
-    req.on('close', () => clearInterval(interval));
+    timer = setInterval(tick, 500);
+    tick(); // first frame immediately, not after a tick of silence
+    req.on('close', stop);
+});
+
+// Cancel a running download (kills yt-dlp) or discard a finished file
+app.delete('/api/download/:id', (req, res) => {
+    const result = downloader.cancelDownload(req.params.id);
+    if (!result) return res.status(404).json({ error: 'Download not found' });
+    res.json({ success: true, ...result });
 });
 
 // Serve downloaded file
@@ -158,8 +207,9 @@ app.get('/api/download/:id', (req, res) => {
 
     res.set({
         'Content-Type': entry.mime,
-        'Content-Disposition': `attachment; filename="openvibeyt-download.${entry.ext}"`,
+        'Content-Disposition': downloader.contentDisposition(entry.filename || `youtube-video.${entry.ext}`),
         'Content-Length': entry.size,
+        'Cache-Control': 'private, no-store',
     });
     res.sendFile(entry.filePath);
 });
@@ -179,6 +229,7 @@ app.get('/api/internal/analytics/bots', (req, res) => {
 // ── Static Files ─────────────────────────────────────────────
 // (shared client-side libs are loaded absolutely from https://openvibe.network/shared/)
 app.use(express.static(path.join(__dirname, '..', 'public'), {
+    index: false, // '/' is rendered below with the head for this host (server/seo.js)
     setHeaders(res, filePath) {
         if (filePath.endsWith('.js') || filePath.endsWith('.css')) {
             res.setHeader('Cache-Control', 'no-cache');
@@ -186,10 +237,16 @@ app.use(express.static(path.join(__dirname, '..', 'public'), {
     },
 }));
 
-// SPA fallback
-app.get('*', (req, res) => {
+// The page: one document, head stamped per host. Anything else that is not a file is a 404
+// (no soft-404 copies of the home page under made-up paths).
+app.get(['/', '/index.html'], (req, res) => {
+    if (req.path !== '/') return res.redirect(301, '/');
+    return seo.sendIndex(req, res);
+});
+app.use((req, res) => {
     if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'Not found' });
-    res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+    res.status(404).set('Cache-Control', 'no-cache').type('html')
+        .send('<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex"><title>Not found</title><p>Nothing here. <a href="/">YouTube Downloader</a></p>');
 });
 
 // ── Start ────────────────────────────────────────────────────

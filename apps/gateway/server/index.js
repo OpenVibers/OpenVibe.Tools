@@ -52,6 +52,17 @@ app.use(helmet({
     },
     crossOriginEmbedderPolicy: false,
 }));
+// ── Host roles: aliases redirect, unknown hosts leave, satellite hosts are proxied ──
+const registry = require('./registry');
+const { hostRoles } = require('./registry/host-middleware');
+registry.start();
+app.use(hostRoles({
+    hostOf: getRequestHost,
+    enforce: config.isProduction || process.env.OV_ENFORCE_HOSTS === '1',
+    // Gateway-served subdomains that predate the catalog (tool aliases, the pastes hand-off).
+    isLegacyHost: (sub) => NET_TOOL_MAP.has(sub) || !!NET_ALIASES[sub] || DEV_TOOL_MAP.has(sub) || !!DEV_ALIASES[sub] || ['pastes', 'paste', 'my', 'login'].includes(sub),
+}));
+
 app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -166,6 +177,8 @@ app.use('/api/dev', rateLimit({ windowMs: 60_000, max: 60 }), createDevRoutes(nu
 
 // ── Host-header subdomain routing ────────────────────────────
 function subdomainOf(req) {
+    // A mirror or custom domain is the tool it points at.
+    if (req.ovHost && req.ovHost.tool && !getRequestHost(req).endsWith('.openvibe.tools')) return req.ovHost.tool;
     return getRequestHost(req).replace(/\.openvibe\.tools$/, '');
 }
 
@@ -186,26 +199,22 @@ function isStaticPath(reqPath) {
 // Every tool subdomain gets its OWN title, description, canonical, structured data and a
 // crawlable content block (server/seo). They used to share the hub's <head>, which told search
 // engines that ~65 distinct tools were one page.
-const { renderTool, buildSitemap, SATELLITES } = require('./seo/render');
+const { renderTool } = require('./seo/render');
 const NET_HTML = path.join(__dirname, '..', 'public', 'net.html');
 const DEV_HTML = path.join(__dirname, '..', 'public', 'dev.html');
 function sendTool(req, res, file) {
     try {
         res.set('Content-Type', 'text/html; charset=utf-8');
-        return res.send(renderTool(file, subdomainOf(req)));
+        return res.send(renderTool(file, subdomainOf(req), req.ovHost && req.ovHost.canonicalHost));
     } catch (err) {
         console.error('[SEO] render failed:', err.message);
         return res.sendFile(file);
     }
 }
 
-// Generated sitemap — covers both hubs, every tool subdomain and the satellite apps, so it can
-// never drift from the tool catalogs the way a hand-maintained file does.
-app.get('/sitemap.xml', (_req, res) => {
-    res.set('Content-Type', 'application/xml; charset=utf-8');
-    res.set('Cache-Control', 'public, max-age=3600');
-    res.send(buildSitemap(SATELLITES));
-});
+// The apex is server-rendered from the registry: index, families, tool pages, search,
+// sitemap.xml, robots.txt, llms.txt and /api/catalog.json (server/pages/site.js).
+app.use(require('./pages/site').createSiteRouter());
 
 // Net tool subdomains → net.html SPA
 app.use((req, res, next) => {
@@ -253,7 +262,8 @@ app.get('*', (req, res) => {
     if (req.path.startsWith('/api/')) {
         return res.status(404).json({ error: 'Not found' });
     }
-    res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+    // Unknown page: a real 404 that still helps (search + every family), never a soft-200 copy of the index.
+    res.status(404).set('Cache-Control', 'no-store').type('html').send(require('./pages/site').renderNotFound());
 });
 
 // ── Start ────────────────────────────────────────────────────

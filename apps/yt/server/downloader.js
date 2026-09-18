@@ -105,6 +105,7 @@ function getInfo(url) {
             }
             try {
                 const info = JSON.parse(stdout);
+                rememberTitle(cleanUrl, info.title);
                 resolve({
                     id: info.id,
                     title: info.title,
@@ -158,28 +159,134 @@ function friendlyDownloadError(line) {
     if (/Sign in to confirm|not a bot|cookies/i.test(t)) return 'YouTube is asking this server to prove it is not a bot — try again in a few minutes';
     if (/Private video|members-only|login required/i.test(t)) return 'This video is private or members-only';
     if (/Video unavailable|has been removed|not available/i.test(t)) return 'This video is unavailable';
-    if (/age|confirm your age/i.test(t)) return 'Age-restricted videos cannot be downloaded';
+    if (/\bage[- ]restrict|confirm your age/i.test(t)) return 'Age-restricted videos cannot be downloaded';
     if (/ffmpeg|ffprobe|Postprocessing/i.test(t)) return `Conversion failed on the server (${t.slice(0, 120)})`;
     if (/Requested format is not available/i.test(t)) return 'That quality is not available for this video — try another';
     if (/HTTP Error 4\d\d/i.test(t)) return `YouTube refused the request (${t.match(/HTTP Error \d+/)[0]})`;
     return t.replace(/^ERROR:\s*/i, '').slice(0, 160) || 'Download failed';
 }
 
+// ── File names ───────────────────────────────────────────────
+/**
+ * A video title as a file name people recognise: no path separators, control characters or
+ * characters Windows refuses, collapsed whitespace, no trailing dots, bounded length.
+ */
+function sanitizeTitle(title) {
+    let t = String(title == null ? '' : title).normalize('NFC');
+    t = t.replace(/[\u0000-\u001f\u007f<>:"/\\|?*]+/g, ' ');
+    t = t.replace(/\s+/g, ' ').trim();
+    t = t.replace(/^[.\s]+|[.\s]+$/g, '');
+    if (t.length > 120) t = t.slice(0, 120).trim();
+    if (/^(con|prn|aux|nul|com\d|lpt\d)$/i.test(t)) t = `${t}_`;
+    return t;
+}
+
+function downloadFilename(title, ext) {
+    const base = sanitizeTitle(title) || 'youtube-video';
+    return `${base}.${ext || 'mp4'}`;
+}
+
+/** Content-Disposition with an ASCII fallback and the real name as RFC 5987 filename*. */
+function contentDisposition(filename) {
+    const ascii = String(filename).normalize('NFKD').replace(/[^\x20-\x7e]/g, '').replace(/["\\]/g, '').replace(/\s+/g, ' ').trim();
+    const ext = path.extname(String(filename));
+    const fallback = ascii && ascii !== ext ? ascii : `youtube-video${ext}`;
+    const encoded = encodeURIComponent(filename).replace(/['()*]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+    return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+}
+
+// Titles seen by getInfo, so a download started right after can be named without asking again.
+const titleCache = new Map(); // clean url → title
+function rememberTitle(cleanUrl, title) {
+    if (!title) return;
+    if (titleCache.size > 500) titleCache.delete(titleCache.keys().next().value);
+    titleCache.set(cleanUrl, title);
+}
+
+// ── Progress parsing ─────────────────────────────────────────
+const cleanField = (v) => {
+    const t = String(v || '').trim();
+    return /^(n\/?a|unknown|none|unknown b\/s)?$/i.test(t) ? '' : t;
+};
+
+/**
+ * Fold one yt-dlp stdout line into the entry. Lines are ours (see the --print / --progress-template
+ * arguments): OVM|sizes|approxSizes|titleJSON, OVP|percent|speed|eta, OVX|pp, OVF|filepath.
+ *
+ * A merged video is two transfers (video, then audio) and yt-dlp reports each 0 → 100 %, so the
+ * raw number runs backwards halfway through. Parts are weighted by their byte sizes when yt-dlp
+ * knows them (85/15 otherwise) and the overall figure never decreases.
+ */
+function applyLine(entry, line) {
+    if (line.startsWith('OVP|')) {
+        const [, pctRaw, speed, eta] = line.split('|');
+        const pct = parseFloat(pctRaw);
+        if (!Number.isFinite(pct)) return;
+        if (entry._lastPct != null && pct < entry._lastPct - 40 && entry._part < entry._weights.length - 1) entry._part++;
+        entry._lastPct = pct;
+        const before = entry._weights.slice(0, entry._part).reduce((a, b) => a + b, 0);
+        const overall = (before + entry._weights[entry._part] * (pct / 100)) * 100;
+        // 100 is reserved for "the file is ready"; until then the bar stops just short.
+        entry.progress = Math.max(entry.progress || 0, Math.min(overall, 99.5));
+        entry.speed = cleanField(speed);
+        entry.eta = cleanField(eta);
+        if (entry.phase !== 'processing') entry.phase = 'downloading';
+    } else if (line.startsWith('OVM|')) {
+        const first = line.indexOf('|', 4);
+        const second = first < 0 ? -1 : line.indexOf('|', first + 1);
+        if (second < 0) return;
+        const parse = (t) => { try { return JSON.parse(t); } catch { return null; } };
+        const sizes = parse(line.slice(4, first));
+        const approx = parse(line.slice(first + 1, second));
+        const title = parse(line.slice(second + 1));
+        if (typeof title === 'string' && title && !entry.title) entry.title = title;
+        const pick = [sizes, approx].find(a => Array.isArray(a) && a.length > 1 && a.every(n => Number.isFinite(n) && n > 0));
+        if (pick) {
+            const total = pick.reduce((a, b) => a + b, 0);
+            entry._weights = pick.map(n => n / total);
+            entry.totalBytes = total;
+        } else if (Array.isArray(sizes) && sizes.length <= 1) {
+            entry._weights = [1];
+        }
+    } else if (line.startsWith('OVX|')) {
+        entry.phase = 'processing';
+        entry.speed = '';
+        entry.eta = '';
+    }
+}
+
 // ── Download Video ───────────────────────────────────────────
+function releaseSlot(entry) {
+    if (entry._slotReleased) return;
+    entry._slotReleased = true;
+    currentConcurrent = Math.max(0, currentConcurrent - 1);
+}
+
+function removePartials(id) {
+    const dir = path.resolve(config.downloadsDir);
+    let names = [];
+    try { names = fs.readdirSync(dir); } catch { return; }
+    for (const f of names) {
+        if (f.startsWith(id)) { try { fs.unlinkSync(path.join(dir, f)); } catch { /* ok */ } }
+    }
+}
+
 /**
  * Start a download and return a tracking ID.
  * @param {string} url - YouTube URL
  * @param {string} quality - Quality preset key
+ * @param {{ title?: string }} [opts] - title the client already shows (yt-dlp's own wins when it reports one)
  * @returns {Promise<{ id: string }>}
  */
-function startDownload(url, quality = 'best') {
+function startDownload(url, quality = 'best', opts = {}) {
     return new Promise((resolve, reject) => {
         if (!isValidUrl(url)) return reject(new Error('Only YouTube URLs are supported'));
         if (currentConcurrent >= config.download.maxConcurrent) {
             return reject(new Error('Server busy — too many concurrent downloads. Try again shortly.'));
         }
 
-        const preset = QUALITY_PRESETS[quality] || QUALITY_PRESETS['best'];
+        if (!QUALITY_PRESETS[quality]) quality = 'best';
+        const preset = QUALITY_PRESETS[quality];
         const cleanUrl = sanitizeUrl(url);
         const id = crypto.randomBytes(12).toString('hex');
 
@@ -190,28 +297,43 @@ function startDownload(url, quality = 'best') {
         // dropped by filter(Boolean) before the cleanup loop ran, so yt-dlp received
         // `--merge-output-format -o` and every audio download died with
         // "invalid merge output format "-o" given".
+        //
+        // --print makes yt-dlp quiet, so everything on stdout is one of our own tagged lines;
+        // --no-simulate keeps it downloading and --progress keeps the progress lines coming.
         const cleanArgs = [
             '-f', preset.video,
             ...(preset.audio ? [] : ['--merge-output-format', preset.ext || 'mp4']),
             '-o', outputTemplate,
             '--no-playlist',
             '--no-warnings',
+            '--no-simulate',
+            '--progress',
             '--newline',  // progress on new lines for parsing
-            '--progress-template', '%(progress._percent_str)s %(progress._speed_str)s %(progress._eta_str)s',
+            '--print', 'before_dl:OVM|%(requested_formats.:.filesize)j|%(requested_formats.:.filesize_approx)j|%(title)j',
+            '--print', 'post_process:OVX|pp',
+            '--progress-template', 'download:OVP|%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s',
             ...(preset.postprocess || []),
             cleanUrl,
         ];
 
+        const clientTitle = sanitizeTitle(opts.title).slice(0, 200);
         const entry = {
             id,
             status: 'downloading',
-            progress: 0,
+            phase: 'starting',          // starting → downloading → processing
+            progress: null,             // null until yt-dlp reports a figure (indeterminate)
             speed: '',
             eta: '',
             error: null,
+            cancelled: false,
             filePath: null,
             quality,
+            title: titleCache.get(cleanUrl) || clientTitle || '',
             startedAt: Date.now(),
+            finishedAt: null,
+            _weights: preset.audio ? [1] : [0.85, 0.15],
+            _part: 0,
+            _lastPct: null,
         };
         activeDownloads.set(id, entry);
         currentConcurrent++;
@@ -219,41 +341,38 @@ function startDownload(url, quality = 'best') {
         const proc = spawn(config.ytdlpPath, cleanArgs, { timeout: config.download.timeout });
         entry.process = proc;
 
+        let stdoutRest = '';
         proc.stdout.on('data', (data) => {
-            const lines = data.toString().split('\n');
-            for (const line of lines) {
-                // Parse progress: "  45.2% 5.23MiB/s 00:12"
-                const match = line.match(/([\d.]+)%\s+([\S]+)\s+([\S]+)/);
-                if (match) {
-                    entry.progress = parseFloat(match[1]);
-                    entry.speed = match[2];
-                    entry.eta = match[3];
-                }
-            }
+            const lines = (stdoutRest + data.toString()).split('\n');
+            stdoutRest = lines.pop();
+            for (const line of lines) applyLine(entry, line.trim());
         });
 
         let stderrTail = '';
         proc.stderr.on('data', (data) => {
-            const text = data.toString();
-            stderrTail = (stderrTail + text).slice(-2000);
-            // Some progress info goes to stderr too
-            const match = text.match(/([\d.]+)%/);
-            if (match) entry.progress = parseFloat(match[1]);
+            stderrTail = (stderrTail + data.toString()).slice(-2000);
         });
 
-        proc.on('close', (code) => {
-            currentConcurrent--;
+        proc.on('close', (code, signal) => {
+            releaseSlot(entry);
+            entry.process = null;
+            entry.finishedAt = Date.now();
+            if (entry.status !== 'downloading') { removePartials(id); return; } // cancelled or timed out
+            if (stdoutRest) applyLine(entry, stdoutRest.trim());
+
             if (code !== 0) {
-                const last = stderrTail.split('\n').map(l => l.trim()).filter(l => l && !/^\[download\]/.test(l)).pop() || `yt-dlp exited with code ${code}`;
+                const last = stderrTail.split('\n').map(l => l.trim()).filter(l => l && !/^\[download\]/.test(l)).pop()
+                    || (signal ? 'The download took too long and was stopped' : `yt-dlp exited with code ${code}`);
                 console.error(`[Download] ${id} (${quality}) failed: ${last}`);
                 entry.status = 'error';
                 entry.error = friendlyDownloadError(last);
+                removePartials(id);
                 return;
             }
 
             // Find the output file (yt-dlp may change extension)
             const dir = path.resolve(config.downloadsDir);
-            const files = fs.readdirSync(dir).filter(f => f.startsWith(id));
+            const files = fs.readdirSync(dir).filter(f => f.startsWith(id) && !/\.(part|ytdl|temp)$/i.test(f));
             if (files.length === 0) {
                 entry.status = 'error';
                 entry.error = 'Output file not found';
@@ -266,10 +385,14 @@ function startDownload(url, quality = 'best') {
             const stat = fs.statSync(filePath);
 
             entry.status = 'done';
+            entry.phase = 'done';
             entry.progress = 100;
+            entry.speed = '';
+            entry.eta = '';
             entry.filePath = filePath;
             entry.fileSize = stat.size;
             entry.ext = ext;
+            entry.filename = downloadFilename(entry.title, ext);
 
             // Register in file index for download serving
             const mimeMap = {
@@ -283,18 +406,55 @@ function startDownload(url, quality = 'best') {
                 mime: mimeMap[ext] || 'application/octet-stream',
                 ext,
                 size: stat.size,
+                filename: entry.filename,
                 expiresAt: Date.now() + config.retention.fileTTL,
             });
         });
 
         proc.on('error', (err) => {
-            currentConcurrent--;
+            releaseSlot(entry);
+            entry.finishedAt = Date.now();
+            if (entry.status !== 'downloading') return;
             entry.status = 'error';
-            entry.error = `yt-dlp error: ${err.message}`;
+            entry.error = err.code === 'ENOENT' ? 'The downloader is not installed on this server' : `yt-dlp error: ${err.message}`;
         });
 
         resolve({ id });
     });
+}
+
+// ── Cancel ───────────────────────────────────────────────────
+/**
+ * Stop a running download (kills yt-dlp and removes what it wrote) or discard a finished one.
+ * @returns {null | { id, cancelled: boolean, removed: boolean }} null when the id is unknown
+ */
+function cancelDownload(id) {
+    const dl = activeDownloads.get(id);
+    if (!dl) return null;
+
+    if (dl.status === 'downloading') {
+        dl.status = 'error';
+        dl.cancelled = true;
+        dl.error = 'Download cancelled';
+        dl.finishedAt = Date.now();
+        const proc = dl.process;
+        if (proc) {
+            try { proc.kill('SIGTERM'); } catch { /* already gone */ }
+            // ffmpeg children can ignore a polite stop; make sure nothing keeps writing.
+            const hard = setTimeout(() => { try { if (dl.process) proc.kill('SIGKILL'); } catch { /* ok */ } }, 3000);
+            hard.unref();
+        } else {
+            releaseSlot(dl);
+            removePartials(id);
+        }
+        return { id, cancelled: true, removed: false };
+    }
+
+    if (dl.status === 'done') {
+        removeFile(id);
+        return { id, cancelled: false, removed: true };
+    }
+    return { id, cancelled: false, removed: false };
 }
 
 // ── Download Status ──────────────────────────────────────────
@@ -303,13 +463,18 @@ function getStatus(id) {
     if (!dl) return null;
     return {
         id: dl.id,
-        status: dl.status,
-        progress: Math.round(dl.progress * 10) / 10,
+        status: dl.status,                       // downloading | done | error
+        phase: dl.status === 'downloading' ? dl.phase : dl.status,
+        progress: dl.progress == null ? null : Math.round(dl.progress * 10) / 10, // 0–100, null = not known yet
         speed: dl.speed,
         eta: dl.eta,
         error: dl.error,
+        cancelled: dl.cancelled || undefined,
         quality: dl.quality,
-        download: dl.status === 'done' ? { url: `/api/download/${id}`, size: dl.fileSize, ext: dl.ext } : null,
+        title: dl.title || null,
+        download: dl.status === 'done'
+            ? { url: `/api/download/${id}`, size: dl.fileSize, ext: dl.ext, filename: dl.filename }
+            : null,
     };
 }
 
@@ -349,13 +514,19 @@ function cleanup() {
         }
     }
 
-    // Clean stale active downloads (stuck for > 15 min with no file)
     for (const [id, dl] of activeDownloads) {
+        // Stuck for > 15 min with no file
         if (dl.status === 'downloading' && now - dl.startedAt > 15 * 60 * 1000) {
-            try { dl.process?.kill('SIGTERM'); } catch { /* ok */ }
             dl.status = 'error';
             dl.error = 'Download timed out';
-            currentConcurrent = Math.max(0, currentConcurrent - 1);
+            dl.finishedAt = now;
+            try { dl.process?.kill('SIGKILL'); } catch { /* ok */ }
+            if (!dl.process) releaseSlot(dl);
+        }
+        // Failed / cancelled entries have no file to expire with; drop them after a while.
+        if (dl.status === 'error' && dl.finishedAt && now - dl.finishedAt > 15 * 60 * 1000) {
+            removePartials(id);
+            activeDownloads.delete(id);
         }
     }
 
@@ -387,6 +558,7 @@ function getStats() {
 }
 
 module.exports = {
-    getInfo, startDownload, getStatus, getFile, removeFile,
+    getInfo, startDownload, cancelDownload, getStatus, getFile, removeFile,
+    sanitizeTitle, downloadFilename, contentDisposition, applyLine,
     cleanup, startCleanup, stopCleanup, getStats, isValidUrl,
 };
