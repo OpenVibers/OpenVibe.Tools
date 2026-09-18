@@ -256,7 +256,7 @@ app.use((req, res, next) => {
     return sendTool(req, res, NET_HTML);
 });
 
-// Paste subdomain → paste.html SPA
+// Paste subdomain → hands over to openvibe.community
 app.use((req, res, next) => {
     if (getRequestHost(req) !== 'pastes.openvibe.tools') return next();
     if (req.path.startsWith('/api/') || req.path.startsWith('/auth/')) return next();
