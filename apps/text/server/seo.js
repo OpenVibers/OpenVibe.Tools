@@ -52,8 +52,6 @@ function renderPage(file, primaryHost) {
             '@context': 'https://schema.org', '@type': 'WebApplication',
             name, url, description: desc,
             applicationCategory: 'UtilitiesApplication', operatingSystem: 'Any (web browser)',
-            offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-            isAccessibleForFree: true,
             publisher: { '@type': 'Organization', name: 'OpenVibe', url: 'https://openvibe.tools' },
         },
         {

@@ -68,18 +68,18 @@
 
     // ── Branding ─────────────────────────────────────────────
     function applyBranding() {
-        document.title = ctx.seoTitle || `${ctx.brandName} — Free Image Tools`;
+        document.title = ctx.seoTitle || `${ctx.brandName} — Image Tools`;
         heroIcon.innerHTML = `<i class="fa-solid ${ctx.faIcon || 'fa-images'}"></i>`;
         heroTitle.textContent = ctx.brandName || 'Img.OpenVibe';
 
         // Set subtitle based on tool
         const subtitles = {
-            hub: 'Free Online Image Converter & Tools',
-            convert: 'Free Online Image Format Converter',
-            compress: 'Free Online Image Compressor',
-            resize: 'Free Online Image Resizer',
-            crop: 'Free Online Image Cropper',
-            favicon: 'Free Online Favicon Generator',
+            hub: 'Online Image Converter & Tools',
+            convert: 'Online Image Format Converter',
+            compress: 'Online Image Compressor',
+            resize: 'Online Image Resizer',
+            crop: 'Online Image Cropper',
+            favicon: 'Online Favicon Generator',
         };
         heroSubtitle.textContent = subtitles[ctx.toolId] || ctx.seoDescription || subtitles.hub;
 

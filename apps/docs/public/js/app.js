@@ -69,22 +69,22 @@
 
     // ── Branding ─────────────────────────────────────────────
     function applyBranding() {
-        document.title = ctx.seoTitle || `${ctx.brandName} — Free Document Tools`;
+        document.title = ctx.seoTitle || `${ctx.brandName} — Document Tools`;
         heroIcon.innerHTML = `<i class="fa-solid ${ctx.faIcon || 'fa-file-pdf'}"></i>`;
         heroTitle.textContent = ctx.brandName || 'Docs.OpenVibe';
 
         const subtitles = {
-            hub: 'Free Online PDF & Document Tools',
-            merge: 'Combine PDF Files Online Free',
-            split: 'Split PDF Files Online Free',
-            compress: 'Compress PDF Files Online Free',
-            rotate: 'Rotate PDF Pages Online Free',
-            reorder: 'Rearrange PDF Pages Online Free',
-            watermark: 'Add Watermarks to PDFs Online Free',
-            protect: 'Password Protect PDFs Online Free',
-            unlock: 'Remove PDF Password Online Free',
-            img2pdf: 'Convert Images to PDF Online Free',
-            pdf2img: 'Convert PDF to Images Online Free',
+            hub: 'Online PDF & Document Tools',
+            merge: 'Combine PDF Files Online',
+            split: 'Split PDF Files Online',
+            compress: 'Compress PDF Files Online',
+            rotate: 'Rotate PDF Pages Online',
+            reorder: 'Rearrange PDF Pages Online',
+            watermark: 'Add Watermarks to PDFs Online',
+            protect: 'Password Protect PDFs Online',
+            unlock: 'Remove PDF Password Online',
+            img2pdf: 'Convert Images to PDF Online',
+            pdf2img: 'Convert PDF to Images Online',
         };
         heroSubtitle.textContent = subtitles[ctx.toolId] || ctx.seoDescription || subtitles.hub;
 

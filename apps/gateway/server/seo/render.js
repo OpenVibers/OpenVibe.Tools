@@ -34,8 +34,6 @@ function jsonLd(rec, url, related) {
         '@context': 'https://schema.org', '@type': 'SoftwareApplication',
         name: rec.name, url, applicationCategory: 'DeveloperApplication',
         operatingSystem: 'Any (web browser)', description: rec.desc,
-        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-        isAccessibleForFree: true,
         publisher: { '@type': 'Organization', name: BRAND, url: SITE },
         featureList: rec.bullets || undefined,
     };
@@ -76,7 +74,7 @@ function contentBlock(rec, related) {
     ${(rec.bullets || []).length ? `<ul class="seo-features">${rec.bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}
     ${(rec.faq || []).length ? `<h2>Frequently asked questions</h2><dl class="seo-faq">${rec.faq.map(([q, a]) => `<dt>${esc(q)}</dt><dd>${esc(a)}</dd>`).join('')}</dl>` : ''}
     ${related.length ? `<h2>Related tools</h2><ul class="seo-related">${related.map(r => `<li><a href="https://${esc(r.sub)}.openvibe.tools"><strong>${esc(r.name)}</strong><span>${esc(r.desc)}</span></a></li>`).join('')}</ul>` : ''}
-    <p class="seo-hub"><a href="${hubUrl}">Browse all free ${hubName}</a> · <a href="${SITE}">${BRAND} home</a> · <a href="https://openvibe.live">Live streaming</a></p>
+    <p class="seo-hub"><a href="${hubUrl}">Browse all ${hubName}</a> · <a href="${SITE}">${BRAND} home</a> · <a href="https://openvibe.live">Live streaming</a></p>
   </div>
 </section>
 <style>

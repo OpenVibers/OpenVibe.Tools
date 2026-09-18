@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Net.OpenVibe — Network & Internet Diagnostics</title>
-    <meta name="description" content="Free online network tools — ping, DNS lookup, GeoIP, SSL checker, HTTP headers, Whois/RDAP, traceroute, port scanner, and more. No login required.">
+    <meta name="description" content="Online network tools — ping, DNS lookup, GeoIP, SSL checker, HTTP headers, Whois/RDAP, traceroute, port scanner, and more. No login required.">
     <meta property="og:title" content="Net.OpenVibe — Network & Internet Diagnostics">
-    <meta property="og:description" content="Free online network tools — ping, DNS lookup, GeoIP, SSL checker, HTTP headers, Whois/RDAP, and more.">
+    <meta property="og:description" content="Online network tools — ping, DNS lookup, GeoIP, SSL checker, HTTP headers, Whois/RDAP, and more.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://net.openvibe.tools">
     <link rel="canonical" href="https://net.openvibe.tools">
@@ -489,7 +489,7 @@
       "@context": "https://schema.org",
       "@type": "CollectionPage",
       "name": "Net.OpenVibe — Network & Utilities Tools",
-      "description": "Free online network and utility tools for IP lookup, DNS, SSL certificate checking, port scanning, WHOIS lookup, traceroute, and more.",
+      "description": "Online network and utility tools for IP lookup, DNS, SSL certificate checking, port scanning, WHOIS lookup, traceroute, and more.",
       "url": "https://net.openvibe.tools",
       "inLanguage": "en-US",
       "isPartOf": {
@@ -500,15 +500,10 @@
       "mainEntity": {
         "@type": "SoftwareApplication",
         "name": "Net.OpenVibe Toolkit",
-        "description": "Collection of 8+ free network and system utilities",
+        "description": "Collection of 8+ network and system utilities",
         "url": "https://net.openvibe.tools",
         "applicationCategory": "UtilityApplication",
         "operatingSystem": "Any",
-        "offers": {
-          "@type": "Offer",
-          "price": "0",
-          "priceCurrency": "USD"
-        },
         "tools": [
           {"@type": "SoftwareApplication", "name": "My IP Address"},
           {"@type": "SoftwareApplication", "name": "DNS Lookup"},
@@ -533,7 +528,7 @@
         <div class="hero shell" id="hero">
             <div class="hero-icon"><i class="fa-solid fa-network-wired"></i></div>
             <h1><span class="accent">OpenVibe</span>Net</h1>
-            <p class="sub">Free online network diagnostics — DNS, GeoIP, ping, SSL, Whois, HTTP headers, and more. No login required.</p>
+            <p class="sub">Online network diagnostics — DNS, GeoIP, ping, SSL, Whois, HTTP headers, and more. No login required.</p>
         </div>
 
         <!-- Search -->
@@ -571,7 +566,7 @@
                         </div>
                         <div class="stat-card">
                             <div class="stat-value">∞</div>
-                            <div class="stat-label">Free Queries</div>
+                            <div class="stat-label">Queries</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-value">⚡</div>
@@ -600,7 +595,7 @@
                 <a href="https://openvibe.live">OpenVibe.Live</a>
                 <a href="https://openvibe.games">Scraplandia</a>
             </div>
-            <p>Part of the <a href="https://openvibe.network">OpenVibe</a>. Free. Open source. Built in the open.</p>
+            <p>Part of the <a href="https://openvibe.network">OpenVibe</a>. Open source. Built in the open.</p>
         </div>
     </div>
 
@@ -760,7 +755,7 @@
         heroIcon.innerHTML = `<i class="fa-solid ${tool.icon}"></i>`;
         if (isHub) {
             heroH1.innerHTML = '<span class="accent">OpenVibe</span>Net';
-            heroSub.textContent = 'Free online network diagnostics — DNS, GeoIP, ping, SSL, Whois, HTTP headers, and more. No login required.';
+            heroSub.textContent = 'Online network diagnostics — DNS, GeoIP, ping, SSL, Whois, HTTP headers, and more. No login required.';
         } else {
             heroH1.innerHTML = tool.name.replace('OpenVibe', '<span class="accent">OpenVibe</span>');
             heroSub.textContent = tool.placeholder || '';
