@@ -49,7 +49,7 @@
             toolList = toolsRes.tools || [];
         } catch (e) {
             console.error('Failed to load context:', e);
-            ctx = { toolId: 'hub', brandName: 'Audio.OpenVibe', seoTitle: 'Audio.OpenVibe', seoDescription: 'Free Online Audio Tools' };
+            ctx = { toolId: 'hub', brandName: 'Audio.OpenVibe', seoTitle: 'Audio.OpenVibe', seoDescription: 'Online Audio Tools' };
             toolList = [];
         }
 
@@ -87,7 +87,7 @@
 
         if (ctx.faIcon) heroIcon.innerHTML = `<i class="fa-solid ${ctx.faIcon}"></i>`;
         heroTitle.textContent = ctx.brandName || 'Audio.OpenVibe';
-        heroSub.textContent = ctx.seoDescription || 'Free Online Audio Tools';
+        heroSub.textContent = ctx.seoDescription || 'Online Audio Tools';
 
         // On a specific tool domain, hide tool tabs and subdomains
         if (ctx.toolId && ctx.toolId !== 'hub') {
