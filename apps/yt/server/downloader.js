@@ -186,9 +186,13 @@ function startDownload(url, quality = 'best') {
         ensureDir();
         const outputTemplate = path.resolve(config.downloadsDir, `${id}.%(ext)s`);
 
-        const args = [
+        // Audio presets must not get --merge-output-format at all: the old '' placeholder was
+        // dropped by filter(Boolean) before the cleanup loop ran, so yt-dlp received
+        // `--merge-output-format -o` and every audio download died with
+        // "invalid merge output format "-o" given".
+        const cleanArgs = [
             '-f', preset.video,
-            '--merge-output-format', preset.audio ? '' : (preset.ext || 'mp4'),
+            ...(preset.audio ? [] : ['--merge-output-format', preset.ext || 'mp4']),
             '-o', outputTemplate,
             '--no-playlist',
             '--no-warnings',
@@ -196,14 +200,7 @@ function startDownload(url, quality = 'best') {
             '--progress-template', '%(progress._percent_str)s %(progress._speed_str)s %(progress._eta_str)s',
             ...(preset.postprocess || []),
             cleanUrl,
-        ].filter(Boolean);
-
-        // Remove empty merge-output-format for audio
-        const cleanArgs = [];
-        for (let i = 0; i < args.length; i++) {
-            if (args[i] === '--merge-output-format' && args[i + 1] === '') { i++; continue; }
-            cleanArgs.push(args[i]);
-        }
+        ];
 
         const entry = {
             id,
