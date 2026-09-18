@@ -136,28 +136,38 @@
         show(loading);
         fetchBtn.disabled = true;
 
+        // Never spin forever: the server gives yt-dlp 30 s, so anything past 45 s is dead.
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 45000);
         try {
             const res = await fetch('/api/info', {
                 method: 'POST',
                 headers: getAuthHeaders(),
                 body: JSON.stringify({ url }),
+                signal: ctrl.signal,
             });
-            const data = await res.json();
+            const data = await res.json().catch(() => ({}));
 
             if (!res.ok) {
-                showError(data.error || 'Failed to fetch video info');
+                showError(data.error || `Could not fetch video info (${res.status})`);
                 return;
             }
 
-            videoInfo = data;
-            renderVideoCard(data);
+            // The API answers { success, video: {...} }; the card used to be fed the envelope,
+            // which is why it showed "Untitled" with no thumbnail while the spinner stayed on.
+            const info = data.video || data;
+            if (!info || !info.id) { showError('No video found at that link'); return; }
+            videoInfo = info;
+            renderVideoCard(info);
             selectedQuality = 'best';
             renderFormats();
+            hideAll();
             show(videoCard);
             show(formatSection);
         } catch (err) {
-            showError('Network error — please check your connection');
+            showError(err && err.name === 'AbortError' ? 'YouTube took too long to answer — try again in a moment' : 'Network error — please check your connection');
         } finally {
+            clearTimeout(timer);
             fetchBtn.disabled = false;
         }
     }
@@ -170,10 +180,12 @@
         `;
 
         const meta = [];
+        const views = info.viewCount ?? info.view_count;
+        const uploaded = info.uploadDate || info.upload_date;
         if (info.uploader) meta.push(`<span><i class="fa-solid fa-user"></i> ${escHtml(info.uploader)}</span>`);
-        if (info.view_count) meta.push(`<span><i class="fa-solid fa-eye"></i> ${formatNumber(info.view_count)}</span>`);
-        if (info.upload_date) {
-            const d = info.upload_date;
+        if (views) meta.push(`<span><i class="fa-solid fa-eye"></i> ${formatNumber(views)}</span>`);
+        if (uploaded && String(uploaded).length === 8) {
+            const d = String(uploaded);
             const formatted = `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`;
             meta.push(`<span><i class="fa-solid fa-calendar"></i> ${formatted}</span>`);
         }
