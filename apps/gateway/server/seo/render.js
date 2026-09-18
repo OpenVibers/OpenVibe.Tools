@@ -97,13 +97,14 @@ function contentBlock(rec, related) {
  * Render the SPA file for one subdomain with its own metadata and content.
  * Returns the original HTML untouched when the subdomain is not catalogued.
  */
-function renderTool(file, sub) {
+function renderTool(file, sub, canonicalHost) {
     const rec = seoFor(sub);
     if (!rec) return baseHtml(file);
-    const key = `${file}::${sub}`;
+    const key = `${file}::${sub}::${canonicalHost || ''}`;
     if (_rendered.has(key)) return _rendered.get(key);
 
-    const url = `https://${sub}.openvibe.tools`;
+    // The registry decides the canonical host (a custom domain may own the tool).
+    const url = `https://${canonicalHost || sub + '.openvibe.tools'}`;
     const related = relatedTo(sub, 6);
     const title = `${rec.title} | ${BRAND}`;
     let html = baseHtml(file);

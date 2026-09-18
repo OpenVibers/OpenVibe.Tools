@@ -203,142 +203,117 @@
     }
 
     // --- Start Download ---
+    // One reducer (download-state.js) turns SSE frames and polls into view state; render() paints it
+    // on the page and mirrors it into the navbar activity island when that module is present.
+    const DS = window.YTDownloadState;
+    let dlState = null, pollTimer = null, watchdog = null, tracking = null;
+    const island = () => window.OpenVibeIsland || null;
+
     async function startDownload() {
         if (!videoInfo) return;
-
-        hideAll();
-        show(videoCard);
-        show(progressSec);
-        progressBar.style.width = '0%';
-        progressBar.classList.remove('indeterminate');
-        progressStats.textContent = '';
-        progressTitle.textContent = 'Starting download...';
+        hideAll(); show(videoCard); show(progressSec);
         downloadBtn.disabled = true;
+        stopTracking();
+        dlState = DS.initial({ title: videoInfo.title || '' });
+        render();
 
         try {
             const res = await fetch('/api/download', {
-                method: 'POST',
-                headers: getAuthHeaders(),
-                body: JSON.stringify({
-                    url: urlInput.value.trim(),
-                    quality: selectedQuality,
-                }),
+                method: 'POST', headers: getAuthHeaders(),
+                body: JSON.stringify({ url: urlInput.value.trim(), quality: selectedQuality, title: videoInfo.title || '' }),
             });
-            const data = await res.json();
-
-            if (!res.ok) {
-                showError(data.error || 'Failed to start download');
-                downloadBtn.disabled = false;
-                return;
-            }
-
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.id) { fail(data.error || 'Failed to start download'); return; }
             downloadId = data.id;
+            const isl = island();
+            if (isl) isl.start({ id: 'yt-' + data.id, title: 'Starting download', subtitle: videoInfo.title || '', icon: 'youtube', image: videoInfo.thumbnail || '', progress: null, state: 'busy',
+                actions: [{ label: 'Cancel', onClick: () => cancelDownload(data.id) }] });
             subscribeProgress(data.id);
         } catch (err) {
-            showError('Network error — please check your connection');
-            downloadBtn.disabled = false;
+            fail('Network error. Please check your connection.');
         }
     }
 
-    // --- SSE Progress ---
+    function fail(msg) { apply({ status: 'error', error: msg }); }
+
+    function apply(msg) {
+        if (!dlState) return;
+        const before = dlState;
+        dlState = DS.reduce(dlState, msg);
+        if (dlState !== before) render();
+        if (dlState.terminal) stopTracking();
+    }
+
     function subscribeProgress(id) {
-        if (sseSource) { sseSource.close(); sseSource = null; }
-
-        sseSource = new EventSource(`/api/status/${id}/stream`);
-
-        sseSource.addEventListener('progress', (e) => {
-            try {
-                const d = JSON.parse(e.data);
-                updateProgress(d);
-            } catch {}
-        });
-
-        sseSource.addEventListener('complete', (e) => {
-            try {
-                const d = JSON.parse(e.data);
-                onDownloadComplete(d);
-            } catch {}
-            closeSse();
-        });
-
-        sseSource.addEventListener('error_event', (e) => {
-            try {
-                const d = JSON.parse(e.data);
-                showError(d.error || 'Download failed');
-            } catch {
-                showError('Download failed unexpectedly');
-            }
-            closeSse();
-            downloadBtn.disabled = false;
-        });
-
-        sseSource.onerror = () => {
-            // SSE disconnected — fall back to polling
-            closeSse();
-            pollFallback(id);
-        };
-    }
-
-    function closeSse() {
-        if (sseSource) { sseSource.close(); sseSource = null; }
-    }
-
-    function updateProgress(d) {
-        progressTitle.textContent = 'Downloading...';
-
-        if (d.progress != null && d.progress >= 0) {
-            progressBar.classList.remove('indeterminate');
-            progressBar.style.width = d.progress + '%';
+        tracking = id;
+        const startedAt = Date.now();
+        let gotFrame = false;
+        const onFrame = (e) => { if (tracking !== id) return; gotFrame = true; try { apply(Object.assign({ id }, JSON.parse(e.data))); } catch { /* */ } };
+        if (window.EventSource) {
+            sseSource = new EventSource(`/api/status/${id}/stream`);
+            // Named events carry the same JSON as the unnamed message; the reducer is idempotent.
+            sseSource.onmessage = onFrame;
+            ['progress', 'complete', 'failed'].forEach((n) => sseSource.addEventListener(n, onFrame));
+            sseSource.onerror = () => { if (tracking === id && !(dlState && dlState.terminal)) { closeSse(); poll(id, startedAt); } };
+            // A proxy that buffers the stream would leave us silent: start polling after 4 s without a frame.
+            watchdog = setTimeout(() => { if (!gotFrame && tracking === id) { closeSse(); poll(id, startedAt); } }, 4000);
         } else {
-            progressBar.classList.add('indeterminate');
+            poll(id, startedAt);
         }
-
-        const parts = [];
-        if (d.progress != null && d.progress >= 0) parts.push(d.progress.toFixed(1) + '%');
-        if (d.speed) parts.push(d.speed);
-        if (d.eta) parts.push('ETA ' + d.eta);
-        if (d.filesize) parts.push(formatSize(d.filesize));
-        progressStats.textContent = parts.join(' • ');
     }
 
-    function onDownloadComplete(d) {
-        hideAll();
-        show(doneSec);
-
-        const parts = [];
-        if (d.filename) parts.push(d.filename);
-        if (d.filesize) parts.push(formatSize(d.filesize));
-        doneInfo.textContent = parts.join(' — ') || 'Your file is ready';
-
-        saveBtn.href = `/api/download/${downloadId}`;
-        saveBtn.download = d.filename || '';
-        downloadBtn.disabled = false;
-    }
-
-    // --- Polling Fallback (if SSE drops) ---
-    function pollFallback(id) {
-        const interval = setInterval(async () => {
+    function poll(id, startedAt) {
+        if (tracking !== id || pollTimer) return;
+        const step = async () => {
+            pollTimer = null;
+            if (tracking !== id) return;
             try {
-                const res = await fetch(`/api/status/${id}`, { headers: getAuthHeaders() });
-                if (!res.ok) { clearInterval(interval); showError('Download failed'); return; }
-                const d = await res.json();
+                const res = await fetch(`/api/status/${id}`, { headers: getAuthHeaders(), cache: 'no-store' });
+                if (res.status === 404) return fail('Download not found or expired');
+                if (res.ok) apply(Object.assign({ id }, await res.json()));
+            } catch { /* transient: keep trying until the deadline */ }
+            if (tracking !== id) return;
+            const delay = DS.pollDelay(Date.now() - startedAt);
+            if (delay == null) return fail('The download took too long. Please try again.');
+            pollTimer = setTimeout(step, delay);
+        };
+        step();
+    }
 
-                if (d.status === 'downloading') {
-                    updateProgress(d);
-                } else if (d.status === 'complete') {
-                    clearInterval(interval);
-                    onDownloadComplete(d);
-                } else if (d.status === 'error') {
-                    clearInterval(interval);
-                    showError(d.error || 'Download failed');
-                    downloadBtn.disabled = false;
-                }
-            } catch {
-                clearInterval(interval);
-                showError('Lost connection');
-                downloadBtn.disabled = false;
-            }
-        }, 1000);
+    function closeSse() { if (sseSource) { sseSource.close(); sseSource = null; } }
+    function stopTracking() { tracking = null; closeSse(); clearTimeout(pollTimer); pollTimer = null; clearTimeout(watchdog); watchdog = null; }
+
+    async function cancelDownload(id) {
+        try { await fetch(`/api/download/${id}`, { method: 'DELETE', headers: getAuthHeaders() }); } catch { /* */ }
+        if (tracking === id) apply({ status: 'error', error: 'Cancelled', cancelled: true });
+    }
+
+    function render() {
+        const s = dlState; if (!s) return;
+        const isl = island(); const iid = downloadId ? 'yt-' + downloadId : null;
+        if (s.phase === 'done') {
+            hideAll(); show(doneSec);
+            const parts = [];
+            if (s.file.filename) parts.push(s.file.filename);
+            if (s.file.size) parts.push(formatSize(s.file.size));
+            doneInfo.textContent = parts.join(' · ') || 'Your file is ready';
+            saveBtn.href = s.file.url || `/api/download/${downloadId}`;
+            saveBtn.download = s.file.filename || '';
+            downloadBtn.disabled = false;
+            if (isl && iid) isl.finish(iid, { state: 'ok', title: 'Ready', subtitle: s.title, detail: parts.join(' · '), actions: [{ label: 'Save file', href: saveBtn.href, download: true }], ttl: 15000 });
+            return;
+        }
+        if (s.phase === 'error') {
+            downloadBtn.disabled = false;
+            if (s.cancelled) { hideAll(); show(videoCard); } else showError(s.error);
+            if (isl && iid) { if (s.cancelled) isl.finish(iid, { state: 'info', title: 'Cancelled', ttl: 2500 }); else isl.fail(iid, { title: 'Download failed', detail: s.error }); }
+            return;
+        }
+        progressTitle.textContent = DS.label(s);
+        if (s.progress == null) { progressBar.classList.add('indeterminate'); progressBar.style.width = ''; }
+        else { progressBar.classList.remove('indeterminate'); progressBar.style.width = (s.progress * 100).toFixed(1) + '%'; }
+        progressStats.textContent = s.detail;
+        if (isl && iid) isl.update(iid, { title: DS.label(s).replace('…', ''), progress: s.progress, detail: s.detail });
     }
 
     // --- Reset ---

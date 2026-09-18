@@ -1,0 +1,11 @@
+'use strict';
+const assert = require('assert');
+const DS = require('../public/js/download-state.js');
+let s = DS.initial(); s = DS.reduce(s, { status: 'downloading', progress: null }); assert.equal(s.phase, 'starting');
+s = DS.reduce(s, { status: 'downloading', progress: 40, speed: '2MiB/s', eta: '00:05' }); assert.equal(s.progress, 0.4);
+s = DS.reduce(s, { status: 'downloading', progress: 10 }); assert.equal(s.percent, 40, 'never runs backwards');
+const done = DS.reduce(s, { status: 'done', id: 'ab', download: { filename: 'a.mp3', size: 5 } }); assert.ok(done.terminal && done.file.url === '/api/download/ab');
+assert.ok(DS.reduce(s, { status: 'complete', id: 'ab' }).terminal, 'the legacy word is accepted');
+assert.strictEqual(DS.reduce(done, { status: 'downloading', progress: 1 }), done, 'a terminal state is final');
+assert.equal(DS.pollDelay(11 * 60 * 1000), null);
+console.log('download-state: all checks passed');
