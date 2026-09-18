@@ -15,7 +15,7 @@ const cookieParser = require('cookie-parser');
 // ── Analytics ────────────────────────────────────────────────
 const Database = require('better-sqlite3');
 const { AnalyticsTracker } = require('openvibe-shared/analytics');
-const INTERNAL_SECRET = 'openvibe-internal-2026';
+const { internalOk } = require('../../_shared/internal-auth');
 const analyticsDbPath = path.join(__dirname, '..', 'data', 'analytics.db');
 fs.mkdirSync(path.dirname(analyticsDbPath), { recursive: true });
 const analyticsDb = new Database(analyticsDbPath);
@@ -26,6 +26,9 @@ const PORT = parseInt(process.env.PORT) || 4011;
 const MAPS_API = process.env.MAPS_API || 'http://127.0.0.1:4010';
 
 const app = express();
+
+// Legal documents live on the apex; every tool host points there instead of answering 404.
+app.get(['/terms', '/privacy', '/dmca', '/tos'], (req, res) => res.redirect(301, 'https://openvibe.tools' + (req.path === '/tos' ? '/terms' : req.path)));
 
 app.set('trust proxy', 2); // Cloudflare → Nginx → Node
 app.use(cors({
@@ -83,12 +86,12 @@ app.get('/api/geocode', proxyToMaps('/api/geocode'));
 
 // ── Internal Analytics API ────────────────────────────────────
 app.get('/api/internal/analytics', (req, res) => {
-    if (req.headers['x-internal-secret'] !== INTERNAL_SECRET) return res.status(403).json({ error: 'Forbidden' });
+    if (!internalOk(req)) return res.status(404).json({ error: 'Not found' });
     try { const d = Math.min(parseInt(req.query.days) || 30, 365); const h = req.query.hours ? Math.min(parseInt(req.query.hours), 8760) : null; res.json({ ok: true, analytics: analytics.getStats({ days: d, hours: h }) }); }
     catch (err) { res.status(500).json({ ok: false, error: err.message }); }
 });
 app.get('/api/internal/analytics/bots', (req, res) => {
-    if (req.headers['x-internal-secret'] !== INTERNAL_SECRET) return res.status(403).json({ error: 'Forbidden' });
+    if (!internalOk(req)) return res.status(404).json({ error: 'Not found' });
     try { res.json({ ok: true, bots: analytics.getBotAnalysis(Math.min(parseInt(req.query.days) || 30, 365)) }); }
     catch (err) { res.status(500).json({ ok: false, error: err.message }); }
 });
