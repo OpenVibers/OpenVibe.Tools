@@ -11,6 +11,17 @@ const registry = require('./index');
 
 const HOP = new Set(['connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade']);
 
+const BOT_RE = /bot|crawl|spider|slurp|bingpreview|facebookexternalhit|embedly|quora|pinterest|vkshare|w3c_validator|whatsapp|telegram|discord|slack|twitter|linkedin|preview|lighthouse|headless|curl|wget|python|httpclient|go-http|java\/|ruby|perl|scrapy|gpt|claude|anthropic|perplexity|ccbot|bytespider|amazonbot|applebot|yandex|baidu|duckduck|archive\.org|ia_archiver/i;
+/** A browser loading a page for a person: GET, wants HTML, has a browser UA, is not a crawler or link preview. */
+function isPersonNavigating(req) {
+    if (req.method !== 'GET') return false;
+    const ua = String(req.headers['user-agent'] || '');
+    if (!/Mozilla\//.test(ua) || BOT_RE.test(ua)) return false;
+    if (!/text\/html/.test(String(req.headers.accept || ''))) return false;
+    const dest = req.headers['sec-fetch-dest'];
+    return !dest || dest === 'document';
+}
+
 function proxyTo(port, info, req, res) {
     const headers = {};
     for (const [k, v] of Object.entries(req.headers)) if (!HOP.has(k) && !k.startsWith('x-ov-')) headers[k] = v;
@@ -57,9 +68,17 @@ function hostRoles(opts) {
             res.set('Cache-Control', 'public, max-age=300');
             return res.redirect(301, `https://${info.shortHost}${req.originalUrl || '/'}`);
         }
+        // People get the address that is easiest to remember; crawlers stay on the canonical host.
+        // The descriptive host (or a custom domain) is what links, sitemaps and rel=canonical name, so
+        // search engines index that one. A person who follows such a link is sent on to the short host
+        // (302, same path). Same page either way, so this is a convenience redirect, not different content.
+        if (info.role === 'canonical' && info.shortHost && info.shortHost !== info.host && isPersonNavigating(req)) {
+            res.set('Cache-Control', 'private, no-store'); res.set('Vary', 'User-Agent, Accept');
+            return res.redirect(302, `https://${info.shortHost}${req.originalUrl || '/'}`);
+        }
         if (info.port) return proxyTo(info.port, info, req, res);
         next();
     };
 }
 
-module.exports = { hostRoles, proxyTo };
+module.exports = { hostRoles, proxyTo, isPersonNavigating };

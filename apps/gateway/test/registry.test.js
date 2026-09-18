@@ -34,3 +34,16 @@ assert.equal(site.search('merge pdf')[0].id, 'mergepdf');
 assert.equal(site.search('youtube to mp3')[0].id, 'yt');
 assert.deepEqual(site.search(''), []);
 console.log('registry + site: all checks passed');
+
+// People are sent from the canonical host to the short one; crawlers are not.
+{
+    const { isPersonNavigating } = require('../server/registry/host-middleware');
+    const req = (ua, accept, extra) => ({ method: 'GET', headers: Object.assign({ 'user-agent': ua, accept }, extra || {}) });
+    const chrome = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36';
+    assert.equal(isPersonNavigating(req(chrome, 'text/html,application/xhtml+xml', { 'sec-fetch-dest': 'document' })), true);
+    assert.equal(isPersonNavigating(req('Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)', 'text/html')), false);
+    assert.equal(isPersonNavigating(req('Mozilla/5.0 AppleWebKit/537.36 (compatible; GPTBot/1.2)', 'text/html')), false);
+    assert.equal(isPersonNavigating(req(chrome, 'application/json')), false, 'API calls are never redirected');
+    assert.equal(isPersonNavigating(req(chrome, 'text/html', { 'sec-fetch-dest': 'iframe' })), false);
+    console.log('short-host redirect rule: ok');
+}
