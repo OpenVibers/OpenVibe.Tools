@@ -9,8 +9,12 @@
 //   GET  /auth/login     → redirect to Network /oauth/authorize
 //                          (?silent=1 adds prompt=none: no login UI, the
 //                          Network answers login_required when nobody is
-//                          signed in there)
+//                          signed in there). A browser that already holds a
+//                          valid ov_token skips the Network and goes to next.
 //   GET  /auth/callback  → server-side code exchange, set cookies
+//   POST /auth/fedcm     → browser-native FedCM sign-in: the page posts the
+//                          Network's assertion JWT + its nonce, we exchange it
+//                          (jwt-bearer grant) and set the same cookies
 //   GET  /auth/logout    → clear cookies (+ best-effort refresh revoke)
 //   GET  /auth/me        → offline-verify ov_token, return profile
 //   POST /auth/refresh   → rotate tokens via refresh_token grant
@@ -45,6 +49,72 @@ const NETWORK_ORIGIN = 'https://openvibe.network';
 // OAuth errors that mean "nobody is signed in at the Network" rather than "something broke".
 // A silent attempt that ends here just goes back where it came from.
 const NO_SESSION_ERRORS = new Set(['login_required', 'interaction_required', 'consent_required']);
+
+// RFC 7523: the FedCM assertion is presented to /oauth/token as a JWT bearer grant.
+const JWT_BEARER_GRANT = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
+
+/** True for https://openvibe.tools and any https://*.openvibe.tools origin, nothing else. */
+function isToolsZoneOrigin(origin) {
+    try {
+        const u = new URL(origin);
+        return u.protocol === 'https:' && (u.hostname === 'openvibe.tools' || u.hostname.endsWith('.openvibe.tools'));
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * CORS for POST /auth/fedcm only. Satellites (yt.openvibe.tools, …) post the assertion
+ * cross-origin to the apex with credentials, so the reply must name their exact origin and
+ * allow credentials; any origin outside the *.openvibe.tools zone is refused outright (403,
+ * no CORS headers) for both the preflight and the request itself. Requests without an
+ * Origin header (same-origin form of the call, curl) pass through untouched.
+ * Mounted in index.js ahead of the gateway-wide CORS so the wider allow-list never answers
+ * this path's preflight.
+ */
+function fedcmCors(req, res, next) {
+    const origin = req.headers.origin;
+    res.vary('Origin');
+    if (origin) {
+        if (!isToolsZoneOrigin(origin)) {
+            res.removeHeader('Access-Control-Allow-Origin');
+            return res.status(403).json({ error: 'origin_not_allowed', error_description: 'Origin is not part of the openvibe.tools zone' });
+        }
+        res.set('Access-Control-Allow-Origin', origin);
+        res.set('Access-Control-Allow-Credentials', 'true');
+    }
+    if (req.method === 'OPTIONS') {
+        res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+        res.set('Access-Control-Allow-Headers', 'Content-Type');
+        res.set('Access-Control-Max-Age', '600');
+        return res.status(204).end();
+    }
+    return next();
+}
+
+/**
+ * Read a JWT's payload WITHOUT checking its signature. Only used to compare the FedCM
+ * assertion's nonce with the one the page posted; the Network verifies the signature when
+ * the assertion is exchanged. Returns null when the token is not a three-part JWT.
+ */
+function decodeJwtPayload(token) {
+    if (typeof token !== 'string') return null;
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    try {
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+        return payload && typeof payload === 'object' ? payload : null;
+    } catch {
+        return null;
+    }
+}
+
+/** Constant-time string comparison; unequal lengths short-circuit (the length is not secret). */
+function safeEqual(a, b) {
+    if (typeof a !== 'string' || typeof b !== 'string' || !a || !b) return false;
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
 
 /**
  * Create the auth client + JWKS fetcher shared by the whole gateway.
@@ -215,6 +285,8 @@ function createAuthRoutes(config, auth) {
                 if (!res.ok) {
                     const err = new Error(data.error_description || data.error || `token grant failed (${res.status})`);
                     err.status = res.status;
+                    err.code = typeof data.error === 'string' ? data.error : null;
+                    err.description = typeof data.error_description === 'string' ? data.error_description : null;
                     throw err;
                 }
                 return data;
@@ -228,12 +300,21 @@ function createAuthRoutes(config, auth) {
     }
 
     // ── GET /auth/login ──────────────────────────────────────
-    router.get('/login', (req, res) => {
-        let { url, state } = auth.client.getAuthorizationUrl(config.oauth.scope);
+    router.get('/login', async (req, res) => {
         // Silent mode (?silent=1): the shared navbar uses it when a page has no session but
         // the browser carries an ov_sso_hint=account cookie. prompt=none tells the Network to
         // answer without any UI — a code if the user is signed in there, login_required if not.
         const silent = String(req.query.silent || '') === '1';
+        if (silent) {
+            // Already signed in here (a valid ov_token rode along)? Then the round trip to the
+            // Network would only hand back the session this browser already has: go straight
+            // to the page that asked.
+            const existing = req.cookies?.[ACCESS_COOKIE];
+            if (existing && await auth.verify(existing)) {
+                return res.redirect(sanitizeNext(req.query.next));
+            }
+        }
+        let { url, state } = auth.client.getAuthorizationUrl(config.oauth.scope);
         if (silent) url += '&prompt=none';
         // Domain-wide: a login can start on net./dev./pastes. but the OAuth
         // redirect_uri is pinned to the apex — the callback must see these cookies.
@@ -287,6 +368,62 @@ function createAuthRoutes(config, auth) {
         } catch (err) {
             console.error('[Auth] Code exchange failed:', err.message);
             return res.status(502).send('Sign-in failed — could not reach the OpenVibe.Network. Please try again.');
+        }
+    });
+
+    // ── POST /auth/fedcm ─────────────────────────────────────
+    // Browser-native FedCM sign-in. The shared navbar asks the browser for an identity
+    // credential from openvibe.network (with a nonce it generated) and posts the resulting
+    // assertion JWT here. We check the nonce claim matches, then present the assertion to
+    // the Network as a jwt-bearer grant — same endpoint and response shape as the code
+    // exchange — and set up the session exactly like /auth/callback does.
+    // Body: { token: '<assertion jwt>', nonce: '<the nonce the page used>' }
+    router.post('/fedcm', async (req, res) => {
+        if (!req.is('application/json')) {
+            return res.status(415).json({ error: 'unsupported_media_type', error_description: 'Send JSON (Content-Type: application/json)' });
+        }
+        const body = req.body && typeof req.body === 'object' ? req.body : {};
+        const token = typeof body.token === 'string' ? body.token.trim() : '';
+        const nonce = typeof body.nonce === 'string' ? body.nonce : '';
+        if (!token) return res.status(400).json({ error: 'invalid_request', error_description: 'Missing token' });
+        if (!nonce || nonce.length > 512) return res.status(400).json({ error: 'invalid_request', error_description: 'Missing nonce' });
+        if (token.length > 16 * 1024) return res.status(400).json({ error: 'invalid_request', error_description: 'Token too large' });
+
+        // Nonce binding: the assertion must carry the very nonce this page generated, or it
+        // was minted for a different request. Signature-less decode is enough for that — the
+        // Network verifies the signature when we exchange it.
+        const claims = decodeJwtPayload(token);
+        if (!claims) return res.status(400).json({ error: 'invalid_request', error_description: 'Token is not a JWT' });
+        if (!safeEqual(String(claims.nonce ?? ''), nonce)) {
+            return res.status(400).json({ error: 'invalid_request', error_description: 'Nonce mismatch' });
+        }
+
+        try {
+            const data = await tokenGrant({ grant_type: JWT_BEARER_GRANT, assertion: token });
+            if (!data.access_token) {
+                return res.status(401).json({ error: 'invalid_grant', error_description: 'The OpenVibe.Network issued no access token' });
+            }
+            setSessionCookies(res, data.access_token, data.refresh_token);
+            setSsoHint(res, 'account');
+            let user = data.user || null;
+            if (!user) {
+                const verified = await auth.verify(data.access_token);
+                if (verified) {
+                    const { iat, exp, aud, iss, ...rest } = verified;
+                    user = rest;
+                }
+            }
+            return res.json({ ok: true, user });
+        } catch (err) {
+            if (err.status && err.status < 500) {
+                // The Network refused the assertion (expired, wrong audience, unknown user…).
+                return res.status(401).json({
+                    error: err.code || 'invalid_grant',
+                    error_description: err.description || err.message,
+                });
+            }
+            console.error('[Auth] FedCM exchange failed:', err.message);
+            return res.status(502).json({ error: 'server_error', error_description: 'Could not reach the OpenVibe.Network' });
         }
     });
 
@@ -355,4 +492,4 @@ function createAuthRoutes(config, auth) {
     return router;
 }
 
-module.exports = { createAuthClient, createAuthRoutes, extractToken };
+module.exports = { createAuthClient, createAuthRoutes, extractToken, fedcmCors };

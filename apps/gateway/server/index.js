@@ -22,7 +22,7 @@ const path = require('path');
 
 const config = require('./config');
 const { BRAND } = require('openvibe-shared/brand');
-const { createAuthClient, createAuthRoutes, extractToken } = require('./auth/routes');
+const { createAuthClient, createAuthRoutes, extractToken, fedcmCors } = require('./auth/routes');
 const createNetRoutes = require('./net/routes');
 const { NET_TOOL_MAP, NET_ALIASES } = require('./net/config');
 const createDevRoutes = require('./dev/routes');
@@ -76,6 +76,11 @@ function isAllowedOrigin(origin) {
     } catch { /* ignore */ }
     return false;
 }
+
+// POST /auth/fedcm is the one credentialed cross-origin call satellites make to the apex;
+// it gets its own, stricter gate (openvibe.tools zone only) and must answer its own
+// preflight before the wider allow-list below gets a chance to.
+app.use('/auth/fedcm', fedcmCors);
 
 app.use(cors({
     origin(origin, callback) {
