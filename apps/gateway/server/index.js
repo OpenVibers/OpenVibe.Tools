@@ -212,6 +212,35 @@ function sendTool(req, res, file) {
     }
 }
 
+// ── Internal analytics (Network admin + ranking) ─────────────
+// The gateway keeps no analytics of its own; it adds up the satellites'. Internal key + loopback only.
+{
+    const { requireInternal } = require('../../_shared/internal-auth');
+    const SATELLITES = { maps: 4010, food: 4011, img: 4012, yt: 4013, audio: 4014, text: 4015, docs: 4016 };
+    app.get('/api/internal/analytics', requireInternal, async (req, res) => {
+        const days = Math.min(parseInt(req.query.days, 10) || 30, 365);
+        const hours = req.query.hours ? Math.min(parseInt(req.query.hours, 10), 8760) : null;
+        const key = String(req.headers['x-internal-key']);
+        const parts = await Promise.all(Object.entries(SATELLITES).map(async ([name, port]) => {
+            try {
+                const r = await fetch(`http://127.0.0.1:${port}/api/internal/analytics?days=${days}${hours ? '&hours=' + hours : ''}`, { headers: { 'X-Internal-Key': key }, signal: AbortSignal.timeout(5000) });
+                const j = r.ok ? await r.json() : null;
+                return j && j.analytics ? { name, analytics: j.analytics } : null;
+            } catch { return null; }
+        }));
+        const live = parts.filter(Boolean);
+        const summary = {};
+        for (const p of live) for (const [k, v] of Object.entries(p.analytics.summary || {})) if (typeof v === 'number' && !/^avg_/.test(k)) summary[k] = (summary[k] || 0) + v;
+        const avg = live.map(p => Number(p.analytics.summary && p.analytics.summary.avg_response_ms) || 0).filter(Boolean);
+        if (avg.length) summary.avg_response_ms = Math.round(avg.reduce((a, b) => a + b, 0) / avg.length);
+        const realtime = {};
+        for (const p of live) for (const [k, v] of Object.entries(p.analytics.realtime || {})) if (typeof v === 'number') realtime[k] = (realtime[k] || 0) + v;
+        // The busiest satellite's detail tables stand in for the family; per-app numbers are listed beside them.
+        const lead = live.slice().sort((a, b) => (b.analytics.summary?.total_pageviews || 0) - (a.analytics.summary?.total_pageviews || 0))[0];
+        res.set('Cache-Control', 'no-store').json({ ok: true, analytics: Object.assign({}, lead ? lead.analytics : {}, { summary, realtime, apps: live.map(p => ({ name: p.name, ...(p.analytics.summary || {}) })) }) });
+    });
+}
+
 // Terms, Privacy and DMCA — the same documents on the apex and on every tool host.
 { const legal = require('openvibe-shared/legal'); app.get(legal.PATHS, legal.handler({ id: 'tools', service: 'tools', host: 'openvibe.tools', name: 'OpenVibe.Tools', profile: 'tools' })); app.get('/tos', (_req, res) => res.redirect(301, '/terms')); }
 
