@@ -22,7 +22,8 @@ const NAME = 'OpenVibe.Tools';
 const esc = seo.esc;
 const POPULAR = ['yt', 'convert', 'compress', 'mergepdf', 'jsonfmt', 'mp3', 'dns', 'whois', 'fancy', 'logo', 'ssl', 'resize', 'trim', 'regex', 'maps', 'food'];
 
-const icon = (name, size) => `<span class="ov-icon" data-icon="${esc(name)}" data-ovi="${esc(icons.resolve(name))}" data-fx="none" style="--ovi-size:${size}px" aria-hidden="true">${icons.svg(name)}</span>`;
+let _used = new Set();
+const icon = (name, size) => { _used.add(name); return icons.use(name, size); };
 const hostLabel = (h) => h.replace(/\.openvibe\.tools$/, '') === h ? h : h;
 
 // Links name the search-friendly host (what crawlers follow and index). A person's click goes straight to
@@ -102,18 +103,20 @@ const NETWORK = [
 ];
 
 function shell({ head, body, families }) {
+    // Every icon on the page once, as a sprite; the markup above only references them.
+    const spriteSvg = icons.sprite([..._used, ...NETWORK.map(n => n[0])]); _used = new Set();
     return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 ${head}
 ${appIcon.headTags({ site: 'tools', iconBase: '/assets' })}
 <link rel="alternate" type="application/json" href="${SITE}/api/catalog.json" title="Tool catalog">
 <link rel="preconnect" href="https://openvibe.network">
 <script src="https://openvibe.network/shared/theme-loader.js" defer></script>
-<style>${CSS}</style></head><body>
+<style>${CSS}</style></head><body>${spriteSvg}
 <noscript><header class="topbar"><a href="${SITE}/">${NAME}</a><nav>${families.filter(f => f.path).map(f => `<a href="${esc(f.path)}">${esc(f.name)}</a>`).join('')}<a href="/all-tools">All tools</a></nav></header></noscript>
 <main class="wrap">${body}
 <section aria-labelledby="net-h"><div class="sec-h"><h2 id="net-h">The rest of OpenVibe</h2></div><p class="sec-p">One account works on every site. Open source and community-run.</p>
 <div class="net">${NETWORK.map(([ic, n, d, u]) => `<a class="tool" href="${u}">${icon(ic, 36)}<span class="tool-t"><b>${n}</b><small>${d}</small></span></a>`).join('')}</div></section>
-</main><div id="ov-footer"></div>
+</main>${require('openvibe-shared/footer').ssr({ service: 'tools', variant: 'full' })}
 <script src="https://openvibe.network/shared/navbar.js" defer></script><script src="https://openvibe.network/shared/footer.js" defer></script><script src="/js/site.js" defer></script>
 </body></html>`;
 }
