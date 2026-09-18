@@ -49,8 +49,7 @@ body {
     color: var(--text-primary);
     line-height: 1.6;
     min-height: 100vh;
-    padding-top: var(--navbar-height);
-    overflow-x: hidden;
+    overflow-x: hidden; /* the shared navbar is sticky and in flow — no reserved top padding */
 }
 
 a { color: var(--accent); text-decoration: none; transition: color var(--transition); }
@@ -698,6 +697,9 @@ textarea.large {
 @keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateY(10px); } }
 
 /* ── Footer ────────────────────────────────────────────────── */
+/* The footer itself is the shared OpenVibeFooter (mounted on #ov-footer by shared.js);
+   .site-note is the one-line disclaimer some pages keep above it. */
+.site-note { text-align: center; padding: 24px 24px 0; color: var(--text-muted); font-size: 0.82rem; margin-top: 40px; border-top: 1px solid var(--border); }
 .site-footer {
     text-align: center;
     padding: 40px 24px;
