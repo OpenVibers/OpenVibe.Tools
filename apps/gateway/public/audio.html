@@ -21,6 +21,7 @@
 </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://openvibe.network/shared/theme-loader.js"></script>
     <style>
         :root {
             --bg-primary: #0b0c12;
@@ -93,7 +94,7 @@
         .search-wrapper input { width: 100%; padding: 16px 20px; border-radius: 12px; border: 1px solid var(--border-light); background: var(--bg-card); color: var(--text-primary); font-family: inherit; font-size: 0.95rem; outline: none; transition: all 0.25s ease; }
         .search-wrapper input:focus { border-color: rgba(139,92,246,0.4); background: var(--bg-hover); }
         
-        footer { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 0.9rem; border-top: 1px solid var(--border); margin-top: 60px; }
+        .note { text-align: center; padding: 40px 20px 0; color: var(--text-muted); font-size: 0.9rem; border-top: 1px solid var(--border); margin-top: 60px; }
         footer a { color: var(--accent-light); text-decoration: none; }
         footer a:hover { text-decoration: underline; }
         
@@ -125,15 +126,15 @@
             <div class="stats-section" id="stats"></div>
         </div>
         
-        <footer>
-            <p>All audio processing is performed locally in your browser. No files are uploaded to our servers. <a href="https://github.com/OpenVibe.Live">Learn more &#8594;</a></p>
-        </footer>
+        <p class="note">All audio processing is performed locally in your browser. No files are uploaded to our servers.</p>
     </div>
+    <div id="ov-footer"></div>
     
     <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/footer.js"></script>
     <script>
         const AUDIO_TOOLS = {
-            'convert': { name: 'Converter', domain: 'convert.openvibe.tools', icon: 'fa-arrow-right-arrow-left', category: 'Convert' },
+            'convert': { name: 'Converter', domain: 'convert.audio.openvibe.tools', icon: 'fa-arrow-right-arrow-left', category: 'Convert' },
             'trim': { name: 'Trim', domain: 'trim.openvibe.tools', icon: 'fa-scissors', category: 'Edit' },
             'merge': { name: 'Merge', domain: 'merge.openvibe.tools', icon: 'fa-code-merge', category: 'Mix' },
             'pitch': { name: 'Pitch', domain: 'pitch.openvibe.tools', icon: 'fa-wave-square', category: 'Effects' },
@@ -191,7 +192,37 @@
         }
         
         // Initialize
+        function getCookie(n) {
+            const m = document.cookie.match(new RegExp('(?:^|; )' + n + '=([^;]*)'));
+            return m ? decodeURIComponent(m[1]) : null;
+        }
+        function initChrome() {
+            const token = getCookie('ov_token') || localStorage.getItem('ov_token');
+            if (window.OpenVibeNavbar) {
+                try {
+                    OpenVibeNavbar.init({
+                        service: 'audio', apiBase: 'https://openvibe.network', token,
+                        history: { type: 'tool', title: document.title.split(' — ')[0] },
+                        silentLogin: 'https://openvibe.tools/auth/login?silent=1&next={url}',
+                    });
+                } catch { /* non-critical */ }
+            }
+            if (window.OpenVibeFooter) {
+                try {
+                    const items = Object.values(AUDIO_TOOLS).map(t => ({ name: t.name, url: 'https://' + t.domain }));
+                    OpenVibeFooter.init({
+                        service: 'audio', variant: 'full', mount: '#ov-footer', apiBase: 'https://openvibe.network',
+                        links: [
+                            { heading: 'Tools', items: items.slice(0, Math.ceil(items.length / 2)) },
+                            { heading: 'Formats', items: items.slice(Math.ceil(items.length / 2)) },
+                        ],
+                    });
+                } catch { /* non-critical */ }
+            }
+        }
+
         window.addEventListener('DOMContentLoaded', () => {
+            initChrome();
             const showcase = document.getElementById('showcase-section');
             showcase.style.display = 'block';
             buildShowcaseGrid();

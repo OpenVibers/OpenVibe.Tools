@@ -299,9 +299,11 @@
         </div>
     </div>
 
+    <div id="ov-footer"></div>
     <div class="toast-container" id="toasts"></div>
 
     <script src="https://openvibe.network/shared/navbar.js"></script>
+    <script src="https://openvibe.network/shared/footer.js"></script>
     <script src="https://openvibe.network/shared/theme-loader.js"></script>
     <script>
     'use strict';
@@ -425,8 +427,10 @@
             const data = await api(`/${slug}`);
             const p = data.paste;
             renderPasteView(p);
+            initChrome({ type: 'paste', title: p.title || slug });
             loadComments(slug);
         } catch (err) {
+            initChrome();
             detail.innerHTML = `<div class="empty">${esc(err.message)}</div>`;
         }
     }
@@ -568,12 +572,40 @@
         document.getElementById('view-paste').classList.toggle('hidden', view !== 'paste');
     }
 
+    // ── Shared chrome ──────────────────────────────────────
+    // The navbar records this visit in the account's cross-network history, so on a paste
+    // page it waits for the paste's title (viewPaste calls it); everywhere else it boots at once.
+    let chromeReady = false;
+    function initChrome(history) {
+        if (chromeReady) return;
+        chromeReady = true;
+        try {
+            OpenVibeNavbar.init({
+                service: 'paste', apiBase: 'https://openvibe.network', token,
+                history: history || { type: 'tool', title: 'Paste.OpenVibe' },
+                silentLogin: 'https://openvibe.tools/auth/login?silent=1&next={url}',
+                menu: { after: [{ id: 'my-pastes', label: 'My pastes', href: 'https://openvibe.community/my', icon: 'fa-clipboard-list' }] },
+            });
+        } catch {}
+        try {
+            OpenVibeFooter.init({
+                service: 'paste', variant: 'compact', mount: '#ov-footer', apiBase: 'https://openvibe.network',
+                links: [{ heading: 'Pastes', items: [
+                    { name: 'New paste', url: '/new' },
+                    { name: 'Browse pastes', url: '/' },
+                    { name: 'My pastes', url: 'https://openvibe.community/my' },
+                ] }],
+            });
+        } catch {}
+    }
+
     function route() {
         const path = location.pathname;
         if (path.startsWith('/p/')) {
             const slug = path.split('/')[2];
             if (slug) { viewPaste(slug); return; }
         }
+        initChrome();
         if (path === '/new') { showView('new'); return; }
         showView('browse');
     }
@@ -593,11 +625,6 @@
     // ── Init ───────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', () => {
         token = localStorage.getItem('ov_token') || getCookie('ov_token');
-
-        try {
-            OpenVibeNavbar.init({ service: 'paste', apiBase: 'https://openvibe.network', token });
-        } catch {}
-
         route();
     });
     </script>

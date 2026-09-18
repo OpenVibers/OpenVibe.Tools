@@ -88,19 +88,6 @@
         a { color: inherit; text-decoration: none; }
         .shell { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
 
-        /* ─── Top bar ─── */
-        .topbar {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 18px 0; gap: 16px;
-        }
-        .brand { display: flex; align-items: center; gap: 11px; font-weight: 900; font-size: 1.12rem; letter-spacing: -0.01em; }
-        .brand-badge {
-            width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center;
-            background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-            color: #fff; font-size: 1rem; box-shadow: 0 6px 18px rgba(139,92,246,0.35);
-        }
-        .brand small { display: block; font-size: 0.68rem; font-weight: 600; color: var(--text-muted); letter-spacing: 0.06em; text-transform: uppercase; }
-        .topbar-actions { display: flex; align-items: center; gap: 10px; }
         .btn {
             display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
             padding: 10px 18px; border-radius: 12px; font-weight: 700; font-size: 0.9rem;
@@ -113,18 +100,6 @@
             border-color: transparent; color: #fff; box-shadow: 0 8px 22px rgba(139,92,246,0.35);
         }
         .btn-primary:hover { filter: brightness(1.1); background: linear-gradient(135deg, var(--accent), var(--accent-dark)); }
-        .user-chip {
-            display: none; align-items: center; gap: 10px; padding: 7px 12px;
-            border: 1px solid var(--border-light); border-radius: 999px; font-size: 0.88rem; font-weight: 600;
-        }
-        .user-chip.visible { display: inline-flex; }
-        .user-chip .avatar {
-            width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
-            background: var(--accent); color: #fff; font-size: 0.72rem; font-weight: 800; overflow: hidden;
-        }
-        .user-chip .avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .user-chip a { color: var(--text-muted); font-size: 0.8rem; }
-        .user-chip a:hover { color: var(--text-primary); }
 
         /* ─── Hero ─── */
         .hero { padding: 64px 0 40px; text-align: center; }
@@ -259,37 +234,15 @@
         .dir-empty i { display: block; font-size: 1.6rem; margin-bottom: 10px; }
 
         /* ─── Footer ─── */
-        footer { border-top: 1px solid var(--border); margin-top: 40px; padding: 34px 0 44px; }
-        .foot { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; color: var(--text-muted); font-size: 0.84rem; }
-        .foot a { color: var(--text-secondary); }
-        .foot a:hover { color: var(--text-primary); }
-        .foot-links { display: flex; gap: 18px; flex-wrap: wrap; }
 
         @media (max-width: 640px) {
             .hero { padding: 40px 0 28px; }
             .hero-stats { gap: 18px; }
-            .topbar-actions .btn span { display: none; }
         }
     </style>
 </head>
 <body>
     <div class="shell">
-        <!-- ─── Top bar ─── -->
-        <header class="topbar">
-            <a class="brand" href="/">
-                <span class="brand-badge"><i class="fa-solid fa-circle-nodes"></i></span>
-                <span>OpenVibe.Tools<small>Part of the OpenVibe network</small></span>
-            </a>
-            <div class="topbar-actions">
-                <span class="user-chip" id="user-chip">
-                    <span class="avatar" id="user-avatar">?</span>
-                    <span id="user-name"></span>
-                    <a href="/auth/logout" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i></a>
-                </span>
-                <a class="btn btn-primary" id="signin-btn" href="/auth/login"><i class="fa-solid fa-right-to-bracket"></i> <span>Sign in</span></a>
-            </div>
-        </header>
-
         <!-- ─── Hero ─── -->
         <section class="hero">
             <h1>Every tool you need,<br><span class="grad">one vibe apart.</span></h1>
@@ -426,20 +379,10 @@
         </div>
     </div>
 
-    <footer>
-        <div class="shell foot">
-            <div>© OpenVibe — open tools, community run. <a href="https://openvibe.network">One Account. All of OpenVibe.</a></div>
-            <div class="foot-links">
-                <a href="https://openvibe.live">Live</a>
-                <a href="https://openvibe.games">Games</a>
-                <a href="https://openvibe.network">Network</a>
-                <a href="https://openvibe.live/tos" rel="noopener">Terms</a>
-                <a href="https://openvibe.live/dmca" rel="noopener">DMCA</a>
-            </div>
-        </div>
-    </footer>
+    <div id="ov-footer"></div>
 
     <script src="https://openvibe.network/shared/navbar.js" defer></script>
+    <script src="https://openvibe.network/shared/footer.js" defer></script>
     <script>
     'use strict';
 
@@ -749,41 +692,53 @@
     document.getElementById('stat-tools').textContent =
         DIR_DATA.reduce((sum, c) => sum + c.tools.length, 0) + '+';
 
-    /* ─── Session (OAuth client of OpenVibe.Network) ─── */
+    /* ─── Shared chrome (navbar + footer from openvibe.network) ─── */
     function getCookie(n) {
         const m = document.cookie.match(new RegExp('(?:^|; )' + n + '=([^;]*)'));
         return m ? decodeURIComponent(m[1]) : null;
     }
 
-    async function initSession() {
-        let user = null;
-        try {
-            const res = await fetch('/auth/me', { credentials: 'include' });
-            if (res.ok) user = (await res.json()).user;
-        } catch { /* signed out */ }
-
-        const chip = document.getElementById('user-chip');
-        const signin = document.getElementById('signin-btn');
-        if (user) {
-            document.getElementById('user-name').textContent = user.display_name || user.username || 'Account';
-            const avatar = document.getElementById('user-avatar');
-            if (user.avatar_url) avatar.innerHTML = `<img src="${escHtml(user.avatar_url)}" alt="">`;
-            else avatar.textContent = (user.display_name || user.username || '?').slice(0, 1).toUpperCase();
-            chip.classList.add('visible');
-            signin.style.display = 'none';
-        } else {
-            chip.classList.remove('visible');
-            signin.style.display = '';
-        }
-
-        // Shared navbar (loaded from openvibe.network) — best effort
+    // The navbar owns the account UI (sign-in, avatar, menu) and boots from the shared
+    // ov_token cookie straight away — no /auth/me round trip before it can render.
+    function initChrome() {
         if (window.OpenVibeNavbar) {
             try {
-                OpenVibeNavbar.init({ service: 'tools', apiBase: 'https://openvibe.network', token: getCookie('ov_token'), user });
+                OpenVibeNavbar.init({
+                    service: 'tools',
+                    apiBase: 'https://openvibe.network',
+                    token: getCookie('ov_token') || localStorage.getItem('ov_token'),
+                    history: { type: 'tool', title: 'OpenVibe.Tools' },
+                    silentLogin: 'https://openvibe.tools/auth/login?silent=1&next={url}',
+                });
+            } catch { /* non-critical */ }
+        }
+        if (window.OpenVibeFooter) {
+            try {
+                OpenVibeFooter.init({
+                    service: 'tools', variant: 'full', mount: '#ov-footer', apiBase: 'https://openvibe.network',
+                    links: [
+                        { heading: 'Tool suites', items: [
+                            { name: 'Net.OpenVibe', url: 'https://net.openvibe.tools' },
+                            { name: 'Dev.OpenVibe', url: 'https://dev.openvibe.tools' },
+                            { name: 'Paste.OpenVibe', url: 'https://pastes.openvibe.tools' },
+                            { name: 'Img.OpenVibe', url: 'https://img.openvibe.tools' },
+                            { name: 'Audio.OpenVibe', url: 'https://audio.openvibe.tools' },
+                            { name: 'Text.OpenVibe', url: 'https://text.openvibe.tools' },
+                        ] },
+                        { heading: 'More suites', items: [
+                            { name: 'Logo.OpenVibe', url: 'https://logo.openvibe.tools' },
+                            { name: 'Docs.OpenVibe', url: 'https://docs.openvibe.tools' },
+                            { name: 'YT.OpenVibe', url: 'https://yt.openvibe.tools' },
+                            { name: 'Maps.OpenVibe', url: 'https://maps.openvibe.tools' },
+                            { name: 'Food.OpenVibe', url: 'https://food.openvibe.tools' },
+                            { name: 'All tools', url: '#', onclick: 'openDirectory(); return false;' },
+                        ] },
+                    ],
+                });
             } catch { /* non-critical */ }
         }
     }
-    window.addEventListener('DOMContentLoaded', initSession);
+    window.addEventListener('DOMContentLoaded', initChrome);
     </script>
 </body>
 </html>

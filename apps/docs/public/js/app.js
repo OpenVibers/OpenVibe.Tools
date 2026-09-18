@@ -140,16 +140,42 @@
             } catch { /* invalid token */ }
         }
 
+        // Brand name/icon come from the hostname now (png.openvibe.tools → "PNG.OpenVibe.Tools").
         if (typeof OpenVibeNavbar !== 'undefined') {
             OpenVibeNavbar.init({
                 service: 'docs',
-                brandName: ctx?.brandName || undefined,
-                brandIcon: ctx?.faIcon || undefined,
                 token,
                 user: ctx?.user || user,
                 apiBase: 'https://openvibe.network',
+                history: { type: 'tool', title: ctx?.brandName || 'Docs.OpenVibe' },
+                silentLogin: 'https://openvibe.tools/auth/login?silent=1&next={url}',
             });
         }
+        initFooter();
+    }
+
+    /* ---------- Footer (shared OpenVibeFooter) ---------- */
+    // Full footer on the hub host, the compact strip on the single-tool hosts.
+    function initFooter() {
+        if (typeof OpenVibeFooter === 'undefined') return;
+        try {
+            OpenVibeFooter.init({
+                service: 'docs',
+                variant: (!ctx || ctx.toolId === 'hub') ? 'full' : 'compact',
+                mount: '#ov-footer',
+                apiBase: 'https://openvibe.network',
+                links: [{ heading: 'Docs tools', items: [
+                    { name: 'Merge PDF', url: 'https://mergepdf.openvibe.tools' },
+                    { name: 'Split PDF', url: 'https://splitpdf.openvibe.tools' },
+                    { name: 'Compress PDF', url: 'https://compresspdf.openvibe.tools' },
+                    { name: 'Rotate PDF', url: 'https://rotatepdf.openvibe.tools' },
+                    { name: 'Watermark PDF', url: 'https://watermarkpdf.openvibe.tools' },
+                    { name: 'Protect PDF', url: 'https://protectpdf.openvibe.tools' },
+                    { name: 'Images to PDF', url: 'https://image2pdf.openvibe.tools' },
+                    { name: 'PDF to images', url: 'https://pdf2jpg.openvibe.tools' },
+                ] }],
+            });
+        } catch { /* optional */ }
     }
 
     function initNotifications() {

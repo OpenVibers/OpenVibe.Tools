@@ -369,11 +369,23 @@
         if (typeof OpenVibeNavbar !== 'undefined') {
             OpenVibeNavbar.init({
                 service: 'yt',
-                brandName: 'YT.OpenVibe',
-                brandIcon: 'fa-circle-play',
                 token, user,
                 apiBase: 'https://openvibe.network',
+                history: { type: 'tool', title: 'YT.OpenVibe' },
+                silentLogin: 'https://openvibe.tools/auth/login?silent=1&next={url}',
             });
+        }
+        if (typeof OpenVibeFooter !== 'undefined') {
+            try {
+                OpenVibeFooter.init({
+                    service: 'yt', variant: 'compact', mount: '#ov-footer', apiBase: 'https://openvibe.network',
+                    links: [{ heading: 'YT.OpenVibe', items: [
+                        { name: 'Video downloader', url: 'https://yt.openvibe.tools' },
+                        { name: 'Audio converter', url: 'https://audio.openvibe.tools' },
+                        { name: 'All tools', url: 'https://openvibe.tools' },
+                    ] }],
+                });
+            } catch { /* optional */ }
         }
         if (typeof OpenVibeAccountSwitcher !== 'undefined') {
             OpenVibeAccountSwitcher.init({ apiBase: 'https://openvibe.network' });

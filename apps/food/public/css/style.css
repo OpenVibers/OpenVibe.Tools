@@ -215,10 +215,10 @@ body { min-height:100%; font-family:var(--font); background:var(--bg); color:var
 @keyframes spin { to { transform:rotate(360deg); } }
 
 /* Footer */
-#footer {
-  display:flex; align-items:center; justify-content:space-between;
-  padding:0 20px; height:32px; background:var(--bg-card);
-  border-top:1px solid var(--border); font-size:11px; color:var(--text-muted); flex-shrink:0;
+/* Data attribution line above the shared footer (OpenVibeFooter mounts on #ov-footer) */
+.data-credit {
+  padding:10px 20px 0; font-size:11px; color:var(--text-muted); flex-shrink:0;
+  border-top:1px solid var(--border);
 }
 
 /* Mobile */
