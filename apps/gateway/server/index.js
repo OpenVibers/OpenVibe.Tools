@@ -178,7 +178,7 @@ app.use('/api/dev', rateLimit({ windowMs: 60_000, max: 60 }), createDevRoutes(nu
 // ── Host-header subdomain routing ────────────────────────────
 function subdomainOf(req) {
     // A mirror or custom domain is the tool it points at.
-    if (req.ovHost && req.ovHost.tool && !getRequestHost(req).endsWith('.openvibe.tools')) return req.ovHost.tool;
+    if (req.ovHost && req.ovHost.tool) return req.ovHost.tool;   // descriptive hosts, mirrors and custom domains all resolve to a tool id
     return getRequestHost(req).replace(/\.openvibe\.tools$/, '');
 }
 
