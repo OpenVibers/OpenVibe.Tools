@@ -2,6 +2,12 @@
 
 // Tool names and descriptions live in server/seo/catalog.js so the UI, the page <title> and
 // the structured data can never disagree. Entries here keep their id/subdomain/icon/category.
+//
+// Host ownership: json., markdown., escape., diff., compare. and slug.openvibe.tools belong to
+// the Text app (apps/text), whose dedicated pages are the richer implementations and whose
+// nginx server_name wins over this gateway's wildcard anyway. The generic dev.html versions
+// of those tools live on their own hosts (jsonfmt., md., entities., codediff., slugify.) so no
+// host is claimed twice. curl. is the Net tool; the dev-side curl converter is curlconvert.
 const { seoFor } = require('../seo/catalog');
 
 // ═══════════════════════════════════════════════════════════════
@@ -13,12 +19,12 @@ const DEV_TOOLS = [
     { id: 'dev',       subdomain: 'dev',       name: 'Dev.OpenVibe',       icon: 'fa-code',                 desc: 'Developer & SEO Tools Hub', hub: true, category: 'hub' },
 
     // Data & Formats
-    { id: 'json',      subdomain: 'json',      name: 'OpenVibeJSON',      icon: 'fa-code',                 desc: 'JSON formatter, validator, minifier & converter', category: 'data' },
+    { id: 'json',      subdomain: 'jsonfmt',      name: 'OpenVibeJSON',      icon: 'fa-code',                 desc: 'JSON formatter, validator, minifier & converter', category: 'data' },
     { id: 'yaml',      subdomain: 'yaml',      name: 'OpenVibeYAML',      icon: 'fa-file-code',            desc: 'YAML formatter, validator & JSON converter', category: 'data' },
     { id: 'xml',       subdomain: 'xml',       name: 'OpenVibeXML',       icon: 'fa-file-code',            desc: 'XML formatter, validator & converter', category: 'data' },
     { id: 'csv',       subdomain: 'csv',       name: 'OpenVibeCSV',       icon: 'fa-table',                desc: 'CSV viewer, converter & JSON transformer', category: 'data' },
     { id: 'sql',       subdomain: 'sql',       name: 'OpenVibeSQL',       icon: 'fa-database',             desc: 'SQL formatter & syntax highlighter', category: 'data' },
-    { id: 'markdown',  subdomain: 'markdown',  name: 'OpenVibeMarkdown',  icon: 'fa-file-lines',           desc: 'Markdown editor with live HTML preview', category: 'data' },
+    { id: 'markdown',  subdomain: 'md',  name: 'OpenVibeMarkdown',  icon: 'fa-file-lines',           desc: 'Markdown editor with live HTML preview', category: 'data' },
     { id: 'html',      subdomain: 'html',      name: 'OpenVibeHTML',      icon: 'fa-file-code',            desc: 'HTML formatter, minifier & entity encoder', category: 'data' },
 
     // Encoding & Crypto
@@ -28,7 +34,7 @@ const DEV_TOOLS = [
     { id: 'uuid',      subdomain: 'uuid',      name: 'OpenVibeUUID',      icon: 'fa-fingerprint',          desc: 'UUID v4 generator, bulk generate & validator', category: 'encoding' },
     { id: 'hash',      subdomain: 'hash',      name: 'OpenVibeHash',      icon: 'fa-hashtag',              desc: 'SHA-1, SHA-256 & SHA-512 hash generator', category: 'encoding' },
     { id: 'hex',       subdomain: 'hex',       name: 'OpenVibeHex',       icon: 'fa-barcode',              desc: 'Hex encoder/decoder & binary converter', category: 'encoding' },
-    { id: 'escape',    subdomain: 'escape',    name: 'OpenVibeEscape',    icon: 'fa-shield-halved',        desc: 'HTML, JavaScript & URL escape/unescape', category: 'encoding' },
+    { id: 'escape',    subdomain: 'entities',    name: 'OpenVibeEscape',    icon: 'fa-shield-halved',        desc: 'HTML, JavaScript & URL escape/unescape', category: 'encoding' },
 
     // Time & Scheduling
     { id: 'timestamp', subdomain: 'timestamp', name: 'OpenVibeTimestamp', icon: 'fa-clock',                desc: 'Unix timestamp ↔ date converter with timezones', category: 'time' },
@@ -37,13 +43,13 @@ const DEV_TOOLS = [
     // Code Quality
     { id: 'beautify',  subdomain: 'beautify',  name: 'OpenVibeBeautify',  icon: 'fa-wand-magic-sparkles',  desc: 'Beautify & format JS, HTML, CSS, JSON & SQL', category: 'quality' },
     { id: 'minify',    subdomain: 'minify',    name: 'OpenVibeMinify',    icon: 'fa-compress',             desc: 'Minify JS, HTML, CSS & JSON', category: 'quality' },
-    { id: 'diff',      subdomain: 'diff',      name: 'OpenVibeDiff',      icon: 'fa-code-compare',         desc: 'Side-by-side text & code diff checker', category: 'quality' },
+    { id: 'diff',      subdomain: 'codediff',      name: 'OpenVibeDiff',      icon: 'fa-code-compare',         desc: 'Side-by-side text & code diff checker', category: 'quality' },
     { id: 'regex',     subdomain: 'regex',     name: 'OpenVibeRegex',     icon: 'fa-magnifying-glass',     desc: 'Regex tester with match highlighting & capture groups', category: 'quality' },
-    { id: 'slug',      subdomain: 'slug',      name: 'OpenVibeSlug',      icon: 'fa-link',                 desc: 'URL slug generator from any text', category: 'quality' },
+    { id: 'slug',      subdomain: 'slugify',      name: 'OpenVibeSlug',      icon: 'fa-link',                 desc: 'URL slug generator from any text', category: 'quality' },
     { id: 'lorem',     subdomain: 'lorem',     name: 'OpenVibeLorem',     icon: 'fa-paragraph',            desc: 'Lorem ipsum & placeholder text generator', category: 'quality' },
 
     // HTTP & API
-    { id: 'curl',      subdomain: 'curl',      name: 'OpenVibeCurl',      icon: 'fa-terminal',             desc: 'Parse curl commands & convert to fetch, Python, Node.js', category: 'http' },
+    { id: 'curl',      subdomain: 'curlconvert',      name: 'OpenVibeCurl',      icon: 'fa-terminal',             desc: 'Parse curl commands & convert to fetch, Python, Node.js', category: 'http' },
     { id: 'webhook',   subdomain: 'webhook',   name: 'OpenVibeWebhook',   icon: 'fa-satellite-dish',       desc: 'Webhook request inspector & debugging bin', category: 'http' },
 
     // Frontend & SEO
@@ -60,10 +66,9 @@ const DEV_ALIASES = {
     code:         'dev',
     build:        'dev',
     debug:        'dev',
-    compare:      'diff',
     format:       'beautify',
     prettier:     'beautify',
-    md:           'markdown',
+    textdiff:     'codediff',
     colours:      'color',
     colors:       'color',
     og:           'opengraph',
@@ -75,17 +80,16 @@ const DEV_ALIASES = {
     b64:          'base64',
     urlencode:    'url',
     urldecode:    'url',
-    entities:     'escape',
-    htmlentities: 'escape',
+    htmlentities: 'entities',
     checksum:     'hash',
     sha256:       'hash',
     sha1:         'hash',
     sha512:       'hash',
-    ini:          'json',
-    toml:         'json',
-    env:          'json',
-    request:      'curl',
-    http:         'curl',
+    ini:          'jsonfmt',
+    toml:         'jsonfmt',
+    env:          'jsonfmt',
+    request:      'curlconvert',
+    http:         'curlconvert',
 };
 
 module.exports = { DEV_TOOLS, DEV_TOOL_MAP, DEV_ALIASES };

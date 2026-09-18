@@ -165,7 +165,8 @@ function buildSitemap(extraUrls = []) {
 /** Satellite apps that live outside the dev/net catalogs but belong in the sitemap. */
 const SATELLITES = [
     'img', 'audio', 'docs', 'food', 'maps', 'yt', 'text', 'logo', 'pastes',
-    'case', 'braille', 'binary', 'fancy', 'json', 'wordcount', 'reverse',
+    'case', 'braille', 'binary', 'fancy', 'json', 'markdown', 'escape', 'diff', 'slug',
+    'wordcount', 'reverse', 'reversetext',
 ].map(sub => ({ loc: `https://${sub}.openvibe.tools/`, priority: '0.8', changefreq: 'weekly' }));
 
 module.exports = { renderTool, buildSitemap, SATELLITES, toolUrls, SITE };

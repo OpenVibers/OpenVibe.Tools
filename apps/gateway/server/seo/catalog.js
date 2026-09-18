@@ -30,7 +30,7 @@ const DEV = {
         bullets: ['Every tool works client-side: your data never leaves the browser', 'No signup and no rate limits on the offline tools', 'Open source and part of the wider OpenVibe network'],
         faq: [['Are these developer tools really free?', 'Yes. Every tool here is free with no account, no trial and no usage cap. The project is community-run and open source.'], ['Is my data sent to a server?', 'The formatting, encoding and generation tools run entirely in your browser, so your data never leaves your machine. Only tools that must reach the network (like the Open Graph preview and webhook inspector) send a request, and they say so on the page.']],
     },
-    json: {
+    jsonfmt: {
         name: 'JSON Formatter', title: 'JSON Formatter & Validator — Free Online JSON Beautifier',
         desc: 'Format, validate and minify JSON online. Pretty-print messy JSON, catch syntax errors with line numbers, and compact it back down. Free, instant, runs in your browser.',
         kw: 'json formatter, json validator, json beautifier, json minifier, pretty print json, json parser online',
@@ -70,7 +70,7 @@ const DEV = {
         bullets: ['Readable indentation for joins, subqueries and CTEs', 'Uppercase keyword mode for a consistent house style', 'Compact mode to put a query back on one line'],
         faq: [['Which SQL dialects are supported?', 'The formatter works on standard SQL syntax, which covers the vast majority of PostgreSQL, MySQL, SQLite and SQL Server queries.'], ['Is my query sent anywhere?', 'No. Formatting happens in your browser, so queries containing table or column names never leave your machine.']],
     },
-    markdown: {
+    md: {
         name: 'Markdown Editor', title: 'Markdown Editor with Live Preview — Free Online Markdown to HTML',
         desc: 'Write Markdown and see the rendered HTML live. Convert Markdown to HTML, preview README files and copy the output. Free, no signup, runs in your browser.',
         kw: 'markdown editor, markdown to html, markdown preview, online markdown, readme preview',
@@ -134,7 +134,7 @@ const DEV = {
         bullets: ['Text ⇄ hex with UTF-8 handling', 'Hex ⇄ binary and decimal conversion', 'Accepts spaced, prefixed or continuous hex input'],
         faq: [['What do the 0x prefixes mean?', 'They mark a number as hexadecimal in most programming languages. The converter accepts input with or without them.'], ['Why do some characters become several hex bytes?', 'Non-ASCII characters take more than one byte in UTF-8, so an emoji or accented letter maps to several hex pairs.']],
     },
-    escape: {
+    entities: {
         name: 'String Escape Tool', title: 'HTML, JavaScript & URL Escape Tool — Free Online Escaper',
         desc: 'Escape and unescape strings for HTML, JavaScript and URLs. Prevent injection bugs and safely embed text in code. Free and instant.',
         kw: 'escape html, unescape string, javascript escape, escape characters online, string escaper',
@@ -174,7 +174,7 @@ const DEV = {
         bullets: ['JavaScript, CSS, HTML and JSON in one place', 'Shows the size saved by the minification', 'Runs locally — no upload, no build step required'],
         faq: [['How much smaller will my file get?', 'Typically 20–60% before compression, depending on how much whitespace and commenting the source contains. The tool reports the exact saving.'], ['Should I minify if my server uses gzip?', 'Yes. Minification and gzip compound: minifying first removes content gzip would otherwise have to encode.']],
     },
-    diff: {
+    codediff: {
         name: 'Diff Checker', title: 'Diff Checker — Compare Text & Code Online, Free',
         desc: 'Compare two blocks of text or code side by side and see every addition, deletion and change highlighted. Free, instant, private to your browser.',
         kw: 'diff checker, compare text, text comparison, code diff, file compare online, difference checker',
@@ -190,7 +190,7 @@ const DEV = {
         bullets: ['Live highlighting of every match as you type', 'Named and numbered capture groups listed per match', 'Flag toggles for global, case-insensitive and multiline'],
         faq: [['Which regex flavour does this use?', 'JavaScript regular expressions, which are close to PCRE for everyday patterns. Lookbehind and named groups are supported in modern browsers.'], ['Why does my pattern match nothing?', 'Common causes are an unescaped special character, a missing global flag when you expect several matches, or anchors that assume single-line input.']],
     },
-    slug: {
+    slugify: {
         name: 'Slug Generator', title: 'URL Slug Generator — Free SEO-Friendly Slug Maker',
         desc: 'Turn any title into a clean, SEO-friendly URL slug. Removes accents and punctuation, lowercases and hyphenates. Free and instant.',
         kw: 'slug generator, url slug, seo friendly url, permalink generator, slugify text online',
@@ -206,7 +206,7 @@ const DEV = {
         bullets: ['Generate by word, sentence or paragraph count', 'Classic lorem ipsum text for familiar typographic colour', 'Copy straight into a design tool or HTML'],
         faq: [['Why use lorem ipsum instead of real text?', 'It has roughly the same letter distribution as natural prose, so a layout reads realistically without reviewers getting distracted by the wording.'], ['Can I generate a specific number of words?', 'Yes. Choose the unit and the amount, and the generator produces exactly that much text.']],
     },
-    curl: {
+    curlconvert: {
         name: 'curl Converter', title: 'curl Converter — Convert curl to fetch, Python & Node.js, Free',
         desc: 'Paste a curl command and convert it to JavaScript fetch, Python requests or Node.js code. Great for turning browser "Copy as cURL" into working code.',
         kw: 'curl to fetch, curl converter, curl to python, curl to javascript, convert curl command',
