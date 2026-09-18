@@ -100,7 +100,7 @@ const NETWORK = [
 function shell({ head, body, families }) {
     return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 ${head}
-${appIcon.headTags({ site: 'tools' })}
+${appIcon.headTags({ site: 'tools', iconBase: '/assets' })}
 <link rel="alternate" type="application/json" href="${SITE}/api/catalog.json" title="Tool catalog">
 <link rel="preconnect" href="https://openvibe.network">
 <script src="https://openvibe.network/shared/theme-loader.js"></script>
