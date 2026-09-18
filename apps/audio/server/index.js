@@ -254,6 +254,7 @@ app.get('/api/internal/analytics/bots', (req, res) => {
 
 // Public assets
 app.use(express.static(path.join(__dirname, '..', 'public'), {
+    index: false, // '/' goes through the per-host SEO renderer below
     setHeaders(res, filePath) {
         if (filePath.endsWith('.js') || filePath.endsWith('.css')) {
             res.setHeader('Cache-Control', 'no-cache');
@@ -261,12 +262,14 @@ app.use(express.static(path.join(__dirname, '..', 'public'), {
     },
 }));
 
-// SPA fallback
+// SPA fallback — every host gets index.html stamped with its own title, canonical, social
+// tags and structured data (server/seo.js); the raw file carries only the hub's.
+const { sendIndex } = require('./seo');
 app.get('*', (req, res) => {
     if (req.path.startsWith('/api/')) {
         return res.status(404).json({ error: 'Not found' });
     }
-    res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+    return sendIndex(req, res);
 });
 
 // ── Start ────────────────────────────────────────────────────
