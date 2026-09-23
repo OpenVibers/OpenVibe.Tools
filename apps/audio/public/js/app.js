@@ -10,6 +10,7 @@
     let toolList = [];        // from /api/tools
     let currentTool = null;   // active tool ID
     let uploadedFile = null;  // File object
+    let uploadedFiles = [];   // merge: the files in the order they are joined
     let resultId = null;      // retention ID from /api/process
 
     /* ---------- DOM refs ---------- */
@@ -188,8 +189,17 @@
         const tool = toolList.find(t => t.id === toolId);
         processText.textContent = tool ? `Process — ${tool.label}` : 'Process Audio';
 
+        // Merge takes several files; the other tools one.
+        fileInput.multiple = isMerge();
+        if (isMerge() && uploadedFile && !uploadedFiles.length) uploadedFiles = [uploadedFile];
+        if (!isMerge() && uploadedFiles.length) { uploadedFile = uploadedFiles[0]; uploadedFiles = []; }
+        if (uploadedFile || uploadedFiles.length) showFiles();
+
         updateProcessBtn();
     }
+
+    const MERGE_MAX = 5;
+    function isMerge() { return currentTool === 'merge'; }
 
     /* ---------- Upload ---------- */
     function initUpload() {
@@ -203,7 +213,9 @@
 
         // File selected
         fileInput.addEventListener('change', () => {
-            if (fileInput.files[0]) handleFile(fileInput.files[0]);
+            if (isMerge()) addFiles([...fileInput.files]);
+            else if (fileInput.files[0]) handleFile(fileInput.files[0]);
+            fileInput.value = '';
         });
 
         // Drag & drop
@@ -212,7 +224,8 @@
         uploadZone.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadZone.classList.remove('drag-over');
-            if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+            if (isMerge()) addFiles([...e.dataTransfer.files]);
+            else if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
         });
 
         // Clear
@@ -221,14 +234,50 @@
 
     function handleFile(file) {
         uploadedFile = file;
-        const size = formatSize(file.size);
-        const ext = file.name.split('.').pop().toUpperCase();
+        showFiles();
+    }
 
+    /** Merge: add files to the list (up to MERGE_MAX), in the order chosen. */
+    function addFiles(files) {
+        const room = MERGE_MAX - uploadedFiles.length;
+        if (files.length > room) showToast(`At most ${MERGE_MAX} files can be merged at once`, 'error');
+        uploadedFiles = uploadedFiles.concat(files.slice(0, Math.max(0, room)));
+        uploadedFile = uploadedFiles[0] || null;
+        if (uploadedFiles.length) showFiles(); else clearFile();
+    }
+
+    function showFiles() {
         const details = $('#file-details');
-        details.innerHTML = `
-            <div class="file-name">${escHtml(file.name)}</div>
-            <div class="file-meta">${ext} — ${size}</div>
-        `;
+        details.textContent = '';
+        const list = isMerge() ? uploadedFiles : (uploadedFile ? [uploadedFile] : []);
+        list.forEach((file, i) => {
+            const row = document.createElement('div');
+            row.className = 'file-row';
+            const name = document.createElement('div');
+            name.className = 'file-name';
+            name.textContent = (isMerge() ? `${i + 1}. ` : '') + file.name;
+            const meta = document.createElement('div');
+            meta.className = 'file-meta';
+            meta.textContent = `${file.name.split('.').pop().toUpperCase()} — ${formatSize(file.size)}`;
+            row.append(name, meta);
+            if (isMerge()) {
+                const rm = document.createElement('button');
+                rm.type = 'button';
+                rm.className = 'btn btn-ghost btn-sm';
+                rm.textContent = 'Remove';
+                rm.addEventListener('click', () => { uploadedFiles.splice(i, 1); addFiles([]); });
+                row.append(rm);
+            }
+            details.append(row);
+        });
+        if (isMerge() && uploadedFiles.length < MERGE_MAX) {
+            const more = document.createElement('button');
+            more.type = 'button';
+            more.className = 'btn btn-ghost btn-sm';
+            more.textContent = uploadedFiles.length < 2 ? 'Add another file' : 'Add a file';
+            more.addEventListener('click', () => fileInput.click());
+            details.append(more);
+        }
 
         uploadArea.style.display = 'none';
         uploadInfo.style.display = 'flex';
@@ -240,6 +289,7 @@
 
     function clearFile() {
         uploadedFile = null;
+        uploadedFiles = [];
         fileInput.value = '';
         uploadArea.style.display = '';
         uploadInfo.style.display = 'none';
@@ -248,7 +298,7 @@
     }
 
     function updateProcessBtn() {
-        processBtn.disabled = !uploadedFile || !currentTool;
+        processBtn.disabled = !currentTool || (isMerge() ? uploadedFiles.length < 2 : !uploadedFile);
     }
 
     /* ---------- Options ---------- */
@@ -316,12 +366,17 @@
         if (echoDecay) echoDecay.addEventListener('input', () => { $('#echo-decay-val').textContent = parseFloat(echoDecay.value).toFixed(2); });
         if (echoRepeats) echoRepeats.addEventListener('input', () => { $('#echo-repeats-val').textContent = echoRepeats.value; });
 
+        // Merge bitrate slider
+        const mergeBitrate = $('#merge-bitrate-slider');
+        if (mergeBitrate) mergeBitrate.addEventListener('input', () => { $('#merge-bitrate-val').textContent = mergeBitrate.value; });
+
         // Reverb mix slider
         const reverbMix = $('#reverb-mix');
         if (reverbMix) reverbMix.addEventListener('input', () => { $('#reverb-mix-val').textContent = reverbMix.value; });
 
         // Format grid click handlers (convert)
         initGridSelect('#format-grid .format-btn', 'format');
+        initGridSelect('#merge-format-grid .format-btn', 'format');
         initGridSelect('#norm-mode-grid .format-btn', 'mode');
         initGridSelect('#eq-grid .format-btn', 'preset');
         initGridSelect('#voice-grid .format-btn', 'preset');
@@ -357,9 +412,11 @@
     /* ---------- Process ---------- */
     async function processAudio() {
         if (!uploadedFile || !currentTool) return;
+        const files = isMerge() ? uploadedFiles.slice() : [uploadedFile];
+        if (isMerge() && files.length < 2) return;
 
         const formData = new FormData();
-        formData.append('file', uploadedFile);
+        for (const f of files) formData.append(isMerge() ? 'files' : 'file', f);
         formData.append('tool', currentTool);
 
         // Gather tool-specific options
@@ -377,9 +434,9 @@
         // Jobs: the work is accepted, followed live (ffmpeg's progress) and survives a reload.
         if (window.OVJobs) {
             const input = {};
-            for (const [k, v] of formData.entries()) if (k !== 'file') input[k] = v;
+            for (const [k, v] of formData.entries()) if (k !== 'file' && k !== 'files') input[k] = v;
             try {
-                const job = await OVJobs.submit({ type: 'audio.process', input, files: [uploadedFile] });
+                const job = await OVJobs.submit({ type: 'audio.process', input, files, fileField: isMerge() ? 'files' : 'file' });
                 OVJobs.remember(job.id);
                 followJob(job);
             } catch (err) {
@@ -391,7 +448,7 @@
 
         // Without the jobs helper: the synchronous endpoint, as before.
         try {
-            const res = await fetch('/api/process', { method: 'POST', body: formData });
+            const res = await fetch(isMerge() ? '/api/process/multi' : '/api/process', { method: 'POST', body: formData });
             const data = await res.json();
 
             if (!res.ok) {
@@ -413,6 +470,12 @@
                 const fmt = $('#format-grid .format-btn.active');
                 if (fmt) o.format = fmt.dataset.format;
                 o.bitrate = $('#bitrate-slider').value;
+                break;
+            }
+            case 'merge': {
+                const fmt = $('#merge-format-grid .format-btn.active');
+                if (fmt) o.format = fmt.dataset.format;
+                o.bitrate = $('#merge-bitrate-slider').value;
                 break;
             }
             case 'trim':

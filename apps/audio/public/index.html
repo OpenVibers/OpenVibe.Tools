@@ -38,6 +38,7 @@
         <nav class="tool-tabs" id="tool-tabs">
             <button class="tool-tab active" data-tool="convert"><i class="fa-solid fa-arrows-rotate"></i> Convert</button>
             <button class="tool-tab" data-tool="trim"><i class="fa-solid fa-scissors"></i> Trim</button>
+            <button class="tool-tab" data-tool="merge"><i class="fa-solid fa-object-group"></i> Merge</button>
             <button class="tool-tab" data-tool="pitch"><i class="fa-solid fa-wave-square"></i> Pitch</button>
             <button class="tool-tab" data-tool="speed"><i class="fa-solid fa-gauge-high"></i> Speed</button>
             <button class="tool-tab" data-tool="reverse"><i class="fa-solid fa-backward"></i> Reverse</button>
@@ -88,6 +89,22 @@
                 <label class="option-label">Bitrate <span id="bitrate-val">192</span> kbps</label>
                 <input type="range" id="bitrate-slider" min="64" max="320" value="192" step="32" class="slider">
                 <p class="option-hint">Higher = better quality, larger file. Lossless formats (WAV, FLAC, AIFF) ignore bitrate.</p>
+            </div>
+
+            <!-- Merge Options -->
+            <div class="option-group" id="opt-merge" style="display:none">
+                <p class="option-hint">The files are joined in the order listed above (2 to 5 files, up to 3 hours in total). Different formats can be mixed; the result is re-encoded.</p>
+                <label class="option-label">Output Format</label>
+                <div class="format-grid" id="merge-format-grid">
+                    <button class="format-btn active" data-format="mp3">MP3</button>
+                    <button class="format-btn" data-format="wav">WAV</button>
+                    <button class="format-btn" data-format="flac">FLAC</button>
+                    <button class="format-btn" data-format="ogg">OGG</button>
+                    <button class="format-btn" data-format="m4a">M4A</button>
+                    <button class="format-btn" data-format="opus">OPUS</button>
+                </div>
+                <label class="option-label">Bitrate <span id="merge-bitrate-val">192</span> kbps</label>
+                <input type="range" id="merge-bitrate-slider" min="64" max="320" value="192" step="32" class="slider">
             </div>
 
             <!-- Trim Options -->

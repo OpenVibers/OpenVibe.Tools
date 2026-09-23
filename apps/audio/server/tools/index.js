@@ -8,6 +8,7 @@
 
 const convert      = require('./convert');
 const trim         = require('./trim');
+const merge        = require('./merge');
 const pitch        = require('./pitch');
 const speed        = require('./speed');
 const reverse      = require('./reverse');
@@ -54,6 +55,18 @@ const TOOLS = {
         accepts: AUDIO_FORMATS,
         category: 'editing',
         handler: trim,
+    },
+    merge: {
+        id: 'merge',
+        label: 'Merge',
+        description: 'Join 2–5 audio files into one',
+        faIcon: 'fa-object-group',
+        accepts: AUDIO_FORMATS,
+        category: 'editing',
+        multiFile: true,            // handler(paths[], options); 2–5 files in the order given
+        minFiles: merge.MIN_FILES,
+        maxFiles: merge.MAX_FILES,
+        handler: merge,
     },
     pitch: {
         id: 'pitch',
@@ -282,6 +295,7 @@ function listTools() {
     return Object.values(TOOLS).map(t => ({
         id: t.id, label: t.label, description: t.description,
         faIcon: t.faIcon, accepts: t.accepts, category: t.category,
+        ...(t.multiFile && { multiFile: true, minFiles: t.minFiles, maxFiles: t.maxFiles }),
     }));
 }
 

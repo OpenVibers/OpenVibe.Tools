@@ -19,7 +19,7 @@ const { optionalAuth } = auth;
 const { resolveContext, DOMAIN_MAP } = require('./domain-map');
 const { getTool, listTools } = require('./tools');
 const { readMetadata } = require('./tools/metadata');
-const { uploadSingle, uploadMultiple } = require('./middleware/upload');
+const { uploadSingle, uploadMultiple, uploadAny } = require('./middleware/upload');
 const { apiLimiter, processLimiter, burstLimiter } = require('./middleware/rate-limit');
 const retention = require('./retention/manager');
 const { probe, getDuration, cleanTmp } = require('./tools/ffmpeg-helper');
@@ -173,6 +173,10 @@ app.post('/api/process', burstLimiter, processLimiter, uploadSingle, async (req,
             cleanTmp(req.file.path);
             return res.status(400).json({ error: `Unknown tool: ${toolId}` });
         }
+        if (tool.multiFile) {
+            cleanTmp(req.file.path);
+            return res.status(400).json({ error: `${tool.label} takes several files: send them in "files" to /api/process/multi` });
+        }
 
         // Execute the tool (same options and code path as the audio.process job)
         const result = await tool.handler(req.file.path, buildOptions(req.body, toolId, req.ctx));
@@ -200,6 +204,30 @@ app.post('/api/process', burstLimiter, processLimiter, uploadSingle, async (req,
     }
 });
 
+// ── Multi-File Processing Endpoint (merge) ───────────────────
+app.post('/api/process/multi', burstLimiter, processLimiter, uploadMultiple, async (req, res) => {
+    const paths = req.files.map(f => f.path);
+    try {
+        const toolId = req.body.tool || req.ctx.defaultOp;
+        const tool = getTool(toolId);
+        if (!tool || !tool.multiFile) {
+            cleanTmp(...paths);
+            return res.status(400).json({ error: tool ? `Tool "${toolId}" takes one file: use /api/process` : `Unknown tool: ${toolId}` });
+        }
+        const result = await tool.handler(paths, buildOptions(req.body, toolId, req.ctx));
+        cleanTmp(...paths);
+        const first = req.files[0].originalname || 'audio';
+        const saved = retention.saveOutputFromFile(result.outputPath, result.ext, result.mime, !!req.user,
+            `${path.basename(first, path.extname(first))}-merged${path.extname(first)}`);
+        const inputSize = req.files.reduce((n, f) => n + f.size, 0);
+        res.json({ success: true, download: saved, ...describe(toolId, result, saved.size, inputSize), fileCount: req.files.length });
+    } catch (err) {
+        cleanTmp(...paths);
+        console.error('[Process/Multi] Error:', err.message);
+        res.status(422).json({ error: err.message || 'Audio processing failed' });
+    }
+});
+
 // ── Jobs (/api/v1/jobs) ──────────────────────────────────────
 // The same operation as /api/process, asynchronous and durable: accepted into data/jobs.db,
 // followed over SSE (ffmpeg's own progress), cancellable (ffmpeg is killed), reattachable by id
@@ -208,7 +236,7 @@ const jobs = jobsRuntime.setupJobs({
     app, service: 'audio', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts, sdk,
     getPublicKey: auth.getPublicKey, issuer: auth.ISSUER,
     define: defineJobs,
-    receive: uploadSingle,
+    receive: uploadAny,
     limiters: [burstLimiter, processLimiter],
     defaults(req, input) {
         const out = { ...input };

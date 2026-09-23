@@ -55,20 +55,26 @@ function describe(toolId, result, size, inputSize) {
     };
 }
 
-/** Job type audio.process: input { tool, …options } + one audio or video file. */
+/** Job type audio.process: input { tool, …options } + one audio or video file (2–5 for merge). */
 function defineJobs(system) {
     const known = new Set(listTools().map(t => t.id));
     system.define({
         type: 'audio.process',
         version: 1,
         minFiles: 1,
-        maxFiles: 1,
+        maxFiles: Math.max(...listTools().map(t => t.maxFiles || 1)),
         maxAttempts: 2,
         onRestart: 'requeue',          // ffmpeg over the stored input: safe to run again
         timeoutMs: 15 * 60 * 1000,
-        validate(input) {
+        validate(input, files) {
             const id = String(input.tool || 'convert');
             if (!known.has(id)) return `Unknown tool: ${id}`;
+            const tool = getTool(id);
+            if (tool.multiFile) {
+                if (files.length < tool.minFiles || files.length > tool.maxFiles) return `${tool.label} takes ${tool.minFiles} to ${tool.maxFiles} files (in "files")`;
+            } else if (files.length !== 1) {
+                return `Tool "${id}" takes exactly one file`;
+            }
             for (const [k, v] of Object.entries(input)) if (v != null && typeof v === 'object') return `Option ${k} must be a string or a number`;
             return null;
         },
@@ -76,14 +82,16 @@ function defineJobs(system) {
             const toolId = String(input.tool || 'convert');
             const tool = getTool(toolId);
             const src = files[0];
-            progress(5, 'Reading the audio');
-            const result = await jobContext.run({ signal, progress }, () => tool.handler(src.path, buildOptions(input, toolId, null)));
+            progress(5, files.length > 1 ? `Reading ${files.length} files` : 'Reading the audio');
+            const arg = tool.multiFile ? files.map(f => f.path) : src.path;
+            const result = await jobContext.run({ signal, progress }, () => tool.handler(arg, buildOptions(input, toolId, null)));
             if (signal.aborted) { fs.rm(result.outputPath, { force: true }, () => {}); throw new Error('cancelled'); }
             const size = fs.statSync(result.outputPath).size;
             const base = path.basename(src.name || 'audio', path.extname(src.name || '')) || 'openvibeaudio-output';
+            const inputSize = files.reduce((n, f) => n + (f.size || 0), 0);
             return {
-                files: [{ path: result.outputPath, name: `${base}.${result.ext}`, mime: result.mime }],
-                data: describe(toolId, result, size, src.size),
+                files: [{ path: result.outputPath, name: `${base}${tool.multiFile ? '-merged' : ''}.${result.ext}`, mime: result.mime }],
+                data: { ...describe(toolId, result, size, inputSize), ...(tool.multiFile && { fileCount: files.length }) },
             };
         },
     });

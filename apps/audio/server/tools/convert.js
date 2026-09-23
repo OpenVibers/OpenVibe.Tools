@@ -90,5 +90,6 @@ async function convert(inputPath, options = {}) {
 }
 
 convert.formats = Object.keys(FORMAT_CONFIG);
+convert.FORMAT_CONFIG = FORMAT_CONFIG;   // merge encodes to the same formats
 
 module.exports = convert;

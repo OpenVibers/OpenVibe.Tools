@@ -578,3 +578,8 @@ a:hover { color: var(--accent-hover); }
     .footer-inner { flex-direction: column; text-align: center; }
     .result-actions { flex-direction: column; align-items: center; }
 }
+
+/* Merge: the list of files to join, in order */
+.file-details .file-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 4px 0; }
+.file-details .file-row + .file-row { border-top: 1px solid var(--border); }
+.file-details .btn-sm { padding: 4px 10px; font-size: 12px; margin-top: 4px; }
