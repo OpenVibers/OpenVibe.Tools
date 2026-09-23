@@ -161,7 +161,7 @@ Every server (gateway and satellites) mounts `apps/_shared/observe.js` with `ope
 | Server | Required | Optional (degraded when failing) |
 |---|---|---|
 | gateway (4001) | `catalog` | `network_key`, `service_directory` (Network registry vs fallback list), `community` (`/api/ready`), `satellite_<app>` for all seven (`/api/ready`, cached 15 s) |
-| img, docs (4012, 4016) | `jobs_db` (query), `job_runtime` (worker started), `data_dir`, `uploads_dir`, `output_dir` (write test) | `analytics_db`, `network_key`, `media_results` (only with `TOOLS_JOB_RESULTS=media`) |
+| img, docs (4012, 4016) | `jobs_db` (query), `job_runtime` (worker started), `data_dir`, `uploads_dir`, `output_dir` (write test) | `analytics_db`, `network_key`, `media_results` (only with `TOOLS_JOB_RESULTS=media`); img: `heif_decoder`; docs: `qpdf`, `pdftoppm`, `pdfinfo` |
 | audio (4014) | same as img | same as img, plus `ffmpeg` on PATH |
 | yt (4013) | `downloads_dir` | `analytics_db`, `yt_dlp`, `ffmpeg`, `yt_cookies` (when `YT_COOKIES_FILE` is set), `network_key` |
 | food (4011) | `maps` (every food API is proxied to it) | `analytics_db` |
@@ -174,8 +174,11 @@ Every server (gateway and satellites) mounts `apps/_shared/observe.js` with `ope
 `npm test` (Node 22) syntax-checks every server file and runs every `apps/*/test/*.test.js`, each in its own
 process: the job runtime end to end (restart, reattach, cancel, idempotency, owner scoping, SSE resume, pruning,
 Media results with a stand-in Media), img/audio/docs as real processes killed with SIGKILL mid-job, canonical
-hosts on every satellite, and the registry-driven catalog. The audio test needs `ffmpeg` and skips without it.
-Install first with `npm run install:all`.
+hosts on every satellite, the registry-driven catalog, and `registry-consistency.test.js`: every catalogue
+tool resolves to an operation, endpoint or page that exists, or is marked unavailable. The audio tests need
+`ffmpeg` and skip without it. The docs and img tests always check the 503 path with qpdf, poppler and libheif
+pointed at nothing, and also run the real encrypt/decrypt, page rendering and HEIC decoding when those programs
+are installed (or `QPDF_PATH` / `HEIF_DEC_PATH` point at them). Install first with `npm run install:all`.
 
 ## Analytics (ADR-021)
 
@@ -204,6 +207,33 @@ Bound by ADR-021 (OpenVibe.Contracts `docs/adr/ADR-021-analytics.md`):
   (verified owner-only online backup; a directory when several databases are targeted) or `--no-backup`;
   `--scrub` also rewrites rows written before ADR-021 and the rollups' top lists (counts unchanged). Ends
   with VACUUM unless `--no-vacuum`.
+
+## Host packages some tools need
+
+A few operations run a program that is not part of Node. Each satellite looks for it at boot (on `PATH`,
+or at the path in its environment variable) and again every minute while it is missing; until it is
+there, the operation answers **503 problem `tools.unavailable`** ("this tool is being set up") on
+`/api/process` and at job submit, its page says so instead of offering the upload, and `/api/ready`
+lists it under `degraded`. Nothing pretends to work.
+
+| Package (Ubuntu) | Program | Used by | Override |
+|---|---|---|---|
+| `qpdf` | `qpdf` | Protect PDF (AES-256), Unlock PDF | `QPDF_PATH` |
+| `poppler-utils` | `pdftoppm`, `pdfinfo` | PDF to image | `PDFTOPPM_PATH`, `PDFINFO_PATH` |
+| `libheif-examples` + `libheif-plugin-libde265` | `heif-dec` (or `heif-convert`) with an HEVC decoder | HEIC (iPhone) photos on every image tool | `HEIF_DEC_PATH` |
+| `ffmpeg` | `ffmpeg`, `ffprobe` | every audio tool | `FFMPEG_PATH` |
+
+sharp's prebuilt libvips cannot decode HEIC (HEVC) at all, and it cannot read or write BMP or read ICO:
+BMP and ICO are handled in JavaScript (`apps/img/server/tools/codec.js`), HEIC by libheif's CLI.
+
+Limits (all in `/etc/openvibe/tools.env`): `PDF_MAX_PAGES` (500 pages per document, every PDF tool),
+`PDF2IMG_MAX_PAGES` (50 pages per conversion up to 150 dpi; 40 % of that up to 300 dpi, 10 % above),
+`YT_MAX_DURATION` (seconds, default 3 hours), `YT_MAX_FILESIZE_MB` (per downloaded part, default 2048),
+`YT_INFO_CONCURRENCY` (yt-dlp lookups at once for `/api/info`, default 3; 20 more wait, then 503).
+Net tools: `NET_IPINFO_TOKEN` makes IP lookups use ipinfo.io over HTTPS instead of ip-api.com's free tier
+(HTTP only); ip-api/ipinfo, RDAP and DNS-over-HTTPS answers are cached either way. `NET_GLOBALPING_TOKEN`
+is read but not used yet. Traceroute, MTR and the reputation report are marked unavailable (the first
+two need raw sockets); ping and latency are timed TCP connections to port 443 from this server.
 
 ## YouTube downloader: when YouTube refuses the server
 
