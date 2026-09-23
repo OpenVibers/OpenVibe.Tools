@@ -69,4 +69,25 @@ function uploadMultiple(req, res, next) {
     });
 }
 
-module.exports = { uploadSingle, uploadMultiple };
+/**
+ * One file in 'file' or several in 'files' (the job endpoint takes either shape).
+ * Attaches req.files as { file?: [...], files?: [...] }.
+ */
+function uploadAny(req, res, next) {
+    upload.fields([{ name: 'file', maxCount: 1 }, { name: 'files', maxCount: 50 }])(req, res, (err) => {
+        if (err) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return res.status(413).json({ error: `File too large. Maximum ${Math.round(config.upload.maxFileSize / 1024 / 1024)}MB per file.` });
+            }
+            if (err.code === 'LIMIT_FILE_COUNT' || err.code === 'LIMIT_UNEXPECTED_FILE') {
+                return res.status(400).json({ error: 'Send one file in "file" or up to 50 in "files".' });
+            }
+            return res.status(400).json({ error: err.message });
+        }
+        const n = req.files ? Object.values(req.files).flat().length : 0;
+        if (!n) return res.status(400).json({ error: 'No files uploaded. Send a file in the "file" field.' });
+        next();
+    });
+}
+
+module.exports = { uploadSingle, uploadMultiple, uploadAny };

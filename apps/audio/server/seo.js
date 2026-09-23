@@ -8,10 +8,15 @@
 // hosts as duplicates of each other and social shares have no card. This stamps each host's
 // own title, description, canonical, Open Graph / Twitter tags and structured data into the
 // HTML on the way out. Rendered variants are cached per host; the file itself is read once.
+//
+// Canonical host: through the gateway (X-OV-* headers) the canonical, og:url and JSON-LD use the
+// host it names — a descriptive host or a custom domain; reached directly, the host itself.
 // ═══════════════════════════════════════════════════════════════
 
 const fs = require('fs');
 const path = require('path');
+const { canonicalHostFor, ownHost } = require('../../_shared/host-role');
+const { DOMAIN_MAP } = require('./domain-map');
 
 const PUBLIC = path.join(__dirname, '..', 'public');
 const HUB_HOST = 'audio.openvibe.tools';
@@ -30,16 +35,18 @@ function baseHtml() {
 /**
  * Render index.html for one host with that host's own metadata.
  * @param {object} ctx  domain-map context (brandName, seoTitle, seoDescription, toolId)
- * @param {string} host request hostname, e.g. 'png.openvibe.tools'
+ * @param {string} host the satellite's own hostname for this tool, e.g. 'png.openvibe.tools'
+ * @param {string} [canonicalHost] the host canonical URLs use (the gateway's; defaults to `host`)
  */
-function renderIndex(ctx, host) {
-    const key = host;
+function renderIndex(ctx, host, canonicalHost) {
+    const canon = canonicalHost || host;
+    const key = `${host}|${canon}`;
     if (_cache.has(key)) return _cache.get(key);
 
-    const url = `https://${host}/`;
+    const url = `https://${canon}/`;
     const title = ctx.seoTitle || ctx.brandName || HUB_NAME;
     const desc = ctx.seoDescription || '';
-    const image = `https://${host}/og.png`;
+    const image = `https://${canon}/og.png`;
     let html = baseHtml();
 
     // Replace what the file already sets, so there is never a second competing value.
@@ -93,11 +100,13 @@ function renderIndex(ctx, host) {
 
 /** Express handler: the SPA with this host's SEO tags applied. */
 function sendIndex(req, res) {
-    const host = String(req.headers.host || HUB_HOST).split(':')[0].toLowerCase();
+    const own = ownHost(req, h => !!DOMAIN_MAP[h]);
+    const host = DOMAIN_MAP[own] ? own : HUB_HOST;
     try {
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
         res.setHeader('Cache-Control', 'no-cache');
-        return res.send(renderIndex(req.ctx || {}, host));
+        res.setHeader('Vary', 'X-OV-Canonical-Host');
+        return res.send(renderIndex(req.ctx || {}, host, canonicalHostFor(req, host)));
     } catch (err) {
         console.error('[SEO] render failed:', err.message);
         return res.sendFile(path.join(PUBLIC, 'index.html'));

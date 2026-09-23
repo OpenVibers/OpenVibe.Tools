@@ -1,0 +1,468 @@
+'use strict';
+// ═══════════════════════════════════════════════════════════════
+// Asynchronous jobs for a Tools satellite (roadmap Wave 11, §15.15).
+//
+//   accepted (202) → queued → running → succeeded | failed | cancelled
+//
+// Durable: a job is written to the satellite's SQLite, and its input files moved under
+// <dataDir>/jobs/<id>/in/, BEFORE the 202 goes out. On boot, rows left 'running' by a restart
+// are re-queued (onRestart: 'requeue', while attempts remain) or failed with retryable = true
+// (onRestart: 'fail'), per job type. Queued rows simply start again.
+//
+// Bounded: at most `concurrency` jobs run at once in this process, and each owner may have at
+// most `maxActivePerOwner` queued + running jobs. Finished jobs expire (ttl chosen at submit),
+// and the pruner deletes the row, its events, its files and any Media objects it made.
+//
+// No dependencies of its own: the app passes its better-sqlite3 handle and openvibe-contracts.
+// ═══════════════════════════════════════════════════════════════
+
+const fs = require('fs');
+const fsp = require('fs/promises');
+const path = require('path');
+const crypto = require('crypto');
+const { createStore, TERMINAL } = require('./store');
+
+const HOUR = 60 * 60 * 1000;
+const EVENT_FOR = { queued: 'job.queued', running: 'job.running', succeeded: 'job.succeeded', failed: 'job.failed', cancelled: 'job.cancelled' };
+const SAFE_NAME = (s) => String(s || 'file').replace(/[/\\\0]/g, '_').replace(/[^\w.\- ]/g, '_').slice(-120) || 'file';
+
+/** A failure the HTTP layer turns into problem+json. */
+class JobError extends Error {
+    constructor(status, code, detail, extra) { super(detail || code); this.status = status; this.code = code; this.detail = detail; this.extra = extra; }
+}
+
+/** Stable JSON: keys sorted, so the same input always hashes the same. */
+function canonical(v) {
+    if (Array.isArray(v)) return `[${v.map(canonical).join(',')}]`;
+    if (v && typeof v === 'object') return `{${Object.keys(v).sort().filter(k => v[k] !== undefined).map(k => `${JSON.stringify(k)}:${canonical(v[k])}`).join(',')}}`;
+    return JSON.stringify(v === undefined ? null : v);
+}
+
+function sha256File(file) {
+    return new Promise((resolve, reject) => {
+        const h = crypto.createHash('sha256');
+        fs.createReadStream(file).on('data', c => h.update(c)).on('error', reject).on('end', () => resolve(h.digest('hex')));
+    });
+}
+
+async function moveFile(from, to) {
+    try { await fsp.rename(from, to); } catch { await fsp.copyFile(from, to); await fsp.unlink(from).catch(() => {}); }
+}
+
+/** Tool error text is meant for people; absolute server paths are not. */
+const scrub = (msg) => String(msg || '').replace(/(?:\/[\w.-]+){2,}/g, '[file]').slice(0, 500);
+
+/**
+ * @param {object} o
+ * @param {object} o.db            better-sqlite3 Database (the satellite's own jobs database)
+ * @param {object} o.contracts     require('openvibe-contracts')
+ * @param {string} o.service       'img' | 'audio' | 'docs' | …
+ * @param {string} o.dataDir       where job files live (<dataDir>/jobs/<id>/…)
+ * @param {number} [o.concurrency=2]
+ * @param {number} [o.maxActivePerOwner=10]
+ * @param {object} [o.media]       result store from ./media (null = keep results on local disk)
+ * @param {number} [o.pruneIntervalMs=300000]
+ * @param {number} [o.progressThrottleMs=250]
+ */
+function createJobSystem(o) {
+    if (!o || !o.db || !o.contracts || !o.dataDir) throw new TypeError('createJobSystem needs db, contracts and dataDir');
+    const { contracts } = o;
+    const store = createStore(o.db);
+    const log = o.log || console;
+    const concurrency = Math.max(0, Number.isFinite(o.concurrency) ? o.concurrency : 2);
+    const maxActivePerOwner = Math.max(1, o.maxActivePerOwner || 10);
+    const media = o.media || null;
+    const throttleMs = o.progressThrottleMs == null ? 250 : o.progressThrottleMs;
+    const root = path.resolve(o.dataDir, 'jobs');
+    fs.mkdirSync(root, { recursive: true });
+
+    const types = new Map();
+    const active = new Map();      // id → { ctrl, reason, last: { pct, msg, at } }
+    const listeners = new Map();   // id → Set<fn>
+    const stopHooks = new Set();   // e.g. open SSE streams, ended on stop()
+    let started = false, stopped = false, pruneTimer = null, kicking = false;
+
+    const jobDir = (id) => path.join(root, id);
+    const problem = (status, code, detail, extra) => contracts.http.problem(status, code, { detail, extra });
+
+    // ── Types ──────────────────────────────────────────────────
+    /**
+     * define({ type, version, onRestart: 'requeue'|'fail', maxAttempts, timeoutMs, minFiles, maxFiles,
+     *          validate(input, files) → string|null, run(ctx) → { files: [{ path, name, mime }], data } })
+     */
+    function define(def) {
+        if (!def || !/^[a-z][a-z0-9]*\.[a-z0-9_.]+$/.test(def.type || '')) throw new TypeError(`bad job type ${def && def.type}`);
+        if (typeof def.run !== 'function') throw new TypeError(`${def.type}: run() is required`);
+        types.set(def.type, {
+            version: 1, onRestart: 'requeue', maxAttempts: 3, timeoutMs: 10 * 60 * 1000, minFiles: 0, maxFiles: 1,
+            validate: () => null, ...def,
+            onRestart: def.onRestart === 'fail' ? 'fail' : 'requeue',
+        });
+        return api;
+    }
+
+    // ── Public representation ─────────────────────────────────
+    const iso = (ms) => (ms == null ? null : new Date(ms).toISOString());
+    function publicResult(result, id) {
+        if (!result) return null;
+        return {
+            files: (result.files || []).map((f, i) => {
+                const out = {};
+                for (const [k, v] of Object.entries(f)) if (!k.startsWith('_')) out[k] = v;
+                out.url = `/api/v1/jobs/${id}/files/${i}`;
+                return out;
+            }),
+            data: result.data || {},
+        };
+    }
+    function view(row) {
+        if (!row) return null;
+        const live = row.state === 'queued' || row.state === 'running';
+        return {
+            id: row.id,
+            object: 'tools.job',
+            service: o.service,
+            type: row.type,
+            type_version: row.type_version,
+            state: row.state,
+            progress: { percent: row.progress == null ? null : Math.round(row.progress * 10) / 10, message: row.progress_message || null },
+            attempts: row.attempts,
+            max_attempts: row.max_attempts,
+            cancel_requested: !!row.cancel_requested,
+            created_at: iso(row.created_at),
+            started_at: iso(row.started_at),
+            finished_at: iso(row.finished_at),
+            expires_at: iso(row.expires_at),
+            result: publicResult(store.parse(row.result_json, null), row.id),
+            error: store.parse(row.error_json, null),
+            retryable: !!row.retryable,
+            links: {
+                self: `/api/v1/jobs/${row.id}`,
+                events: `/api/v1/jobs/${row.id}/events`,
+                cancel: live ? `/api/v1/jobs/${row.id}` : null,
+            },
+        };
+    }
+
+    // ── Events ─────────────────────────────────────────────────
+    function emit(id, event) {
+        if (stopped) return;
+        const data = view(store.get(id));
+        if (!data) return;
+        const seq = store.appendEvent(id, event, data);
+        const set = listeners.get(id);
+        if (set) for (const fn of [...set]) { try { fn({ seq, event, data }); } catch (err) { log.error('[Jobs] listener error:', err.message); } }
+    }
+    function subscribe(id, fn) {
+        if (!listeners.has(id)) listeners.set(id, new Set());
+        listeners.get(id).add(fn);
+        return () => { const s = listeners.get(id); if (s) { s.delete(fn); if (!s.size) listeners.delete(id); } };
+    }
+
+    // ── Submit ─────────────────────────────────────────────────
+    /**
+     * submit({ owner, type, input, files: [{ path | buffer, name, mime, size }], idempotencyKey, ttlMs })
+     * → { job (row), replayed }. Temp input files are consumed (moved) on accept and deleted on replay.
+     */
+    async function submit({ owner, type, input = {}, files = [], idempotencyKey = null, ttlMs = HOUR }) {
+        if (stopped) throw new JobError(503, 'tools.job.unavailable', 'The job system is shutting down');
+        const discard = () => Promise.all(files.map(f => (f.path ? fsp.unlink(f.path).catch(() => {}) : null)));
+        try {
+            if (!owner) throw new JobError(401, 'tools.job.no_owner', 'No owner for this job');
+            const def = types.get(type);
+            if (!def) throw new JobError(400, 'tools.job.unknown_type', `Unknown job type "${type}". Known: ${[...types.keys()].join(', ')}`);
+            if (input == null || typeof input !== 'object' || Array.isArray(input)) throw new JobError(400, 'tools.job.invalid', 'input must be a JSON object');
+            if (JSON.stringify(input).length > 16384) throw new JobError(400, 'tools.job.invalid', 'input is larger than 16 KB');
+            if (files.length < def.minFiles) throw new JobError(400, 'tools.job.invalid', def.minFiles === 1 ? 'This job needs a file' : `This job needs at least ${def.minFiles} files`);
+            if (files.length > def.maxFiles) throw new JobError(400, 'tools.job.invalid', `At most ${def.maxFiles} file(s) for this job`);
+            const bad = def.validate(input, files);
+            if (bad) throw new JobError(400, 'tools.job.invalid', bad);
+            if (idempotencyKey != null && !/^[\x21-\x7e]{8,200}$/.test(String(idempotencyKey))) throw new JobError(400, 'tools.job.invalid', 'Idempotency-Key must be 8-200 printable characters');
+
+            // Hash the request so a reused key with a different request is caught.
+            const fileHashes = [];
+            for (const f of files) fileHashes.push(f.buffer ? crypto.createHash('sha256').update(f.buffer).digest('hex') : await sha256File(f.path));
+            const requestHash = crypto.createHash('sha256').update(canonical({ type, input, files: fileHashes })).digest('hex');
+
+            if (idempotencyKey != null) {
+                const prior = store.byIdempotencyKey(owner, String(idempotencyKey));
+                if (prior) {
+                    await discard();
+                    if (prior.request_hash !== requestHash) throw new JobError(409, 'tools.job.idempotency_conflict', 'This Idempotency-Key was used for a different request', { job_id: prior.id });
+                    return { job: prior, replayed: true };
+                }
+            }
+            if (store.activeForOwner(owner) >= maxActivePerOwner) throw new JobError(429, 'tools.job.too_many_active', `At most ${maxActivePerOwner} unfinished jobs at a time; wait for one to finish or cancel one`);
+
+            const id = `job_${contracts.ids.ulid()}`;
+            const inDir = path.join(jobDir(id), 'in');
+            await fsp.mkdir(inDir, { recursive: true });
+            const stored = [];
+            for (let i = 0; i < files.length; i++) {
+                const f = files[i];
+                const dest = path.join(inDir, `${i}-${SAFE_NAME(f.name)}`);
+                if (f.buffer) await fsp.writeFile(dest, f.buffer); else await moveFile(f.path, dest);
+                stored.push({ name: String(f.name || `file-${i}`).slice(0, 200), mime: f.mime || 'application/octet-stream', size: f.size != null ? f.size : fs.statSync(dest).size, sha256: fileHashes[i], _path: dest });
+            }
+            try {
+                store.transaction(() => {
+                    store.insert({
+                        id, type, type_version: def.version, owner, input_json: JSON.stringify(input), files_json: JSON.stringify(stored),
+                        idempotency_key: idempotencyKey == null ? null : String(idempotencyKey), request_hash: requestHash,
+                        max_attempts: def.maxAttempts, ttl_ms: ttlMs, now: Date.now(),
+                    });
+                })();
+            } catch (err) {
+                await fsp.rm(jobDir(id), { recursive: true, force: true });
+                // Two submits with one key raced: the other one won, so this is a replay of it.
+                if (/UNIQUE/.test(err.message) && idempotencyKey != null) {
+                    const prior = store.byIdempotencyKey(owner, String(idempotencyKey));
+                    if (prior && prior.request_hash === requestHash) return { job: prior, replayed: true };
+                    throw new JobError(409, 'tools.job.idempotency_conflict', 'This Idempotency-Key was used for a different request');
+                }
+                throw err;
+            }
+            emit(id, 'job.queued');
+            kick();
+            return { job: store.get(id), replayed: false };
+        } catch (err) {
+            await discard();
+            throw err;
+        }
+    }
+
+    // ── Scheduling ─────────────────────────────────────────────
+    function kick() {
+        if (!started || stopped || kicking) return;
+        kicking = true;
+        try {
+            while (active.size < concurrency) {
+                const [row] = store.nextQueued(1);
+                if (!row) break;
+                if (!store.claim(row.id)) continue;
+                const entry = { ctrl: new AbortController(), reason: null, last: { pct: -1, msg: null, at: 0 } };
+                active.set(row.id, entry);
+                emit(row.id, 'job.running');
+                setImmediate(() => execute(row.id, entry));
+            }
+        } finally { kicking = false; }
+    }
+
+    function progressFn(id, entry) {
+        return (percent, message) => {
+            if (stopped || entry.reason) return;
+            const pct = Math.max(0, Math.min(100, Number(percent) || 0));
+            const msg = message == null ? entry.last.msg : String(message).slice(0, 200);
+            const now = Date.now();
+            if (msg === entry.last.msg && (Math.abs(pct - entry.last.pct) < 1 || now - entry.last.at < throttleMs)) return;
+            entry.last = { pct, msg, at: now };
+            if (store.setProgress(id, pct, msg, now)) emit(id, 'job.progress');
+        };
+    }
+
+    async function execute(id, entry) {
+        const row = stopped ? null : store.get(id);
+        if (!row) { active.delete(id); return; }
+        const def = types.get(row.type);
+        const outDir = path.join(jobDir(row.id), 'out');
+        let outcome;
+        const timer = setTimeout(() => { if (!entry.reason) { entry.reason = 'timeout'; entry.ctrl.abort(new Error('timeout')); } }, def.timeoutMs);
+        if (timer.unref) timer.unref();
+        try {
+            await fsp.mkdir(outDir, { recursive: true });
+            const files = store.parse(row.files_json, []).map(f => ({ name: f.name, mime: f.mime, size: f.size, sha256: f.sha256, path: f._path }));
+            const out = await def.run({
+                job: { id: row.id, type: row.type, attempt: row.attempts, owner: row.owner },
+                input: store.parse(row.input_json, {}), files, outDir,
+                signal: entry.ctrl.signal,
+                progress: progressFn(row.id, entry),
+            });
+            if (stopped) return;
+            if (entry.reason) throw new Error(entry.reason);
+            const result = await storeResult(row, out || {}, entry);
+            if (stopped) return;
+            if (entry.reason) { await dropResult(result); throw new Error(entry.reason); }
+            outcome = { state: 'succeeded', result };
+        } catch (err) {
+            if (stopped) return;
+            const fresh = store.get(row.id) || row;
+            if (entry.reason === 'cancel' || fresh.cancel_requested) outcome = { state: 'cancelled', error: problem(409, 'tools.job.cancelled', 'The job was cancelled') };
+            else if (entry.reason === 'timeout') outcome = { state: 'failed', error: problem(504, 'tools.job.timeout', `The job ran longer than ${Math.round(def.timeoutMs / 1000)} s`), retryable: true };
+            else {
+                if (!err.expose) log.error(`[Jobs] ${row.type} ${row.id} failed:`, err.message);
+                // Only codes a tool chose on purpose (tools.…) are passed on; errno codes and the like are not contracts.
+                const code = /^tools\.[a-z0-9_.]+$/.test(String(err.code || '')) ? err.code : 'tools.job.failed';
+                outcome = { state: 'failed', error: problem(Number.isInteger(err.status) ? err.status : 422, code, scrub(err.message) || 'The tool could not process this input'), retryable: !!err.retryable };
+            }
+        } finally {
+            clearTimeout(timer);
+        }
+        try {
+            store.transaction(() => store.finish(row.id, outcome))();
+            emit(row.id, EVENT_FOR[outcome.state]);
+        } finally {
+            active.delete(row.id);
+            fsp.rm(path.join(jobDir(row.id), 'in'), { recursive: true, force: true }).catch(() => {});
+            if (outcome.state !== 'succeeded') fsp.rm(outDir, { recursive: true, force: true }).catch(() => {});
+            kick();
+        }
+    }
+
+    /** Output files → Media objects (when configured) or kept under <job>/out for /files/:n. */
+    async function storeResult(row, out, entry) {
+        const outDir = path.join(jobDir(row.id), 'out');
+        const files = [];
+        const list = Array.isArray(out.files) ? out.files : [];
+        for (let i = 0; i < list.length; i++) {
+            const f = list[i];
+            let local = path.resolve(f.path);
+            if (path.dirname(local) !== outDir) {
+                const dest = path.join(outDir, `${i}-${SAFE_NAME(f.name)}`);
+                await moveFile(local, dest);
+                local = dest;
+            }
+            const size = fs.statSync(local).size;
+            const sha256 = await sha256File(local);
+            const rec = { name: String(f.name || `result-${i}`).slice(0, 200), mime: f.mime || 'application/octet-stream', size, sha256, storage: 'local', media: null, _path: local };
+            if (media && !entry.reason) {
+                try {
+                    const progress = progressFn(row.id, entry);
+                    progress(99, 'Storing the result');
+                    rec.media = await media.upload({ path: local, name: rec.name, mime: rec.mime, size, sha256, owner: row.owner, jobId: row.id, service: o.service, type: row.type });
+                    rec.storage = 'media';
+                    delete rec._path;
+                    await fsp.unlink(local).catch(() => {});
+                } catch (err) {
+                    // The result is still here; say where it is rather than pretending it reached Media.
+                    log.error(`[Jobs] Media upload failed for ${row.id}:`, err.message);
+                    rec.media_error = 'Could not store the result in OpenVibe.Media; it is kept on this server until the job expires';
+                }
+            }
+            files.push(rec);
+        }
+        return { files, data: out.data && typeof out.data === 'object' ? out.data : {} };
+    }
+
+    async function dropResult(result) {
+        for (const f of (result && result.files) || []) {
+            if (f._path) await fsp.unlink(f._path).catch(() => {});
+            if (f.media && media) await media.remove(f.media.media_id).catch(() => {});
+        }
+    }
+
+    // ── Cancel ─────────────────────────────────────────────────
+    /** → { job, changed } — queued jobs end at once; running ones are signalled and end as cancelled. */
+    function cancel(id) {
+        const row = store.get(id);
+        if (!row) return null;
+        if (TERMINAL.includes(row.state)) return { job: row, changed: false };
+        if (row.state === 'queued') {
+            const done = store.transaction(() => store.requestCancel(id) && store.finish(id, { state: 'cancelled', error: problem(409, 'tools.job.cancelled', 'The job was cancelled before it started') }))();
+            if (done) {
+                emit(id, 'job.cancelled');
+                fsp.rm(jobDir(id), { recursive: true, force: true }).catch(() => {});
+            }
+            return { job: store.get(id), changed: done };
+        }
+        store.requestCancel(id);
+        const entry = active.get(id);
+        if (entry && !entry.reason) { entry.reason = 'cancel'; entry.ctrl.abort(new Error('cancelled')); }
+        emit(id, 'job.cancel_requested');
+        return { job: store.get(id), changed: true };
+    }
+
+    // ── Boot recovery, pruning ─────────────────────────────────
+    function recover() {
+        let requeued = 0, failed = 0;
+        for (const row of store.running()) {
+            const def = types.get(row.type);
+            if (row.cancel_requested) {
+                store.finish(row.id, { state: 'cancelled', error: problem(409, 'tools.job.cancelled', 'The job was cancelled') });
+                emit(row.id, 'job.cancelled');
+            } else if (!def) {
+                store.finish(row.id, { state: 'failed', error: problem(500, 'tools.job.unknown_type', `This service no longer runs "${row.type}" jobs`) });
+                emit(row.id, 'job.failed'); failed++;
+            } else if (def.onRestart === 'requeue' && row.attempts < row.max_attempts) {
+                store.requeue(row.id);
+                emit(row.id, 'job.queued'); requeued++;
+            } else {
+                const retryable = def.onRestart === 'fail';
+                store.finish(row.id, {
+                    state: 'failed', retryable,
+                    error: problem(503, 'tools.job.interrupted', retryable ? 'The service restarted while this job was running; submit it again' : `The service restarted during each of ${row.attempts} attempts`),
+                });
+                emit(row.id, 'job.failed'); failed++;
+            }
+            fs.rmSync(path.join(jobDir(row.id), 'out'), { recursive: true, force: true });
+        }
+        // Directories without a row: a crash between moving the upload and recording the job.
+        // That job was never accepted (no 202 went out), so its files have no owner.
+        for (const name of fs.readdirSync(root)) {
+            if (/^job_[0-9A-Z]{26}$/.test(name) && !store.get(name)) fs.rmSync(path.join(root, name), { recursive: true, force: true });
+        }
+        return { requeued, failed };
+    }
+
+    async function prune(now = Date.now()) {
+        let n = 0;
+        for (const row of store.expired(now)) {
+            const result = store.parse(row.result_json, null);
+            if (media && result) for (const f of result.files || []) if (f.media && f.media.media_id) await media.remove(f.media.media_id).catch(err => log.warn(`[Jobs] could not delete ${f.media.media_id}:`, err.message));
+            await fsp.rm(jobDir(row.id), { recursive: true, force: true }).catch(() => {});
+            store.remove(row.id);
+            listeners.delete(row.id);
+            n++;
+        }
+        return n;
+    }
+
+    function start() {
+        if (started) return api;
+        started = true;
+        const r = recover();
+        if (r.requeued || r.failed) log.log(`[Jobs] ${o.service}: ${r.requeued} job(s) re-queued, ${r.failed} failed after restart`);
+        prune().catch(() => {});
+        pruneTimer = setInterval(() => prune().catch(err => log.error('[Jobs] prune:', err.message)), o.pruneIntervalMs || 5 * 60 * 1000);
+        if (pruneTimer.unref) pruneTimer.unref();
+        kick();
+        return api;
+    }
+
+    /**
+     * Stop. Running jobs are left as they are in the database ('running'), which is exactly what a
+     * crash or a restart leaves behind; the next start() recovers them per type.
+     */
+    function stop() {
+        stopped = true;
+        if (pruneTimer) clearInterval(pruneTimer);
+        for (const entry of active.values()) { entry.reason = entry.reason || 'shutdown'; entry.ctrl.abort(new Error('shutdown')); }
+        listeners.clear();
+        for (const fn of [...stopHooks]) { try { fn(); } catch { /* best effort */ } }
+        stopHooks.clear();
+    }
+    /** Run fn when the system stops; → a function that removes it. */
+    function onStop(fn) { stopHooks.add(fn); return () => stopHooks.delete(fn); }
+
+    /** Where a result file's bytes are: { local: path } or { media: MediaRef }. */
+    function resultFile(row, n) {
+        const result = store.parse(row.result_json, null);
+        const f = result && result.files && result.files[n];
+        if (!f) return null;
+        return { name: f.name, mime: f.mime, size: f.size, storage: f.storage, media: f.media || null, path: f._path || null };
+    }
+
+    const api = {
+        define, submit, cancel, subscribe, start, stop, onStop, prune, recover, view, resultFile,
+        get: (id) => store.get(id),
+        eventsAfter: (id, seq) => store.eventsAfter(id, seq),
+        lastSeq: (id) => store.lastSeq(id),
+        types: () => [...types.keys()],
+        media,
+        stats: () => ({ running: active.size, concurrency, ...store.counts(), results: media ? 'media' : 'local' }),
+        store,
+        JobError,
+    };
+    return api;
+}
+
+module.exports = { createJobSystem, JobError, canonical, TERMINAL };

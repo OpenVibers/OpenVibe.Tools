@@ -64,6 +64,7 @@
         initOptions();
         initSubdomains();
         initResult();
+        reattach();
     }
 
     // ── Branding ─────────────────────────────────────────────
@@ -356,6 +357,21 @@
             }
         }
 
+        // Jobs: the work is accepted, followed live and survives a reload (?job=<id> in the address).
+        if (window.OVJobs) {
+            const input = {};
+            for (const [k, v] of formData.entries()) if (k !== 'file') input[k] = v;
+            try {
+                const job = await OVJobs.submit({ type: 'img.process', input, files: [selectedFile] });
+                OVJobs.remember(job.id);
+                followJob(job);
+            } catch (err) {
+                failProcessing(err.message);
+            }
+            return;
+        }
+
+        // Without the jobs helper: the synchronous endpoint, as before.
         try {
             const token = getCookie('ov_token') || localStorage.getItem('ov_token');
             const headers = {};
@@ -378,9 +394,82 @@
         }
     }
 
+    // ── Jobs ─────────────────────────────────────────────────
+    let watcher = null;
+    let currentJob = null;
+
+    function processingText(job) {
+        const pct = job.progress && job.progress.percent;
+        if (job.cancel_requested) return 'Cancelling...';
+        if (job.state === 'queued') return 'Waiting for a free slot...';
+        const label = (job.progress && job.progress.message) || 'Processing your image';
+        return pct != null ? `${label}... ${Math.round(pct)}%` : `${label}...`;
+    }
+
+    function cancelButton() {
+        let btn = processingEl.querySelector('.job-cancel');
+        if (!btn) {
+            btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn-secondary job-cancel';
+            btn.textContent = 'Cancel';
+            btn.addEventListener('click', () => { if (currentJob) OVJobs.cancel(currentJob).catch(() => {}); });
+            processingEl.appendChild(btn);
+        }
+        return btn;
+    }
+
+    function followJob(job) {
+        currentJob = job.id;
+        optionsPanel.style.display = 'none';
+        resultPanel.style.display = 'none';
+        processingEl.style.display = '';
+        processBtn.disabled = true;
+        const label = processingEl.querySelector('p');
+        const update = (j) => { if (label) label.textContent = processingText(j); };
+        cancelButton().style.display = '';
+        update(job);
+        if (watcher) watcher.close();
+        watcher = OVJobs.watch(job.id, {
+            onUpdate: update,
+            onDone(done) {
+                watcher = null;
+                cancelButton().style.display = 'none';
+                if (done.state === 'succeeded') return showResult(jobResult(done));
+                OVJobs.forget();
+                failProcessing(done.state === 'cancelled' ? null : (done.error && done.error.detail) || 'Processing failed');
+            },
+            onGone() { OVJobs.forget(); failProcessing(null); },
+        });
+    }
+
+    /** A finished job in the shape the synchronous endpoint answers with. */
+    function jobResult(job) {
+        const f = (job.result && job.result.files && job.result.files[0]) || {};
+        return {
+            ...(job.result && job.result.data),
+            download: { id: job.id, downloadUrl: f.url, previewUrl: f.url ? `${f.url}?inline=1` : null, filename: f.name, expiresIn: OVJobs.expiresIn(job) },
+        };
+    }
+
+    function failProcessing(message) {
+        processingEl.style.display = 'none';
+        optionsPanel.style.display = selectedFile ? '' : 'none';
+        processBtn.disabled = !selectedFile;
+        if (message) alert(`Error: ${message}`);
+    }
+
+    /** After a reload: pick the job up again from ?job=<id> or this tab's session. */
+    function reattach() {
+        const id = window.OVJobs && OVJobs.recall();
+        if (!id) return;
+        OVJobs.get(id).then(followJob).catch(() => OVJobs.forget());
+    }
+
     // ── Result ───────────────────────────────────────────────
     function initResult() {
         anotherBtn.addEventListener('click', () => {
+            if (window.OVJobs) OVJobs.forget();
             resetUpload();
             toolTabs.scrollIntoView({ behavior: 'smooth' });
         });
@@ -393,7 +482,10 @@
         // Preview image (if it's a previewable type)
         const previewable = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp', 'image/avif'];
         if (previewable.includes(data.output.mime)) {
-            resultPreview.innerHTML = `<img src="${data.download.downloadUrl}" alt="Result">`;
+            const img = document.createElement('img');
+            img.src = data.download.previewUrl || data.download.downloadUrl;
+            img.alt = 'Result';
+            resultPreview.replaceChildren(img);
         } else {
             resultPreview.innerHTML = `<div style="font-size:48px;color:var(--accent);padding:24px"><i class="fa-solid fa-file-image"></i></div>`;
         }

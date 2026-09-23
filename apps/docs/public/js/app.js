@@ -65,6 +65,7 @@
         initOptions();
         initSubdomains();
         initResult();
+        reattach();
     }
 
     // ── Branding ─────────────────────────────────────────────
@@ -434,6 +435,21 @@
         // Add tool-specific options
         addToolOptions(formData);
 
+        // Jobs: the work is accepted, followed live and survives a reload (?job=<id> in the address).
+        if (window.OVJobs) {
+            const input = {};
+            for (const [k, v] of formData.entries()) if (k !== 'file' && k !== 'files') input[k] = v;
+            try {
+                const job = await OVJobs.submit({ type: 'docs.process', input, files: isMulti ? selectedFiles : [selectedFiles[0]], fileField: isMulti ? 'files' : 'file' });
+                OVJobs.remember(job.id);
+                followJob(job);
+            } catch (err) {
+                failProcessing(err.message);
+            }
+            return;
+        }
+
+        // Without the jobs helper: the synchronous endpoints, as before.
         try {
             const token = getCookie('ov_token') || localStorage.getItem('ov_token');
             const headers = {};
@@ -509,9 +525,85 @@
         }
     }
 
+    // ── Jobs ─────────────────────────────────────────────────
+    let watcher = null;
+    let currentJob = null;
+
+    function processingText(job) {
+        const pct = job.progress && job.progress.percent;
+        if (job.cancel_requested) return 'Cancelling...';
+        if (job.state === 'queued') return 'Waiting for a free slot...';
+        const label = (job.progress && job.progress.message) || 'Processing your document';
+        return pct != null ? `${label}... ${Math.round(pct)}%` : `${label}...`;
+    }
+
+    function cancelButton() {
+        let btn = processingEl.querySelector('.job-cancel');
+        if (!btn) {
+            btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn-secondary job-cancel';
+            btn.textContent = 'Cancel';
+            btn.addEventListener('click', () => { if (currentJob) OVJobs.cancel(currentJob).catch(() => {}); });
+            processingEl.appendChild(btn);
+        }
+        return btn;
+    }
+
+    function followJob(job) {
+        currentJob = job.id;
+        optionsPanel.style.display = 'none';
+        resultPanel.style.display = 'none';
+        processingEl.style.display = '';
+        processBtn.disabled = true;
+        const label = processingEl.querySelector('p');
+        const update = (j) => { if (label) label.textContent = processingText(j); };
+        cancelButton().style.display = '';
+        update(job);
+        if (watcher) watcher.close();
+        watcher = OVJobs.watch(job.id, {
+            onUpdate: update,
+            onDone(done) {
+                watcher = null;
+                cancelButton().style.display = 'none';
+                if (done.state === 'succeeded') {
+                    const data = jobResult(done);
+                    return data.viewOnly ? showMetadataResult(data) : showResult(data);
+                }
+                OVJobs.forget();
+                failProcessing(done.state === 'cancelled' ? null : (done.error && done.error.detail) || 'Processing failed');
+            },
+            onGone() { OVJobs.forget(); failProcessing(null); },
+        });
+    }
+
+    /** A finished job in the shape the synchronous endpoints answer with. */
+    function jobResult(job) {
+        const f = job.result && job.result.files && job.result.files[0];
+        return {
+            ...(job.result && job.result.data),
+            download: f ? { id: job.id, downloadUrl: f.url, filename: f.name, expiresIn: OVJobs.expiresIn(job) } : undefined,
+        };
+    }
+
+    function failProcessing(message) {
+        processingEl.style.display = 'none';
+        optionsPanel.style.display = selectedFiles.length ? '' : 'none';
+        processBtn.disabled = !selectedFiles.length;
+        if (message) alert(`Error: ${message}`);
+    }
+
+    /** After a reload: pick the job up again from ?job=<id> or this tab's session. */
+    function reattach() {
+        const id = window.OVJobs && OVJobs.recall();
+        if (!id) return;
+        OVJobs.get(id).then(followJob).catch(() => OVJobs.forget());
+    }
+
     // ── Result ───────────────────────────────────────────────
     function initResult() {
         anotherBtn.addEventListener('click', () => {
+            if (window.OVJobs) OVJobs.forget();
             resetUpload();
             (toolTabs.style.display !== 'none' ? toolTabs : uploadArea).scrollIntoView({ behavior: 'smooth' });
         });

@@ -14,20 +14,25 @@ const path = require('path');
 const fs = require('fs');
 
 const config = require('./config');
-const { optionalAuth } = require('./auth');
-const { resolveContext } = require('./domain-map');
+const auth = require('./auth');
+const { optionalAuth } = auth;
+const { resolveContext, DOMAIN_MAP } = require('./domain-map');
 const { getTool, listTools } = require('./tools');
 const { readMetadata } = require('./tools/metadata');
 const { uploadSingle, uploadMultiple } = require('./middleware/upload');
 const { apiLimiter, processLimiter, burstLimiter } = require('./middleware/rate-limit');
 const retention = require('./retention/manager');
 const { probe, getDuration, cleanTmp } = require('./tools/ffmpeg-helper');
+const { buildOptions, describe, defineJobs } = require('./process');
+const { hostGuard, ownHost } = require('../../_shared/host-role');
+const jobsRuntime = require('../../_shared/jobs');
+const contracts = require('openvibe-contracts');
 
 // ── Analytics ────────────────────────────────────────────────
 const Database = require('better-sqlite3');
 const { AnalyticsTracker } = require('openvibe-shared/analytics');
 const { internalOk } = require('../../_shared/internal-auth');
-const analyticsDbPath = path.join(__dirname, '..', 'data', 'analytics.db');
+const analyticsDbPath = path.resolve(__dirname, '..', config.dataDir, 'analytics.db');
 fs.mkdirSync(path.dirname(analyticsDbPath), { recursive: true });
 const analyticsDb = new Database(analyticsDbPath);
 analyticsDb.pragma('journal_mode = WAL');
@@ -47,8 +52,8 @@ app.use(helmet({
             scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com", "https://openvibe.network"],
             styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
-            imgSrc: ["'self'", "data:", "blob:"],
-            mediaSrc: ["'self'", "blob:"],
+            imgSrc: ["'self'", "data:", "blob:", jobsRuntime.mediaOrigin()],     // job result previews are 302s to Media
+            mediaSrc: ["'self'", "blob:", jobsRuntime.mediaOrigin()],
             connectSrc: ["'self'", "https://openvibe.network", "https://*.openvibe.tools"],
             workerSrc: ["'self'", "blob:"],
             scriptSrcAttr: ["'unsafe-inline'"],
@@ -58,6 +63,7 @@ app.use(helmet({
 }));
 app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
+app.use(contracts.http.middleware());   // traceparent + X-OpenVibe-Request-Id on every response
 
 // ── CORS ─────────────────────────────────────────────────────
 app.use(cors({
@@ -79,9 +85,16 @@ app.use(analytics.middleware());
 // ── Auth (optional on all routes) ────────────────────────────
 app.use(optionalAuth);
 
+// ── Hosts ────────────────────────────────────────────────────
+// Through the gateway the X-OV-* headers name the tool and its canonical host (a custom domain
+// included); aliases the gateway missed are redirected. Hosts this app does not serve go to the
+// tools index. API paths are never redirected.
+const knowsHost = (h) => !!DOMAIN_MAP[h];
+app.use(hostGuard({ knows: knowsHost }));
+
 // ── Attach domain context to every request ───────────────────
 app.use((req, _res, next) => {
-    req.ctx = resolveContext(req.headers.host);
+    req.ctx = resolveContext(ownHost(req, knowsHost));
     next();
 });
 
@@ -90,7 +103,7 @@ app.use((req, _res, next) => {
 // Health check
 app.get('/api/health', (_req, res) => {
     const stats = retention.getStats();
-    res.json({ status: 'ok', service: 'openvibe-audio', version: '1.0.0', files: stats });
+    res.json({ status: 'ok', service: 'openvibe-audio', version: '1.0.0', files: stats, jobs: jobs.stats() });
 });
 
 // Domain context (frontend calls this on load to get branding)
@@ -138,18 +151,8 @@ app.post('/api/process', burstLimiter, processLimiter, uploadSingle, async (req,
             return res.status(400).json({ error: `Unknown tool: ${toolId}` });
         }
 
-        // Build options from body params
-        const options = { ...req.body };
-        delete options.tool;
-        delete options.file;
-
-        // If this is a format-specific domain, enforce that format
-        if (req.ctx.defaultFormat && toolId === 'convert') {
-            options.format = req.ctx.defaultFormat;
-        }
-
-        // Execute the tool
-        const result = await tool.handler(req.file.path, options);
+        // Execute the tool (same options and code path as the audio.process job)
+        const result = await tool.handler(req.file.path, buildOptions(req.body, toolId, req.ctx));
 
         // Clean up the uploaded input file
         cleanTmp(req.file.path);
@@ -166,29 +169,30 @@ app.post('/api/process', burstLimiter, processLimiter, uploadSingle, async (req,
         // Probe input for size comparison
         const inputSize = req.file.size;
 
-        res.json({
-            success: true,
-            tool: toolId,
-            download: saved,
-            output: {
-                mime: result.mime,
-                ext: result.ext,
-                size: saved.size,
-                sizeKB: Math.round(saved.size / 1024 * 10) / 10,
-                duration: result.duration || null,
-            },
-            input: {
-                size: inputSize,
-                sizeKB: Math.round(inputSize / 1024 * 10) / 10,
-            },
-            ...(result.metadata && { metadata: result.metadata }),
-            ...(result.preset && { preset: result.preset }),
-        });
+        res.json({ success: true, download: saved, ...describe(toolId, result, saved.size, inputSize) });
     } catch (err) {
         cleanTmp(req.file?.path);
         console.error('[Process] Error:', err.message);
         res.status(422).json({ error: err.message || 'Audio processing failed' });
     }
+});
+
+// ── Jobs (/api/v1/jobs) ──────────────────────────────────────
+// The same operation as /api/process, asynchronous and durable: accepted into data/jobs.db,
+// followed over SSE (ffmpeg's own progress), cancellable (ffmpeg is killed), reattachable by id
+// after a reload or a restart (apps/_shared/jobs).
+const jobs = jobsRuntime.setupJobs({
+    app, service: 'audio', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts,
+    getPublicKey: auth.getPublicKey, issuer: auth.ISSUER,
+    define: defineJobs,
+    receive: uploadSingle,
+    limiters: [burstLimiter, processLimiter],
+    defaults(req, input) {
+        const out = { ...input };
+        if (!out.tool) out.tool = req.ctx.defaultOp || 'convert';
+        if (req.ctx.defaultFormat && out.tool === 'convert') out.format = req.ctx.defaultFormat;
+        return out;
+    },
 });
 
 // ── File Download ────────────────────────────────────────────
@@ -291,6 +295,7 @@ function shutdown() {
     console.log('[Audio.OpenVibe] Shutting down...');
     analytics.destroy();
     analyticsDb.close();
+    jobs.close();   // running jobs stay 'running' in data/jobs.db; the next boot re-queues them
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(1), 5000);
 }

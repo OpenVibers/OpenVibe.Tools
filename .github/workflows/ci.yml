@@ -1,0 +1,22 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.1   # production runs Node 22
+      - name: ffmpeg (audio tests)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - run: npm run install:all
+      - run: npm test
+      - name: contracts check (satellites that use openvibe-contracts)
+        run: |
+          for app in img audio docs; do
+            (cd apps/$app && npx openvibe-contracts-check --service tools --src server --src ../_shared)
+          done

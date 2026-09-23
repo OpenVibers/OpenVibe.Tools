@@ -14,18 +14,23 @@ const path = require('path');
 const fs = require('fs');
 
 const config = require('./config');
-const { optionalAuth } = require('./auth');
-const { resolveContext } = require('./domain-map');
+const auth = require('./auth');
+const { optionalAuth } = auth;
+const { resolveContext, DOMAIN_MAP } = require('./domain-map');
 const { getTool, listTools } = require('./tools');
 const { uploadSingle } = require('./middleware/upload');
 const { apiLimiter, processLimiter, burstLimiter } = require('./middleware/rate-limit');
 const retention = require('./retention/manager');
+const { buildOptions, describe, processBuffer, defineJobs } = require('./process');
+const { hostGuard, ownHost } = require('../../_shared/host-role');
+const jobsRuntime = require('../../_shared/jobs');
+const contracts = require('openvibe-contracts');
 
 // ── Analytics ────────────────────────────────────────────────
 const Database = require('better-sqlite3');
 const { AnalyticsTracker } = require('openvibe-shared/analytics');
 const { internalOk } = require('../../_shared/internal-auth');
-const analyticsDbPath = path.join(__dirname, '..', 'data', 'analytics.db');
+const analyticsDbPath = path.resolve(__dirname, '..', config.dataDir, 'analytics.db');
 fs.mkdirSync(path.dirname(analyticsDbPath), { recursive: true });
 const analyticsDb = new Database(analyticsDbPath);
 analyticsDb.pragma('journal_mode = WAL');
@@ -45,7 +50,7 @@ app.use(helmet({
             scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com", "https://openvibe.network"],
             styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
-            imgSrc: ["'self'", "data:", "blob:"],
+            imgSrc: ["'self'", "data:", "blob:", jobsRuntime.mediaOrigin()],   // job result previews are 302s to Media
             connectSrc: ["'self'", "https://openvibe.network", "https://*.openvibe.tools"],
             workerSrc: ["'self'", "blob:"],
             scriptSrcAttr: ["'unsafe-inline'"],
@@ -55,6 +60,7 @@ app.use(helmet({
 }));
 app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
+app.use(contracts.http.middleware());   // traceparent + X-OpenVibe-Request-Id on every response
 
 // ── CORS ─────────────────────────────────────────────────────
 app.use(cors({
@@ -77,9 +83,16 @@ app.use(analytics.middleware());
 // ── Auth (optional on all routes) ────────────────────────────
 app.use(optionalAuth);
 
+// ── Hosts ────────────────────────────────────────────────────
+// Through the gateway the X-OV-* headers name the tool and its canonical host (a custom domain
+// included); aliases the gateway missed are redirected. Hosts this app does not serve go to the
+// tools index. API paths are never redirected.
+const knowsHost = (h) => !!DOMAIN_MAP[h];
+app.use(hostGuard({ knows: knowsHost }));
+
 // ── Attach domain context to every request ───────────────────
 app.use((req, _res, next) => {
-    req.ctx = resolveContext(req.headers.host);
+    req.ctx = resolveContext(ownHost(req, knowsHost));
     next();
 });
 
@@ -88,7 +101,7 @@ app.use((req, _res, next) => {
 // Health check
 app.get('/api/health', (_req, res) => {
     const stats = retention.getStats();
-    res.json({ status: 'ok', service: 'openvibe-img', version: '1.0.0', files: stats });
+    res.json({ status: 'ok', service: 'openvibe-img', version: '1.0.0', files: stats, jobs: jobs.stats() });
 });
 
 // Domain context (frontend calls this on load to get branding)
@@ -122,23 +135,8 @@ app.post('/api/process', burstLimiter, processLimiter, uploadSingle, async (req,
             return res.status(400).json({ error: `Unknown tool: ${toolId}` });
         }
 
-        // Build options from body params
-        const options = {
-            format: req.body.format || req.ctx.defaultFormat || undefined,
-            quality: req.body.quality || undefined,
-            width: req.body.width || undefined,
-            height: req.body.height || undefined,
-            percentage: req.body.percentage || undefined,
-            fit: req.body.fit || undefined,
-            background: req.body.background || undefined,
-            left: req.body.left || undefined,
-            top: req.body.top || undefined,
-            aspect: req.body.aspect || undefined,
-            inputFormat: req.file.mimetype.split('/')[1],
-        };
-
-        // Execute the tool
-        const result = await tool.handler(req.file.buffer, options);
+        // Execute the tool (the same code the img.process job runs)
+        const result = await processBuffer(req.file.buffer, toolId, buildOptions(req.body, req.ctx, req.file.mimetype));
 
         // Save to retention
         const saved = retention.saveOutput(
@@ -149,21 +147,7 @@ app.post('/api/process', burstLimiter, processLimiter, uploadSingle, async (req,
             req.file.originalname,
         );
 
-        res.json({
-            success: true,
-            tool: toolId,
-            download: saved,
-            output: {
-                mime: result.mime,
-                ext: result.ext,
-                size: result.buffer.length,
-                sizeKB: Math.round(result.buffer.length / 1024 * 10) / 10,
-            },
-            // Include tool-specific metadata
-            ...(result.savings && { savings: result.savings }),
-            ...(result.dimensions && { dimensions: result.dimensions }),
-            ...(result.crop && { crop: result.crop }),
-        });
+        res.json({ success: true, download: saved, ...describe(toolId, result) });
     } catch (err) {
         console.error('[Process] Error:', err.message);
         res.status(422).json({ error: err.message || 'Image processing failed' });
@@ -177,20 +161,7 @@ app.post('/api/process/direct', burstLimiter, processLimiter, uploadSingle, asyn
         const tool = getTool(toolId);
         if (!tool) return res.status(400).json({ error: `Unknown tool: ${toolId}` });
 
-        const options = {
-            format: req.body.format || req.ctx.defaultFormat || undefined,
-            quality: req.body.quality || undefined,
-            width: req.body.width || undefined,
-            height: req.body.height || undefined,
-            percentage: req.body.percentage || undefined,
-            fit: req.body.fit || undefined,
-            left: req.body.left || undefined,
-            top: req.body.top || undefined,
-            aspect: req.body.aspect || undefined,
-            inputFormat: req.file.mimetype.split('/')[1],
-        };
-
-        const result = await tool.handler(req.file.buffer, options);
+        const result = await processBuffer(req.file.buffer, toolId, buildOptions(req.body, req.ctx, req.file.mimetype));
         const baseName = path.basename(req.file.originalname, path.extname(req.file.originalname));
 
         res.set({
@@ -203,6 +174,23 @@ app.post('/api/process/direct', burstLimiter, processLimiter, uploadSingle, asyn
         console.error('[Process/Direct] Error:', err.message);
         res.status(422).json({ error: err.message || 'Image processing failed' });
     }
+});
+
+// ── Jobs (/api/v1/jobs) ──────────────────────────────────────
+// The same operation as /api/process, asynchronous and durable: accepted into data/jobs.db,
+// followed over SSE, reattachable by id after a reload or a restart (apps/_shared/jobs).
+const jobs = jobsRuntime.setupJobs({
+    app, service: 'img', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts,
+    getPublicKey: auth.getPublicKey, issuer: auth.ISSUER,
+    define: defineJobs,
+    receive: uploadSingle,
+    limiters: [burstLimiter, processLimiter],
+    defaults(req, input) {
+        const out = { ...input };
+        if (!out.tool) out.tool = req.ctx.defaultOp || 'convert';
+        if (!out.format && req.ctx.defaultFormat) out.format = req.ctx.defaultFormat;
+        return out;
+    },
 });
 
 // ── File Download ────────────────────────────────────────────
@@ -274,6 +262,7 @@ function shutdown() {
     console.log('[Img.OpenVibe] Shutting down...');
     analytics.destroy();
     analyticsDb.close();
+    jobs.close();   // running jobs stay 'running' in data/jobs.db; the next boot re-queues them
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(1), 5000);
 }

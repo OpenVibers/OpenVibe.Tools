@@ -114,4 +114,7 @@ function requireAuth(req, res, next) {
     next();
 }
 
-module.exports = { extractToken, verifyToken, optionalAuth, requireAuth, loadPublicKey };
+/** The Network public key (PEM) once loaded; the job routes verify service tokens with it. */
+function getPublicKey() { return publicKey; }
+
+module.exports = { extractToken, verifyToken, optionalAuth, requireAuth, loadPublicKey, getPublicKey, ISSUER };

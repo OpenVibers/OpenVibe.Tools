@@ -14,18 +14,23 @@ const path = require('path');
 const fs = require('fs');
 
 const config = require('./config');
-const { optionalAuth } = require('./auth');
-const { resolveContext } = require('./domain-map');
+const auth = require('./auth');
+const { optionalAuth } = auth;
+const { resolveContext, DOMAIN_MAP } = require('./domain-map');
 const { getTool, listTools } = require('./tools');
-const { uploadSingle, uploadMultiple } = require('./middleware/upload');
+const { uploadSingle, uploadMultiple, uploadAny } = require('./middleware/upload');
 const { apiLimiter, processLimiter, burstLimiter } = require('./middleware/rate-limit');
 const retention = require('./retention/manager');
+const { buildOptions, defineJobs } = require('./process');
+const { hostGuard, ownHost } = require('../../_shared/host-role');
+const jobsRuntime = require('../../_shared/jobs');
+const contracts = require('openvibe-contracts');
 
 // ── Analytics ────────────────────────────────────────────────
 const Database = require('better-sqlite3');
 const { AnalyticsTracker } = require('openvibe-shared/analytics');
 const { internalOk } = require('../../_shared/internal-auth');
-const analyticsDbPath = path.join(__dirname, '..', 'data', 'analytics.db');
+const analyticsDbPath = path.resolve(__dirname, '..', config.dataDir, 'analytics.db');
 fs.mkdirSync(path.dirname(analyticsDbPath), { recursive: true });
 const analyticsDb = new Database(analyticsDbPath);
 analyticsDb.pragma('journal_mode = WAL');
@@ -55,6 +60,7 @@ app.use(helmet({
 }));
 app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
+app.use(contracts.http.middleware());   // traceparent + X-OpenVibe-Request-Id on every response
 
 // ── CORS ─────────────────────────────────────────────────────
 app.use(cors({
@@ -76,9 +82,16 @@ app.use(analytics.middleware());
 // ── Auth (optional on all routes) ────────────────────────────
 app.use(optionalAuth);
 
+// ── Hosts ────────────────────────────────────────────────────
+// Through the gateway the X-OV-* headers name the tool and its canonical host (a custom domain
+// included); aliases the gateway missed are redirected. Hosts this app does not serve go to the
+// tools index. API paths are never redirected.
+const knowsHost = (h) => !!DOMAIN_MAP[h];
+app.use(hostGuard({ knows: knowsHost }));
+
 // ── Attach domain context to every request ───────────────────
 app.use((req, _res, next) => {
-    req.ctx = resolveContext(req.headers.host);
+    req.ctx = resolveContext(ownHost(req, knowsHost));
     next();
 });
 
@@ -87,7 +100,7 @@ app.use((req, _res, next) => {
 // Health check
 app.get('/api/health', (_req, res) => {
     const stats = retention.getStats();
-    res.json({ status: 'ok', service: 'openvibe-docs', version: '1.0.0', files: stats });
+    res.json({ status: 'ok', service: 'openvibe-docs', version: '1.0.0', files: stats, jobs: jobs.stats() });
 });
 
 // Domain context (frontend calls this on load to get branding)
@@ -133,22 +146,8 @@ app.post('/api/process', burstLimiter, processLimiter, uploadSingle, async (req,
         const tool = getTool(toolId);
         if (!tool) return res.status(400).json({ error: `Unknown tool: ${toolId}` });
 
-        // Build options from body params
-        const options = {};
-        for (const key of ['format', 'quality', 'angle', 'pages', 'order', 'ranges', 'mode',
-            'text', 'fontSize', 'opacity', 'rotation', 'color',
-            'pageSize', 'dpi', 'password', 'userPassword', 'ownerPassword',
-            'title', 'author', 'subject', 'keywords', 'creator',
-            'level', 'defaultFormat']) {
-            if (req.body[key] !== undefined) options[key] = req.body[key];
-        }
-
-        // Use context default format if available
-        if (req.ctx.defaultFormat && !options.format) {
-            options.defaultFormat = req.ctx.defaultFormat;
-        }
-
-        const result = await tool.handler(req.file.buffer, options);
+        // Same options and code path as the docs.process job
+        const result = await tool.handler(req.file.buffer, buildOptions(req.body, req.ctx, false));
 
         // Some tools return view-only results (like metadata view)
         if (result.viewOnly) {
@@ -196,12 +195,7 @@ app.post('/api/process/multi', burstLimiter, processLimiter, uploadMultiple, asy
         if (!tool.multiFile) return res.status(400).json({ error: `Tool "${toolId}" does not support multiple files. Use /api/process instead.` });
 
         const buffers = req.files.map(f => f.buffer);
-        const options = {};
-        for (const key of ['order', 'pageSize', 'quality', 'format']) {
-            if (req.body[key] !== undefined) options[key] = req.body[key];
-        }
-
-        const result = await tool.handler(buffers, options);
+        const result = await tool.handler(buffers, buildOptions(req.body, req.ctx, true));
 
         // Save output
         const firstName = req.files[0]?.originalname || 'output';
@@ -230,6 +224,23 @@ app.post('/api/process/multi', burstLimiter, processLimiter, uploadMultiple, asy
         console.error('[Process/Multi] Error:', err.message);
         res.status(422).json({ error: err.message || 'Document processing failed' });
     }
+});
+
+// ── Jobs (/api/v1/jobs) ──────────────────────────────────────
+// The same operations as /api/process and /api/process/multi, asynchronous and durable: accepted
+// into data/jobs.db, followed over SSE, reattachable by id after a reload or a restart.
+const jobs = jobsRuntime.setupJobs({
+    app, service: 'docs', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts,
+    getPublicKey: auth.getPublicKey, issuer: auth.ISSUER,
+    define: defineJobs,
+    receive: uploadAny,
+    limiters: [burstLimiter, processLimiter],
+    defaults(req, input) {
+        const out = { ...input };
+        if (!out.tool && req.ctx.defaultOp) out.tool = req.ctx.defaultOp;
+        if (!out.format && !out.defaultFormat && req.ctx.defaultFormat) out.defaultFormat = req.ctx.defaultFormat;
+        return out;
+    },
 });
 
 // ── File Download ────────────────────────────────────────────
@@ -301,6 +312,7 @@ function shutdown() {
     console.log('[Docs.OpenVibe] Shutting down...');
     analytics.destroy();
     analyticsDb.close();
+    jobs.close();   // running jobs stay 'running' in data/jobs.db; the next boot re-queues them
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(1), 5000);
 }

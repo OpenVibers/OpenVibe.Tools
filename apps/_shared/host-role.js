@@ -74,6 +74,50 @@ function canonicalUrlFor(req, fallbackHost, pathname) {
 }
 
 /**
+ * Which host of the satellite's own domain map a request is for. Through the gateway the tool id
+ * decides (a descriptive host, a mirror or a custom domain is not in the satellite's map, but
+ * `<tool>.openvibe.tools` is); otherwise the Host header.
+ * @param {(host: string) => boolean} has  is this hostname in the satellite's map?
+ */
+function ownHost(req, has) {
+    const info = req.ovHost || hostRole(req);
+    const byTool = info.tool ? `${info.tool}.openvibe.tools` : '';
+    if (byTool && has(byTool)) return byTool;
+    return requestHost(req);
+}
+
+/**
+ * Swap `https://<fromHost>` for `https://<toHost>` inside <head> — for static pages whose canonical,
+ * og:url and JSON-LD were written for one host (maps, food).
+ */
+function restampHead(html, fromHost, toHost) {
+    if (!fromHost || !toHost || fromHost === toHost) return html;
+    const end = html.search(/<\/head>/i);
+    if (end < 0) return html;
+    const from = new RegExp(`https://${fromHost.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=[/"'])`, 'g');
+    return html.slice(0, end).replace(from, `https://${toHost}`) + html.slice(end);
+}
+
+/**
+ * Handler for a static page written for one host: the canonical, og:url and JSON-LD in its <head>
+ * are rewritten to the canonical host of this request (the gateway's X-OV-Canonical-Host, or
+ * `ownHost` itself when reached directly). The file is read once.
+ */
+function stampedPage(file, ownHostName) {
+    let html = null;
+    const cache = new Map();
+    return function sendStampedPage(req, res) {
+        if (html === null) html = require('fs').readFileSync(file, 'utf8');
+        const canonical = canonicalHostFor(req, ownHostName);
+        if (!cache.has(canonical)) { if (cache.size > 50) cache.clear(); cache.set(canonical, restampHead(html, ownHostName, canonical)); }
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Vary', 'X-OV-Canonical-Host');
+        return res.send(cache.get(canonical));
+    };
+}
+
+/**
  * Express middleware. Sets `req.ovHost` and turns away hosts this satellite does not serve.
  *
  * @param {object}   opts
@@ -117,4 +161,4 @@ function hostGuard(opts) {
     };
 }
 
-module.exports = { hostRole, hostGuard, canonicalHostFor, canonicalUrlFor, requestHost, isLocalHost, cleanHost, TOOLS_HOME };
+module.exports = { hostRole, hostGuard, canonicalHostFor, canonicalUrlFor, ownHost, restampHead, stampedPage, requestHost, isLocalHost, cleanHost, TOOLS_HOME };

@@ -1,0 +1,121 @@
+'use strict';
+// ═══════════════════════════════════════════════════════════════
+// Job store — the satellite's own SQLite (better-sqlite3 handle passed in).
+//
+// Two tables, created on first use (idempotent):
+//   tool_jobs        one row per job; the durable truth a restart recovers from
+//   tool_job_events  the ordered event log per job; its AUTOINCREMENT seq is the SSE event id,
+//                    so a reconnect with Last-Event-ID replays exactly what was missed
+// ═══════════════════════════════════════════════════════════════
+
+const TERMINAL = ['succeeded', 'failed', 'cancelled'];
+const STATES = ['queued', 'running', ...TERMINAL];
+
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS tool_jobs (
+    id               TEXT PRIMARY KEY,
+    type             TEXT NOT NULL,
+    type_version     INTEGER NOT NULL DEFAULT 1,
+    owner            TEXT NOT NULL,
+    state            TEXT NOT NULL CHECK (state IN ('queued','running','succeeded','failed','cancelled')),
+    progress         REAL,
+    progress_message TEXT,
+    input_json       TEXT NOT NULL DEFAULT '{}',
+    files_json       TEXT NOT NULL DEFAULT '[]',
+    result_json      TEXT,
+    error_json       TEXT,
+    retryable        INTEGER NOT NULL DEFAULT 0,
+    idempotency_key  TEXT,
+    request_hash     TEXT,
+    attempts         INTEGER NOT NULL DEFAULT 0,
+    max_attempts     INTEGER NOT NULL DEFAULT 1,
+    cancel_requested INTEGER NOT NULL DEFAULT 0,
+    ttl_ms           INTEGER NOT NULL DEFAULT 3600000,
+    created_at       INTEGER NOT NULL,
+    updated_at       INTEGER NOT NULL,
+    started_at       INTEGER,
+    finished_at      INTEGER,
+    expires_at       INTEGER
+);
+CREATE UNIQUE INDEX IF NOT EXISTS tool_jobs_idem ON tool_jobs(owner, idempotency_key) WHERE idempotency_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS tool_jobs_state ON tool_jobs(state, id);
+CREATE INDEX IF NOT EXISTS tool_jobs_expiry ON tool_jobs(expires_at) WHERE expires_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS tool_jobs_owner ON tool_jobs(owner, state);
+CREATE TABLE IF NOT EXISTS tool_job_events (
+    seq     INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id  TEXT NOT NULL,
+    event   TEXT NOT NULL,
+    data    TEXT NOT NULL,
+    at      INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS tool_job_events_job ON tool_job_events(job_id, seq);
+`;
+
+const parse = (s, fallback) => { if (s == null) return fallback; try { return JSON.parse(s); } catch { return fallback; } };
+
+function createStore(db) {
+    db.pragma('journal_mode = WAL');
+    db.pragma('busy_timeout = 5000');
+    db.exec(SCHEMA);
+
+    const q = {
+        insert: db.prepare(`INSERT INTO tool_jobs (id, type, type_version, owner, state, input_json, files_json, idempotency_key, request_hash, max_attempts, ttl_ms, created_at, updated_at)
+            VALUES (@id, @type, @type_version, @owner, 'queued', @input_json, @files_json, @idempotency_key, @request_hash, @max_attempts, @ttl_ms, @now, @now)`),
+        get: db.prepare('SELECT * FROM tool_jobs WHERE id = ?'),
+        byIdem: db.prepare('SELECT * FROM tool_jobs WHERE owner = ? AND idempotency_key = ?'),
+        nextQueued: db.prepare("SELECT * FROM tool_jobs WHERE state = 'queued' ORDER BY id LIMIT ?"),
+        claim: db.prepare("UPDATE tool_jobs SET state = 'running', attempts = attempts + 1, started_at = @now, updated_at = @now, progress = NULL, progress_message = NULL WHERE id = @id AND state = 'queued'"),
+        running: db.prepare("SELECT * FROM tool_jobs WHERE state = 'running'"),
+        activeForOwner: db.prepare("SELECT COUNT(*) AS n FROM tool_jobs WHERE owner = ? AND state IN ('queued','running')"),
+        progress: db.prepare('UPDATE tool_jobs SET progress = @progress, progress_message = @message, updated_at = @now WHERE id = @id AND state = \'running\''),
+        requestCancel: db.prepare("UPDATE tool_jobs SET cancel_requested = 1, updated_at = @now WHERE id = @id AND state IN ('queued','running')"),
+        requeue: db.prepare("UPDATE tool_jobs SET state = 'queued', started_at = NULL, progress = NULL, progress_message = NULL, updated_at = @now WHERE id = @id AND state = 'running'"),
+        finish: db.prepare(`UPDATE tool_jobs SET state = @state, result_json = @result_json, error_json = @error_json, retryable = @retryable,
+            progress = CASE WHEN @state = 'succeeded' THEN 100 ELSE progress END, progress_message = NULL,
+            finished_at = @now, updated_at = @now, expires_at = @now + ttl_ms WHERE id = @id AND state IN ('queued','running')`),
+        setFiles: db.prepare('UPDATE tool_jobs SET files_json = @files_json, updated_at = @now WHERE id = @id'),
+        event: db.prepare('INSERT INTO tool_job_events (job_id, event, data, at) VALUES (?, ?, ?, ?)'),
+        eventsAfter: db.prepare('SELECT seq, event, data, at FROM tool_job_events WHERE job_id = ? AND seq > ? ORDER BY seq'),
+        lastSeq: db.prepare('SELECT MAX(seq) AS seq FROM tool_job_events WHERE job_id = ?'),
+        expired: db.prepare('SELECT * FROM tool_jobs WHERE expires_at IS NOT NULL AND expires_at <= ? LIMIT 500'),
+        del: db.prepare('DELETE FROM tool_jobs WHERE id = ?'),
+        delEvents: db.prepare('DELETE FROM tool_job_events WHERE job_id = ?'),
+        counts: db.prepare('SELECT state, COUNT(*) AS n FROM tool_jobs GROUP BY state'),
+    };
+
+    /** Append one event; returns its seq (the SSE id). */
+    function appendEvent(jobId, event, data, now = Date.now()) {
+        return Number(q.event.run(jobId, event, JSON.stringify(data), now).lastInsertRowid);
+    }
+
+    return {
+        db,
+        TERMINAL, STATES,
+        insert(row) { q.insert.run(row); },
+        get: (id) => q.get.get(id) || null,
+        byIdempotencyKey: (owner, key) => q.byIdem.get(owner, key) || null,
+        nextQueued: (limit) => q.nextQueued.all(limit),
+        claim: (id, now = Date.now()) => q.claim.run({ id, now }).changes === 1,
+        running: () => q.running.all(),
+        activeForOwner: (owner) => q.activeForOwner.get(owner).n,
+        setProgress: (id, progress, message, now = Date.now()) => q.progress.run({ id, progress, message, now }).changes === 1,
+        requestCancel: (id, now = Date.now()) => q.requestCancel.run({ id, now }).changes === 1,
+        requeue: (id, now = Date.now()) => q.requeue.run({ id, now }).changes === 1,
+        finish: (id, { state, result = null, error = null, retryable = false }, now = Date.now()) => q.finish.run({
+            id, state, now, retryable: retryable ? 1 : 0,
+            result_json: result == null ? null : JSON.stringify(result),
+            error_json: error == null ? null : JSON.stringify(error),
+        }).changes === 1,
+        setFiles: (id, files, now = Date.now()) => q.setFiles.run({ id, files_json: JSON.stringify(files), now }),
+        appendEvent,
+        eventsAfter: (jobId, seq) => q.eventsAfter.all(jobId, seq).map(e => ({ seq: e.seq, event: e.event, data: parse(e.data, {}), at: e.at })),
+        lastSeq: (jobId) => q.lastSeq.get(jobId).seq || 0,
+        expired: (now = Date.now()) => q.expired.all(now),
+        remove: db.transaction((id) => { q.delEvents.run(id); q.del.run(id); }),
+        counts() { const out = Object.fromEntries(STATES.map(s => [s, 0])); for (const r of q.counts.all()) out[r.state] = r.n; return out; },
+        transaction: (fn) => db.transaction(fn),
+        parse,
+    };
+}
+
+module.exports = { createStore, TERMINAL, STATES };

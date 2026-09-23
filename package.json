@@ -2,8 +2,9 @@
   "name": "openvibe-tools",
   "version": "1.0.0",
   "private": true,
-  "description": "OpenVibe.Tools — the tools suite on openvibe.tools and *.openvibe.tools",
+  "description": "OpenVibe.Tools \u2014 the tools suite on openvibe.tools and *.openvibe.tools",
   "scripts": {
+    "test": "node test/run.js",
     "install:all": "npm --prefix apps/gateway install && npm --prefix apps/maps install && npm --prefix apps/food install && npm --prefix apps/img install && npm --prefix apps/yt install && npm --prefix apps/audio install && npm --prefix apps/text install && npm --prefix apps/docs install",
     "start:gateway": "npm --prefix apps/gateway start",
     "start:maps": "npm --prefix apps/maps start",
@@ -14,5 +15,8 @@
     "start:text": "npm --prefix apps/text start",
     "start:docs": "npm --prefix apps/docs start"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  }
 }

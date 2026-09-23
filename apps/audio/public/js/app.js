@@ -75,6 +75,7 @@
         } else {
             selectTool('convert');
         }
+        reattach();
     }
 
     /* ---------- Branding ---------- */
@@ -373,6 +374,22 @@
         resultPanel.style.display = 'none';
         processing.style.display = '';
 
+        // Jobs: the work is accepted, followed live (ffmpeg's progress) and survives a reload.
+        if (window.OVJobs) {
+            const input = {};
+            for (const [k, v] of formData.entries()) if (k !== 'file') input[k] = v;
+            try {
+                const job = await OVJobs.submit({ type: 'audio.process', input, files: [uploadedFile] });
+                OVJobs.remember(job.id);
+                followJob(job);
+            } catch (err) {
+                showToast(err.message, 'error');
+                resetUI();
+            }
+            return;
+        }
+
+        // Without the jobs helper: the synchronous endpoint, as before.
         try {
             const res = await fetch('/api/process', { method: 'POST', body: formData });
             const data = await res.json();
@@ -460,9 +477,76 @@
         return o;
     }
 
+    /* ---------- Jobs ---------- */
+    let watcher = null;
+    let currentJob = null;
+
+    function processingText(job) {
+        const pct = job.progress && job.progress.percent;
+        if (job.cancel_requested) return 'Cancelling...';
+        if (job.state === 'queued') return 'Waiting for a free slot...';
+        const label = (job.progress && job.progress.message) || 'Processing your audio';
+        return pct != null ? `${label}... ${Math.round(pct)}%` : `${label}...`;
+    }
+
+    function cancelButton() {
+        let btn = processing.querySelector('.job-cancel');
+        if (!btn) {
+            btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn-secondary job-cancel';
+            btn.textContent = 'Cancel';
+            btn.addEventListener('click', () => { if (currentJob) OVJobs.cancel(currentJob).catch(() => {}); });
+            processing.appendChild(btn);
+        }
+        return btn;
+    }
+
+    function followJob(job) {
+        currentJob = job.id;
+        optionsPanel.style.display = 'none';
+        uploadZone.style.display = 'none';
+        resultPanel.style.display = 'none';
+        processing.style.display = '';
+        const label = processing.querySelector('p');
+        const update = (j) => { if (label) label.textContent = processingText(j); };
+        cancelButton().style.display = '';
+        update(job);
+        if (watcher) watcher.close();
+        watcher = OVJobs.watch(job.id, {
+            onUpdate: update,
+            onDone(done) {
+                watcher = null;
+                cancelButton().style.display = 'none';
+                if (done.state === 'succeeded') { resultId = done.id; return showResult(jobResult(done)); }
+                OVJobs.forget();
+                if (done.state !== 'cancelled') showToast((done.error && done.error.detail) || 'Processing failed', 'error');
+                resetUI();
+            },
+            onGone() { OVJobs.forget(); resetUI(); },
+        });
+    }
+
+    /** A finished job in the shape the synchronous endpoint answers with. */
+    function jobResult(job) {
+        const f = (job.result && job.result.files && job.result.files[0]) || {};
+        return {
+            ...(job.result && job.result.data),
+            download: { id: job.id, downloadUrl: f.url, previewUrl: f.url ? `${f.url}?inline=1` : null, filename: f.name, expiresIn: OVJobs.expiresIn(job) },
+        };
+    }
+
+    /** After a reload: pick the job up again from ?job=<id> or this tab's session. */
+    function reattach() {
+        const id = window.OVJobs && OVJobs.recall();
+        if (!id) return;
+        OVJobs.get(id).then(followJob).catch(() => OVJobs.forget());
+    }
+
     /* ---------- Result ---------- */
     function initResult() {
         anotherBtn.addEventListener('click', () => {
+            if (window.OVJobs) OVJobs.forget();
             clearFile();
             resetUI();
         });
@@ -473,8 +557,8 @@
         resultPanel.style.display = '';
 
         const fileId = data.download.id;
-        const previewUrl = `/api/preview/${fileId}`;
-        const downloadUrl = `/api/download/${fileId}`;
+        const previewUrl = data.download.previewUrl || `/api/preview/${fileId}`;
+        const downloadUrl = data.download.downloadUrl || `/api/download/${fileId}`;
         const outputMime = data.output?.mime || '';
 
         if (outputMime.startsWith('image/')) {
