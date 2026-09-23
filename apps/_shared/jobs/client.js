@@ -114,7 +114,7 @@
         if (!f) return null;
         return f.url + (opts && opts.inline ? '?inline=1' : '');
     }
-    /** Milliseconds until a finished job's files expire (null while it is still running). */
+    /** Milliseconds until a finished job's files expire (null while it is still running, or while something references it). */
     function expiresIn(job) {
         return job && job.expires_at ? Math.max(0, Date.parse(job.expires_at) - Date.now()) : null;
     }

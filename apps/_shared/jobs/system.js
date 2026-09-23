@@ -11,7 +11,10 @@
 //
 // Bounded: at most `concurrency` jobs run at once in this process, and each owner may have at
 // most `maxActivePerOwner` queued + running jobs. Finished jobs expire (ttl chosen at submit),
-// and the pruner deletes the row, its events, its files and any Media objects it made.
+// and the pruner deletes the row, its events, its files and any Media objects it made — except
+// while something references the result (reference(), e.g. a paste or a project that points at the
+// Media object), and never while Media keeps an object (a retention hold, or Media unreachable):
+// then the job is kept and looked at again later, so no referenced result loses its record.
 //
 // Retry: a failed job keeps its input files until it expires; retry(id) moves them to a new job
 // (retry_of → the failed one, which records retried_by). Retrying the same failed job again
@@ -27,6 +30,9 @@ const crypto = require('crypto');
 const { createStore, TERMINAL } = require('./store');
 
 const HOUR = 60 * 60 * 1000;
+const PRUNE_RECHECK_MS = 24 * HOUR;   // an expired job the pruner could not finish is looked at again after this
+const REF_RE = /^[a-z][a-z0-9_-]*(?::[A-Za-z0-9_.-]+){1,4}$/;   // <service>:<kind>:<id>, e.g. community:paste:p_123
+const MAX_REFS = 50;
 const EVENT_FOR = { queued: 'job.queued', running: 'job.running', succeeded: 'job.succeeded', failed: 'job.failed', cancelled: 'job.cancelled' };
 const SAFE_NAME = (s) => String(s || 'file').replace(/[/\\\0]/g, '_').replace(/[^\w.\- ]/g, '_').slice(-120) || 'file';
 
@@ -122,6 +128,7 @@ function createJobSystem(o) {
     function view(row) {
         if (!row) return null;
         const live = row.state === 'queued' || row.state === 'running';
+        const references = store.references(row.id).map(r => ({ ref: r.ref, created_at: iso(r.created_at) }));
         return {
             id: row.id,
             object: 'tools.job',
@@ -136,12 +143,14 @@ function createJobSystem(o) {
             created_at: iso(row.created_at),
             started_at: iso(row.started_at),
             finished_at: iso(row.finished_at),
-            expires_at: iso(row.expires_at),
+            // null while something references the result: it is kept until the last reference goes.
+            expires_at: references.length ? null : iso(row.expires_at),
             result: publicResult(store.parse(row.result_json, null), row.id),
             error: store.parse(row.error_json, null),
             retryable: !!row.retryable,
             retry_of: row.retry_of || null,
             retried_by: row.retried_by || null,
+            references,
             links: {
                 self: `/api/v1/jobs/${row.id}`,
                 events: `/api/v1/jobs/${row.id}/events`,
@@ -439,6 +448,35 @@ function createJobSystem(o) {
         return { job: store.get(next), replayed: false };
     }
 
+    // ── References (results something still points at) ─────────
+    function checkRef(ref) {
+        if (!REF_RE.test(String(ref || '')) || String(ref).length > 200) {
+            throw new JobError(400, 'tools.job.invalid', 'A reference is <service>:<kind>:<id>, e.g. community:paste:p_123 (at most 200 characters)');
+        }
+        return String(ref);
+    }
+    /**
+     * Keep a succeeded job's result while `ref` points at it. → { job, created }. Idempotent.
+     */
+    function reference(id, ref) {
+        ref = checkRef(ref);
+        const row = store.get(id);
+        if (!row) return null;
+        if (row.state !== 'succeeded') throw new JobError(409, 'tools.job.not_succeeded', `Only a succeeded job's result can be referenced; this one is ${row.state}`, { state: row.state });
+        if (row.env === 'sandbox') throw new JobError(409, 'tools.job.sandbox', 'Sandbox results are kept briefly and cannot be referenced');
+        const has = store.references(id).some(r => r.ref === ref);
+        if (!has && store.referenceCount(id) >= MAX_REFS) throw new JobError(409, 'tools.job.too_many_references', `At most ${MAX_REFS} references per job`);
+        const created = store.addReference(id, ref);
+        return { job: store.get(id), created };
+    }
+    /** Stop keeping the result for `ref`. → { job, removed }. Idempotent. */
+    function unreference(id, ref) {
+        ref = checkRef(ref);
+        if (!store.get(id)) return null;
+        const removed = store.dropReference(id, ref);
+        return { job: store.get(id), removed };
+    }
+
     // ── Boot recovery, pruning ─────────────────────────────────
     function recover() {
         let requeued = 0, failed = 0;
@@ -471,11 +509,30 @@ function createJobSystem(o) {
         return { requeued, failed };
     }
 
+    /**
+     * Delete expired jobs. Referenced jobs are never expired (store.expired skips them). A job whose
+     * Media objects cannot all be deleted — Media keeps one under a retention hold (409
+     * media.object.held), Media is unreachable, or this process no longer has Media configured —
+     * is kept, record and all, and looked at again after PRUNE_RECHECK_MS: dropping the record
+     * would leave an object nobody deletes, and a held object is one somebody still needs.
+     */
     async function prune(now = Date.now()) {
         let n = 0;
         for (const row of store.expired(now)) {
             const result = store.parse(row.result_json, null);
-            if (media && result) for (const f of result.files || []) if (f.media && f.media.media_id) await media.remove(f.media.media_id).catch(err => log.warn(`[Jobs] could not delete ${f.media.media_id}:`, err.message));
+            let kept = null;
+            for (const f of (result && result.files) || []) {
+                if (!f.media || !f.media.media_id) continue;
+                if (!media) { kept = 'results in OpenVibe.Media, but Media is not configured here'; continue; }
+                try { await media.remove(f.media.media_id); } catch (err) {
+                    kept = err.code === 'media.object.held' ? `${f.media.media_id} is under a retention hold` : `could not delete ${f.media.media_id}: ${err.message}`;
+                }
+            }
+            if (kept) {
+                log.warn(`[Jobs] kept expired job ${row.id} (${kept}); checking again later`);
+                store.deferExpiry(row.id, now + PRUNE_RECHECK_MS);
+                continue;
+            }
             await fsp.rm(jobDir(row.id), { recursive: true, force: true }).catch(() => {});
             store.remove(row.id);
             listeners.delete(row.id);
@@ -520,7 +577,7 @@ function createJobSystem(o) {
     }
 
     const api = {
-        define, submit, cancel, retry, subscribe, start, stop, onStop, prune, recover, view, resultFile,
+        define, submit, cancel, retry, reference, unreference, subscribe, start, stop, onStop, prune, recover, view, resultFile,
         get: (id) => store.get(id),
         eventsAfter: (id, seq) => store.eventsAfter(id, seq),
         lastSeq: (id) => store.lastSeq(id),

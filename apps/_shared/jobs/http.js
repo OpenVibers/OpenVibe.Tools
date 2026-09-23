@@ -10,6 +10,9 @@
 //   POST   /api/v1/jobs/:id/retry        retry a failed job as a new job → 202 + Location (new) |
 //                                        200 + Idempotent-Replayed: true (it was already retried: that job)
 //                                        | 409 tools.job.not_failed | 410 tools.job.inputs_gone
+//   PUT    /api/v1/jobs/:id/references/:ref   keep a succeeded job's result while <ref> points at it
+//                                        (e.g. community:paste:p_123) → 201 new | 200 already there
+//   DELETE /api/v1/jobs/:id/references/:ref   drop it → 200 (the expiry clock restarts after the last one)
 //   GET    /api/v1/jobs/:id/events       SSE: job.queued|running|progress|cancel_requested|succeeded|failed|cancelled;
 //                                        every event has an id; reconnecting with Last-Event-ID replays
 //                                        only what came after it; 204 once there is nothing left to say
@@ -197,7 +200,7 @@ function mountJobRoutes(app, o) {
         return res.status(job.state === 'cancelled' ? 200 : 202).json(system.view(job));
     });
 
-    // Retry is a write: a principal needs tools.job.create, like a submit.
+    // Retry and references are writes: a principal needs tools.job.create, like a submit.
     app.post('/api/v1/jobs/:id/retry', ...(o.limiters || []), (req, res) => {
         noStore(res);
         const row = load(req, res, 'create');
@@ -213,6 +216,24 @@ function mountJobRoutes(app, o) {
             return send(res, 500, 'tools.job.retry_failed', 'The job could not be retried');
         }
     });
+
+    function referenceRoute(fn) {
+        return (req, res) => {
+            noStore(res);
+            const row = load(req, res, 'create');
+            if (!row) return;
+            try {
+                const r = fn(row.id, String(req.params.ref || ''));
+                return res.status(r.created ? 201 : 200).json(system.view(r.job));
+            } catch (err) {
+                if (err instanceof system.JobError) return send(res, err.status, err.code, err.detail, err.extra);
+                console.error('[Jobs] reference failed:', err.message);
+                return send(res, 500, 'tools.job.reference_failed', 'The reference could not be changed');
+            }
+        };
+    }
+    app.put('/api/v1/jobs/:id/references/:ref', referenceRoute((id, ref) => system.reference(id, ref)));
+    app.delete('/api/v1/jobs/:id/references/:ref', referenceRoute((id, ref) => system.unreference(id, ref)));
 
     app.get('/api/v1/jobs/:id/events', (req, res) => {
         const row = load(req, res, 'read');

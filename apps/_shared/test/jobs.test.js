@@ -3,7 +3,8 @@
 //   an accepted job survives a restart (DB and app closed and reopened), running jobs are re-queued
 //   or failed-retryable per type, reattach by id, cancel (queued and running), idempotency keys,
 //   owner scoping, SSE resume with Last-Event-ID, bounded concurrency, pruning, results stored
-//   as Media objects through Media's v2 object API (with the local fallback), and retrying a failed job.
+//   as Media objects through Media's v2 object API (with the local fallback), retention of results
+//   that are referenced or held in Media, and retrying a failed job.
 const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
@@ -80,7 +81,7 @@ const flaky = new Set();
 function fakeMedia() {
     const objects = new Map();
     const app = express();
-    const state = { failInit: false, deleted: [] };
+    const state = { failInit: false, deleted: [], held: new Set(), deleteDown: false };
     app.use(express.json());
     const authed = (req, res, next) => (req.headers.authorization === 'Bearer media-token' ? next() : res.status(401).json({ error: 'no' }));
     app.post('/api/v2/tools/objects', authed, (req, res) => {
@@ -103,7 +104,11 @@ function fakeMedia() {
         res.json({ id: o.id, lifecycle_status: 'ready' });
     });
     app.get('/api/v2/tools/objects/:id/download', authed, (req, res) => res.json({ url: `https://openvibe.media/o/${req.params.id}?exp=1&sig=s`, expires_at: 'x', public: false }));
-    app.delete('/api/v2/tools/objects/:id', authed, (req, res) => { state.deleted.push(req.params.id); objects.delete(req.params.id); res.json({ ok: true }); });
+    app.delete('/api/v2/tools/objects/:id', authed, (req, res) => {
+        if (state.deleteDown) return res.status(503).json({ code: 'media.unavailable' });
+        if (state.held.has(req.params.id)) return res.status(409).type('application/problem+json').send(JSON.stringify({ status: 409, code: 'media.object.held', detail: 'Object is under a retention hold' }));
+        state.deleted.push(req.params.id); objects.delete(req.params.id); res.json({ ok: true });
+    });
     app.get('/o/:id', (req, res) => { const o = objects.get(req.params.id); if (!o || req.query.sig !== 's') return res.status(404).end(); res.type('text/plain').send(o.bytes); });
     return { app, objects, state };
 }
@@ -368,6 +373,60 @@ async function readSse(url, { headers = {}, stop = () => false, ms = 5000 } = {}
         assert.strictEqual((await frank(fb.result.files[0].url)).body, 'FALLBACK');
         await s.system.prune(Date.now() + 25 * 60 * 60 * 1000);
         assert.ok(fm.state.deleted.includes(f0.media.media_id), 'pruning deletes the Media object');
+        await s.close();
+
+        // ── Retention: referenced or held results are not pruned ──
+        fm.state.failInit = false;
+        const DAY = 24 * 60 * 60 * 1000;
+        s = await satellite(path.join(root, 'g'), { media });
+        const gina = client(s.base, { user: USER_A });
+        const finished = async (text) => {
+            const id = (await gina('/api/v1/jobs', json({ type: 'test.upper', input: { text } }))).body.id;
+            return until(async () => { const g = await gina(`/api/v1/jobs/${id}`); return g.body.state === 'succeeded' && g.body; }, `job ${text}`);
+        };
+        const kept = await finished('kept by a paste');
+        const keptMedia = kept.result.files[0].media.media_id;
+        r = await gina(`/api/v1/jobs/${kept.id}/references/community:paste:p_123`, { method: 'PUT' });
+        assert.strictEqual(r.status, 201, 'a reference is recorded');
+        assert.deepStrictEqual(r.body.references.map(x => x.ref), ['community:paste:p_123']);
+        assert.strictEqual(r.body.expires_at, null, 'a referenced result does not expire');
+        assert.strictEqual((await gina(`/api/v1/jobs/${kept.id}/references/community:paste:p_123`, { method: 'PUT' })).status, 200, 'referencing twice is fine');
+        assert.strictEqual((await client(s.base, { user: USER_B })(`/api/v1/jobs/${kept.id}/references/community:paste:p_9`, { method: 'PUT' })).status, 404, 'only the owner can reference it');
+        r = await gina(`/api/v1/jobs/${kept.id}/references/${encodeURIComponent('no spaces allowed')}`, { method: 'PUT' });
+        assert.strictEqual(r.status, 400); assert.strictEqual(r.body.code, 'tools.job.invalid');
+        const held = await finished('held by Media');
+        const heldMedia = held.result.files[0].media.media_id;
+        fm.state.held.add(heldMedia);
+        const plain = await finished('nobody needs this');
+        fm.state.deleted.length = 0;
+        await s.system.prune(Date.now() + 2 * DAY);
+        assert.strictEqual((await gina(`/api/v1/jobs/${kept.id}`)).status, 200, 'a referenced job survives pruning');
+        assert.ok(fm.objects.has(keptMedia) && !fm.state.deleted.includes(keptMedia), 'and so does its Media object');
+        assert.strictEqual((await gina(`/api/v1/jobs/${kept.id}/files/0`)).body, 'KEPT BY A PASTE', 'still downloadable');
+        const stillHeld = (await gina(`/api/v1/jobs/${held.id}`)).body;
+        assert.ok(stillHeld.id && Date.parse(stillHeld.expires_at) > Date.now() + 2 * DAY, 'a job whose Media object is held keeps its record and is checked again later');
+        assert.ok(fm.objects.has(heldMedia));
+        assert.strictEqual((await gina(`/api/v1/jobs/${plain.id}`)).status, 404, 'an unreferenced job is pruned as before');
+        assert.deepStrictEqual(fm.state.deleted, [plain.result.files[0].media.media_id]);
+        // Media unreachable: nothing is dropped.
+        const outage = await finished('media is down');
+        fm.state.deleteDown = true;
+        await s.system.prune(Date.now() + 2 * DAY);
+        assert.strictEqual((await gina(`/api/v1/jobs/${outage.id}`)).status, 200, 'a failed Media delete keeps the job');
+        fm.state.deleteDown = false;
+        // Dropping the last reference restarts the clock; after that the job expires normally.
+        r = await gina(`/api/v1/jobs/${kept.id}/references/community:paste:p_123`, { method: 'DELETE' });
+        assert.strictEqual(r.status, 200); assert.deepStrictEqual(r.body.references, []);
+        assert.ok(Date.parse(r.body.expires_at) >= Date.now() + DAY - 60000, 'kept one more ttl after the last reference goes');
+        assert.strictEqual((await gina(`/api/v1/jobs/${kept.id}/references/community:paste:p_123`, { method: 'DELETE' })).status, 200, 'dropping twice is fine');
+        fm.state.held.delete(heldMedia);
+        await s.system.prune(Date.now() + 5 * DAY);
+        for (const j of [kept, held, outage]) assert.strictEqual((await gina(`/api/v1/jobs/${j.id}`)).status, 404, `${j.id} pruned once nothing keeps it`);
+        assert.ok([keptMedia, heldMedia].every(id => fm.state.deleted.includes(id)));
+        r = await gina('/api/v1/jobs', json({ type: 'test.boom' }));
+        await until(async () => (await gina(`/api/v1/jobs/${r.body.id}`)).body.state === 'failed', 'failed job');
+        r = await gina(`/api/v1/jobs/${r.body.id}/references/community:paste:p_1`, { method: 'PUT' });
+        assert.strictEqual(r.status, 409); assert.strictEqual(r.body.code, 'tools.job.not_succeeded');
         await s.close();
         mediaServer.close();
 

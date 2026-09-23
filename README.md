@@ -75,6 +75,8 @@ routes answer on every host of the img, audio and docs satellites:
 | `GET /api/v1/jobs/:id/events` | SSE: `job.queued`, `job.running`, `job.progress`, `job.cancel_requested`, `job.succeeded`, `job.failed`, `job.cancelled`, each with an `id`. Reconnecting with `Last-Event-ID` (or `?last_event_id=`) replays only later events; a finished job with nothing newer answers `204`. |
 | `GET /api/v1/jobs/:id/files/:n` | A result file (attachment); `?inline=1` for previews. |
 | `POST /api/v1/jobs/:id/retry` | Retry a **failed** job: a new job with the same type, input and files (`retry_of` → the failed one, which gets `retried_by`) → `202` + `Location`. Idempotent: asking again returns that same retry with `200` + `Idempotent-Replayed: true`. Not failed → `409 tools.job.not_failed`; inputs gone → `410 tools.job.inputs_gone`. A failed job keeps its input files until it expires. |
+| `PUT /api/v1/jobs/:id/references/:ref` | Keep a **succeeded** job's result while `<ref>` (`<service>:<kind>:<id>`, e.g. `community:paste:p_123`) points at it → `201` (`200` if already there). The job then shows `references` and `expires_at: null`. At most 50 per job; not for sandbox jobs. |
+| `DELETE /api/v1/jobs/:id/references/:ref` | Drop it → `200`; after the last one the job expires one ttl later at the earliest. |
 
 Job types: `img.process` (input `{ tool: convert|compress|resize|crop, format, quality, width, … }`, one image),
 `audio.process` (`{ tool, …options }` as `/api/process` takes them, one audio/video file; progress from ffmpeg),
@@ -94,7 +96,10 @@ reload reattaches.
   overrides), `TOOLS_JOBS_MAX_ACTIVE` unfinished jobs per owner (default 10, then `429`), plus the satellites'
   existing burst and processing rate limits on submit.
 - **Retention.** Finished jobs expire after 1 hour (browser sessions) or 24 hours (signed-in people, principals);
-  the pruner deletes the row, its events, its files and its Media objects.
+  the pruner deletes the row, its events, its files and its Media objects. It never touches a job that has a
+  reference (above). If Media will not delete a result object (a retention hold, `409 media.object.held`), cannot
+  be reached, or is no longer configured here, the job is kept, record and all, and looked at again 24 hours
+  later, so no object is left without the record that would delete it.
 - **Results in OpenVibe.Media** when `TOOLS_JOB_RESULTS=media`: each result file becomes a private Media object
   (v2 object API, namespace `tools`, owner `X-OV-Subject` for signed-in people) and the job's result carries its
   `media.media_id`; previews redirect to a short-lived signed Media URL, downloads stream through the satellite.

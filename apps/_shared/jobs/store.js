@@ -2,10 +2,12 @@
 // ═══════════════════════════════════════════════════════════════
 // Job store — the satellite's own SQLite (better-sqlite3 handle passed in).
 //
-// Two tables, created on first use (idempotent):
-//   tool_jobs        one row per job; the durable truth a restart recovers from
-//   tool_job_events  the ordered event log per job; its AUTOINCREMENT seq is the SSE event id,
-//                    so a reconnect with Last-Event-ID replays exactly what was missed
+// Three tables, created on first use (idempotent):
+//   tool_jobs            one row per job; the durable truth a restart recovers from
+//   tool_job_events      the ordered event log per job; its AUTOINCREMENT seq is the SSE event id,
+//                        so a reconnect with Last-Event-ID replays exactly what was missed
+//   tool_job_references  who still points at a job's result (a paste, a project, …); a referenced
+//                        job never expires, so its files and Media objects are not pruned
 // ═══════════════════════════════════════════════════════════════
 
 const TERMINAL = ['succeeded', 'failed', 'cancelled'];
@@ -50,6 +52,12 @@ CREATE TABLE IF NOT EXISTS tool_job_events (
     at      INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS tool_job_events_job ON tool_job_events(job_id, seq);
+CREATE TABLE IF NOT EXISTS tool_job_references (
+    job_id     TEXT NOT NULL,
+    ref        TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (job_id, ref)
+);
 `;
 
 // Columns added after the first release, each added when missing (idempotent).
@@ -88,9 +96,19 @@ function createStore(db) {
         event: db.prepare('INSERT INTO tool_job_events (job_id, event, data, at) VALUES (?, ?, ?, ?)'),
         eventsAfter: db.prepare('SELECT seq, event, data, at FROM tool_job_events WHERE job_id = ? AND seq > ? ORDER BY seq'),
         lastSeq: db.prepare('SELECT MAX(seq) AS seq FROM tool_job_events WHERE job_id = ?'),
-        expired: db.prepare('SELECT * FROM tool_jobs WHERE expires_at IS NOT NULL AND expires_at <= ? LIMIT 500'),
+        // A job something still references is never expired (see tool_job_references).
+        expired: db.prepare(`SELECT * FROM tool_jobs j WHERE expires_at IS NOT NULL AND expires_at <= ?
+            AND NOT EXISTS (SELECT 1 FROM tool_job_references r WHERE r.job_id = j.id) LIMIT 500`),
+        deferExpiry: db.prepare('UPDATE tool_jobs SET expires_at = @until, updated_at = @now WHERE id = @id'),
         del: db.prepare('DELETE FROM tool_jobs WHERE id = ?'),
         delEvents: db.prepare('DELETE FROM tool_job_events WHERE job_id = ?'),
+        delRefs: db.prepare('DELETE FROM tool_job_references WHERE job_id = ?'),
+        addRef: db.prepare('INSERT OR IGNORE INTO tool_job_references (job_id, ref, created_at) VALUES (?, ?, ?)'),
+        dropRef: db.prepare('DELETE FROM tool_job_references WHERE job_id = ? AND ref = ?'),
+        refs: db.prepare('SELECT ref, created_at FROM tool_job_references WHERE job_id = ? ORDER BY created_at, ref'),
+        refCount: db.prepare('SELECT COUNT(*) AS n FROM tool_job_references WHERE job_id = ?'),
+        // After the last reference goes, the result is kept at least one more ttl.
+        releaseExpiry: db.prepare('UPDATE tool_jobs SET expires_at = MAX(COALESCE(expires_at, 0), @now + ttl_ms), updated_at = @now WHERE id = @id AND finished_at IS NOT NULL'),
         counts: db.prepare('SELECT state, COUNT(*) AS n FROM tool_jobs GROUP BY state'),
     };
 
@@ -123,7 +141,18 @@ function createStore(db) {
         eventsAfter: (jobId, seq) => q.eventsAfter.all(jobId, seq).map(e => ({ seq: e.seq, event: e.event, data: parse(e.data, {}), at: e.at })),
         lastSeq: (jobId) => q.lastSeq.get(jobId).seq || 0,
         expired: (now = Date.now()) => q.expired.all(now),
-        remove: db.transaction((id) => { q.delEvents.run(id); q.del.run(id); }),
+        deferExpiry: (id, until, now = Date.now()) => q.deferExpiry.run({ id, until, now }),
+        remove: db.transaction((id) => { q.delEvents.run(id); q.delRefs.run(id); q.del.run(id); }),
+        /** → true when the reference is new. */
+        addReference: (id, ref, now = Date.now()) => q.addRef.run(id, ref, now).changes === 1,
+        /** → true when it existed; dropping the last one restarts the job's expiry clock. */
+        dropReference: db.transaction((id, ref, now = Date.now()) => {
+            const gone = q.dropRef.run(id, ref).changes === 1;
+            if (gone && q.refCount.get(id).n === 0) q.releaseExpiry.run({ id, now });
+            return gone;
+        }),
+        references: (id) => q.refs.all(id),
+        referenceCount: (id) => q.refCount.get(id).n,
         counts() { const out = Object.fromEntries(STATES.map(s => [s, 0])); for (const r of q.counts.all()) out[r.state] = r.n; return out; },
         transaction: (fn) => db.transaction(fn),
         parse,
