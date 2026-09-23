@@ -22,6 +22,7 @@ apps/
 ├── audio     # Audio.OpenVibe — audio converter & effects
 ├── text      # Text.OpenVibe + Logo.OpenVibe — text generators & logo makers
 └── docs      # Docs.OpenVibe  — PDF & document tools
+apps/_shared   # code the apps require by relative path: host roles, internal auth, the job runtime (jobs/)
 (openvibe-shared is a pinned OpenVibe.Shared release in each app's package.json; no vendor/ copy)
 ```
 
@@ -56,6 +57,75 @@ Public, cacheable outputs on the apex: `/` (every tool by family, planned tools 
 `/llms.txt`, `/api/catalog.json`, `/terms`, `/privacy`, `/dmca`. All of it renders without JavaScript.
 
 Deploy with `deploy/scripts/deploy.sh` (it refreshes the copied shared package inside each app).
+
+## Jobs (Img, Audio, Docs)
+
+Heavy operations run as durable asynchronous jobs (`apps/_shared/jobs`, roadmap Wave 11). The same
+routes answer on every host of the img, audio and docs satellites:
+
+| Route | What it does |
+|---|---|
+| `POST /api/v1/jobs` | Submit: multipart `type`, `input` (JSON text), `file` / `files`, or JSON `{ type, input }`. `Idempotency-Key` header (8–200 chars). → `202` + `Location`; a repeat with the same key and request → `200` + `Idempotent-Replayed: true` (same job); same key, different request → `409 tools.job.idempotency_conflict`. |
+| `GET /api/v1/jobs/:id` | The job: `state` (`queued`, `running`, `succeeded`, `failed`, `cancelled`), `progress {percent, message}`, `attempts`, `result {files, data}`, `error` (problem+json), `retryable`, `expires_at`. |
+| `DELETE /api/v1/jobs/:id` | Cancel: queued → `200` cancelled at once; running → `202` (signalled; ffmpeg is killed, sharp/pdf-lib work finishes and is discarded) and ends `cancelled`; finished → `409 tools.job.already_finished`. |
+| `GET /api/v1/jobs/:id/events` | SSE: `job.queued`, `job.running`, `job.progress`, `job.cancel_requested`, `job.succeeded`, `job.failed`, `job.cancelled`, each with an `id`. Reconnecting with `Last-Event-ID` (or `?last_event_id=`) replays only later events; a finished job with nothing newer answers `204`. |
+| `GET /api/v1/jobs/:id/files/:n` | A result file (attachment); `?inline=1` for previews. |
+
+Job types: `img.process` (input `{ tool: convert|compress|resize|crop, format, quality, width, … }`, one image),
+`audio.process` (`{ tool, …options }` as `/api/process` takes them, one audio/video file; progress from ffmpeg),
+`docs.process` (`{ tool, …options }`, one PDF, or several files for `merge` / `img2pdf`). A format host fills
+in its format (`webp.openvibe.tools` converts to WebP). The synchronous `/api/process` endpoints still work and
+run the same code; the pages use jobs and keep the job id in the address (`?job=`) and in sessionStorage, so a
+reload reattaches.
+
+- **Durable.** A job and its uploaded input are in `data/jobs.db` and `data/jobs/<id>/` before the `202` is sent.
+  After a restart, queued jobs run; jobs that were running are re-queued (all three types, up to their attempt
+  limit) — a type can instead declare `onRestart: 'fail'`, which fails them with `retryable: true`.
+- **Owner-scoped.** A job is visible only to whoever created it: a signed-in person (`user:usr_…` from the
+  `ov_token` subject), an app/service principal (Network client-credentials token, audience `openvibe.tools`,
+  capabilities `tools.job.create|read|cancel`), or else this browser's `ov_tools_jobs` cookie (only its hash is
+  stored). Anyone else gets `404 tools.job.not_found`.
+- **Bounded.** `TOOLS_JOBS_CONCURRENCY` jobs run at once per satellite (default 2; `TOOLS_JOBS_CONCURRENCY_<APP>`
+  overrides), `TOOLS_JOBS_MAX_ACTIVE` unfinished jobs per owner (default 10, then `429`), plus the satellites'
+  existing burst and processing rate limits on submit.
+- **Retention.** Finished jobs expire after 1 hour (browser sessions) or 24 hours (signed-in people, principals);
+  the pruner deletes the row, its events, its files and its Media objects.
+- **Results in OpenVibe.Media** when `TOOLS_JOB_RESULTS=media`: each result file becomes a private Media object
+  (v2 object API, namespace `tools`, owner `X-OV-Subject` for signed-in people) and the job's result carries its
+  `media.media_id`; previews redirect to a short-lived signed Media URL, downloads stream through the satellite.
+  This needs `OV_OAUTH_CLIENT_SECRET` and Network grants for the `tools` client:
+  `media.object.upload` and `media.object.read` for audience `openvibe.media`, namespace `tools`, and a `tools`
+  tenant in Media. Without them (or if an upload fails) results stay on local disk and the file says
+  `storage: "local"`. Default: `local`.
+
+Environment (all in `/etc/openvibe/tools.env`): `TOOLS_JOBS_CONCURRENCY`, `TOOLS_JOBS_CONCURRENCY_<APP>`,
+`TOOLS_JOBS_MAX_ACTIVE`, `TOOLS_JOB_RESULTS`, `TOOLS_MEDIA_NAMESPACE`, `OV_MEDIA_INTERNAL_URL`, `OV_MEDIA_URL`,
+`OV_NETWORK_INTERNAL_URL`, `OV_OAUTH_CLIENT_ID`, `OV_OAUTH_CLIENT_SECRET`.
+
+Not done yet: job lifecycle events are not published to OpenVibe.Events; there is no retry endpoint (a failed
+retryable job is submitted again); quotas for external developer apps are the per-owner limits above, not a
+Codes-issued quota.
+
+## Canonical hosts and the service registry
+
+Every satellite honours the gateway's `X-OV-Tool` / `X-OV-Host-Role` / `X-OV-Canonical-Host` / `X-OV-Short-Host`
+headers (`apps/_shared/host-role.js`): canonical links, `og:url` and JSON-LD use the canonical host (a custom
+domain included), a custom domain gets its tool's page through `X-OV-Tool`, aliases the gateway missed are
+redirected, and a host a satellite does not serve goes to the tools index. Reached directly, each host is its
+own canonical as before.
+
+The gateway resolves the other services' origins (Community for pastes, the "elsewhere on OpenVibe" links)
+through Network's registry, `GET /api/v1/registry/services` (fetched on boot and every 10 minutes; the last good
+answer is kept). Until it answers, a local list is used and `/api/catalog.json` says `services.source: "fallback"`.
+Services the registry marks `placeholder` or `retired` are not linked. `OV_REGISTRY_URL` overrides the URL.
+
+## Tests
+
+`npm test` (Node 22) syntax-checks every server file and runs every `apps/*/test/*.test.js`, each in its own
+process: the job runtime end to end (restart, reattach, cancel, idempotency, owner scoping, SSE resume, pruning,
+Media results with a stand-in Media), img/audio/docs as real processes killed with SIGKILL mid-job, canonical
+hosts on every satellite, and the registry-driven catalog. The audio test needs `ffmpeg` and skips without it.
+Install first with `npm run install:all`.
 
 ## YouTube downloader: when YouTube refuses the server
 

@@ -1,0 +1,21 @@
+{
+  "id": "tools.job.read",
+  "version": "1.0",
+  "owner": "tools",
+  "status": "active",
+  "visibility": "public",
+  "description": "Read a job the calling principal created: state, progress, result (Media object references or local files), SSE progress with Last-Event-ID resume, result files.",
+  "permissions": [
+    "tools:jobs:read"
+  ],
+  "resourceConstraints": [
+    "owner"
+  ],
+  "quotaClass": "tools-read",
+  "events": [],
+  "implementedBy": [
+    "GET /api/v1/jobs/:id",
+    "GET /api/v1/jobs/:id/events",
+    "GET /api/v1/jobs/:id/files/:n"
+  ]
+}

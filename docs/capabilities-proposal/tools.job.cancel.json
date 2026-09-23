@@ -1,0 +1,19 @@
+{
+  "id": "tools.job.cancel",
+  "version": "1.0",
+  "owner": "tools",
+  "status": "active",
+  "visibility": "public",
+  "description": "Cancel a queued or running job the calling principal created.",
+  "permissions": [
+    "tools:jobs:write"
+  ],
+  "resourceConstraints": [
+    "owner"
+  ],
+  "quotaClass": "tools-job",
+  "events": [],
+  "implementedBy": [
+    "DELETE /api/v1/jobs/:id"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "id": "tools.job.create",
+  "version": "1.0",
+  "owner": "tools",
+  "status": "active",
+  "visibility": "public",
+  "description": "Submit an asynchronous tool job (img.process, audio.process, docs.process) with its input files; the job is owned by the calling principal. Idempotency-Key supported.",
+  "permissions": [
+    "tools:jobs:write"
+  ],
+  "resourceConstraints": [
+    "owner"
+  ],
+  "quotaClass": "tools-job",
+  "events": [],
+  "implementedBy": [
+    "POST /api/v1/jobs (Tools satellites: img, audio, docs)"
+  ]
+}

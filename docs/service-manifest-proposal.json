@@ -1,0 +1,26 @@
+{
+  "version": "0.2.0",
+  "contractRanges": {
+    "openvibe-contracts": ">=0.7.0 <1.0.0"
+  },
+  "id": "tools",
+  "name": "OpenVibe.Tools",
+  "status": "stable",
+  "repository": "OpenVibers/OpenVibe.Tools",
+  "domains": [
+    "openvibe.tools"
+  ],
+  "publicOrigin": "https://openvibe.tools",
+  "health": "/api/health",
+  "capabilities": [
+    "tools.job.create",
+    "tools.job.read",
+    "tools.job.cancel"
+  ],
+  "eventsProduced": [],
+  "eventsConsumed": [],
+  "namespacesOwned": [
+    "tools.*"
+  ],
+  "notes": "Wave 11: asynchronous jobs on the img, audio and docs satellites (POST/GET/DELETE /api/v1/jobs, SSE events). Job lifecycle is not yet published to OpenVibe.Events, so eventsProduced stays empty. Tools consumes media.object.upload and media.object.read (namespace tools) when TOOLS_JOB_RESULTS=media."
+}
