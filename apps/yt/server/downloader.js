@@ -70,6 +70,76 @@ function sanitizeUrl(url) {
     }
 }
 
+/** The YouTube video id of a link (watch?v=, youtu.be/, /shorts/, /live/, /embed/), or null. */
+function videoId(url) {
+    try {
+        const u = new URL(url);
+        let id = u.hostname === 'youtu.be' ? u.pathname.slice(1).split('/')[0] : u.searchParams.get('v');
+        if (!id) { const m = /^\/(?:shorts|live|embed|v)\/([^/?#]+)/.exec(u.pathname); if (m) id = m[1]; }
+        return id && /^[\w-]{6,20}$/.test(id) ? id : null;
+    } catch { return null; }
+}
+
+const sizeLabel = () => (config.download.maxFilesize >= 1024 ? `${Math.round(config.download.maxFilesize / 102.4) / 10} GB` : `${config.download.maxFilesize} MB`);
+const fmtHours = (s) => (s % 3600 === 0 ? `${s / 3600} hour${s === 3600 ? '' : 's'}` : `${Math.round(s / 60)} minutes`);
+
+/** Why this video cannot be downloaded here (null when it can). */
+function limitReason(duration, isLive) {
+    const max = config.download.maxDuration;
+    if (isLive) return 'This is a live stream that has not ended; it can be saved once it is over.';
+    if (Number.isFinite(duration) && duration > max) return `This video is ${fmtHours(Math.round(duration))} long; downloads are limited to ${fmtHours(max)}.`;
+    return null;
+}
+
+// ── Info: at most N yt-dlp runs at once, answers cached per video id ─────
+const infoCache = new Map();      // id → { info, expires }
+const infoInflight = new Map();   // id → Promise
+let infoRunning = 0;
+const infoQueue = [];
+
+function acquireInfoSlot() {
+    if (infoRunning < config.info.maxConcurrent) { infoRunning++; return Promise.resolve(); }
+    if (infoQueue.length >= config.info.maxQueued) return Promise.reject(Object.assign(new Error('The server is busy looking up other videos. Try again in a moment.'), { status: 503 }));
+    return new Promise(resolve => infoQueue.push(resolve));
+}
+function releaseInfoSlot() {
+    const next = infoQueue.shift();
+    if (next) next(); else infoRunning = Math.max(0, infoRunning - 1);
+}
+
+function cachedInfo(id) {
+    const hit = id && infoCache.get(id);
+    if (!hit) return null;
+    if (hit.expires <= Date.now()) { infoCache.delete(id); return null; }
+    return hit.info;
+}
+
+/** getInfo with the concurrency cap, the per-id cache and one run per id at a time. */
+function getInfoLimited(url, { run = getInfo } = {}) {
+    const id = videoId(url);
+    const hit = cachedInfo(id);
+    if (hit) return Promise.resolve(hit);
+    if (id && infoInflight.has(id)) return infoInflight.get(id);
+    const p = (async () => {
+        await acquireInfoSlot();
+        try {
+            const info = await run(url);
+            if (id) {
+                infoCache.set(id, { info, expires: Date.now() + config.info.cacheTtlMs });
+                while (infoCache.size > config.info.cacheMax) infoCache.delete(infoCache.keys().next().value);
+            }
+            return info;
+        } finally {
+            releaseInfoSlot();
+            if (id) infoInflight.delete(id);
+        }
+    })();
+    if (id) infoInflight.set(id, p);
+    return p;
+}
+
+function infoStats() { return { running: infoRunning, queued: infoQueue.length, cached: infoCache.size }; }
+
 // ── Quality Presets ──────────────────────────────────────────
 const QUALITY_PRESETS = {
     'best':      { video: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best', ext: 'mp4' },
@@ -132,7 +202,11 @@ function getInfo(url) {
                     uploaderUrl: info.uploader_url,
                     viewCount: info.view_count,
                     uploadDate: info.upload_date,
+                    isLive: !!info.is_live,
                     formats: getAvailableFormats(info),
+                    downloadable: !limitReason(info.duration, info.is_live),
+                    ...(limitReason(info.duration, info.is_live) && { reason: limitReason(info.duration, info.is_live) }),
+                    limits: { maxDuration: config.download.maxDuration, maxFilesizeMB: config.download.maxFilesize },
                 });
             } catch (e) {
                 reject(new Error('Failed to parse video info'));
@@ -233,8 +307,23 @@ const cleanField = (v) => {
  * knows them (85/15 otherwise) and the overall figure never decreases.
  */
 function applyLine(entry, line) {
+    if (line.startsWith('OVD|')) {
+        // pre_process: the video's length and live state, before the match filter and any download.
+        const [, dur, live] = line.split('|');
+        entry.probed = true;
+        const d = parseFloat(dur);
+        if (Number.isFinite(d)) entry.duration = d;
+        if (live === 'True') entry.isLive = true;
+        const why = limitReason(entry.duration, entry.isLive);
+        if (why && !entry.limitError) entry.limitError = why;
+        return;
+    }
     if (line.startsWith('OVP|')) {
-        const [, pctRaw, speed, eta] = line.split('|');
+        const [, pctRaw, speed, eta, bytesRaw] = line.split('|');
+        const bytes = parseFloat(bytesRaw);
+        if (Number.isFinite(bytes) && bytes > config.download.maxFilesize * 1024 * 1024 && !entry.limitError) {
+            entry.limitError = `This download is larger than ${sizeLabel()}, the limit here.`;
+        }
         const pct = parseFloat(pctRaw);
         if (!Number.isFinite(pct)) return;
         if (entry._lastPct != null && pct < entry._lastPct - 40 && entry._part < entry._weights.length - 1) entry._part++;
@@ -325,9 +414,15 @@ function startDownload(url, quality = 'best', opts = {}) {
             '--no-simulate',
             '--progress',
             '--newline',  // progress on new lines for parsing
+            // Limits: a video longer than maxDuration (or a live stream without a length) does not
+            // pass the filter, a part larger than maxFilesize is not downloaded; OVD reports the
+            // length before either happens so the error can say why.
+            '--match-filter', `duration<=${config.download.maxDuration} & !is_live`,
+            '--max-filesize', `${config.download.maxFilesize}M`,
+            '--print', 'pre_process:OVD|%(duration)s|%(is_live)s',
             '--print', 'before_dl:OVM|%(requested_formats.:.filesize)j|%(requested_formats.:.filesize_approx)j|%(title)j',
             '--print', 'post_process:OVX|pp',
-            '--progress-template', 'download:OVP|%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s',
+            '--progress-template', 'download:OVP|%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s|%(progress.downloaded_bytes)s',
             ...(preset.postprocess || []),
             cleanUrl,
         ];
@@ -362,6 +457,14 @@ function startDownload(url, quality = 'best', opts = {}) {
             const lines = (stdoutRest + data.toString()).split('\n');
             stdoutRest = lines.pop();
             for (const line of lines) applyLine(entry, line.trim());
+            // Over a limit: stop now rather than after the whole file arrived.
+            if (entry.limitError && entry.status === 'downloading') {
+                entry.status = 'error';
+                entry.error = entry.limitError;
+                entry.finishedAt = Date.now();
+                try { proc.kill('SIGTERM'); } catch { /* gone */ }
+                setTimeout(() => { try { proc.kill('SIGKILL'); } catch { /* gone */ } }, 3000).unref();
+            }
         });
 
         let stderrTail = '';
@@ -391,8 +494,12 @@ function startDownload(url, quality = 'best', opts = {}) {
             const dir = path.resolve(config.downloadsDir);
             const files = fs.readdirSync(dir).filter(f => f.startsWith(id) && !/\.(part|ytdl|temp)$/i.test(f));
             if (files.length === 0) {
+                // yt-dlp exits 0 when --match-filter or --max-filesize skipped the video.
                 entry.status = 'error';
-                entry.error = 'Output file not found';
+                entry.error = entry.limitError
+                    || (entry.probed && !Number.isFinite(entry.duration) ? 'This video has no known length (a live or upcoming stream); it can be saved once it has ended.' : null)
+                    || `This video is over the limits here: at most ${fmtHours(config.download.maxDuration)} long and ${sizeLabel()} per file.`;
+                removePartials(id);
                 return;
             }
 
@@ -609,7 +716,7 @@ function getUpstream() { return upstream; }
 function noteUpstream(state) { if (state === 'ok' || state === 'blocked') upstream = { state, checkedAt: Date.now(), detail: state === 'blocked' ? 'YouTube is refusing requests from this server address' : '' }; }
 
 module.exports = {
-    getInfo, startDownload, cancelDownload, getStatus, getFile, removeFile,
+    getInfo, getInfoLimited, cachedInfo, videoId, limitReason, infoStats, startDownload, cancelDownload, getStatus, getFile, removeFile,
     sanitizeTitle, downloadFilename, contentDisposition, applyLine,
     cleanup, startCleanup, stopCleanup, getStats, isValidUrl, probeUpstream, startUpstreamProbe, getUpstream,
 };

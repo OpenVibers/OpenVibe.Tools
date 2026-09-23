@@ -159,6 +159,13 @@
             if (!info || !info.id) { showError('No video found at that link'); return; }
             videoInfo = info;
             renderVideoCard(info);
+            // Over the length limit (or still live): show the video and say why, instead of a
+            // download that would fail.
+            if (info.downloadable === false) {
+                showError(info.reason || 'This video cannot be downloaded here.');
+                show(videoCard);
+                return;
+            }
             selectedQuality = 'best';
             renderFormats();
             hideAll();

@@ -120,7 +120,7 @@ app.use(hostGuard({ knows: seo.knowsHost, aliasOf: seo.aliasOf }));
 app.get('/api/health', (_req, res) => {
     const stats = downloader.getStats();
     const up = downloader.getUpstream();
-    res.set('Cache-Control', 'no-store').json({ status: 'ok', service: 'openvibe-yt', version: '1.0.0', stats, youtube: up.state, youtubeCheckedAt: up.checkedAt ? new Date(up.checkedAt).toISOString() : null });
+    res.set('Cache-Control', 'no-store').json({ status: 'ok', service: 'openvibe-yt', version: '1.0.0', stats, info: downloader.infoStats(), limits: { maxDuration: config.download.maxDuration, maxFilesizeMB: config.download.maxFilesize }, youtube: up.state, youtubeCheckedAt: up.checkedAt ? new Date(up.checkedAt).toISOString() : null });
 });
 
 // Get video info
@@ -130,9 +130,12 @@ app.post('/api/info', async (req, res) => {
     if (!downloader.isValidUrl(url)) return res.status(400).json({ error: 'Only YouTube URLs are supported (youtube.com, youtu.be)' });
 
     try {
-        const info = await downloader.getInfo(url);
+        // At most config.info.maxConcurrent yt-dlp lookups at once; the same video is looked up once
+        // per ten minutes however many people paste it.
+        const info = await downloader.getInfoLimited(url);
         res.json({ success: true, video: info });
     } catch (err) {
+        if (err.status === 503) return res.status(503).set('Retry-After', '5').json({ error: err.message });
         console.error('[Info] Error:', err.message);
         res.status(422).json({ error: err.message });
     }
@@ -143,6 +146,9 @@ app.post('/api/download', downloadLimiter, async (req, res) => {
     const { url, quality, title } = req.body;
     if (!url) return res.status(400).json({ error: 'URL is required' });
     if (!downloader.isValidUrl(url)) return res.status(400).json({ error: 'Only YouTube URLs are supported' });
+    // The length is known from the info lookup the page made first: refuse before yt-dlp starts.
+    const known = downloader.cachedInfo(downloader.videoId(url));
+    if (known && known.downloadable === false) return res.status(422).json({ error: known.reason });
 
     try {
         const { id } = await downloader.startDownload(url, quality || 'best', { title: typeof title === 'string' ? title : '' });
