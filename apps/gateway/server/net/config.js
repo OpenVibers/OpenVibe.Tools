@@ -99,7 +99,7 @@ const NET_TOOLS = [
     { id: 'isp',              subdomain: 'isp',              name: 'OpenVibeISP',           icon: 'fa-building',          desc: 'ISP & organization info from IP', endpoint: '/ip' },
     { id: 'asn',              subdomain: 'asn',              name: 'OpenVibeASN',           icon: 'fa-diagram-project',   desc: 'Autonomous System Number lookup', endpoint: '/ip' },
     { id: 'rdns',             subdomain: 'rdns',             name: 'OpenVibeReverseDNS',    icon: 'fa-rotate-left',       desc: 'Reverse DNS (PTR) lookup for IPv4 & IPv6', endpoint: '/rdns' },
-    { id: 'whois',            subdomain: 'whois',            name: 'OpenVibeWhois',         icon: 'fa-address-book',      desc: 'Whois domain registration lookup', endpoint: '/whois' },
+    { id: 'whois',            subdomain: 'whois',            name: 'OpenVibeWhois',         icon: 'fa-address-book',      desc: 'Whois domain registration lookup', endpoint: '/rdap' },
     { id: 'rdap',             subdomain: 'rdap',             name: 'OpenVibeRDAP',          icon: 'fa-id-card',           desc: 'RDAP — modern registration data lookup', endpoint: '/rdap' },
     // DNS
     { id: 'dns',              subdomain: 'dns',              name: 'OpenVibeDNS',           icon: 'fa-sitemap',           desc: 'DNS record lookup — A, AAAA, MX, TXT, and more', endpoint: '/dns' },

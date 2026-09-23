@@ -58,7 +58,7 @@ function netEndpoints() {
     return new Set(router.stack.filter(l => l.route).map(l => l.route.path.replace(/\/:target\?$/, '')));
 }
 
-/** net.html's TOOLS: id → { endpoint, unavailable }. */
+/** net.html's TOOLS: id → { endpoint, unavailable }, plus the endpoints renderResults() has a renderer for. */
 function netPage() {
     const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'net.html'), 'utf8');
     const block = html.slice(html.indexOf('const TOOLS = {'), html.indexOf('const CATS = {'));
@@ -67,6 +67,9 @@ function netPage() {
         const ep = /endpoint: (?:null|'([^']*)')/.exec(m[0]);
         out.set(m[1], { endpoint: ep ? ep[1] || null : undefined, unavailable: /unavailable: '/.test(m[0]) });
     }
+    const dispatch = html.slice(html.indexOf('function renderResults('), html.indexOf('// Fallback: raw JSON'));
+    out.rendered = new Set([...dispatch.matchAll(/tool\.endpoint === '([^']+)'\) return render/g)].map(m => m[1]));
+    out.renderedById = new Set([...dispatch.matchAll(/activeTool === '([a-z0-9]+)'/g)].map(m => m[1]));
     return out;
 }
 
@@ -103,6 +106,7 @@ for (const t of cat.tools) {
             }
             if (!def.endpoint || !endpoints.has(def.endpoint)) problems.push(`net/${t.id}: endpoint ${def.endpoint} is not a route of /api/net`);
             if (ui.endpoint !== def.endpoint) problems.push(`net/${t.id}: net.html calls ${ui.endpoint}, net/config.js says ${def.endpoint}`);
+            if (!page.rendered.has(ui.endpoint) && !page.renderedById.has(t.id)) problems.push(`net/${t.id}: net.html has no renderer for ${ui.endpoint} (the result would show as raw JSON)`);
             if (t.status !== 'available') problems.push(`net/${t.id}: implemented but marked ${t.status}`);
             break;
         }

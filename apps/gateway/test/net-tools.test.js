@@ -183,7 +183,7 @@ async function fakeFetch(url) {
     const egress = createEgress({ lookup, tcpConnect, tlsConnect: () => { throw new Error('unused'); }, httpRequest: fakeHttp, httpsRequest: fakeHttp });
     const app = express();
     app.set('trust proxy', 1);   // what the gateway sets: the host's nginx is the one hop
-    app.use('/api/net', createNetRoutes(null, null, { egress, resolverFor, tlsUpgrade, fetch: fakeFetch }));
+    app.use('/api/net', createNetRoutes(null, null, { egress, resolverFor, tlsUpgrade, fetch: fakeFetch, reverse: async (ip) => (ip === '2606:4700:4700::1111' ? ['one.one.one.one'] : []) }));
     const srv = await new Promise(r => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
     const base = `http://127.0.0.1:${srv.address().port}`;
     const get = async (p, headers) => { const r = await fetch(base + p, { headers }); return { status: r.status, body: await r.json() }; };
@@ -216,6 +216,31 @@ async function fakeFetch(url) {
         delete process.env.NET_IPINFO_TOKEN;
         assert.ok(fetched.some(u => u.startsWith('https://ipinfo.io/8.8.4.4/json?token=tok_test')), 'ipinfo over HTTPS with the token');
         assert.deepStrictEqual([r.body.geo.city, r.body.network.isp, r.body.network.as, r.body.reverse], ['Mountain View', 'Google LLC', 'AS15169 Google LLC', 'dns.google']);
+
+        // IPv4: CIDR blocks are calculated; private addresses are classified without an upstream call.
+        const before = fetched.length;
+        r = await get(`/api/net/ipv4?target=${q('192.168.1.77/24')}`);
+        assert.deepStrictEqual(r.body.cidr, { cidr: '192.168.1.0/24', prefix: 24, network: '192.168.1.0', broadcast: '192.168.1.255', netmask: '255.255.255.0', wildcard: '0.0.0.255', firstUsable: '192.168.1.1', lastUsable: '192.168.1.254', total: 256, usable: 254 });
+        assert.strictEqual(r.body.ipv4.type, 'Private (RFC 1918)');
+        r = await get(`/api/net/ipv4?target=${q('10.0.0.0/31')}`);
+        assert.deepStrictEqual([r.body.cidr.usable, r.body.cidr.broadcast, r.body.cidr.lastUsable], [2, null, '10.0.0.1'], '/31 is point-to-point');
+        r = await get('/api/net/ipv4?target=100.64.3.4');
+        assert.deepStrictEqual([r.body.ipv4.type, r.body.cidr.total, !!r.body.note], ['Carrier-grade NAT (RFC 6598)', 1, true]);
+        assert.strictEqual(fetched.length, before, 'no geolocation lookup for ranges or private addresses');
+        r = await get('/api/net/ipv4?target=8.8.8.8');
+        assert.deepStrictEqual([r.body.ipv4.type, r.body.geo.city], ['Public', 'Mountain View']);
+        assert.strictEqual((await get(`/api/net/ipv4?target=${q('1.2.3.4/40')}`)).status, 400);
+        // IPv6: expanded and compressed forms, type and scope, owner for global addresses.
+        r = await get(`/api/net/ipv6?target=${q('2001:DB8:0:0:1::1')}`);
+        assert.deepStrictEqual([r.body.ipv6.expanded, r.body.ipv6.compressed, r.body.ipv6.type], ['2001:0db8:0000:0000:0001:0000:0000:0001', '2001:db8::1:0:0:1', 'Documentation']);
+        r = await get(`/api/net/ipv6?target=${q('ff02::1')}`);
+        assert.deepStrictEqual([r.body.ipv6.type, r.body.ipv6.scope], ['Multicast', 'link-local']);
+        r = await get(`/api/net/ipv6?target=${q('2606:4700:4700::1111')}`);
+        assert.deepStrictEqual([r.body.ipv6.type, r.body.network.isp, r.body.ipv6.ptr], ['Global unicast', 'Google LLC', 'one.one.one.one'], 'a global address gets its owner (mock answer)');
+        const { expand6, compress6 } = createNetRoutes.helpers;
+        assert.strictEqual(expand6('::ffff:192.0.2.1'), '0000:0000:0000:0000:0000:ffff:c000:0201');
+        assert.strictEqual(compress6(expand6('2001:db8:0:0:1:0:0:1')), '2001:db8::1:0:0:1', 'the first of two equal zero runs');
+        assert.strictEqual(compress6(expand6('1:0:2:3:4:5:6:7')), '1:0:2:3:4:5:6:7', 'a single zero group is not ::');
 
         // robots
         r = await get(`/api/net/robots?target=${q('https://site.example/some/page')}&path=${q('/private/x')}`);

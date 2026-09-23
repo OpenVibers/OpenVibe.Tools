@@ -646,14 +646,14 @@
         // IP / Identity
         myip:             { name: 'What Is My IP',           icon: 'fa-location-crosshairs', cat: 'ip',  endpoint: '/myip',     placeholder: null, auto: true },
         ip:               { name: 'IP Address Lookup',             icon: 'fa-at',                cat: 'ip',    endpoint: '/ip',       placeholder: 'IP address or domain' },
-        ipv4:             { name: 'IPv4 Lookup & CIDR Calculator',           icon: 'fa-hashtag',           cat: 'ip',    endpoint: '/ipv4',     placeholder: 'IPv4 address or domain' },
+        ipv4:             { name: 'IPv4 Lookup & CIDR Calculator',           icon: 'fa-hashtag',           cat: 'ip',    endpoint: '/ipv4',     placeholder: 'IPv4 address, CIDR block (e.g. 192.168.1.0/24) or domain' },
         ipv6:             { name: 'IPv6 Lookup',           icon: 'fa-code',              cat: 'ip',    endpoint: '/ipv6',     placeholder: 'IPv6 address or domain' },
         geoip:            { name: 'IP Geolocation',          icon: 'fa-earth-americas',    cat: 'ip',    endpoint: '/ip',       placeholder: 'IP address or domain' },
         hostname:         { name: 'Hostname Lookup',       icon: 'fa-server',            cat: 'ip',    endpoint: '/rdns',     placeholder: 'IP address to resolve hostname' },
         isp:              { name: 'ISP Lookup',            icon: 'fa-building',          cat: 'ip',    endpoint: '/ip',       placeholder: 'IP address or domain' },
         asn:              { name: 'ASN Lookup',            icon: 'fa-diagram-project',   cat: 'ip',    endpoint: '/ip',       placeholder: 'IP address or domain' },
         rdns:             { name: 'Reverse DNS Lookup',     icon: 'fa-rotate-left',       cat: 'ip',    endpoint: '/rdns',     placeholder: 'IP address for reverse DNS' },
-        whois:            { name: 'Whois Lookup',          icon: 'fa-address-book',      cat: 'ip',    endpoint: '/whois',    placeholder: 'Domain or IP' },
+        whois:            { name: 'Whois Lookup',          icon: 'fa-address-book',      cat: 'ip',    endpoint: '/rdap',     placeholder: 'Domain or IP' },
         rdap:             { name: 'RDAP Lookup',           icon: 'fa-id-card',           cat: 'ip',    endpoint: '/rdap',     placeholder: 'Domain or IP for RDAP lookup' },
         // DNS
         dns:              { name: 'DNS Lookup',            icon: 'fa-sitemap',           cat: 'dns',   endpoint: '/dns',      placeholder: 'Domain to query' },
@@ -986,6 +986,8 @@
         if (activeTool === 'myip') return renderMyIP(el, data);
         if (activeTool === 'lookup' || isLookup) return renderLookup(el, data);
         if (tool.endpoint === '/ip') return renderIP(el, data);
+        if (tool.endpoint === '/ipv4') return renderIPv4(el, data);
+        if (tool.endpoint === '/ipv6') return renderIPv6(el, data);
         if (tool.endpoint === '/dns') return renderDNS(el, data);
         if (tool.endpoint === '/rdns') return renderRDNS(el, data);
         if (tool.endpoint === '/rdap') return renderRDAP(el, data);
@@ -1288,6 +1290,47 @@
                 </table>
             </div>
         </div>`;
+        el.innerHTML = html;
+    }
+
+    // ── IPv4 (address or CIDR block) and IPv6 ────────────────
+    function renderIPv4(el, data) {
+        const v = data.ipv4 || {};
+        const c = data.cidr;
+        let html = `<div class="badges">
+            <span class="badge badge-cyan">${esc(c && c.prefix < 32 ? c.cidr : data.ip)}</span>
+            <span class="badge">Class ${esc(v.class)}</span>
+            <span class="badge ${v.isPublic ? 'badge-green' : 'badge-yellow'}">${esc(v.type)}</span>
+        </div>`;
+        if (c && c.prefix < 32) {
+            const n = (x) => Number(x).toLocaleString('en-US');
+            html += `<div class="card"><div class="card-head"><i class="fa-solid fa-hashtag"></i> Subnet ${esc(c.cidr)}</div><table class="res-table">
+                ${row('Network', esc(c.network))}${c.broadcast ? row('Broadcast', esc(c.broadcast)) : ''}
+                ${row('Netmask', esc(c.netmask))}${row('Wildcard', esc(c.wildcard))}
+                ${row('Usable hosts', `${esc(c.firstUsable)} – ${esc(c.lastUsable)}`)}
+                ${row('Addresses', `${n(c.total)} total, ${n(c.usable)} usable`)}
+            </table></div>`;
+        }
+        if (data.geo) html += renderIPCard(data);
+        else if (data.note) html += `<p style="color:var(--text-muted);font-size:13px">${esc(data.note)}</p>`;
+        el.innerHTML = html;
+    }
+
+    function renderIPv6(el, data) {
+        const v = data.ipv6 || {};
+        const nw = data.network;
+        let html = `<div class="badges">
+            <span class="badge badge-cyan">${esc(data.ip)}</span>
+            <span class="badge ${v.type === 'Global unicast' ? 'badge-green' : 'badge-yellow'}">${esc(v.type)}</span>
+            ${v.scope ? `<span class="badge">scope: ${esc(v.scope)}</span>` : ''}
+        </div>`;
+        html += `<div class="card"><div class="card-head"><i class="fa-solid fa-code"></i> IPv6 address</div><table class="res-table">
+            ${row('Compressed', esc(v.compressed))}${row('Expanded', esc(v.expanded))}
+            ${v.prefix ? row('Range', esc(v.prefix)) : ''}
+            ${row('Reverse DNS', v.ptr ? esc(v.ptr) : '<span style="color:var(--text-muted)">No PTR record</span>')}
+            ${nw ? row('Network', `${esc(nw.org || nw.isp || '—')}${nw.as ? ` (${esc(nw.as)})` : ''}`) : ''}
+            ${data.geo && data.geo.country ? row('Location', esc([data.geo.city, data.geo.country].filter(Boolean).join(', '))) : ''}
+        </table></div>`;
         el.innerHTML = html;
     }
 

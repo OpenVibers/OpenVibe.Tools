@@ -25,6 +25,89 @@ const IPAPI_FIELDS = 'status,message,country,countryCode,region,regionName,city,
  * custom DNS server) goes through the shared SSRF guard: only public addresses, checked after DNS
  * and dialled as checked. `opts.egress` is for tests (a guard with a mock resolver and transports).
  */
+// ── IPv4 / IPv6 arithmetic ─────────────────────────────────
+
+const ipv4ToInt = (ip) => ip.split('.').reduce((n, o) => n * 256 + Number(o), 0) >>> 0;
+const intToIpv4 = (n) => [n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join('.');
+
+/** a.b.c.d/prefix → the subnet: network, broadcast, mask, usable range and counts (RFC 3021 for /31). */
+function cidr4(ip, prefix) {
+    const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
+    const network = (ipv4ToInt(ip) & mask) >>> 0;
+    const broadcast = (network | (~mask >>> 0)) >>> 0;
+    const total = 2 ** (32 - prefix);
+    const p2p = prefix >= 31;
+    return {
+        cidr: `${intToIpv4(network)}/${prefix}`, prefix,
+        network: intToIpv4(network), broadcast: p2p ? null : intToIpv4(broadcast),
+        netmask: intToIpv4(mask), wildcard: intToIpv4(~mask >>> 0),
+        firstUsable: intToIpv4(p2p ? network : network + 1), lastUsable: intToIpv4(p2p ? broadcast : broadcast - 1),
+        total, usable: p2p ? total : total - 2,
+    };
+}
+
+const V4_RANGES = [
+    ['0.0.0.0/8', 'This network (reserved)'], ['10.0.0.0/8', 'Private (RFC 1918)'], ['100.64.0.0/10', 'Carrier-grade NAT (RFC 6598)'],
+    ['127.0.0.0/8', 'Loopback'], ['169.254.0.0/16', 'Link-local'], ['172.16.0.0/12', 'Private (RFC 1918)'],
+    ['192.0.0.0/24', 'IETF protocol assignments'], ['192.0.2.0/24', 'Documentation (TEST-NET-1)'], ['192.168.0.0/16', 'Private (RFC 1918)'],
+    ['198.18.0.0/15', 'Benchmarking (RFC 2544)'], ['198.51.100.0/24', 'Documentation (TEST-NET-2)'], ['203.0.113.0/24', 'Documentation (TEST-NET-3)'],
+    ['224.0.0.0/4', 'Multicast'], ['255.255.255.255/32', 'Broadcast'], ['240.0.0.0/4', 'Reserved (class E)'],
+];
+
+function ipv4Info(ip) {
+    const first = Number(ip.split('.')[0]);
+    const [cls, range] = first < 128 ? ['A', '0.0.0.0 - 127.255.255.255'] : first < 192 ? ['B', '128.0.0.0 - 191.255.255.255']
+        : first < 224 ? ['C', '192.0.0.0 - 223.255.255.255'] : first < 240 ? ['D', '224.0.0.0 - 239.255.255.255'] : ['E', '240.0.0.0 - 255.255.255.255'];
+    const n = ipv4ToInt(ip);
+    const hit = V4_RANGES.find(([block]) => { const [base, p] = block.split('/'); const m = Number(p) === 0 ? 0 : (0xffffffff << (32 - Number(p))) >>> 0; return ((n & m) >>> 0) === ipv4ToInt(base); });
+    const type = hit ? hit[1] : 'Public';
+    return { class: cls, range, type, isPrivate: /Private|Carrier/.test(type), isLoopback: type === 'Loopback', isLinkLocal: type === 'Link-local', isPublic: type === 'Public' };
+}
+
+/** Any IPv6 text form (including an embedded IPv4 tail) → eight 4-digit groups. */
+function expand6(ip) {
+    let s = ip.toLowerCase().replace(/%.*$/, '');
+    const v4 = /(\d+\.\d+\.\d+\.\d+)$/.exec(s);
+    if (v4) { const n = ipv4ToInt(v4[1]); s = s.slice(0, -v4[1].length) + `${(n >>> 16).toString(16)}:${(n & 0xffff).toString(16)}`; }
+    const [head, tail] = s.split('::');
+    const left = head ? head.split(':') : [];
+    const right = tail !== undefined && tail ? tail.split(':') : [];
+    const groups = tail !== undefined ? [...left, ...Array(8 - left.length - right.length).fill('0'), ...right] : left;
+    return groups.map(g => g.padStart(4, '0')).join(':');
+}
+
+/** Eight groups → RFC 5952 text: no leading zeros, the longest run of two or more zero groups as ::. */
+function compress6(expanded) {
+    const groups = expanded.split(':').map(g => g.replace(/^0+(?=.)/, ''));
+    let best = [-1, 0];
+    for (let i = 0; i < 8;) {
+        if (groups[i] !== '0') { i++; continue; }
+        let j = i; while (j < 8 && groups[j] === '0') j++;
+        if (j - i > best[1] && j - i >= 2) best = [i, j - i];
+        i = j;
+    }
+    if (best[0] < 0) return groups.join(':');
+    return `${groups.slice(0, best[0]).join(':')}::${groups.slice(best[0] + best[1]).join(':')}`;
+}
+
+const V6_SCOPES = { 1: 'interface-local', 2: 'link-local', 4: 'admin-local', 5: 'site-local', 8: 'organization-local', 14: 'global' };
+function ipv6Kind(expanded) {
+    const g = expanded.split(':').map(x => parseInt(x, 16));
+    const zeroTo = (k) => g.slice(0, k).every(x => x === 0);
+    if (zeroTo(8)) return { type: 'Unspecified', scope: null, prefix: '::/128' };
+    if (zeroTo(7) && g[7] === 1) return { type: 'Loopback', scope: 'host', prefix: '::1/128' };
+    if (zeroTo(5) && g[5] === 0xffff) return { type: 'IPv4-mapped', scope: null, prefix: '::ffff:0:0/96' };
+    if (g[0] === 0x64 && g[1] === 0xff9b && g.slice(2, 6).every(x => x === 0)) return { type: 'NAT64 (IPv4-translated)', scope: 'global', prefix: '64:ff9b::/96', global: true };
+    if ((g[0] & 0xffc0) === 0xfe80) return { type: 'Link-local', scope: 'link', prefix: 'fe80::/10' };
+    if ((g[0] & 0xfe00) === 0xfc00) return { type: 'Unique local (private)', scope: 'site', prefix: 'fc00::/7' };
+    if ((g[0] & 0xff00) === 0xff00) return { type: 'Multicast', scope: V6_SCOPES[g[0] & 0xf] || 'reserved', prefix: 'ff00::/8' };
+    if (g[0] === 0x2001 && g[1] === 0x0db8) return { type: 'Documentation', scope: null, prefix: '2001:db8::/32' };
+    if (g[0] === 0x2001 && g[1] === 0) return { type: 'Teredo', scope: 'global', prefix: '2001::/32', global: true };
+    if (g[0] === 0x2002) return { type: '6to4', scope: 'global', prefix: '2002::/16', global: true };
+    if ((g[0] & 0xe000) === 0x2000) return { type: 'Global unicast', scope: 'global', prefix: '2000::/3', global: true };
+    return { type: 'Reserved', scope: null, prefix: null };
+}
+
 module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
     const router = express.Router();
     const egress = opts.egress || createEgress();
@@ -33,6 +116,7 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
     const fetchImpl = opts.fetch || fetch;
     const cache = opts.cache || createCache({ max: 5000, ttlMs: HOUR });
     const checks = createChecks({ egress, cache, ...(opts.resolverFor && { resolverFor: opts.resolverFor }), ...(opts.tlsUpgrade && { tlsUpgrade: opts.tlsUpgrade }) });
+    const reverseDns = opts.reverse || ((ip) => dns.reverse(ip));
 
     // ── Helpers ──────────────────────────────────────────────
 
@@ -222,11 +306,19 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
         }
     });
 
-    // IPv4 Lookup — IPv4-specific info
+    // IPv4 Lookup & CIDR calculator: a CIDR block (a.b.c.d/nn) gives the subnet; an address gives its
+    // class, what kind of range it is in, and (for public addresses) the owner and location.
     router.get('/ipv4/:target?', async (req, res) => {
         try {
-            const target = parseTarget(req.params.target || req.query.target);
-            if (!target) return fail(res, 'Please provide a valid IPv4 address or domain');
+            const rawTarget = String(req.params.target || req.query.target || '').trim();
+            const block = /^(\d{1,3}(?:\.\d{1,3}){3})\/(\d{1,2})$/.exec(rawTarget);
+            if (block) {
+                const prefix = Number(block[2]);
+                if (net.isIP(block[1]) !== 4 || prefix > 32) return fail(res, 'Enter a CIDR block like 192.168.1.0/24');
+                return ok(res, { ip: block[1], cidr: cidr4(block[1], prefix), ipv4: ipv4Info(block[1]) });
+            }
+            const target = parseTarget(rawTarget);
+            if (!target) return fail(res, 'Please provide a valid IPv4 address, CIDR block or domain');
 
             let ip = target;
             let hostname = null;
@@ -236,56 +328,22 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
                 ip = addrs[0];
                 hostname = target;
             }
-
-            // Validate it's IPv4
             if (net.isIP(ip) !== 4) return fail(res, `${ip} is not a valid IPv4 address`);
 
-            // Determine IP class
-            const parts = ip.split('.').map(Number);
-            let ipClass, range;
-            if (parts[0] < 128) { ipClass = 'A'; range = '1.0.0.0 - 126.255.255.255'; }
-            else if (parts[0] < 192) { ipClass = 'B'; range = '128.0.0.0 - 191.255.255.255'; }
-            else if (parts[0] < 224) { ipClass = 'C'; range = '192.0.0.0 - 223.255.255.255'; }
-            else if (parts[0] < 240) { ipClass = 'D'; range = '224.0.0.0 - 239.255.255.255'; }
-            else { ipClass = 'E'; range = '240.0.0.0 - 255.255.255.255'; }
+            const out = { ip, hostname, ipv4: ipv4Info(ip), cidr: cidr4(ip, 32) };
+            // Private and reserved addresses have no public owner or location.
+            if (!egress.isAllowed(ip)) return ok(res, { ...out, note: 'A private or reserved address: it has no public owner or location.' });
 
-            // Check if private
-            const isPrivate = /^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)/.test(ip);
-            const isLoopback = ip.startsWith('127.');
-            const isLinkLocal = ip.startsWith('169.254.');
-
-            // GeoIP (ipinfo with a token, else ip-api.com; cached)
-            const data = await geoLookup(ip);
-
-            if (data.status === 'fail') return fail(res, data.message || 'Lookup failed');
-
+            const data = await geoLookup(ip);   // ipinfo with a token, else ip-api.com; cached
+            if (data.status === 'fail') return ok(res, { ...out, note: data.message || 'No owner information' });
             ok(res, {
-                ip: data.query || ip,
+                ...out,
                 hostname: hostname || data.reverse || null,
-                ipv4: {
-                    class: ipClass,
-                    range: range,
-                    isPrivate: isPrivate,
-                    isLoopback: isLoopback,
-                    isLinkLocal: isLinkLocal,
-                },
                 geo: {
-                    country: data.country,
-                    countryCode: data.countryCode,
-                    region: data.regionName,
-                    regionCode: data.region,
-                    city: data.city,
-                    zip: data.zip,
-                    lat: data.lat,
-                    lon: data.lon,
-                    timezone: data.timezone,
+                    country: data.country, countryCode: data.countryCode, region: data.regionName, regionCode: data.region,
+                    city: data.city, zip: data.zip, lat: data.lat, lon: data.lon, timezone: data.timezone,
                 },
-                network: {
-                    isp: data.isp,
-                    org: data.org,
-                    as: data.as,
-                    asname: data.asname,
-                },
+                network: { isp: data.isp, org: data.org, as: data.as, asname: data.asname },
                 reverse: data.reverse || null,
             });
         } catch (err) {
@@ -293,7 +351,8 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
         }
     });
 
-    // IPv6 Lookup — IPv6-specific info
+    // IPv6 Lookup: full and compressed notation, what kind of address it is, reverse DNS, and the owner
+    // of a global address.
     router.get('/ipv6/:target?', async (req, res) => {
         try {
             const target = parseTarget(req.params.target || req.query.target);
@@ -307,32 +366,23 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
                 ip = addrs[0];
                 hostname = target;
             }
-
-            // Validate it's IPv6
             if (net.isIP(ip) !== 6) return fail(res, `${ip} is not a valid IPv6 address`);
 
-            // Determine IPv6 type
-            let ipv6Type = 'Global Unicast';
-            if (ip.startsWith('::1')) ipv6Type = 'Loopback';
-            else if (ip.startsWith('::')) ipv6Type = 'Loopback/Unspecified';
-            else if (ip.startsWith('fe80:')) ipv6Type = 'Link-Local';
-            else if (ip.startsWith('ff')) ipv6Type = 'Multicast';
-            else if (ip.startsWith('fc') || ip.startsWith('fd')) ipv6Type = 'Unique Local (Private)';
-            else if (ip.startsWith('2001:db8:')) ipv6Type = 'Documentation';
-
-            // Reverse DNS lookup
-            const hostnames = await dns.reverse(ip).catch(() => []);
-
-            ok(res, {
-                ip: ip,
-                hostname: hostname || hostnames[0] || null,
-                ipv6: {
-                    type: ipv6Type,
-                    compressed: ip,
-                    ptr: hostnames[0] || null,
-                },
-                note: 'Most public IPv6 addresses do not have geolocation data available through standard APIs.',
-            });
+            const expanded = expand6(ip);
+            const kind = ipv6Kind(expanded);
+            const hostnames = await reverseDns(ip).catch(() => []);
+            const out = {
+                ip: compress6(expanded), hostname: hostname || hostnames[0] || null,
+                ipv6: { type: kind.type, scope: kind.scope, prefix: kind.prefix, expanded, compressed: compress6(expanded), ptr: hostnames[0] || null },
+            };
+            if (kind.global && egress.isAllowed(ip)) {
+                const data = await geoLookup(ip).catch(() => null);
+                if (data && data.status === 'success') {
+                    out.network = { isp: data.isp, org: data.org, as: data.as, asname: data.asname };
+                    out.geo = { country: data.country, countryCode: data.countryCode, region: data.regionName, city: data.city, timezone: data.timezone };
+                }
+            }
+            ok(res, out);
         } catch (err) {
             fail(res, err.message || 'IPv6 lookup failed', 500);
         }
@@ -862,3 +912,5 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
 
     return router;
 };
+
+module.exports.helpers = { cidr4, ipv4Info, expand6, compress6, ipv6Kind };
