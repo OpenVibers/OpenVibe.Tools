@@ -92,4 +92,25 @@ function setupJobs(o) {
     return system;
 }
 
-module.exports = { setupJobs, createJobSystem, mountJobRoutes, createOwnerResolver, createMediaResults, mediaFromEnv, mediaOrigin, contentDisposition, JobError, CAPS };
+/**
+ * Readiness checks the job runtime adds to a satellite's /api/ready (apps/_shared/observe.js):
+ * with TOOLS_JOB_RESULTS=media, whether results really go to Media and Media answers (optional —
+ * a failure there is reported as degraded, never hidden).
+ */
+function readyChecks(getSystem, env = process.env) {
+    if (String(env.TOOLS_JOB_RESULTS || 'local').toLowerCase() !== 'media') return [];
+    const url = `${String(env.OV_MEDIA_INTERNAL_URL || env.MEDIA_URL || 'http://127.0.0.1:4100').replace(/\/+$/, '')}/healthz`;
+    return [{
+        name: 'media_results', required: false, cacheMs: 15000, timeoutMs: 1500,
+        description: 'TOOLS_JOB_RESULTS=media: finished job files are uploaded to OpenVibe.Media (liveness of Media, not its readiness)',
+        check: async () => {
+            const sys = getSystem();
+            if (!sys) return 'job runtime not set up yet';
+            if (!sys.media) return 'TOOLS_JOB_RESULTS=media, but results stay local (OV_OAUTH_CLIENT_SECRET is not set)';
+            const res = await fetch(url, { signal: AbortSignal.timeout(1500) });
+            return res.ok ? true : `Media answered HTTP ${res.status}`;
+        },
+    }];
+}
+
+module.exports = { setupJobs, readyChecks, createJobSystem, mountJobRoutes, createOwnerResolver, createMediaResults, mediaFromEnv, mediaOrigin, contentDisposition, JobError, CAPS };

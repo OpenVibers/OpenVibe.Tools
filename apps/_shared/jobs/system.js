@@ -458,7 +458,10 @@ function createJobSystem(o) {
         lastSeq: (id) => store.lastSeq(id),
         types: () => [...types.keys()],
         media,
-        stats: () => ({ running: active.size, concurrency, ...store.counts(), results: media ? 'media' : 'local' }),
+        // running (after the spread) is the store's count of rows in 'running'; executing is this process's.
+        stats: () => ({ running: active.size, concurrency, ...store.counts(), executing: active.size, results: media ? 'media' : 'local' }),
+        /** True between start() and stop(): the worker picks up queued jobs. */
+        isRunning: () => started && !stopped,
         store,
         JobError,
     };

@@ -31,7 +31,26 @@ const analytics = new AnalyticsTracker(analyticsDb, 'openvibe-yt');
 
 const app = express();
 // What this deploy runs (ADR-016); the shared navbar's release-watch polls it on every tool host.
-{ const release = require('openvibe-shared/release').createRelease({ service: 'tools', root: require('path').join(__dirname, '..', '..', '..') }); app.get('/release.json', release.handler); }
+const release = require('openvibe-shared/release').createRelease({ service: 'tools', root: require('path').join(__dirname, '..', '..', '..') });
+// Metrics (GET /metrics, direct loopback callers only) and GET /api/ready from this server's real
+// dependencies (roadmap Track O). First, so the HTTP metrics see every request.
+const { observe, checks: ready } = require('../../_shared/observe');
+observe({
+    app, metrics: require('openvibe-shared/metrics'), ready: require('openvibe-shared/ready'),
+    service: 'tools-yt', release: release.release,
+    checks: [
+        ready.writableDir('downloads_dir', path.resolve(config.downloadsDir), { description: 'downloads are written here before they are served' }),
+        ready.sqlite('analytics_db', analyticsDb, { required: false, description: 'visit analytics only; downloads work without it' }),
+        ready.binary('yt_dlp', config.ytdlpPath, { description: 'every download runs yt-dlp' }),
+        ready.binary('ffmpeg', process.env.FFMPEG_PATH || 'ffmpeg', { description: 'merging video+audio and audio conversion' }),
+        ...(process.env.YT_COOKIES_FILE ? [ready.readableFile('yt_cookies', process.env.YT_COOKIES_FILE, { description: 'YT_COOKIES_FILE is set; yt-dlp is given these cookies' })] : []),
+        ready.networkKey('network_key', require('./auth').getPublicKey, { description: 'recognises signed-in visitors (higher limits); anonymous use works without it' }),
+    ],
+    // Download progress streams last as long as the download.
+    skip: (req) => /^\/api\/status\/[^/]+\/stream$/.test(req.path),
+    details: () => ({ yt_proxy_configured: !!String(process.env.YT_PROXY || '').trim() }),
+});
+app.get('/release.json', release.handler);
 
 // Legal documents live on the apex; every tool host points there instead of answering 404.
 app.get(['/terms', '/privacy', '/dmca', '/tos'], (req, res) => res.redirect(301, 'https://openvibe.tools' + (req.path === '/tos' ? '/terms' : req.path)));

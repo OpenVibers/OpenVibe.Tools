@@ -40,7 +40,27 @@ const analytics = new AnalyticsTracker(analyticsDb, 'openvibe-audio');
 
 const app = express();
 // What this deploy runs (ADR-016); the shared navbar's release-watch polls it on every tool host.
-{ const release = require('openvibe-shared/release').createRelease({ service: 'tools', root: require('path').join(__dirname, '..', '..', '..') }); app.get('/release.json', release.handler); }
+const release = require('openvibe-shared/release').createRelease({ service: 'tools', root: require('path').join(__dirname, '..', '..', '..') });
+// Metrics (GET /metrics, direct loopback callers only) and GET /api/ready from this server's real
+// dependencies (roadmap Track O). First, so the HTTP metrics see every request.
+const { observe, checks: ready } = require('../../_shared/observe');
+observe({
+    app, metrics: require('openvibe-shared/metrics'), ready: require('openvibe-shared/ready'),
+    service: 'tools-audio', release: release.release,
+    checks: [
+        ready.sqlite('jobs_db', () => jobs.db, { sql: 'SELECT COUNT(*) AS n FROM tool_jobs', description: 'job store (jobs.db)' }),
+        ready.jobRuntime('job_runtime', () => jobs),
+        ready.writableDir('data_dir', path.resolve(__dirname, '..', config.dataDir), { description: 'jobs.db and job inputs/results' }),
+        ready.writableDir('uploads_dir', path.resolve(config.uploadsDir), { description: 'synchronous uploads' }),
+        ready.writableDir('output_dir', path.resolve(config.outputDir), { description: 'synchronous results' }),
+        ready.sqlite('analytics_db', analyticsDb, { required: false, description: 'visit analytics only; tools work without it' }),
+        ready.networkKey('network_key', auth.getPublicKey, { description: 'verifies signed-in users and service tokens on the job API; anonymous use works without it' }),
+        ...jobsRuntime.readyChecks(() => jobs),
+        ready.binary('ffmpeg', process.env.FFMPEG_PATH || 'ffmpeg', { description: 'every audio tool runs ffmpeg; without it jobs and conversions fail' }),
+    ],
+    jobs: () => jobs,
+});
+app.get('/release.json', release.handler);
 
 // Legal documents live on the apex; every tool host points there instead of answering 404.
 app.get(['/terms', '/privacy', '/dmca', '/tos'], (req, res) => res.redirect(301, 'https://openvibe.tools' + (req.path === '/tos' ? '/terms' : req.path)));

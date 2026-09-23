@@ -30,7 +30,48 @@ const { DEV_TOOL_MAP, DEV_ALIASES } = require('./dev/config');
 
 const app = express();
 // What this deploy runs (ADR-016); the shared navbar's release-watch polls it on every tool host.
-{ const release = require('openvibe-shared/release').createRelease({ service: 'tools', root: require('path').join(__dirname, '..', '..', '..') }); app.get('/release.json', release.handler); }
+const release = require('openvibe-shared/release').createRelease({ service: 'tools', root: require('path').join(__dirname, '..', '..', '..') });
+
+// The satellites on this host (ports), for readiness and the analytics roll-up.
+// TOOLS_SATELLITE_PORTS="img=5012,yt=5013" overrides single entries (tests, a moved unit).
+const SATELLITES = { maps: 4010, food: 4011, img: 4012, yt: 4013, audio: 4014, text: 4015, docs: 4016 };
+for (const pair of String(process.env.TOOLS_SATELLITE_PORTS || '').split(',')) {
+    const [name, port] = pair.split('=').map(x => String(x || '').trim());
+    if (SATELLITES[name] && /^\d{2,5}$/.test(port)) SATELLITES[name] = Number(port);
+}
+const SATELLITE_BY_PORT = new Map(Object.entries(SATELLITES).map(([name, port]) => [port, name]));
+
+// Metrics (GET /metrics, direct loopback callers only) and readiness (roadmap Track O). The metrics
+// middleware goes first so it sees every request, proxied ones included; /api/ready is mounted after
+// the host router, so on a satellite's host it is the satellite's own.
+const { observe, checks: ready } = require('../../_shared/observe');
+const registry = require('./registry');
+let auth = null;   // created below; the key check reads it at request time
+const obs = observe({
+    app, metrics: require('openvibe-shared/metrics'), ready: require('openvibe-shared/ready'),
+    service: 'tools', release: release.release, mountReady: false,
+    normalize: (req) => {
+        if (req.ovHost && req.ovHost.port) return `proxy:${SATELLITE_BY_PORT.get(req.ovHost.port) || 'other'}`;
+        if (req.baseUrl === '/api/pastes') return '/api/pastes/*';
+        if (isNetHost(req)) return 'page:net';
+        if (isDevHost(req)) return 'page:dev';
+        return null;
+    },
+    checks: [
+        {
+            name: 'catalog', required: true, description: 'the tool catalog every apex page, host route and proxy decision is built from',
+            check: () => { const n = registry.get().tools.length; return n > 0 ? { ok: true, detail: { tools: n } } : 'catalog is empty'; },
+        },
+        ready.networkKey('network_key', () => auth && auth.client.publicKey, { description: 'verifies signed-in visitors offline; signed-out use works without it' }),
+        {
+            name: 'service_directory', required: false, description: 'other services\' origins from the Network registry (a built-in fallback list is used without it)',
+            check: () => { const s = registry.services.status(); return s.source === 'registry' ? { ok: true, detail: { as_of: s.as_of, last_ok: s.last_ok } } : `using the built-in fallback list${s.last_error ? ` (${s.last_error})` : ''}`; },
+        },
+        ready.upstream('community', `${config.communityUrl}/api/ready`, { description: 'paste API proxy (pastes.openvibe.tools)' }),
+        ...Object.entries(SATELLITES).map(([name, port]) => ready.upstream(`satellite_${name}`, `http://127.0.0.1:${port}/api/ready`, { description: `${name} satellite (port ${port}); its hosts fail without it` })),
+    ],
+});
+app.get('/release.json', release.handler);
 
 function getRequestHost(req) {
     return String(req.headers.host || '').split(':')[0].toLowerCase();
@@ -55,7 +96,6 @@ app.use(helmet({
     crossOriginEmbedderPolicy: false,
 }));
 // ── Host roles: aliases redirect, unknown hosts leave, satellite hosts are proxied ──
-const registry = require('./registry');
 const { hostRoles } = require('./registry/host-middleware');
 registry.start();
 app.use(hostRoles({
@@ -64,6 +104,8 @@ app.use(hostRoles({
     // Gateway-served subdomains that predate the catalog (tool aliases, the pastes hand-off).
     isLegacyHost: (sub) => NET_TOOL_MAP.has(sub) || !!NET_ALIASES[sub] || DEV_TOOL_MAP.has(sub) || !!DEV_ALIASES[sub] || ['pastes', 'paste', 'my', 'login'].includes(sub),
 }));
+
+app.get('/api/ready', obs.readiness.handler);
 
 app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
@@ -109,7 +151,7 @@ app.use('/api/', rateLimit({ windowMs: 60_000, max: 120 }));
 app.use('/auth/', rateLimit({ windowMs: 15 * 60_000, max: 60 }));
 
 // ── Auth (OAuth2 client of OpenVibe.Network) ─────────────────
-const auth = createAuthClient(config);
+auth = createAuthClient(config);
 app.locals.auth = auth;
 app.locals.config = config;
 
@@ -211,7 +253,6 @@ function sendTool(req, res, file) {
 // The gateway keeps no analytics of its own; it adds up the satellites'. Internal key + loopback only.
 {
     const { requireInternal } = require('../../_shared/internal-auth');
-    const SATELLITES = { maps: 4010, food: 4011, img: 4012, yt: 4013, audio: 4014, text: 4015, docs: 4016 };
     app.get('/api/internal/analytics', requireInternal, async (req, res) => {
         const days = Math.min(parseInt(req.query.days, 10) || 30, 365);
         const hours = req.query.hours ? Math.min(parseInt(req.query.hours, 10), 8760) : null;

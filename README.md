@@ -119,6 +119,33 @@ through Network's registry, `GET /api/v1/registry/services` (fetched on boot and
 answer is kept). Until it answers, a local list is used and `/api/catalog.json` says `services.source: "fallback"`.
 Services the registry marks `placeholder` or `retired` are not linked. `OV_REGISTRY_URL` overrides the URL.
 
+## Metrics and readiness
+
+Every server (gateway and satellites) mounts `apps/_shared/observe.js` with `openvibe-shared/metrics` and
+`openvibe-shared/ready`:
+
+- `GET /metrics` — Prometheus text for **direct loopback callers only** (127.0.0.1/::1 with no
+  `X-Forwarded-For`/`X-Real-IP`); anything through nginx or the gateway gets 404, and each nginx server block
+  also answers `location = /metrics` with 404. HTTP golden signals are labelled by route template
+  (`/api/v1/jobs/:id`), proxied satellite traffic on the gateway by satellite (`proxy:img`), SPA pages and
+  static files by a fixed label — never the raw URL. `release_info{service="tools"|"tools-<app>"}`, process
+  metrics, and on img/audio/docs `tools_jobs{app,state}` (a group-by on jobs.db) and
+  `tools_jobs_executing{app,kind="executing"|"limit"}`.
+- `GET /api/ready` — named checks with `status`, `required`, `latency_ms`, `checked_at`; HTTP 503 only when a
+  required check fails, otherwise 200 with failed optional checks listed in `degraded`. `/api/health` is
+  unchanged.
+
+| Server | Required | Optional (degraded when failing) |
+|---|---|---|
+| gateway (4001) | `catalog` | `network_key`, `service_directory` (Network registry vs fallback list), `community` (`/api/ready`), `satellite_<app>` for all seven (`/api/ready`, cached 15 s) |
+| img, docs (4012, 4016) | `jobs_db` (query), `job_runtime` (worker started), `data_dir`, `uploads_dir`, `output_dir` (write test) | `analytics_db`, `network_key`, `media_results` (only with `TOOLS_JOB_RESULTS=media`) |
+| audio (4014) | same as img | same as img, plus `ffmpeg` on PATH |
+| yt (4013) | `downloads_dir` | `analytics_db`, `yt_dlp`, `ffmpeg`, `yt_cookies` (when `YT_COOKIES_FILE` is set), `network_key` |
+| food (4011) | `maps` (every food API is proxied to it) | `analytics_db` |
+| maps, text (4010, 4015) | — | `analytics_db` (maps' external data sources are not probed) |
+
+`TOOLS_SATELLITE_PORTS="img=5012,…"` overrides the gateway's satellite ports (tests, a moved unit).
+
 ## Tests
 
 `npm test` (Node 22) syntax-checks every server file and runs every `apps/*/test/*.test.js`, each in its own

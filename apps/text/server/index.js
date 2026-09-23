@@ -23,7 +23,18 @@ const analytics = new AnalyticsTracker(analyticsDb, 'openvibe-text');
 
 const app = express();
 // What this deploy runs (ADR-016); the shared navbar's release-watch polls it on every tool host.
-{ const release = require('openvibe-shared/release').createRelease({ service: 'tools', root: require('path').join(__dirname, '..', '..', '..') }); app.get('/release.json', release.handler); }
+const release = require('openvibe-shared/release').createRelease({ service: 'tools', root: require('path').join(__dirname, '..', '..', '..') });
+// Metrics (GET /metrics, direct loopback callers only) and GET /api/ready from this server's real
+// dependencies (roadmap Track O). First, so the HTTP metrics see every request.
+const { observe, checks: ready } = require('../../_shared/observe');
+observe({
+    app, metrics: require('openvibe-shared/metrics'), ready: require('openvibe-shared/ready'),
+    service: 'tools-text', release: release.release,
+    checks: [
+        ready.sqlite('analytics_db', analyticsDb, { required: false, description: 'visit analytics only; the text tools run in the browser and on this process' }),
+    ],
+});
+app.get('/release.json', release.handler);
 
 // Legal documents live on the apex; every tool host points there instead of answering 404.
 app.get(['/terms', '/privacy', '/dmca', '/tos'], (req, res) => res.redirect(301, 'https://openvibe.tools' + (req.path === '/tos' ? '/terms' : req.path)));
