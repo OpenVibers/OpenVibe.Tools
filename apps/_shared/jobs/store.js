@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS tool_jobs (
     updated_at       INTEGER NOT NULL,
     started_at       INTEGER,
     finished_at      INTEGER,
-    expires_at       INTEGER
+    expires_at       INTEGER,
+    env              TEXT NOT NULL DEFAULT 'production' CHECK (env IN ('production','sandbox'))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS tool_jobs_idem ON tool_jobs(owner, idempotency_key) WHERE idempotency_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS tool_jobs_state ON tool_jobs(state, id);
@@ -57,10 +58,14 @@ function createStore(db) {
     db.pragma('journal_mode = WAL');
     db.pragma('busy_timeout = 5000');
     db.exec(SCHEMA);
+    // Databases created before developer-app sandboxes: add the env column.
+    if (!db.prepare('PRAGMA table_info(tool_jobs)').all().some((c) => c.name === 'env')) {
+        db.exec("ALTER TABLE tool_jobs ADD COLUMN env TEXT NOT NULL DEFAULT 'production' CHECK (env IN ('production','sandbox'))");
+    }
 
     const q = {
-        insert: db.prepare(`INSERT INTO tool_jobs (id, type, type_version, owner, state, input_json, files_json, idempotency_key, request_hash, max_attempts, ttl_ms, created_at, updated_at)
-            VALUES (@id, @type, @type_version, @owner, 'queued', @input_json, @files_json, @idempotency_key, @request_hash, @max_attempts, @ttl_ms, @now, @now)`),
+        insert: db.prepare(`INSERT INTO tool_jobs (id, type, type_version, owner, state, input_json, files_json, idempotency_key, request_hash, max_attempts, ttl_ms, created_at, updated_at, env)
+            VALUES (@id, @type, @type_version, @owner, 'queued', @input_json, @files_json, @idempotency_key, @request_hash, @max_attempts, @ttl_ms, @now, @now, @env)`),
         get: db.prepare('SELECT * FROM tool_jobs WHERE id = ?'),
         byIdem: db.prepare('SELECT * FROM tool_jobs WHERE owner = ? AND idempotency_key = ?'),
         nextQueued: db.prepare("SELECT * FROM tool_jobs WHERE state = 'queued' ORDER BY id LIMIT ?"),

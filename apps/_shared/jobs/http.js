@@ -71,11 +71,16 @@ function createOwnerResolver(o) {
             const claims = parts.length === 3 ? b64json(parts[1]) : null;
             const looksLikePrincipal = claims && (Array.isArray(claims.cap) || /^(svc|app|mod):/.test(String(claims.sub || '')));
             if (looksLikePrincipal) {
-                const r = contracts.serviceAuth.verifyServiceToken(token, { publicKey: o.getPublicKey(), issuer: o.issuer, audience });
+                // Job routes are the only Tools routes that take sandbox tokens (developer apps, ADR-014), and
+                // only from apps: a sandbox token that is not an app's is refused.
+                const r = contracts.serviceAuth.verifyServiceToken(token, { publicKey: o.getPublicKey(), issuer: o.issuer, audience, acceptSandbox: true });
+                if (r.ok && r.claims.env === 'sandbox' && !(r.claims.actor_type === 'app' && /^app:/.test(String(r.claims.sub || '')))) {
+                    return { error: [401, 'token.sandbox_refused', 'sandbox tokens are accepted only from developer apps'] };
+                }
                 if (!r.ok) return { error: [401, r.code, r.reason] };
                 const denied = principalCapability(r.claims, CAPS[action] || CAPS.read);
                 if (denied) return { error: denied };
-                return { owner: r.claims.sub, kind: 'principal', claims: r.claims };
+                return { owner: r.claims.sub, kind: 'principal', claims: r.claims, env: r.claims.env === 'sandbox' ? 'sandbox' : 'production' };
             }
         }
         const sid = req.user && req.user.subject_id;
@@ -163,7 +168,7 @@ function mountJobRoutes(app, o) {
         const files = list.map(f => ({ path: f.path, buffer: f.path ? undefined : f.buffer, name: f.originalname, mime: f.mimetype, size: f.size }));
         const key = req.headers['idempotency-key'] != null ? String(req.headers['idempotency-key']) : (b.idempotency_key != null ? String(b.idempotency_key) : null);
         try {
-            const { job, replayed } = await system.submit({ owner: w.owner, type: String(b.type || ''), input, files, idempotencyKey: key, ttlMs: ttlMs(req, w) });
+            const { job, replayed } = await system.submit({ owner: w.owner, type: String(b.type || ''), input, files, idempotencyKey: key, ttlMs: ttlMs(req, w), env: w.env || 'production' });
             res.set('Location', `/api/v1/jobs/${job.id}`);
             if (replayed) res.set('Idempotent-Replayed', 'true');
             return res.status(replayed ? 200 : 202).json(system.view(job));

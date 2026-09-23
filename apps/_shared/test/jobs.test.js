@@ -363,7 +363,7 @@ async function readSse(url, { headers = {}, stop = () => false, ms = 5000 } = {}
         // ── Service/app principals (tools.job.* capabilities) ───
         s = await satellite(path.join(root, 'f'));
         const token = (claims) => contracts.serviceAuth.signServiceToken({
-            iss: ISSUER, sub: 'app:app_01JCCCCCCCCCCCCCCCCCCCCCCC', actor_type: 'app', aud: ['openvibe.tools'],
+            iss: ISSUER, sub: 'app:app_01JCCCCCCCCCCCCCCCCCCCCCCC', actor_type: 'app', aud: ['openvibe.tools'], project_id: 'prj_01JCCCCCCCCCCCCCCCCCCCCCCC', env: 'production',
             cap: ['tools.job.create', 'tools.job.read'], iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 300, jti: crypto.randomBytes(8).toString('hex'), ...claims,
         }, privateKey);
         const dev = client(s.base, { bearer: token({}) });
@@ -381,6 +381,22 @@ async function readSse(url, { headers = {}, stop = () => false, ms = 5000 } = {}
         assert.strictEqual(r.status, 401); assert.strictEqual(r.body.code, 'token.wrong_audience');
         r = await client(s.base, { bearer: token({ sub: 'app:app_01JDDDDDDDDDDDDDDDDDDDDDDD' }) })(`/api/v1/jobs/${devJob}`);
         assert.strictEqual(r.status, 404, 'another app cannot read it');
+
+        // ── Developer-app sandbox (ADR-014): only apps, kept apart, never sent to Media ───
+        const sbx = client(s.base, { bearer: token({ env: 'sandbox', cap: ['tools.job.create', 'tools.job.read', 'tools.job.cancel'] }) });
+        r = await sbx('/api/v1/jobs', json({ type: 'test.upper', input: { text: 'sandbox' } }));
+        assert.strictEqual(r.status, 202, 'a sandbox app token can submit');
+        const sbxJob = r.body.id;
+        await until(async () => (await sbx(`/api/v1/jobs/${sbxJob}`)).body.state === 'succeeded', 'sandbox job');
+        assert.strictEqual(s.system.get(sbxJob).env, 'sandbox', 'the job remembers its environment');
+        assert.ok(s.system.get(sbxJob).ttl_ms <= 30 * 60 * 1000, 'sandbox jobs are kept briefly');
+        r = await client(s.base, { bearer: token({ sub: 'app:app_01JDDDDDDDDDDDDDDDDDDDDDDD', env: 'sandbox' }) })(`/api/v1/jobs/${sbxJob}`);
+        assert.strictEqual(r.status, 404, 'another sandbox app cannot read it');
+        r = await client(s.base, { bearer: contracts.serviceAuth.signServiceToken({
+            iss: ISSUER, sub: 'svc:live', actor_type: 'service', aud: ['openvibe.tools'], cap: ['tools.job.create'], env: 'sandbox',
+            iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 300, jti: crypto.randomBytes(8).toString('hex'),
+        }, privateKey) })('/api/v1/jobs', json({ type: 'test.upper', input: {} }));
+        assert.strictEqual(r.status, 401, 'a sandbox token that is not an app is refused'); assert.strictEqual(r.body.code, 'token.sandbox_refused');
         await s.close();
 
         console.log('jobs (shared runtime): all checks passed');

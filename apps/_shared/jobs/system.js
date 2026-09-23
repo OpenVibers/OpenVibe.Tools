@@ -164,7 +164,12 @@ function createJobSystem(o) {
      * submit({ owner, type, input, files: [{ path | buffer, name, mime, size }], idempotencyKey, ttlMs })
      * → { job (row), replayed }. Temp input files are consumed (moved) on accept and deleted on replay.
      */
-    async function submit({ owner, type, input = {}, files = [], idempotencyKey = null, ttlMs = HOUR }) {
+    // Developer-app sandbox jobs: fewer at a time, kept briefly, results never leave this server.
+    const SANDBOX_MAX_ACTIVE = Math.max(1, o.sandboxMaxActivePerOwner || 2);
+    const SANDBOX_TTL_MS = 30 * 60 * 1000;
+    async function submit({ owner, type, input = {}, files = [], idempotencyKey = null, ttlMs = HOUR, env = 'production' }) {
+        if (env !== 'sandbox') env = 'production';
+        if (env === 'sandbox') ttlMs = Math.min(ttlMs, SANDBOX_TTL_MS);
         if (stopped) throw new JobError(503, 'tools.job.unavailable', 'The job system is shutting down');
         const discard = () => Promise.all(files.map(f => (f.path ? fsp.unlink(f.path).catch(() => {}) : null)));
         try {
@@ -192,7 +197,8 @@ function createJobSystem(o) {
                     return { job: prior, replayed: true };
                 }
             }
-            if (store.activeForOwner(owner) >= maxActivePerOwner) throw new JobError(429, 'tools.job.too_many_active', `At most ${maxActivePerOwner} unfinished jobs at a time; wait for one to finish or cancel one`);
+            const limit = env === 'sandbox' ? Math.min(SANDBOX_MAX_ACTIVE, maxActivePerOwner) : maxActivePerOwner;
+            if (store.activeForOwner(owner) >= limit) throw new JobError(429, 'tools.job.too_many_active', `At most ${limit} unfinished jobs at a time; wait for one to finish or cancel one`);
 
             const id = `job_${contracts.ids.ulid()}`;
             const inDir = path.join(jobDir(id), 'in');
@@ -209,7 +215,7 @@ function createJobSystem(o) {
                     store.insert({
                         id, type, type_version: def.version, owner, input_json: JSON.stringify(input), files_json: JSON.stringify(stored),
                         idempotency_key: idempotencyKey == null ? null : String(idempotencyKey), request_hash: requestHash,
-                        max_attempts: def.maxAttempts, ttl_ms: ttlMs, now: Date.now(),
+                        max_attempts: def.maxAttempts, ttl_ms: ttlMs, now: Date.now(), env,
                     });
                 })();
             } catch (err) {
@@ -324,7 +330,7 @@ function createJobSystem(o) {
             const size = fs.statSync(local).size;
             const sha256 = await sha256File(local);
             const rec = { name: String(f.name || `result-${i}`).slice(0, 200), mime: f.mime || 'application/octet-stream', size, sha256, storage: 'local', media: null, _path: local };
-            if (media && !entry.reason) {
+            if (media && !entry.reason && row.env !== 'sandbox') {
                 try {
                     const progress = progressFn(row.id, entry);
                     progress(99, 'Storing the result');
