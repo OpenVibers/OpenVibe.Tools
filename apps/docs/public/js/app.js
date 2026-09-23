@@ -57,6 +57,7 @@
         }
 
         applyBranding();
+        showAvailability();
         initNavbar();
         initNotifications();
         if (typeof OpenVibeAccountSwitcher !== 'undefined') OpenVibeAccountSwitcher.init({ apiBase: 'https://openvibe.network' });
@@ -107,6 +108,28 @@
         // Update meta description
         const metaDesc = document.querySelector('meta[name="description"]');
         if (metaDesc && ctx.seoDescription) metaDesc.content = ctx.seoDescription;
+    }
+
+    // A tool whose server-side program is not installed yet (Protect/Unlock need qpdf, PDF to image
+    // needs poppler): the page says so instead of letting an upload fail.
+    function showAvailability() {
+        const tool = (ctx.tools || []).find(t => t.id === selectedTool);
+        const off = !!(tool && tool.available === false);
+        let note = document.getElementById('tool-notice');
+        const zone = document.getElementById('upload-zone');
+        if (off && !note && zone) {
+            note = document.createElement('div');
+            note.id = 'tool-notice';
+            note.className = 'tool-notice';
+            note.setAttribute('role', 'status');
+            zone.parentNode.insertBefore(note, zone);
+        }
+        if (note) {
+            note.textContent = off ? `${tool.label} is being set up on the server and is not available yet. The other PDF tools work now.` : '';
+            note.style.display = off ? '' : 'none';
+        }
+        if (zone) zone.style.display = off ? 'none' : '';
+        if (off) { optionsPanel.style.display = 'none'; processBtn.disabled = true; }
     }
 
     function updateUploadHint() {
@@ -204,6 +227,7 @@
                 resetUpload();
                 updateUploadHint();
                 updateProcessButton();
+                showAvailability();
             });
         });
     }
@@ -518,6 +542,8 @@
                 break;
             case 'protect':
                 formData.append('password', $('#protect-password').value);
+                formData.append('allowPrint', $('#protect-print').checked ? 'true' : 'false');
+                formData.append('allowCopy', $('#protect-copy').checked ? 'true' : 'false');
                 break;
             case 'unlock':
                 formData.append('password', $('#unlock-password').value);

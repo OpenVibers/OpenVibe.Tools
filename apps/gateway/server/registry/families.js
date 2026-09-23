@@ -62,7 +62,7 @@ const FAMILIES = [
         faq: [
             ['Are my documents kept?', 'No. Files are processed, offered for download and then removed from the server.'],
             ['Can I unlock a PDF without the password?', 'No. The unlock tool removes protection from a PDF when you know its password; it does not break into files.'],
-            ['Is there a page limit?', 'There is no page limit. The upload size limit is 100 MB per file.'],
+            ['Is there a page limit?', 'Documents of up to 500 pages are accepted, and each file can be up to 100 MB. PDF to image converts up to 50 pages at a time (fewer at high resolution).'],
         ],
     },
     {

@@ -17,6 +17,7 @@ const unlock    = require('./unlock');
 const img2pdf   = require('./img2pdf');
 const pdf2img   = require('./pdf2img');
 const metadata  = require('./metadata');
+const { qpdf, pdftoppm, pdfinfo } = require('./pdf');
 
 const TOOLS = {
     merge: {
@@ -80,6 +81,7 @@ const TOOLS = {
         faIcon: 'fa-lock',
         accepts: ['pdf'],
         multiFile: false,
+        requires: [qpdf],               // AES-256 encryption
         handler: protect,
     },
     unlock: {
@@ -89,6 +91,7 @@ const TOOLS = {
         faIcon: 'fa-lock-open',
         accepts: ['pdf'],
         multiFile: false,
+        requires: [qpdf],               // decryption
         handler: unlock,
     },
     img2pdf: {
@@ -107,6 +110,7 @@ const TOOLS = {
         faIcon: 'fa-image',
         accepts: ['pdf'],
         multiFile: false,
+        requires: [pdftoppm, pdfinfo],  // poppler-utils renders the pages
         handler: pdf2img,
     },
     metadata: {
@@ -124,11 +128,26 @@ function getTool(id) {
     return TOOLS[id] || null;
 }
 
+/** Can this server run the tool now? (Its command-line tools are installed.) */
+function isAvailable(tool) {
+    return (tool.requires || []).every(b => b.available());
+}
+
+/** Throws 503 tools.unavailable when a tool's command-line tools are missing. */
+function assertAvailable(tool) {
+    for (const b of tool.requires || []) b.path({ tool: tool.id });
+}
+
 function listTools() {
     return Object.values(TOOLS).map(t => ({
         id: t.id, label: t.label, description: t.description,
         faIcon: t.faIcon, accepts: t.accepts, multiFile: t.multiFile,
+        available: isAvailable(t),
+        ...(!isAvailable(t) && { unavailable: 'This tool is being set up on the server and is not available yet.' }),
     }));
 }
 
-module.exports = { TOOLS, getTool, listTools };
+/** Every optional command-line tool, for boot detection and /api/ready. */
+const BINARIES = [qpdf, pdftoppm, pdfinfo];
+
+module.exports = { TOOLS, getTool, listTools, isAvailable, assertAvailable, BINARIES };

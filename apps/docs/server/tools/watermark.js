@@ -6,6 +6,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 const { PDFDocument, StandardFonts, rgb, degrees } = require('pdf-lib');
+const { loadPdf } = require('./pdf');   // pdf-lib's load + the page limit
 
 /**
  * Add text watermarks to a PDF.
@@ -22,7 +23,7 @@ async function watermark(buffer, options = {}) {
     // Parse color (hex to rgb)
     const color = parseColor(options.color || '#888888');
 
-    const src = await PDFDocument.load(buffer, { ignoreEncryption: true });
+    const src = await loadPdf(buffer);
     const totalPages = src.getPageCount();
     const font = await src.embedFont(StandardFonts.Helvetica);
     const pages = src.getPages();

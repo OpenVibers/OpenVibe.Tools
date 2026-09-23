@@ -6,6 +6,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 const { PDFDocument, degrees } = require('pdf-lib');
+const { loadPdf } = require('./pdf');   // pdf-lib's load + the page limit
 
 /**
  * Rotate pages in a PDF.
@@ -19,7 +20,7 @@ async function rotate(buffer, options = {}) {
         throw new Error('Rotation angle must be 90, 180, or 270 degrees.');
     }
 
-    const src = await PDFDocument.load(buffer, { ignoreEncryption: true });
+    const src = await loadPdf(buffer);
     const totalPages = src.getPageCount();
     const pages = src.getPages();
 

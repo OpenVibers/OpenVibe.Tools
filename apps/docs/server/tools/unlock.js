@@ -2,44 +2,50 @@
 
 // ═══════════════════════════════════════════════════════════════
 // Docs.OpenVibe — Unlock PDF Tool
-// Attempts to remove password protection from a PDF.
+// Removes password protection from a PDF whose password you know (qpdf --decrypt). pdf-lib cannot
+// decrypt, so the old version re-saved still-encrypted content. Without qpdf on the server the
+// tool answers 503 tools.unavailable.
 // ═══════════════════════════════════════════════════════════════
 
-const { PDFDocument } = require('pdf-lib');
+const fsp = require('fs/promises');
+const path = require('path');
+const { qpdf, run, withTempDir, writeArgFile, qpdfPages, checkPages, refuse } = require('./pdf');
 
 /**
- * Remove password from a PDF.
  * @param {Buffer} buffer - PDF buffer
- * @param {Object} options - { password: string (current password) }
- * @returns {{ buffer: Buffer, ext: string, mime: string }}
+ * @param {Object} options - { password: the current (user or owner) password }
+ * @returns {{ buffer: Buffer, ext: string, mime: string, pageCount: number }}
  */
 async function unlock(buffer, options = {}) {
-    // Attempt to load with the provided password
-    // pdf-lib's ignoreEncryption flag allows reading without a password
-    // for PDFs with owner-only restrictions
-    try {
-        const src = await PDFDocument.load(buffer, {
-            ignoreEncryption: true,
-            password: options.password || undefined,
-        });
+    const password = String(options.password || '');
+    const bin = qpdf.path({ tool: 'unlock' });
 
-        const pageCount = src.getPageCount();
+    return withTempDir(async (dir) => {
+        const input = path.join(dir, 'in.pdf');
+        const output = path.join(dir, 'out.pdf');
+        await fsp.writeFile(input, buffer);
 
-        // Re-serialize without encryption
-        const outputBytes = await src.save();
-
-        return {
-            buffer: Buffer.from(outputBytes),
-            ext: 'pdf',
-            mime: 'application/pdf',
-            pageCount,
-        };
-    } catch (err) {
-        if (err.message.includes('password') || err.message.includes('encrypted')) {
-            throw new Error('Could not unlock the PDF. The password may be incorrect or the encryption is too strong.');
+        const enc = await run(bin, ['--is-encrypted', input], { timeoutMs: 30_000 });
+        if (enc.code === 2 && !/error|not a PDF|can't find/i.test(enc.stderr)) {
+            const count = await qpdfPages(bin, dir, input);
+            if (count.error) throw refuse('This file could not be read as a PDF.');
+            checkPages(count.pages);
+            return { buffer, ext: 'pdf', mime: 'application/pdf', pageCount: count.pages, note: 'This PDF was not password-protected; it is unchanged.' };
         }
-        throw err;
-    }
+        if (enc.code !== 0) throw refuse('This file could not be read as a PDF.');
+
+        const count = await qpdfPages(bin, dir, input, password);
+        if (count.error) {
+            if (/invalid password/i.test(count.error)) throw refuse(password ? 'The password is incorrect.' : 'This PDF needs its password to be unlocked.', 400, 'tools.pdf.wrong_password');
+            throw refuse('This file could not be read as a PDF.');
+        }
+        checkPages(count.pages);
+
+        const args = await writeArgFile(dir, [`--password=${password}`, '--decrypt']);
+        const r = await run(bin, [`@${args}`, input, output]);
+        if (r.code !== 0 && r.code !== 3) throw refuse('The PDF could not be unlocked.');
+        return { buffer: await fsp.readFile(output), ext: 'pdf', mime: 'application/pdf', pageCount: count.pages };
+    });
 }
 
 module.exports = unlock;

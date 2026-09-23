@@ -7,6 +7,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 const { PDFDocument } = require('pdf-lib');
+const { loadPdf } = require('./pdf');   // pdf-lib's load + the page limit
 
 /**
  * Compress a PDF by re-serializing (strips unused objects, optimizes structure).
@@ -16,7 +17,7 @@ const { PDFDocument } = require('pdf-lib');
  */
 async function compress(buffer, options = {}) {
     const originalSize = buffer.length;
-    const src = await PDFDocument.load(buffer, { ignoreEncryption: true });
+    const src = await loadPdf(buffer);
     const pageCount = src.getPageCount();
 
     // pdf-lib re-serialization naturally strips unused objects

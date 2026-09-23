@@ -7,6 +7,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 const { PDFDocument } = require('pdf-lib');
+const { loadPdf } = require('./pdf');   // pdf-lib's load + the page limit
 
 /**
  * Reorder pages in a PDF.
@@ -19,7 +20,7 @@ async function reorder(buffer, options = {}) {
         throw new Error('Page order is required. Provide a comma-separated list of page numbers.');
     }
 
-    const src = await PDFDocument.load(buffer, { ignoreEncryption: true });
+    const src = await loadPdf(buffer);
     const totalPages = src.getPageCount();
 
     // Parse order

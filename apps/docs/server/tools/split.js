@@ -6,6 +6,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 const { PDFDocument } = require('pdf-lib');
+const { loadPdf, zip } = require('./pdf');   // pdf-lib's load + the page limit; parts come back as one ZIP
 
 /**
  * Split a PDF into parts.
@@ -14,7 +15,7 @@ const { PDFDocument } = require('pdf-lib');
  * @returns {{ buffer: Buffer, ext: string, mime: string, parts: number }}
  */
 async function split(buffer, options = {}) {
-    const src = await PDFDocument.load(buffer, { ignoreEncryption: true });
+    const src = await loadPdf(buffer);
     const totalPages = src.getPageCount();
 
     if (totalPages === 0) throw new Error('PDF has no pages.');
@@ -39,35 +40,27 @@ async function split(buffer, options = {}) {
         };
     }
 
-    // Multiple ranges → create a ZIP-like response (we'll return multiple PDFs)
-    // For simplicity, return the first part and metadata about all parts
-    // In practice the frontend makes multiple calls or we return all parts
+    // Several parts ("every page", "in half", several ranges) → one PDF per part, in one ZIP.
+    // (This used to return only the first part.)
+    const width = String(totalPages).length;
+    const label = (pages) => (pages.length === 1 ? `page-${String(pages[0]).padStart(width, '0')}` : `pages-${String(pages[0]).padStart(width, '0')}-${String(pages[pages.length - 1]).padStart(width, '0')}`);
     const results = [];
     for (const range of ranges) {
         const output = await PDFDocument.create();
         const pages = await output.copyPages(src, range.map(p => p - 1));
         for (const page of pages) output.addPage(page);
-        results.push({
-            buffer: Buffer.from(await output.save()),
-            pages: range,
-        });
+        results.push({ buffer: Buffer.from(await output.save()), pages: range });
     }
 
-    // Return the combined result as the first part's buffer with metadata
     return {
-        buffer: results[0].buffer,
-        ext: 'pdf',
-        mime: 'application/pdf',
+        buffer: zip(results.map((r, i) => ({ name: `part-${String(i + 1).padStart(String(results.length).length, '0')}-${label(r.pages)}.pdf`, data: r.buffer }))),
+        ext: 'zip',
+        mime: 'application/zip',
         parts: results.length,
-        pageCount: results[0].pages.length,
+        pageCount: results.reduce((n, r) => n + r.pages.length, 0),
         totalPages,
-        allParts: results.map((r, i) => ({
-            part: i + 1,
-            pages: r.pages,
-            size: r.buffer.length,
-        })),
-        // Store all part buffers for multi-download
-        _partBuffers: results.map(r => r.buffer),
+        allParts: results.map((r, i) => ({ part: i + 1, pages: r.pages, size: r.buffer.length })),
+        note: `${results.length} PDF files in one ZIP.`,
     };
 }
 
@@ -87,7 +80,7 @@ function parseRanges(input, totalPages) {
         const mid = Math.ceil(totalPages / 2);
         const first = Array.from({ length: mid }, (_, i) => i + 1);
         const second = Array.from({ length: totalPages - mid }, (_, i) => mid + i + 1);
-        return [first, second];
+        return [first, second].filter(r => r.length);
     }
 
     // Custom ranges: '1-3,5,7-9'

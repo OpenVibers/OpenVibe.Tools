@@ -17,7 +17,7 @@ const config = require('./config');
 const auth = require('./auth');
 const { optionalAuth } = auth;
 const { resolveContext, DOMAIN_MAP } = require('./domain-map');
-const { getTool, listTools } = require('./tools');
+const { getTool, listTools, BINARIES } = require('./tools');
 const { uploadSingle, uploadMultiple, uploadAny } = require('./middleware/upload');
 const { apiLimiter, processLimiter, burstLimiter } = require('./middleware/rate-limit');
 const retention = require('./retention/manager');
@@ -54,6 +54,7 @@ observe({
         ready.writableDir('output_dir', path.resolve(config.outputDir), { description: 'synchronous results' }),
         ready.sqlite('analytics_db', analyticsDb, { required: false, description: 'visit analytics only; tools work without it' }),
         ready.networkKey('network_key', auth.getPublicKey, { description: 'verifies signed-in users and service tokens on the job API; anonymous use works without it' }),
+        ...BINARIES.map(b => b.readyCheck(b.name === 'qpdf' ? 'Protect and Unlock PDF (package qpdf); the other tools work without it' : 'PDF to image (package poppler-utils); the other tools work without it')),
         ...jobsRuntime.readyChecks(() => jobs),
     ],
     jobs: () => jobs,
@@ -119,6 +120,14 @@ app.use((req, _res, next) => {
 
 // ── API Routes ───────────────────────────────────────────────
 
+/** A tool's error on the synchronous endpoints: 503 problem when a tool is not set up, else { error }. */
+function sendToolError(req, res, err, label) {
+    if (err.status === 503) return contracts.http.sendProblem(res, 503, err.code || 'tools.unavailable', { detail: err.message, ctx: req.ov });
+    if (!err.expose) console.error(`[${label}] Error:`, err.message);
+    const status = Number.isInteger(err.status) && err.status >= 400 && err.status < 500 ? err.status : 422;
+    return res.status(status).json({ error: err.message || 'Document processing failed', ...(err.code && { code: err.code }) });
+}
+
 // Health check
 app.get('/api/health', (_req, res) => {
     const stats = retention.getStats();
@@ -154,8 +163,7 @@ app.post('/api/info', burstLimiter, processLimiter, uploadSingle, async (req, re
         const result = await tool.handler(req.file.buffer, { mode: 'view' });
         res.json({ success: true, ...result });
     } catch (err) {
-        console.error('[Info] Error:', err.message);
-        res.status(422).json({ error: err.message || 'Failed to read PDF' });
+        sendToolError(req, res, err, 'Info');
     }
 });
 
@@ -201,8 +209,7 @@ app.post('/api/process', burstLimiter, processLimiter, uploadSingle, async (req,
             ...(result.note && { note: result.note }),
         });
     } catch (err) {
-        console.error('[Process] Error:', err.message);
-        res.status(422).json({ error: err.message || 'Document processing failed' });
+        sendToolError(req, res, err, 'Process');
     }
 });
 
@@ -243,8 +250,7 @@ app.post('/api/process/multi', burstLimiter, processLimiter, uploadMultiple, asy
             ...(result.pageCount !== undefined && { pageCount: result.pageCount }),
         });
     } catch (err) {
-        console.error('[Process/Multi] Error:', err.message);
-        res.status(422).json({ error: err.message || 'Document processing failed' });
+        sendToolError(req, res, err, 'Process/Multi');
     }
 });
 
@@ -327,6 +333,10 @@ const server = app.listen(config.port, config.host, () => {
     console.log(`║  Port: ${String(config.port).padEnd(30)}║`);
     console.log(`║  Host: ${config.host.padEnd(30)}║`);
     console.log(`╚═══════════════════════════════════════╝\n`);
+    for (const b of BINARIES) {
+        const st = b.detect();
+        console.log(st.available ? `[Docs.OpenVibe] ${b.name}: ${st.path}` : `[Docs.OpenVibe] ${b.name} missing (${st.detail}): its tools answer 503 tools.unavailable until it is installed`);
+    }
 });
 
 // ── Graceful Shutdown ────────────────────────────────────────

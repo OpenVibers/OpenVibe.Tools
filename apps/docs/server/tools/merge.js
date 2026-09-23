@@ -6,6 +6,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 const { PDFDocument } = require('pdf-lib');
+const { loadPdf, checkPages } = require('./pdf');   // pdf-lib's load + the page limit
 
 /**
  * Merge multiple PDF buffers into one.
@@ -28,8 +29,9 @@ async function merge(buffers, options = {}) {
         const buf = buffers[idx];
         if (!buf) continue;
 
+        const src = await loadPdf(buf, { what: `PDF file #${idx + 1}` });
+        checkPages(totalPages + src.getPageCount(), 'The merged PDF');
         try {
-            const src = await PDFDocument.load(buf, { ignoreEncryption: true });
             const pages = await merged.copyPages(src, src.getPageIndices());
             for (const page of pages) {
                 merged.addPage(page);

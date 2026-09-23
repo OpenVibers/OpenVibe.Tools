@@ -8,11 +8,11 @@
 const fs = require('fs');
 const fsp = require('fs/promises');
 const path = require('path');
-const { getTool, listTools } = require('./tools');
+const { getTool, listTools, assertAvailable } = require('./tools');
 
 const SINGLE_KEYS = ['format', 'quality', 'angle', 'pages', 'order', 'ranges', 'mode',
     'text', 'fontSize', 'opacity', 'rotation', 'color',
-    'pageSize', 'dpi', 'password', 'userPassword', 'ownerPassword',
+    'pageSize', 'dpi', 'password', 'userPassword', 'ownerPassword', 'allowPrint', 'allowCopy',
     'title', 'author', 'subject', 'keywords', 'creator',
     'level', 'defaultFormat'];
 const MULTI_KEYS = ['order', 'pageSize', 'quality', 'format'];
@@ -36,6 +36,9 @@ function describe(toolId, result, fileCount) {
         ...(result.savings && { savings: result.savings }),
         ...(result.metadata && { metadata: result.metadata }),
         ...(result.note && { note: result.note }),
+        ...(result.parts && { parts: result.parts }),
+        ...(result.pages && { pages: result.pages }),
+        ...(result.encryption && { encryption: result.encryption }),
     };
 }
 
@@ -54,6 +57,8 @@ function defineJobs(system) {
             const id = String(input.tool || '');
             if (!known.has(id)) return id ? `Unknown tool: ${id}` : 'No tool specified.';
             const tool = getTool(id);
+            // A tool whose command-line tools are not installed yet: 503 now, not a failed job later.
+            try { assertAvailable(tool); } catch (err) { throw new system.JobError(err.status, err.code, err.message, { tool: id }); }
             if (!tool.multiFile && files.length !== 1) return `Tool "${id}" takes exactly one file`;
             if (id === 'merge' && files.length < 2) return 'Upload at least 2 files to merge.';
             for (const k of Object.keys(input)) if (k !== 'tool' && !SINGLE_KEYS.includes(k)) return `Unknown option: ${k}`;

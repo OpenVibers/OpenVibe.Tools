@@ -89,6 +89,7 @@
                     <input type="text" id="split-ranges" class="text-input" placeholder="e.g. 1-3, 5, 7-9">
                     <p class="option-hint">Comma-separated page numbers or ranges</p>
                 </div>
+                <p class="option-hint">Several parts download as one ZIP of PDF files.</p>
             </div>
 
             <!-- Compress Options -->
@@ -168,12 +169,16 @@
                 <input type="number" id="pdf2img-dpi" class="num-input num-input-sm" value="150" min="72" max="600">
                 <label class="option-label" style="margin-top:12px">Pages</label>
                 <input type="text" id="pdf2img-pages" class="text-input" placeholder="all (or e.g. 1,3,5-7)">
+                <p class="option-hint">Up to 50 pages at 150 DPI (20 at 300 DPI, 5 above). One page downloads as an image, several as a ZIP.</p>
             </div>
 
             <!-- Protect Options -->
             <div class="option-group" id="opt-protect" style="display:none">
                 <label class="option-label">Password</label>
-                <input type="password" id="protect-password" class="text-input" placeholder="Enter a password">
+                <input type="password" id="protect-password" class="text-input" placeholder="Enter a password" autocomplete="new-password" maxlength="127">
+                <label class="check-row"><input type="checkbox" id="protect-print" checked> Allow printing</label>
+                <label class="check-row"><input type="checkbox" id="protect-copy" checked> Allow copying text</label>
+                <p class="option-hint">Encrypted with AES-256. The password cannot be recovered, so keep it safe.</p>
             </div>
 
             <!-- Unlock Options -->

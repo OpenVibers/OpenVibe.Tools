@@ -6,6 +6,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 const { PDFDocument } = require('pdf-lib');
+const { loadPdf } = require('./pdf');   // pdf-lib's load + the page limit
 
 /**
  * Get or update PDF metadata.
@@ -14,7 +15,7 @@ const { PDFDocument } = require('pdf-lib');
  * @returns {{ buffer?: Buffer, ext: string, mime: string, metadata: Object }}
  */
 async function metadata(buffer, options = {}) {
-    const src = await PDFDocument.load(buffer, { ignoreEncryption: true });
+    const src = await loadPdf(buffer);
     const pageCount = src.getPageCount();
 
     // Get current metadata
