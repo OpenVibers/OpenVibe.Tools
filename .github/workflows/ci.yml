@@ -20,3 +20,8 @@ jobs:
           for app in img audio docs; do
             (cd apps/$app && npx openvibe-contracts-check --service tools --src server --src ../_shared)
           done
+  # Secret scan (gitleaks) and dependency audit, shared by every OpenVibers repo (Track Q).
+  security:
+    uses: OpenVibers/OpenVibe.Shared/.github/workflows/security.yml@83c998b65424fb97e6f6de55ad9cc5981767e89c
+    with:
+      audit-fail-level: none   # report only until fixed: apps/img has 5 critical advisories (to-ico -> jimp/request chain) that need a semver-major to-ico/sharp bump
