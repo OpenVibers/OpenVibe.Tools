@@ -17,9 +17,10 @@ function freePort() {
 /**
  * @param {string} app   'img' | 'audio' | 'docs' | …
  * @param {object} env   extra environment (DATA_DIR, TOOLS_JOBS_CONCURRENCY_…)
+ * @param {object} [opts.readyPath]  what to poll until it answers 200 (maps and food have no /api/health)
  * @returns {Promise<{ base, port, kill(signal), exited: Promise, output: () => string }>}
  */
-async function startApp(app, env = {}, port) {
+async function startApp(app, env = {}, port, { readyPath = '/api/health' } = {}) {
     port = port || await freePort();
     const dir = path.join(__dirname, '..', '..', app);
     let out = '';
@@ -45,7 +46,7 @@ async function startApp(app, env = {}, port) {
     const t0 = Date.now();
     for (;;) {
         if (child.exitCode != null) throw new Error(`${app} exited during boot:\n${out}`);
-        try { const r = await fetch(`${base}/api/health`); if (r.ok) break; } catch { /* not up yet */ }
+        try { const r = await fetch(`${base}${readyPath}`); if (r.ok) break; } catch { /* not up yet */ }
         if (Date.now() - t0 > 15000) { child.kill('SIGKILL'); throw new Error(`${app} did not start:\n${out}`); }
         await new Promise(r => setTimeout(r, 100));
     }

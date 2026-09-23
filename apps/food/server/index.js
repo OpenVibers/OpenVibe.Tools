@@ -46,7 +46,9 @@ app.get('/release.json', release.handler);
 // Legal documents live on the apex; every tool host points there instead of answering 404.
 app.get(['/terms', '/privacy', '/dmca', '/tos'], (req, res) => res.redirect(301, 'https://openvibe.tools' + (req.path === '/tos' ? '/terms' : req.path)));
 
-app.set('trust proxy', 2); // Cloudflare → Nginx → Node
+// Only loopback hops (the host's nginx, the gateway) are proxies: req.ip is the first address before
+// them, which is what maps is told below. A client's own X-Forwarded-For is never believed.
+app.set('trust proxy', 'loopback');
 app.use(cors({
   origin(origin, callback) {
     if (!origin) return callback(null, true);
@@ -87,13 +89,15 @@ app.get(['/', '/index.html'], sendIndex);
 // Static files
 app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: '1d', index: false }));
 
-// Proxy food-related API calls to openvibe-maps backend
+// Proxy food-related API calls to openvibe-maps backend. The visitor's address goes along, so maps
+// rate-limits each person instead of putting every food visitor in one 127.0.0.1 bucket.
 function proxyToMaps(apiPath) {
   return async (req, res) => {
     const qs = new URL(req.url, `http://localhost`).search;
     const url = `${MAPS_API}${apiPath}${qs}`;
     try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
+      const headers = req.ip ? { 'X-Forwarded-For': req.ip, 'X-Real-IP': req.ip } : {};
+      const response = await fetch(url, { headers, signal: AbortSignal.timeout(15000) });
       const data = await response.json();
       res.status(response.status).json(data);
     } catch (e) {

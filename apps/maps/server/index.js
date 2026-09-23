@@ -49,7 +49,10 @@ app.get(['/terms', '/privacy', '/dmca', '/tos'], (req, res) => res.redirect(301,
 const cache = new NodeCache({ stdTTL: config.cache.search, checkperiod: 60 });
 
 // ── Middleware ──────────────────────────────────────────────
-app.set('trust proxy', 2); // Cloudflare → Nginx → Node
+// X-Forwarded-For is believed only from loopback hops: the host's nginx, the gateway and the food
+// app (which forwards its visitor's address). Maps listens on 0.0.0.0 by default, so a direct
+// caller's own header must not count.
+app.set('trust proxy', 'loopback');
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
