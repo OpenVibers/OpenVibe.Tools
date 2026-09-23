@@ -3,7 +3,14 @@
 # changed (that includes a new openvibe-shared release tag), restart the units, check health.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-BEFORE=$(git rev-parse HEAD); git pull -q --ff-only; AFTER=$(git rev-parse HEAD)
+BEFORE=$(git rev-parse HEAD)
+# npm leaves untracked lockfiles in apps that did not track one; once the repo starts tracking it,
+# `git pull` refuses to overwrite it. Those files are generated, so remove exactly those before pulling.
+git fetch -q origin
+for f in $(git diff --name-only HEAD "origin/$(git rev-parse --abbrev-ref HEAD)" -- 'apps/*/package-lock.json'); do
+  if [ -f "$f" ] && ! git ls-files --error-unmatch "$f" >/dev/null 2>&1; then echo "removing untracked $f (the release tracks it)"; rm -f "$f"; fi
+done
+git pull -q --ff-only; AFTER=$(git rev-parse HEAD)
 for app in apps/*/; do
   [ -f "$app/package.json" ] || continue
   if git diff --name-only "$BEFORE" "$AFTER" -- "$app/package.json" | grep -q . || [ ! -d "$app/node_modules" ]; then (cd "$app" && npm install --omit=dev --no-audit --no-fund --loglevel=error); fi
