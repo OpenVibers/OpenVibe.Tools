@@ -295,6 +295,19 @@ const cleanFns = {
 };
 
 // ── Text analysis ────────────────────────────────────────────
+// The Text Cleaner's steps in the order it applies them, and whether each is on by default.
+const CLEAN_STEPS = [
+    ['invisible', 'removeInvisible', true], ['zalgo', 'removeZalgo', false], ['quotes', 'normalizeQuotes', true],
+    ['hyphens', 'normalizeHyphens', true], ['html', 'stripHtml', false], ['spaces', 'collapseSpaces', true],
+    ['trim', 'trimLines', true], ['blank', 'removeBlankLines', false], ['lines', 'collapseLines', true],
+];
+
+/** Run the cleaner's steps; opts.<step> true/false overrides its default. */
+function cleanText(text, opts = {}) {
+    for (const [key, fn, on] of CLEAN_STEPS) if (opts[key] === undefined ? on : opts[key]) text = cleanFns[fn](text);
+    return text;
+}
+
 function analyze(text) {
     const chars = [...text];
     const words = text.trim().split(/\s+/).filter(Boolean);
@@ -430,15 +443,78 @@ function generateBio(opts = {}) {
     return templates[Math.floor(Math.random() * templates.length)];
 }
 
-// ── Braille art conversion ───────────────────────────────────
+// ── Braille (Grade 1: letters, digits with the number sign, common punctuation) ──
+const BRAILLE_MAP = {
+    'a':'⠁','b':'⠃','c':'⠉','d':'⠙','e':'⠑','f':'⠋','g':'⠛','h':'⠓','i':'⠊','j':'⠚',
+    'k':'⠅','l':'⠇','m':'⠍','n':'⠝','o':'⠕','p':'⠏','q':'⠟','r':'⠗','s':'⠎','t':'⠞',
+    'u':'⠥','v':'⠧','w':'⠺','x':'⠭','y':'⠽','z':'⠵',
+    '1':'⠼⠁','2':'⠼⠃','3':'⠼⠉','4':'⠼⠙','5':'⠼⠑',
+    '6':'⠼⠋','7':'⠼⠛','8':'⠼⠓','9':'⠼⠊','0':'⠼⠚',
+    ' ':'⠀','.':'⠲',',':'⠂','?':'⠦','!':'⠖',';':'⠆',':':'⠒',
+    '-':'⠤','(':'⠶',')':'⠶','\'':'⠄','"':'⠐⠂','/':'⠌'
+};
+const BRAILLE_REVERSE = {};
+Object.entries(BRAILLE_MAP).forEach(([k, v]) => { if (!BRAILLE_REVERSE[v]) BRAILLE_REVERSE[v] = k; });
+
 function toBraille(text) {
-    const BRAILLE_MAP = {
-        a:'\u2801',b:'\u2803',c:'\u2809',d:'\u2819',e:'\u2811',f:'\u280B',g:'\u281B',
-        h:'\u2813',i:'\u280A',j:'\u281A',k:'\u2805',l:'\u2807',m:'\u280D',n:'\u281D',
-        o:'\u2815',p:'\u280F',q:'\u281F',r:'\u2817',s:'\u280E',t:'\u281E',u:'\u2825',
-        v:'\u2827',w:'\u283A',x:'\u282D',y:'\u283D',z:'\u2835',' ':'\u2800',
-    };
     return [...text.toLowerCase()].map(c => BRAILLE_MAP[c] || c).join('');
+}
+
+function fromBraille(braille) {
+    let out = '', i = 0;
+    const chars = [...braille];
+    while (i < chars.length) {
+        const two = chars[i] + (chars[i+1] || '');
+        if (BRAILLE_REVERSE[two]) { out += BRAILLE_REVERSE[two]; i += 2; }
+        else if (BRAILLE_REVERSE[chars[i]]) { out += BRAILLE_REVERSE[chars[i]]; i++; }
+        else { out += chars[i]; i++; }
+    }
+    return out;
+}
+
+// ── Code points as hex, decimal and octal ────────────────────
+function toHex(text) { return [...text].map(c => c.codePointAt(0).toString(16).toUpperCase().padStart(2, '0')).join(' '); }
+function toDecimal(text) { return [...text].map(c => c.codePointAt(0)).join(' '); }
+function toOctal(text) { return [...text].map(c => c.codePointAt(0).toString(8).padStart(3, '0')).join(' '); }
+
+// ── Character inspector ──────────────────────────────────────
+const INVISIBLE_CHARS = new Set([0x200B,0x200C,0x200D,0xFEFF,0x00AD,0x034F,0x180E,0x2060,0x2061,0x2062,0x2063,0x2064,0x200E,0x200F,0x202A,0x202B,0x202C,0x202D,0x202E]);
+
+function utf8Bytes(cp) {
+    if (cp <= 0x7F) return 1;
+    if (cp <= 0x7FF) return 2;
+    if (cp <= 0xFFFF) return 3;
+    return 4;
+}
+
+function charCategory(cp) {
+    if (cp <= 0x1F || (cp >= 0x7F && cp <= 0x9F)) return 'Control';
+    if (INVISIBLE_CHARS.has(cp)) return 'Invisible';
+    if (cp >= 0x0300 && cp <= 0x036F) return 'Combining';
+    if (cp >= 0x1F600 && cp <= 0x1F64F) return 'Emoji';
+    if (cp >= 0x1F300 && cp <= 0x1F5FF) return 'Emoji Symbol';
+    if (cp >= 0x1F680 && cp <= 0x1F6FF) return 'Emoji Transport';
+    if (cp >= 0x1F900 && cp <= 0x1F9FF) return 'Emoji Supplement';
+    if (cp >= 0x2600 && cp <= 0x26FF) return 'Misc Symbol';
+    if (cp >= 0x2700 && cp <= 0x27BF) return 'Dingbat';
+    if (cp >= 65 && cp <= 90) return 'Latin Upper';
+    if (cp >= 97 && cp <= 122) return 'Latin Lower';
+    if (cp >= 48 && cp <= 57) return 'Digit';
+    if (cp === 32) return 'Space';
+    if (cp === 10) return 'Newline';
+    return 'Other';
+}
+
+/** One row per character: { char, codePoint: 'U+0041', hex: '0x41', utf8Bytes, category, invisible }. */
+function inspectChars(text) {
+    return [...text].map(ch => {
+        const cp = ch.codePointAt(0);
+        const hex = cp.toString(16).toUpperCase();
+        return {
+            char: ch, codePoint: 'U+' + hex.padStart(4, '0'), hex: '0x' + hex, utf8Bytes: utf8Bytes(cp), category: charCategory(cp),
+            invisible: INVISIBLE_CHARS.has(cp) || (cp <= 0x1F && cp !== 10) || (cp >= 0x7F && cp <= 0x9F),
+        };
+    });
 }
 
 // ── Slug generation ──────────────────────────────────────────
@@ -459,6 +535,16 @@ function dedupeLines(text) {
     return [...new Set(text.split('\n'))].join('\n');
 }
 
+function shuffleLines(text) {
+    const lines = text.split('\n');
+    for (let i = lines.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [lines[i], lines[j]] = [lines[j], lines[i]]; }
+    return lines.join('\n');
+}
+
+function reverseLines(text) {
+    return text.split('\n').reverse().join('\n');
+}
+
 // ── Escape / unescape ───────────────────────────────────────
 function escapeHtml(text) {
     return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -466,6 +552,23 @@ function escapeHtml(text) {
 function unescapeHtml(text) {
     return text.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'");
 }
+
+// Every escape the Escape & Unescape tool shows, in its order. A decoder that cannot read its input
+// answers a bracketed note instead of throwing, as the page always has.
+const ESCAPES = {
+    htmlEscape:    { label: 'HTML Escaped',     fn: t => escapeHtml(t) },
+    htmlUnescape:  { label: 'HTML Unescaped',   fn: t => unescapeHtml(t) },
+    urlEncode:     { label: 'URL Encoded',      fn: t => encodeURIComponent(t) },
+    urlDecode:     { label: 'URL Decoded',      fn: t => { try { return decodeURIComponent(t); } catch { return '[Invalid encoded string]'; } } },
+    base64Encode:  { label: 'Base64 Encoded',   fn: t => { try { return btoa(unescape(encodeURIComponent(t))); } catch { return '[Error]'; } } },
+    base64Decode:  { label: 'Base64 Decoded',   fn: t => { try { return decodeURIComponent(escape(atob(t))); } catch { return '[Invalid Base64]'; } } },
+    jsonStringify: { label: 'JSON Stringified', fn: t => JSON.stringify(t) },
+    jsonParse:     { label: 'JSON Parsed',      fn: t => { try { return typeof JSON.parse(t) === 'string' ? JSON.parse(t) : JSON.stringify(JSON.parse(t), null, 2); } catch { return '[Invalid JSON string]'; } } },
+    cssEscape:     { label: 'CSS Escaped',      fn: t => t.replace(/([^\w-])/g, '\\$1') },
+    regexEscape:   { label: 'Regex Escaped',    fn: t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') },
+    unicodeEscape: { label: 'Unicode Escape',   fn: t => [...t].map(c => { const cp = c.codePointAt(0); return cp > 127 ? (cp > 0xFFFF ? '\\u{' + cp.toString(16) + '}' : '\\u' + cp.toString(16).padStart(4, '0')) : c; }).join('') },
+    hexEncode:     { label: 'Hex Encoded',      fn: t => [...new TextEncoder().encode(t)].map(b => b.toString(16).padStart(2, '0')).join(' ') },
+};
 
 // ── Public API ───────────────────────────────────────────────
 const TextOpenVibeEngine = {
@@ -490,7 +593,7 @@ const TextOpenVibeEngine = {
     case: caseFns,
 
     // Cleanup
-    clean: cleanFns,
+    clean: cleanFns, cleanText, cleanSteps: CLEAN_STEPS.map(([key, , on]) => ({ key, on })),
 
     // Analysis
     analyze,
@@ -502,16 +605,22 @@ const TextOpenVibeEngine = {
     toBinary, fromBinary,
 
     // Braille
-    toBraille,
+    toBraille, fromBraille,
+
+    // Code points
+    toHex, toDecimal, toOctal,
+
+    // Character inspector
+    inspectChars,
 
     // Slug
     toSlug,
 
     // Sort / dedupe
-    sortLines, dedupeLines,
+    sortLines, dedupeLines, shuffleLines, reverseLines,
 
     // Escape
-    escapeHtml, unescapeHtml,
+    escapeHtml, unescapeHtml, escapes: ESCAPES,
 
     // Kaomoji
     kaomoji: KAOMOJI,

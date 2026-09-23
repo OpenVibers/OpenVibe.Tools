@@ -62,20 +62,8 @@
     <script>
         OpenVibeUI.initPage();
 
-        const TRANSFORMS = [
-            { id: 'htmlEscape', label: 'HTML Escaped', icon: 'fa-code', fn: t => TextOpenVibeEngine.escapeHtml(t) },
-            { id: 'htmlUnescape', label: 'HTML Unescaped', icon: 'fa-code', fn: t => TextOpenVibeEngine.unescapeHtml(t) },
-            { id: 'urlEncode', label: 'URL Encoded', icon: 'fa-link', fn: t => encodeURIComponent(t) },
-            { id: 'urlDecode', label: 'URL Decoded', icon: 'fa-link', fn: t => { try { return decodeURIComponent(t); } catch { return '[Invalid encoded string]'; } } },
-            { id: 'base64Encode', label: 'Base64 Encoded', icon: 'fa-lock', fn: t => { try { return btoa(unescape(encodeURIComponent(t))); } catch { return '[Error]'; } } },
-            { id: 'base64Decode', label: 'Base64 Decoded', icon: 'fa-unlock', fn: t => { try { return decodeURIComponent(escape(atob(t))); } catch { return '[Invalid Base64]'; } } },
-            { id: 'jsonStringify', label: 'JSON Stringified', icon: 'fa-brackets-curly', fn: t => JSON.stringify(t) },
-            { id: 'jsonParse', label: 'JSON Parsed', icon: 'fa-brackets-curly', fn: t => { try { return typeof JSON.parse(t) === 'string' ? JSON.parse(t) : JSON.stringify(JSON.parse(t), null, 2); } catch { return '[Invalid JSON string]'; } } },
-            { id: 'cssEscape', label: 'CSS Escaped', icon: 'fa-paintbrush', fn: t => t.replace(/([^\w-])/g, '\\$1') },
-            { id: 'regexEscape', label: 'Regex Escaped', icon: 'fa-asterisk', fn: t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') },
-            { id: 'unicodeEscape', label: 'Unicode Escape', icon: 'fa-globe', fn: t => [...t].map(c => { const cp = c.codePointAt(0); return cp > 127 ? (cp > 0xFFFF ? '\\u{' + cp.toString(16) + '}' : '\\u' + cp.toString(16).padStart(4, '0')) : c; }).join('') },
-            { id: 'hexEncode', label: 'Hex Encoded', icon: 'fa-hashtag', fn: t => [...new TextEncoder().encode(t)].map(b => b.toString(16).padStart(2, '0')).join(' ') },
-        ];
+        const ICONS = { htmlEscape: 'fa-code', htmlUnescape: 'fa-code', urlEncode: 'fa-link', urlDecode: 'fa-link', base64Encode: 'fa-lock', base64Decode: 'fa-unlock', jsonStringify: 'fa-brackets-curly', jsonParse: 'fa-brackets-curly', cssEscape: 'fa-paintbrush', regexEscape: 'fa-asterisk', unicodeEscape: 'fa-globe', hexEncode: 'fa-hashtag' };
+        const TRANSFORMS = Object.entries(TextOpenVibeEngine.escapes).map(([id, e]) => ({ id, label: e.label, icon: ICONS[id], fn: e.fn }));
 
         const grid = document.getElementById('grid');
         TRANSFORMS.forEach(tr => {

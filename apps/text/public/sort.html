@@ -74,13 +74,9 @@ elderberry</textarea>
 
         function sortAsc() { output.textContent = TextOpenVibeEngine.sortLines(input.value); }
         function sortDesc() { output.textContent = TextOpenVibeEngine.sortLines(input.value, { reverse: true }); }
-        function shuffle() {
-            const lines = input.value.split('\n');
-            for (let i = lines.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [lines[i], lines[j]] = [lines[j], lines[i]]; }
-            output.textContent = lines.join('\n');
-        }
+        function shuffle() { output.textContent = TextOpenVibeEngine.shuffleLines(input.value); }
         function dedupe() { output.textContent = TextOpenVibeEngine.dedupeLines(input.value); }
-        function reverseLines() { output.textContent = input.value.split('\n').reverse().join('\n'); }
+        function reverseLines() { output.textContent = TextOpenVibeEngine.reverseLines(input.value); }
         function applyResult() { input.value = output.textContent; }
     </script>
 </body>

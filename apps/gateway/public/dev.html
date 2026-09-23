@@ -147,6 +147,7 @@ a{color:inherit;text-decoration:none}
 <script src="https://openvibe.network/shared/navbar.js"></script>
 <script src="https://openvibe.network/shared/footer.js"></script>
 <script src="https://openvibe.network/shared/theme-loader.js" defer></script>
+<script src="/js/dev-engine.js"></script>
 <script>
 'use strict';
 const API='https://openvibe.tools/api/dev',$=s=>document.getElementById(s),
@@ -267,80 +268,35 @@ async function run(){
 }
 const P={};
 
-P.jsonfmt=(s,m)=>{const o=JSON.parse(s);if(m==='Minify')return JSON.stringify(o);if(m==='Validate')return'\u2713 Valid JSON \u2014 '+(Array.isArray(o)?o.length+' items':typeof o==='object'?Object.keys(o).length+' keys':typeof o);return JSON.stringify(o,null,2)};
-
-P.yaml=(s,m)=>{
-    if(m.includes('JSON\u2192')){const o=JSON.parse(s);return j2y(o,'')}
-    const ln=s.split('\n').filter(l=>l.trim()&&!l.trim().startsWith('#')),r={};
-    for(const l of ln){const mt=l.match(/^(\s*)([^:]+):\s*(.*)$/);if(mt){let v=mt[3].trim();v=v===''||v==='~'||v==='null'?null:v==='true'?true:v==='false'?false:/^-?\d+(\.\d+)?$/.test(v)?Number(v):v.replace(/^["']|["']$/g,'');r[mt[2].trim()]=v}}
-    return JSON.stringify(r,null,2);
-};
-function j2y(o,ind){let r='';if(Array.isArray(o))o.forEach(v=>{r+=ind+'- '+(typeof v==='object'&&v?'\n'+j2y(v,ind+'  '):v)+'\n'});
-else if(typeof o==='object'&&o)for(const[k,v]of Object.entries(o))r+=typeof v==='object'&&v?ind+k+':\n'+j2y(v,ind+'  '):ind+k+': '+v+'\n';
-else r+=ind+o+'\n';return r}
-
+// The transforms live in /js/dev-engine.js (shared with the tools API); these add the page's presentation.
+P.jsonfmt=(s,m)=>DevEngine.jsonfmt(s,m);
+P.yaml=(s,m)=>DevEngine.yaml(s,m);
 P.xml=(s,m)=>{
     if(m==='Validate'){const d=new DOMParser().parseFromString(s,'text/xml');if(d.querySelector('parsererror'))throw new Error(d.querySelector('parsererror').textContent);return'\u2713 Valid XML'}
-    if(m==='Minify')return s.replace(/>\s+</g,'><').replace(/\s{2,}/g,' ').trim();
-    let f='',ind=0;s.replace(/>\s*</g,'><').split(/(<[^>]+>)/g).filter(Boolean).forEach(n=>{if(n.match(/^<\//))ind--;f+='  '.repeat(Math.max(0,ind))+n.trim()+'\n';if(n.match(/^<[^\/!?]/)&&!n.match(/\/>/))ind++});return f.trim();
+    return DevEngine.xml(s,m);
 };
-
 P.csv=(s,m)=>{
-    const rows=s.trim().split('\n').map(r=>{const c=[];let cur='',q=false;for(let i=0;i<r.length;i++){if(r[i]==='"')q=!q;else if(r[i]===','&&!q){c.push(cur.trim());cur=''}else cur+=r[i]}c.push(cur.trim());return c});
-    if(m==='To JSON'){const hd=rows[0];return JSON.stringify(rows.slice(1).map(r=>{const o={};hd.forEach((h,i)=>o[h]=r[i]||'');return o}),null,2)}
+    if(m==='To JSON')return JSON.stringify(DevEngine.csvObjects(s),null,2);
+    const rows=DevEngine.csvRows(s);
     return{html:'<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:.82rem">'+rows.map((r,ri)=>'<tr>'+r.map(c=>'<'+(ri?'td':'th')+' style="border:1px solid var(--brd);padding:6px 10px;text-align:left;'+(ri?'':'background:var(--bg3);font-weight:700')+'">'+H(c)+'</'+(ri?'td':'th')+'>').join('')+'</tr>').join('')+'</table></div>'};
 };
-
-P.sql=(s,m)=>{
-    if(m==='Compact')return s.replace(/\s+/g,' ').trim();
-    const kw=['SELECT','DISTINCT','FROM','WHERE','JOIN','LEFT JOIN','RIGHT JOIN','INNER JOIN','ON','AND','OR','ORDER BY','GROUP BY','HAVING','LIMIT','OFFSET','INSERT INTO','VALUES','UPDATE','SET','DELETE FROM','CREATE TABLE','ALTER TABLE','UNION','CASE','WHEN','THEN','ELSE','END'];
-    let r=s;if(m==='Uppercase')kw.forEach(k=>{r=r.replace(new RegExp('\\b'+k.replace(/ /g,'\\s+')+'\\b','gi'),k)});
-    kw.slice(0,20).forEach(k=>{r=r.replace(new RegExp('(\\b)('+k.replace(/ /g,'\\s+')+')(\\b)','gi'),'\n$1$2$3')});
-    return r.replace(/^\n+/,'').replace(/\n{2,}/g,'\n');
-};
-
-P.md=(s,m)=>{
-    let h=s.replace(/^######\s(.+)/gm,'<h6>$1</h6>').replace(/^#####\s(.+)/gm,'<h5>$1</h5>').replace(/^####\s(.+)/gm,'<h4>$1</h4>')
-    .replace(/^###\s(.+)/gm,'<h3>$1</h3>').replace(/^##\s(.+)/gm,'<h2>$1</h2>').replace(/^#\s(.+)/gm,'<h1>$1</h1>')
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>')
-    .replace(/`([^`]+)`/g,'<code style="background:var(--bg3);padding:2px 5px;border-radius:4px">$1</code>')
-    .replace(/^\- (.+)/gm,'<li>$1</li>').replace(/^> (.+)/gm,'<blockquote style="border-left:3px solid var(--ac);padding-left:12px;color:var(--tx2)">$1</blockquote>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g,'<a href="$2" style="color:var(--ac)">$1</a>')
-    .replace(/^---$/gm,'<hr style="border:none;border-top:1px solid var(--brd);margin:16px 0">');
-    if(m==='To HTML')return h;
-    return{html:'<div style="line-height:1.8;font-family:Inter,sans-serif;font-size:.92rem">'+h+'</div>'};
-};
-
+P.sql=(s,m)=>DevEngine.sql(s,m);
+P.md=(s,m)=>{const h=DevEngine.md(s);if(m==='To HTML')return h;return{html:'<div style="line-height:1.8;font-family:Inter,sans-serif;font-size:.92rem">'+h+'</div>'}};
 P.html=(s,m)=>{
-    if(m==='Entities')return s.replace(/[\u00A0-\u9999<>&'"]/g,c=>'&#'+c.charCodeAt(0)+';');
     if(m==='Unescape'){const d=document.createElement('div');d.innerHTML=s;return d.textContent}
-    if(m==='Minify')return s.replace(/\s+/g,' ').replace(/>\s+</g,'><').trim();
-    let f='',ind=0;s.replace(/>\s*</g,'><').split(/(<[^>]+>)/g).filter(Boolean).forEach(n=>{if(n.match(/^<\//))ind--;f+='  '.repeat(Math.max(0,ind))+n.trim()+'\n';if(n.match(/^<[^\/!?]/)&&!n.match(/\/>/))ind++});return f.trim();
+    return DevEngine.html(s,m);
 };
 
-P.base64=(s,m)=>m==='Decode'?decodeURIComponent(escape(atob(s.trim()))):btoa(unescape(encodeURIComponent(s)));
-
-P.url=(s,m)=>{if(m==='Encode')return encodeURIComponent(s);if(m==='Decode')return decodeURIComponent(s);
-    try{const u=new URL(s);return'Protocol: '+u.protocol+'\nHost:     '+u.host+'\nPath:     '+u.pathname+'\nSearch:   '+u.search+'\nHash:     '+u.hash+'\nOrigin:   '+u.origin}catch{return'Invalid URL \u2014 include protocol (https://)'}};
-
+P.base64=(s,m)=>DevEngine.base64(s,m);
+P.url=(s,m)=>DevEngine.url(s,m);
 P.jwt=(s)=>{
-    const p=s.trim().split('.');if(p.length!==3)throw new Error('JWT must have 3 dot-separated parts');
-    const d=v=>JSON.parse(decodeURIComponent(escape(atob(v.replace(/-/g,'+').replace(/_/g,'/')))));
-    const hdr=d(p[0]),pay=d(p[1]);let ex='';
-    if(pay.exp){const dt=new Date(pay.exp*1000),left=dt-Date.now();ex=left>0?'\n\u23f1 Expires: '+dt.toISOString()+' ('+Math.floor(left/36e5)+'h '+Math.floor(left%36e5/6e4)+'m left)':'\n\u26a0 EXPIRED: '+dt.toISOString()}
-    return{html:'<div class="js"><div class="jl">Header</div>'+H(JSON.stringify(hdr,null,2))+'</div><div class="js"><div class="jl">Payload</div>'+H(JSON.stringify(pay,null,2))+(ex?'<div style="margin-top:6px;color:'+(ex.includes('EXPIRED')?'#f87171':'#34d399')+'">'+H(ex)+'</div>':'')+'</div><div class="js"><div class="jl">Signature</div>'+H(p[2])+'</div>'};
+    const j=DevEngine.jwt(s);let ex='';
+    if(j.exp){const left=j.exp.msLeft;ex=left>0?'\n\u23f1 Expires: '+j.exp.at+' ('+Math.floor(left/36e5)+'h '+Math.floor(left%36e5/6e4)+'m left)':'\n\u26a0 EXPIRED: '+j.exp.at}
+    return{html:'<div class="js"><div class="jl">Header</div>'+H(JSON.stringify(j.header,null,2))+'</div><div class="js"><div class="jl">Payload</div>'+H(JSON.stringify(j.payload,null,2))+(ex?'<div style="margin-top:6px;color:'+(ex.includes('EXPIRED')?'#f87171':'#34d399')+'">'+H(ex)+'</div>':'')+'</div><div class="js"><div class="jl">Signature</div>'+H(j.signature)+'</div>'};
 };
-
-P.uuid=(s,m)=>{
-    if(m==='Validate')return/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s.trim())?'\u2713 Valid UUID v4':'\u2717 Invalid UUID v4';
-    const n=m.includes('100')?100:m.includes('10')?10:1;return Array.from({length:n},()=>crypto.randomUUID()).join('\n');
-};
-
-P.hash=async(s,m)=>{const a=m==='SHA-1'?'SHA-1':m==='SHA-512'?'SHA-512':'SHA-256';
-    const buf=await crypto.subtle.digest(a,new TextEncoder().encode(s));return a+': '+Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('')};
-
-P.hex=(s,m)=>{if(m==='From Hex')return s.trim().replace(/\s+/g,'').match(/.{2}/g).map(h=>String.fromCharCode(parseInt(h,16))).join('');
-    return[...s].map(c=>c.charCodeAt(0).toString(16).padStart(2,'0')).join(' ')};
+P.uuid=(s,m)=>DevEngine.uuid(s,m);
+P.hash=async(s,m)=>{const a=m==='SHA-1'?'SHA-1':m==='SHA-512'?'SHA-512':'SHA-256';return a+': '+await DevEngine.hash(s,a)};
+P.hex=(s,m)=>DevEngine.hex(s,m);
 
 P.entities=(s,m)=>{
     if(m==='HTML Enc')return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
@@ -350,29 +306,9 @@ P.entities=(s,m)=>{
     if(m==='URL Enc')return encodeURIComponent(s);return decodeURIComponent(s);
 };
 
-P.timestamp=(s,m)=>{
-    if(m==='Now'){const n=Date.now();return'Unix (s):  '+Math.floor(n/1000)+'\nUnix (ms): '+n+'\nISO 8601:  '+new Date(n).toISOString()+'\nLocal:     '+new Date(n).toLocaleString()+'\nUTC:       '+new Date(n).toUTCString()}
-    if(m==='To Date'){const v=Number(s.trim()),d=new Date(v<1e12?v*1000:v);if(isNaN(d.getTime()))throw new Error('Invalid timestamp');return'ISO 8601:  '+d.toISOString()+'\nLocal:     '+d.toLocaleString()+'\nUTC:       '+d.toUTCString()+'\nUnix (s):  '+Math.floor(d/1000)+'\nUnix (ms): '+Number(d)}
-    const d=new Date(s.trim());if(isNaN(d.getTime()))throw new Error('Invalid date string');return'Unix (s):  '+Math.floor(d/1000)+'\nUnix (ms): '+Number(d)+'\nISO 8601:  '+d.toISOString()+'\nUTC:       '+d.toUTCString();
-};
-
-P.cron=(s)=>{
-    const p=s.trim().split(/\s+/);if(p.length<5)throw new Error('Need 5 fields: minute hour day month weekday');
-    const N=[['minute',0,59],['hour',0,23],['day',1,31],['month',1,12],['weekday',0,6]];
-    function desc(v,i){if(v==='*')return'every '+N[i][0];if(v.includes('/'))return'every '+v.split('/')[1]+' '+N[i][0]+'s';return N[i][0]+' '+v}
-    function expand(v,mn,mx){if(v==='*')return Array.from({length:mx-mn+1},(_,i)=>i+mn);if(v.includes('/')){const[b,st]=v.split('/');const start=b==='*'?mn:+b;const r=[];for(let i=start;i<=mx;i+=+st)r.push(i);return r}
-    if(v.includes(','))return v.split(',').map(Number);if(v.includes('-')){const[a,b]=v.split('-').map(Number);return Array.from({length:b-a+1},(_,i)=>i+a)}return[+v]}
-    const mins=expand(p[0],0,59),hrs=expand(p[1],0,23),doms=expand(p[2],1,31),mos=expand(p[3],1,12),dws=expand(p[4],0,6);
-    const nx=[];const d=new Date();d.setSeconds(0,0);d.setMinutes(d.getMinutes()+1);
-    for(let i=0;i<525600&&nx.length<5;i++){if(mins.includes(d.getMinutes())&&hrs.includes(d.getHours())&&doms.includes(d.getDate())&&mos.includes(d.getMonth()+1)&&dws.includes(d.getDay()))nx.push(new Date(d));d.setMinutes(d.getMinutes()+1)}
-    return'Schedule: '+p.map((v,i)=>desc(v,i)).join(', ')+'\n\nNext 5 runs:\n'+nx.map((d,i)=>'  '+(i+1)+'. '+d.toLocaleString()).join('\n');
-};
-
-P.beautify=(s,m)=>{
-    if(m==='JSON')return JSON.stringify(JSON.parse(s),null,2);
-    if(m==='CSS'){let r='',ind=0;for(const c of s){if(c==='{'){r+=' {\n';ind++;r+='  '.repeat(ind)}else if(c==='}'){ind--;r+='\n'+'  '.repeat(ind)+'}\n'+'  '.repeat(ind)}else if(c===';')r+=';\n'+'  '.repeat(ind);else r+=c}return r.trim()}
-    let f='',ind=0;s.replace(/>\s*</g,'><').split(/(<[^>]+>)/g).filter(Boolean).forEach(n=>{if(n.match(/^<\//))ind--;f+='  '.repeat(Math.max(0,ind))+n.trim()+'\n';if(n.match(/^<[^\/!?]/)&&!n.match(/\/>/))ind++});return f.trim();
-};
+P.timestamp=(s,m)=>DevEngine.timestamp(s,m);
+P.cron=(s)=>DevEngine.cron(s);
+P.beautify=(s,m)=>DevEngine.beautify(s,m);
 
 // ── Single-purpose tools ─────────────────────────────────────
 const loadScript=(src)=>new Promise((ok,no)=>{const e=document.createElement('script');e.src=src;e.onload=ok;e.onerror=()=>no(new Error('Could not load the minifier. Check your connection and try again.'));document.head.appendChild(e)});
@@ -381,36 +317,16 @@ const saved=(a,b)=>{const x=new Blob([a]).size,y=new Blob([b]).size;return x?`${
 const withNote=(code,note)=>({html:(note?'<div style="color:var(--tx2);font-size:.8rem;margin-bottom:8px">'+H(note)+'</div>':'')+'<pre style="margin:0;white-space:pre-wrap;word-break:break-word">'+H(code)+'</pre>'});
 P.jsminify=async(s,m)=>{const T=await terser();const r=await T.minify(s,m==='Whitespace only'?{compress:false,mangle:false}:{compress:true,mangle:m==='Minify + mangle'});return withNote(r.code||'',saved(s,r.code||''))};
 P.jsformat=async(s)=>{const T=await terser();const r=await T.minify(s,{compress:false,mangle:false,format:{beautify:true,comments:'all',indent_level:2}});return r.code||''};
-const cssMin=(s)=>{const keep=[];s=s.replace(/("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|url\([^)]*\))/g,(m)=>{keep.push(m);return'\u0000'+(keep.length-1)+'\u0000'});
-    s=s.replace(/\/\*[\s\S]*?\*\//g,'').replace(/\s+/g,' ').replace(/\s*([{}:;,>+~])\s*/g,'$1').replace(/;}/g,'}').replace(/(^|[\s:,(])0(?:px|em|rem|%|pt|vh|vw)(?=[\s;,)}]|$)/g,'$10').replace(/#([0-9a-f])\1([0-9a-f])\2([0-9a-f])\3\b/gi,'#$1$2$3').trim();
-    return s.replace(/\u0000(\d+)\u0000/g,(_,i)=>keep[+i])};
-P.cssminify=(s)=>{const o=cssMin(s);return withNote(o,saved(s,o))};
-P.cssformat=(s)=>{let out='',depth=0;const pad=()=>'  '.repeat(depth);const min=cssMin(s);let buf='';
-    for(let i=0;i<min.length;i++){const c=min[i];
-        if(c==='{'){out+=pad()+buf.trim()+' {\n';buf='';depth++}
-        else if(c==='}'){if(buf.trim())out+=pad()+buf.trim().replace(/:(?!\/\/)/,': ')+';\n';buf='';depth=Math.max(0,depth-1);out+=pad()+'}\n'+(depth?'':'\n')}
-        else if(c===';'){out+=pad()+buf.trim().replace(/:(?!\/\/)/,': ')+';\n';buf=''}
-        else buf+=c}
-    return out.trim()};
-P.htmlminify=(s)=>{const keep=[];let o=s.replace(/<(pre|textarea|script|style)\b[\s\S]*?<\/\1>/gi,(m)=>{keep.push(m);return'\u0000'+(keep.length-1)+'\u0000'});
-    o=o.replace(/<!--(?!\[if)[\s\S]*?-->/g,'').replace(/\s+/g,' ').replace(/>\s+</g,'> <').replace(/>\s<(\/?(?:html|head|body|div|p|ul|ol|li|table|tr|td|th|thead|tbody|section|article|header|footer|nav|main|h[1-6]|meta|link|title|br|hr)\b)/gi,'><$1').trim();
-    o=o.replace(/\u0000(\d+)\u0000/g,(_,i)=>keep[+i]);return withNote(o,saved(s,o))};
+P.cssminify=(s)=>{const o=DevEngine.cssMinify(s);return withNote(o,saved(s,o))};
+P.cssformat=(s)=>DevEngine.cssFormat(s);
+P.htmlminify=(s)=>{const o=DevEngine.htmlMinify(s);return withNote(o,saved(s,o))};
 P.xmlminify=(s)=>{const d=new DOMParser().parseFromString(s,'application/xml');const er=d.querySelector('parsererror');if(er)throw new Error(er.textContent.split('\n')[0]);
     const keep=[];let o=s.replace(/<!\[CDATA\[[\s\S]*?\]\]>/g,(m)=>{keep.push(m);return'\u0000'+(keep.length-1)+'\u0000'}).replace(/<!--[\s\S]*?-->/g,'').replace(/>\s+</g,'><').trim().replace(/\u0000(\d+)\u0000/g,(_,i)=>keep[+i]);return withNote(o,saved(s,o))};
-const jsonWhere=(s,e)=>{const m=/position (\d+)/.exec(e.message);if(!m)return e.message;const pos=+m[1],pre=s.slice(0,pos),line=pre.split('\n').length,col=pos-pre.lastIndexOf('\n');
-    const near=s.slice(Math.max(0,pos-20),pos+1);let hint='';if(/,\s*[}\]]$/.test(s.slice(0,pos+1).replace(/\s+$/,''))||/,\s*$/.test(pre))hint=' A trailing comma is not allowed in JSON.';else if(/'/.test(near))hint=' JSON strings and keys need double quotes.';else if(/\/\/|\/\*/.test(near))hint=' JSON has no comments.';else if(/[{,]\s*[A-Za-z_]\w*\s*:?$/.test(pre+s[pos]))hint=' Keys must be in double quotes.';
-    return `Line ${line}, column ${col}: ${e.message.replace(/ in JSON at position \d+.*/,'')}.${hint}`};
-const jsonIn=(s)=>{try{return JSON.parse(s)}catch(e){throw new Error(jsonWhere(s,e))}};
-const kind=(v)=>v===null?'null':Array.isArray(v)?'array':typeof v;
-P.jsonminify=(s)=>{const o=JSON.stringify(jsonIn(s));return withNote(o,saved(s,o))};
-P.jsonvalidate=(s)=>{const v=jsonIn(s);let n=0,depth=0;(function walk(x,d){n++;depth=Math.max(depth,d);if(x&&typeof x==='object')for(const k in x)walk(x[k],d+1)})(v,0);
-    return'\u2713 Valid JSON\n\nTop level: '+kind(v)+(Array.isArray(v)?' with '+v.length+' items':v&&typeof v==='object'?' with '+Object.keys(v).length+' keys':'')+'\nValues: '+n.toLocaleString()+'\nDeepest nesting: '+depth};
-P.jsonparse=(s,m)=>{const v=jsonIn(s);if(m==='Tree')return JSON.stringify(v,null,2);const rows=[];
-    (function walk(x,p){if(x&&typeof x==='object'){if(m==='Types')rows.push((p||'$')+'  '+kind(x));const ks=Array.isArray(x)?x.map((_,i)=>i):Object.keys(x);if(!ks.length&&m!=='Types')rows.push((p||'$')+' = '+JSON.stringify(x));
-        for(const k of ks)walk(x[k],Array.isArray(x)?p+'['+k+']':(/^[A-Za-z_$][\w$]*$/.test(k)?(p?p+'.':'')+k:p+'['+JSON.stringify(k)+']'))}
-        else rows.push((p||'$')+(m==='Types'?'  '+kind(x):' = '+JSON.stringify(x)))})(v,'');
-    return rows.join('\n')};
-P.jsonstringify=(s,m)=>{if(m==='Parse string'){let t=s.trim();const inner=JSON.parse(/^"/.test(t)?t:'"'+t.replace(/"/g,'\\"')+'"');return JSON.stringify(jsonIn(inner),null,2)}return JSON.stringify(JSON.stringify(jsonIn(s)))};
+P.jsonminify=(s)=>{const o=DevEngine.jsonMinify(s);return withNote(o,saved(s,o))};
+P.jsonvalidate=(s)=>{const j=DevEngine.jsonStats(s);
+    return'\u2713 Valid JSON\n\nTop level: '+j.kind+(j.kind==='array'?' with '+j.size+' items':j.kind==='object'?' with '+j.size+' keys':'')+'\nValues: '+j.values.toLocaleString()+'\nDeepest nesting: '+j.depth};
+P.jsonparse=(s,m)=>DevEngine.jsonParse(s,m);
+P.jsonstringify=(s,m)=>DevEngine.jsonStringify(s,m);
 P.html2md=(s)=>{const doc=new DOMParser().parseFromString(s,'text/html');const esc=(t)=>t.replace(/([\\`*_{}\[\]#|])/g,'\\$1');
     const inline=(n)=>[...n.childNodes].map(node).join('');
     const list=(n,ord,depth)=>[...n.children].filter(c=>c.tagName==='LI').map((li,i)=>'  '.repeat(depth)+(ord?(i+1)+'. ':'- ')+[...li.childNodes].map(c=>c.nodeType===1&&/^(UL|OL)$/.test(c.tagName)?'\n'+list(c,c.tagName==='OL',depth+1):node(c)).join('').trim()).join('\n');
@@ -430,11 +346,8 @@ P.html2md=(s)=>{const doc=new DOMParser().parseFromString(s,'text/html');const e
         if(t==='TABLE'){const rows=[...n.querySelectorAll('tr')].map(r=>[...r.children].map(c=>inline(c).trim().replace(/\|/g,'\\|').replace(/\n+/g,' ')));if(!rows.length)return'';const w=Math.max(...rows.map(r=>r.length));const line=(r)=>'| '+Array.from({length:w},(_,i)=>r[i]||'').join(' | ')+' |';return'\n\n'+line(rows[0])+'\n|'+' --- |'.repeat(w)+'\n'+rows.slice(1).map(line).join('\n')+'\n\n'}
         return inline(n)}
     return node(doc.body).replace(/[ \t]+\n/g,(m)=>m.startsWith('  ')?'  \n':'\n').replace(/\n{3,}/g,'\n\n').trim()};
-P.md2html=(s,m)=>{let h=P.md(s,'To HTML').replace(/ style="[^"]*"/g,'').replace(/((?:<li>.*<\/li>\n?)+)/g,'<ul>\n$1</ul>\n');
-    h=h.split(/\n{2,}/).map(b=>/^\s*<(h\d|ul|ol|li|blockquote|hr|pre|table)/.test(b)?b:'<p>'+b.trim().replace(/\n/g,'<br>\n')+'</p>').join('\n');
-    return m==='Preview'?{html:'<div style="line-height:1.8">'+h+'</div>'}:h};
-P.minify=(s,m)=>{if(m==='JSON')return JSON.stringify(JSON.parse(s));if(m==='CSS')return s.replace(/\/\*[\s\S]*?\*\//g,'').replace(/\s+/g,' ').replace(/\s*([{}:;,])\s*/g,'$1').trim();
-    if(m==='HTML')return s.replace(/\s+/g,' ').replace(/>\s+</g,'><').trim();return s.replace(/\/\/.*$/gm,'').replace(/\/\*[\s\S]*?\*\//g,'').replace(/\s+/g,' ').trim()};
+P.md2html=(s,m)=>{const h=DevEngine.md2html(s);return m==='Preview'?{html:'<div style="line-height:1.8">'+h+'</div>'}:h};
+P.minify=(s,m)=>DevEngine.minify(s,m);
 
 P.codediff=(a,m,b)=>{
     const al=a.split('\n'),bl=b.split('\n'),r=[];let ai=0,bi=0;
@@ -459,29 +372,9 @@ P.regex=(pat,m,test)=>{
 
 P.slugify=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 
-P.lorem=(s,m)=>{
-    const W='lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua enim ad minim veniam quis nostrud exercitation ullamco laboris nisi aliquip ex ea commodo consequat duis aute irure in reprehenderit voluptate velit esse cillum fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt culpa qui officia deserunt mollit anim id est laborum'.split(' ');
-    const rw=()=>W[Math.random()*W.length|0];
-    const sent=()=>{const n=8+(Math.random()*10|0);let s=Array.from({length:n},rw).join(' ');return s[0].toUpperCase()+s.slice(1)+'.'};
-    const para=()=>Array.from({length:4+(Math.random()*4|0)},sent).join(' ');
-    if(m.includes('Words'))return Array.from({length:50},rw).join(' ');
-    if(m.includes('Sent'))return Array.from({length:10},sent).join(' ');
-    return Array.from({length:parseInt(m)||3},para).join('\n\n');
-};
+P.lorem=(s,m)=>DevEngine.lorem(m.includes('Words')?'words':m.includes('Sent')?'sentences':'paragraphs',m.includes('Words')?50:m.includes('Sent')?10:parseInt(m)||3);
 
-P.curlconvert=(s,m)=>{
-    const cmd=s.trim().replace(/\\\n/g,' ');let method='GET',url='',hd={},body='';
-    const tok=[];let cur='',inQ=false,qc='';
-    for(let i=0;i<cmd.length;i++){const c=cmd[i];if(!inQ&&(c==="'"||c==='"')){inQ=true;qc=c}else if(inQ&&c===qc){inQ=false}else if(!inQ&&c===' '){if(cur){tok.push(cur);cur=''}continue}else cur+=c}
-    if(cur)tok.push(cur);
-    for(let i=0;i<tok.length;i++){const t=tok[i];if(t==='-X'||t==='--request')method=tok[++i];else if(t==='-H'||t==='--header'){const h=tok[++i];const ci=h.indexOf(':');if(ci>0)hd[h.slice(0,ci).trim()]=h.slice(ci+1).trim()}
-    else if(t==='-d'||t==='--data'||t==='--data-raw')body=tok[++i];else if(!t.startsWith('-')&&t!=='curl')url=t}
-    if(body&&method==='GET')method='POST';
-    if(m==='Parsed')return'Method:  '+method+'\nURL:     '+url+'\nHeaders:\n'+Object.entries(hd).map(([k,v])=>'  '+k+': '+v).join('\n')+'\nBody:    '+(body||'(none)');
-    if(m==='To fetch')return"fetch('"+url+"', {\n  method: '"+method+"',\n  headers: "+JSON.stringify(hd,null,4).replace(/\n/g,'\n  ')+','+(body?"\n  body: '"+body+"',":'')+'\n});';
-    if(m==='To Python')return"import requests\n\nresponse = requests."+method.toLowerCase()+"(\n    '"+url+"',\n    headers="+JSON.stringify(hd)+","+(body?"\n    data='"+body+"',":'')+"\n)\nprint(response.json())";
-    return"const https = require('https');\n\nconst req = https.request('"+url+"', {\n  method: '"+method+"',\n  headers: "+JSON.stringify(hd,null,4).replace(/\n/g,'\n  ')+"\n}, res => {\n  let data = '';\n  res.on('data', c => data += c);\n  res.on('end', () => console.log(data));\n});\n"+(body?"req.write('"+body+"');\n":"")+"req.end();";
-};
+P.curlconvert=(s,m)=>DevEngine.curlconvert(s,m);
 
 P.webhook=async()=>{
     const o=$('out');
@@ -494,17 +387,8 @@ P.webhook=async()=>{
 };
 
 P.color=(s)=>{
-    let r,g,b;const v=s.trim();
-    if(v.startsWith('#')){const hx=v.slice(1);r=parseInt(hx.slice(0,2),16);g=parseInt(hx.slice(2,4),16);b=parseInt(hx.slice(4,6),16)}
-    else if(v.startsWith('rgb')){[r,g,b]=v.match(/\d+/g).map(Number)}
-    else throw new Error('Enter HEX (#ff0000) or RGB (rgb(255,0,0))');
-    if([r,g,b].some(x=>isNaN(x)))throw new Error('Invalid color value');
-    const mx=Math.max(r,g,b)/255,mn=Math.min(r,g,b)/255,d=mx-mn;let h=0,s2=0,l=(mx+mn)/2;
-    if(d){s2=l>.5?d/(2-mx-mn):d/(mx+mn);if(mx===r/255)h=((g/255-b/255)/d+(g<b?6:0))*60;else if(mx===g/255)h=((b/255-r/255)/d+2)*60;else h=((r/255-g/255)/d+4)*60}
-    const hex='#'+[r,g,b].map(c=>c.toString(16).padStart(2,'0')).join('');
-    const hsl='hsl('+Math.round(h)+', '+Math.round(s2*100)+'%, '+Math.round(l*100)+'%)';
-    const comp='#'+[255-r,255-g,255-b].map(c=>c.toString(16).padStart(2,'0')).join('');
-    return{html:'<div><div class="sw" style="background:'+hex+'" title="'+hex+'"></div><div class="sw" style="background:'+comp+'" title="Complement"></div></div><div style="line-height:2.2;margin-top:8px">HEX: <strong>'+hex+'</strong>\nRGB: <strong>rgb('+r+', '+g+', '+b+')</strong>\nHSL: <strong>'+hsl+'</strong>\nComplement: <strong>'+comp+'</strong></div><div style="margin-top:12px;color:var(--tx2);font-size:.82rem">CSS:\n  --color: '+hex+';\n  --color-rgb: '+r+', '+g+', '+b+';</div>'};
+    const c=DevEngine.color(s);
+    return{html:'<div><div class="sw" style="background:'+c.hex+'" title="'+c.hex+'"></div><div class="sw" style="background:'+c.complement+'" title="Complement"></div></div><div style="line-height:2.2;margin-top:8px">HEX: <strong>'+c.hex+'</strong>\nRGB: <strong>'+c.rgb+'</strong>\nHSL: <strong>'+c.hsl+'</strong>\nComplement: <strong>'+c.complement+'</strong></div><div style="margin-top:12px;color:var(--tx2);font-size:.82rem">CSS:\n  --color: '+c.hex+';\n  --color-rgb: '+c.r+', '+c.g+', '+c.b+';</div>'};
 };
 
 P.opengraph=async(s)=>{

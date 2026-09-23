@@ -63,16 +63,13 @@
         OpenVibeUI.initPage();
         const output = document.getElementById('output');
 
-        function toHex(text) { return [...text].map(c => c.codePointAt(0).toString(16).toUpperCase().padStart(2, '0')).join(' '); }
-        function toDec(text) { return [...text].map(c => c.codePointAt(0)).join(' '); }
-        function toOct(text) { return [...text].map(c => c.codePointAt(0).toString(8).padStart(3, '0')).join(' '); }
 
         const cards = {};
         const formats = [
             { key: 'binary', name: 'Binary', fn: TextOpenVibeEngine.toBinary },
-            { key: 'hex', name: 'Hexadecimal', fn: toHex },
-            { key: 'decimal', name: 'Decimal', fn: toDec },
-            { key: 'octal', name: 'Octal', fn: toOct },
+            { key: 'hex', name: 'Hexadecimal', fn: TextOpenVibeEngine.toHex },
+            { key: 'decimal', name: 'Decimal', fn: TextOpenVibeEngine.toDecimal },
+            { key: 'octal', name: 'Octal', fn: TextOpenVibeEngine.toOctal },
         ];
 
         function update() {

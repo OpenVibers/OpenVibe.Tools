@@ -76,17 +76,9 @@
         function update() {
             let text = document.getElementById('input').value;
             if (!text) { document.getElementById('output').textContent = ''; return; }
-            const c = TextOpenVibeEngine.clean;
-            if (document.getElementById('optInvisible').checked) text = c.removeInvisible(text);
-            if (document.getElementById('optZalgo').checked) text = c.removeZalgo(text);
-            if (document.getElementById('optQuotes').checked) text = c.normalizeQuotes(text);
-            if (document.getElementById('optHyphens').checked) text = c.normalizeHyphens(text);
-            if (document.getElementById('optHtml').checked) text = c.stripHtml(text);
-            if (document.getElementById('optSpaces').checked) text = c.collapseSpaces(text);
-            if (document.getElementById('optTrim').checked) text = c.trimLines(text);
-            if (document.getElementById('optBlank').checked) text = c.removeBlankLines(text);
-            if (document.getElementById('optLines').checked) text = c.collapseLines(text);
-            document.getElementById('output').textContent = text;
+            const steps = {};
+            for (const { key } of TextOpenVibeEngine.cleanSteps) steps[key] = document.getElementById('opt' + key[0].toUpperCase() + key.slice(1)).checked;
+            document.getElementById('output').textContent = TextOpenVibeEngine.cleanText(text, steps);
         }
 
         document.getElementById('input').addEventListener('input', update);

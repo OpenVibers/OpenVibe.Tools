@@ -63,18 +63,6 @@
     <script src="/js/shared.js"></script>
     <script>
         OpenVibeUI.initPage();
-        const BRAILLE_MAP = {
-            'a':'⠁','b':'⠃','c':'⠉','d':'⠙','e':'⠑','f':'⠋','g':'⠛','h':'⠓','i':'⠊','j':'⠚',
-            'k':'⠅','l':'⠇','m':'⠍','n':'⠝','o':'⠕','p':'⠏','q':'⠟','r':'⠗','s':'⠎','t':'⠞',
-            'u':'⠥','v':'⠧','w':'⠺','x':'⠭','y':'⠽','z':'⠵',
-            '1':'⠼⠁','2':'⠼⠃','3':'⠼⠉','4':'⠼⠙','5':'⠼⠑',
-            '6':'⠼⠋','7':'⠼⠛','8':'⠼⠓','9':'⠼⠊','0':'⠼⠚',
-            ' ':'⠀','.':'⠲',',':'⠂','?':'⠦','!':'⠖',';':'⠆',':':'⠒',
-            '-':'⠤','(':'⠶',')':'⠶','\'':'⠄','"':'⠐⠂','/':'⠌'
-        };
-        const REVERSE_MAP = {};
-        Object.entries(BRAILLE_MAP).forEach(([k, v]) => { if (!REVERSE_MAP[v]) REVERSE_MAP[v] = k; });
-
         let mode = 'encode';
         function setMode(m) {
             mode = m;
@@ -84,23 +72,9 @@
             document.getElementById('input').placeholder = m === 'encode' ? 'Type your text...' : 'Paste Braille dots here...';
             update();
         }
-        function encode(text) {
-            return [...text.toLowerCase()].map(c => BRAILLE_MAP[c] || c).join('');
-        }
-        function decode(braille) {
-            let out = '', i = 0;
-            const chars = [...braille];
-            while (i < chars.length) {
-                const two = chars[i] + (chars[i+1] || '');
-                if (REVERSE_MAP[two]) { out += REVERSE_MAP[two]; i += 2; }
-                else if (REVERSE_MAP[chars[i]]) { out += REVERSE_MAP[chars[i]]; i++; }
-                else { out += chars[i]; i++; }
-            }
-            return out;
-        }
         function update() {
             const text = document.getElementById('input').value;
-            document.getElementById('output').textContent = mode === 'encode' ? encode(text) : decode(text);
+            document.getElementById('output').textContent = mode === 'encode' ? TextOpenVibeEngine.toBraille(text) : TextOpenVibeEngine.fromBraille(text);
         }
         document.getElementById('input').addEventListener('input', update);
         update();

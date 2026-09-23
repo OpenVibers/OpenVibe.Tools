@@ -77,6 +77,7 @@
     <script src="https://openvibe.network/shared/notification-ui.js"></script>
     <script src="https://openvibe.network/shared/account-switcher.js"></script>
     <script src="/js/shared.js"></script>
+    <script src="/js/format-engine.js"></script>
     <script>
         OpenVibeUI.initPage();
         let lastFormatted = '';
@@ -96,33 +97,7 @@
                        .replace(/(?<=[\[,]\s*)(null)(?=\s*[,\]])/g, '<span class="json-null">$1</span>');
         }
 
-        function countKeys(obj) {
-            let count = 0;
-            if (typeof obj === 'object' && obj !== null) {
-                if (Array.isArray(obj)) { obj.forEach(v => count += countKeys(v)); }
-                else { for (const k of Object.keys(obj)) { count++; count += countKeys(obj[k]); } }
-            }
-            return count;
-        }
-
-        function maxDepth(obj, d) {
-            d = d || 0;
-            if (typeof obj !== 'object' || obj === null) return d;
-            if (Array.isArray(obj)) return obj.length ? Math.max(...obj.map(v => maxDepth(v, d + 1))) : d + 1;
-            const vals = Object.values(obj);
-            return vals.length ? Math.max(...vals.map(v => maxDepth(v, d + 1))) : d + 1;
-        }
-
-        function sortKeysDeep(obj) {
-            if (Array.isArray(obj)) return obj.map(sortKeysDeep);
-            if (typeof obj === 'object' && obj !== null) {
-                const sorted = {};
-                Object.keys(obj).sort().forEach(k => sorted[k] = sortKeysDeep(obj[k]));
-                return sorted;
-            }
-            return obj;
-        }
-
+        const { countKeys, maxDepth, sortKeysDeep } = FormatOpenVibeEngine;
         function format(indent) {
             const raw = document.getElementById('input').value.trim();
             const out = document.getElementById('output');
