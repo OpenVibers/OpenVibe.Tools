@@ -62,6 +62,42 @@ Public, cacheable outputs on the apex: `/` (every tool by family, planned tools 
 
 Deploy with `deploy/scripts/deploy.sh` (it refreshes the copied shared package inside each app).
 
+## Tool registry API (ADR-027)
+
+Every catalogue tool has one descriptor (`openvibe-contracts` `tools.tool@1`): how it runs (`execution`:
+`client` in the browser, `sync` answered inline, `job`), whether the run API exposes it (`api`, `run`), its input
+JSON Schema, files, output, limits, `auth` (anonymous or not; `tools.net.probe` for network probes), `quotaClass`,
+`cost`, `egress`, hosts and docs page. Public, read-only, cacheable (capability `tools.tool.read`):
+
+| Route | Answer |
+|---|---|
+| `GET /api/v1/tools` | `tools.tool-list@1`, schemas as `{ $ref }`. Filters `?family=` `?execution=client\|sync\|job` `?api=true\|false` `?status=` `?q=` (comma lists allowed); a bad value → 400 `tools.query.invalid` |
+| `GET /api/v1/tools/:id` | `tools.tool@1` with the schemas embedded |
+| `GET /api/v1/tools/:id/schema` | `{ $schema, $id, $defs: { input, output } }` (what the list's `$ref`s point at) |
+
+All three answer `Access-Control-Allow-Origin: *` (the apps' own CORS rules do not apply to them), an ETag
+(`If-None-Match` → 304) and `Cache-Control: public, max-age=300`, and count against the `/api/` limiter. An unknown
+id is 404 problem+json `tools.tool.not_found` (planned placeholders and mirrors say what they are). The gateway
+answers for every tool; each satellite answers the same routes for its own tools, with its own live status.
+`/api/catalog.json` is unchanged.
+
+- **Specs next to the code.** `apps/<app>/server/descriptors.js` (img, audio, docs, text, yt; maps holds maps and
+  food) and `apps/gateway/server/{net,dev}/descriptors.js` are pure data: the operation, job type and preset come
+  from the app's domain map, net endpoints from `net/config.js`; `apps/_shared/tools/descriptor.js` joins a spec
+  with the catalogue's family, name, summary and hosts (owner overrides included).
+- **Checked.** `apps/gateway/server/registry/descriptors.js` merges them and checks every build with
+  `contracts.validate('tools.tool@1')`, `contracts.tools.checkDescriptor` and `contracts.tools.checkList`. A failing
+  descriptor is left out and `/api/ready` lists it (`tool_registry`, degraded), never a crash.
+- **Status.** Unavailable when the catalogue says so (net tools without an implementation) or when the satellite
+  lacks a program the tool needs (`requires`: qpdf, pdftoppm/pdfinfo, heif-dec, ffmpeg, yt-dlp). The gateway reads
+  each satellite's `GET /api/v1/tools` on loopback every minute and keeps its unavailable marks.
+- **Server engines for browser tools.** The pure transforms behind the dev and text pages live in
+  `apps/gateway/public/js/dev-engine.js`, `apps/text/public/js/text-engine.js` and `format-engine.js`, which the
+  pages load; `apps/gateway/server/dev/engines.js` and `apps/text/server/engines.js` run the same code in Node, so
+  those tools say `execution: client, api: true` (the pages stay browser-only). Tools that need a DOM, a CDN
+  library or isolation (XML minify, HTML to Markdown, the JS minifier/beautifier, the regex tester, the canvas
+  graphics makers) say `api: false`, as does the YouTube downloader (page-only by decision).
+
 ## Jobs (Img, Audio, Docs)
 
 Heavy operations run as durable asynchronous jobs (`apps/_shared/jobs`, roadmap Wave 11). The same
@@ -160,7 +196,7 @@ Every server (gateway and satellites) mounts `apps/_shared/observe.js` with `ope
 
 | Server | Required | Optional (degraded when failing) |
 |---|---|---|
-| gateway (4001) | `catalog` | `network_key`, `service_directory` (Network registry vs fallback list), `community` (`/api/ready`), `satellite_<app>` for all seven (`/api/ready`, cached 15 s) |
+| gateway (4001) | `catalog` | `network_key`, `service_directory` (Network registry vs fallback list), `community` (`/api/ready`), `satellite_<app>` for all seven (`/api/ready`, cached 15 s), `tool_registry` (every catalogue tool has a descriptor that meets the contracts) |
 | img, docs (4012, 4016) | `jobs_db` (query), `job_runtime` (worker started), `data_dir`, `uploads_dir`, `output_dir` (write test) | `analytics_db`, `network_key`, `media_results` (only with `TOOLS_JOB_RESULTS=media`); img: `heif_decoder`; docs: `qpdf`, `pdftoppm`, `pdfinfo` |
 | audio (4014) | same as img | same as img, plus `ffmpeg` on PATH |
 | yt (4013) | `downloads_dir` | `analytics_db`, `yt_dlp`, `ffmpeg`, `yt_cookies` (when `YT_COOKIES_FILE` is set), `network_key` |
@@ -175,7 +211,10 @@ Every server (gateway and satellites) mounts `apps/_shared/observe.js` with `ope
 process: the job runtime end to end (restart, reattach, cancel, idempotency, owner scoping, SSE resume, pruning,
 Media results with a stand-in Media), img/audio/docs as real processes killed with SIGKILL mid-job, canonical
 hosts on every satellite, the registry-driven catalog, and `registry-consistency.test.js`: every catalogue
-tool resolves to an operation, endpoint or page that exists, or is marked unavailable. The audio tests need
+tool resolves to an operation, endpoint or page that exists, or is marked unavailable. `descriptors.test.js`
+holds every descriptor to the contracts and to the code (a job's operation, validation, files and limits; a sync
+tool's route), `engines.test.js` runs every browser tool's server engine in plain Node against its output schema,
+and `tools-api.test.js` checks the three routes on the gateway and all seven satellites. The audio tests need
 `ffmpeg` and skip without it. The docs and img tests always check the 503 path with qpdf, poppler and libheif
 pointed at nothing, and also run the real encrypt/decrypt, page rendering and HEIC decoding when those programs
 are installed (or `QPDF_PATH` / `HEIF_DEC_PATH` point at them). Install first with `npm run install:all`.

@@ -24,6 +24,8 @@ const retention = require('./retention/manager');
 const { buildOptions, describe, processBuffer, defineJobs } = require('./process');
 const codec = require('./tools/codec');
 const { hostGuard, ownHost } = require('../../_shared/host-role');
+const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
+const { createLocalRegistry, requiresStatus } = require('../../_shared/tools/local');
 const jobsRuntime = require('../../_shared/jobs');
 const contracts = require('openvibe-contracts');
 const sdk = require('openvibe-sdk');
@@ -87,7 +89,7 @@ app.use(express.json({ limit: '1mb' }));
 app.use(contracts.http.middleware());   // traceparent + X-OpenVibe-Request-Id on every response
 
 // ── CORS ─────────────────────────────────────────────────────
-app.use(cors({
+app.use(exceptRegistry(cors({
     origin(origin, callback) {
         if (!origin) return callback(null, true);
         // Allow any *.openvibe.tools subdomain + openvibe.tools itself
@@ -96,10 +98,16 @@ app.use(cors({
         return callback(new Error('Origin not allowed by CORS'));
     },
     credentials: true,
-}));
+})));
 
 // ── Rate Limiting ────────────────────────────────────────────
 app.use('/api/', apiLimiter);
+
+// ── Tool registry (ADR-027): GET /api/v1/tools[/:id[/schema]] for this app's image tools ──
+// Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the limiter above. The
+// gateway (openvibe.tools) answers the same routes for every tool and reads this list for status.
+const toolRegistry = createLocalRegistry({ specs: require('./descriptors').SPECS, statusOf: requiresStatus((p) => (p === 'heif-dec' ? codec.heif.available() : true)) });
+app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
 
 // ── Analytics Middleware ─────────────────────────────────────
 app.use(analytics.middleware());

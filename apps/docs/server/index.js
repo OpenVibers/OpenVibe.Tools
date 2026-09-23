@@ -23,6 +23,8 @@ const { apiLimiter, processLimiter, burstLimiter } = require('./middleware/rate-
 const retention = require('./retention/manager');
 const { buildOptions, defineJobs } = require('./process');
 const { hostGuard, ownHost } = require('../../_shared/host-role');
+const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
+const { createLocalRegistry, requiresStatus } = require('../../_shared/tools/local');
 const jobsRuntime = require('../../_shared/jobs');
 const contracts = require('openvibe-contracts');
 const sdk = require('openvibe-sdk');
@@ -86,7 +88,7 @@ app.use(express.json({ limit: '1mb' }));
 app.use(contracts.http.middleware());   // traceparent + X-OpenVibe-Request-Id on every response
 
 // ── CORS ─────────────────────────────────────────────────────
-app.use(cors({
+app.use(exceptRegistry(cors({
     origin(origin, callback) {
         if (!origin) return callback(null, true);
         if (/^https:\/\/([a-z0-9-]+\.)?openvibe\.tools$/.test(origin)) return callback(null, true);
@@ -94,10 +96,17 @@ app.use(cors({
         return callback(new Error('Origin not allowed by CORS'));
     },
     credentials: true,
-}));
+})));
 
 // ── Rate Limiting ────────────────────────────────────────────
 app.use('/api/', apiLimiter);
+
+// ── Tool registry (ADR-027): GET /api/v1/tools[/:id[/schema]] for this app's PDF tools ──
+// Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the limiter above. The
+// gateway (openvibe.tools) answers the same routes for every tool and reads this list for status.
+const pdfPrograms = require('./tools/pdf');
+const toolRegistry = createLocalRegistry({ specs: require('./descriptors').SPECS, statusOf: requiresStatus((p) => (pdfPrograms[p] ? pdfPrograms[p].available() : true)) });
+app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
 
 // ── Analytics Middleware ─────────────────────────────────────
 app.use(analytics.middleware());

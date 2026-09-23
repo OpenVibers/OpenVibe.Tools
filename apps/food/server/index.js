@@ -17,6 +17,8 @@ const Database = require('better-sqlite3');
 const { AnalyticsTracker } = require('openvibe-shared/analytics'); // ADR-021: no IP/user id, route templates, raw rows pruned after 30 days, Sec-GPC/DNT not recorded
 const { internalOk } = require('../../_shared/internal-auth');
 const { hostGuard, stampedPage } = require('../../_shared/host-role');
+const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
+const { createLocalRegistry, requiresStatus } = require('../../_shared/tools/local');
 const analyticsDbPath = path.join(__dirname, '..', 'data', 'analytics.db');
 fs.mkdirSync(path.dirname(analyticsDbPath), { recursive: true });
 const analyticsDb = new Database(analyticsDbPath);
@@ -49,7 +51,7 @@ app.get(['/terms', '/privacy', '/dmca', '/tos'], (req, res) => res.redirect(301,
 // Only loopback hops (the host's nginx, the gateway) are proxies: req.ip is the first address before
 // them, which is what maps is told below. A client's own X-Forwarded-For is never believed.
 app.set('trust proxy', 'loopback');
-app.use(cors({
+app.use(exceptRegistry(cors({
   origin(origin, callback) {
     if (!origin) return callback(null, true);
     if (/^https:\/\/[a-z0-9-]+\.openvibe\.tools$/.test(origin)) return callback(null, true);
@@ -58,7 +60,7 @@ app.use(cors({
     return callback(new Error('Origin not allowed'));
   },
   credentials: true,
-}));
+})));
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -73,6 +75,13 @@ app.use(helmet({
   },
 }));
 app.use(rateLimit({ windowMs: 60000, max: 60 }));
+
+// ── Tool registry (ADR-027): GET /api/v1/tools[/:id[/schema]] for this app's food finder ──
+// Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the limiter above. The
+// gateway (openvibe.tools) answers the same routes for every tool and reads this list for status.
+// The food finder is built on the maps backend; its descriptor lives with the maps app's.
+const toolRegistry = createLocalRegistry({ specs: require('../../maps/server/descriptors').SPECS.filter(s => s.id === 'food') });
+app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
 app.use(cookieParser());
 
 // ── Analytics Middleware ─────────────────────────────────────

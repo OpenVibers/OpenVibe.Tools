@@ -22,6 +22,8 @@ const Database = require('better-sqlite3');
 const { AnalyticsTracker } = require('openvibe-shared/analytics'); // ADR-021: no IP/user id, route templates, raw rows pruned after 30 days, Sec-GPC/DNT not recorded
 const { internalOk } = require('../../_shared/internal-auth');
 const { hostGuard, stampedPage } = require('../../_shared/host-role');
+const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
+const { createLocalRegistry, requiresStatus } = require('../../_shared/tools/local');
 const analyticsDbPath = path.join(__dirname, '..', 'data', 'analytics.db');
 fs.mkdirSync(path.dirname(analyticsDbPath), { recursive: true });
 const analyticsDb = new Database(analyticsDbPath);
@@ -67,7 +69,7 @@ app.use(helmet({
     },
   },
 }));
-app.use(cors({ origin: ['https://maps.openvibe.tools', 'https://food.openvibe.tools', 'https://openvibe.network', 'http://localhost:4010', 'http://localhost:4011'] }));
+app.use(exceptRegistry(cors({ origin: ['https://maps.openvibe.tools', 'https://food.openvibe.tools', 'https://openvibe.network', 'http://localhost:4010', 'http://localhost:4011'] })));
 app.use(cookieParser());
 app.use(express.json());
 
@@ -78,6 +80,12 @@ const apiLimiter = rateLimit({
   message: { error: 'Too many requests — slow down, traveler.' },
 });
 app.use('/api/', apiLimiter);
+
+// ── Tool registry (ADR-027): GET /api/v1/tools[/:id[/schema]] for this app's survival map ──
+// Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the limiter above. The
+// gateway (openvibe.tools) answers the same routes for every tool and reads this list for status.
+const toolRegistry = createLocalRegistry({ specs: require('./descriptors').SPECS.filter(s => s.id === 'maps') });
+app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
 
 // ── Analytics Middleware ─────────────────────────────────────
 app.use(analytics.middleware());

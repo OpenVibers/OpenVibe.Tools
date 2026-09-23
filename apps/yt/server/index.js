@@ -18,6 +18,8 @@ const { optionalAuth } = require('./auth');
 const downloader = require('./downloader');
 const seo = require('./seo');
 const { hostGuard } = require('../../_shared/host-role');
+const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
+const { createLocalRegistry, requiresStatus } = require('../../_shared/tools/local');
 
 // ── Analytics ────────────────────────────────────────────────
 const Database = require('better-sqlite3');
@@ -34,7 +36,7 @@ const app = express();
 const release = require('openvibe-shared/release').createRelease({ service: 'tools', root: require('path').join(__dirname, '..', '..', '..') });
 // Metrics (GET /metrics, direct loopback callers only) and GET /api/ready from this server's real
 // dependencies (roadmap Track O). First, so the HTTP metrics see every request.
-const { observe, checks: ready } = require('../../_shared/observe');
+const { observe, checks: ready, which } = require('../../_shared/observe');
 observe({
     app, metrics: require('openvibe-shared/metrics'), ready: require('openvibe-shared/ready'),
     service: 'tools-yt', release: release.release,
@@ -78,7 +80,7 @@ app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));
 
 // ── CORS ─────────────────────────────────────────────────────
-app.use(cors({
+app.use(exceptRegistry(cors({
     origin(origin, callback) {
         if (!origin) return callback(null, true);
         if (/^https:\/\/([a-z0-9-]+\.)?openvibe\.tools$/.test(origin)) return callback(null, true);
@@ -86,7 +88,7 @@ app.use(cors({
         return callback(new Error('Origin not allowed by CORS'));
     },
     credentials: true,
-}));
+})));
 
 // ── Rate Limiting ────────────────────────────────────────────
 // Progress is one SSE connection, or a poll every 1–3 s when SSE is unavailable; the poll must
@@ -95,6 +97,12 @@ const isStatusRoute = (req) => req.method === 'GET' && /^\/status\/[a-f0-9]+(\/s
 app.use('/api/', rateLimit({ windowMs: 60_000, max: 60, skip: isStatusRoute }));
 app.use('/api/status/', rateLimit({ windowMs: 60_000, max: 240 }));
 app.use('/api/', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
+
+// ── Tool registry (ADR-027): GET /api/v1/tools[/:id[/schema]] for this app's YouTube downloader ──
+// Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the limiter above. The
+// gateway (openvibe.tools) answers the same routes for every tool and reads this list for status.
+const toolRegistry = createLocalRegistry({ specs: require('./descriptors').SPECS, statusOf: requiresStatus((p) => (p === 'yt-dlp' ? !!which(config.ytdlpPath) : true)) });
+app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
 
 // ── Analytics Middleware ─────────────────────────────────────
 app.use(analytics.middleware());

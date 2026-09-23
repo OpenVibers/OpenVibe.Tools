@@ -46,6 +46,10 @@ const SATELLITE_BY_PORT = new Map(Object.entries(SATELLITES).map(([name, port]) 
 // the host router, so on a satellite's host it is the satellite's own.
 const { observe, checks: ready } = require('../../_shared/observe');
 const registry = require('./registry');
+// Every tool's descriptor (tools.tool@1, ADR-027) for GET /api/v1/tools[/:id[/schema]]; checked with
+// openvibe-contracts on every build, a failure is the tool_registry readiness row, never a crash.
+const toolRegistry = require('./registry/descriptors');
+const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
 let auth = null;   // created below; the key check reads it at request time
 const obs = observe({
     app, metrics: require('openvibe-shared/metrics'), ready: require('openvibe-shared/ready'),
@@ -68,6 +72,7 @@ const obs = observe({
             check: () => { const s = registry.services.status(); return s.source === 'registry' ? { ok: true, detail: { as_of: s.as_of, last_ok: s.last_ok } } : `using the built-in fallback list${s.last_error ? ` (${s.last_error})` : ''}`; },
         },
         ready.upstream('community', `${config.communityUrl}/api/ready`, { description: 'paste API proxy (pastes.openvibe.tools)' }),
+        toolRegistry.readyCheck(),
         ...Object.entries(SATELLITES).map(([name, port]) => ready.upstream(`satellite_${name}`, `http://127.0.0.1:${port}/api/ready`, { description: `${name} satellite (port ${port}); its hosts fail without it` })),
     ],
 });
@@ -140,18 +145,25 @@ function isAllowedOrigin(origin) {
 // preflight before the wider allow-list below gets a chance to.
 app.use('/auth/fedcm', fedcmCors);
 
-app.use(cors({
+// The tool registry (/api/v1/tools…) is public and read-only: open to every origin, no credentials.
+app.use(exceptRegistry(cors({
     origin(origin, callback) {
         if (!origin) return callback(null, true); // curl / server-to-server
         if (isAllowedOrigin(origin)) return callback(null, true);
         return callback(new Error('Origin not allowed by CORS'));
     },
     credentials: true,
-}));
+})));
 
 // ── Rate Limiting ────────────────────────────────────────────
 app.use('/api/', rateLimit({ windowMs: 60_000, max: 120 }));
 app.use('/auth/', rateLimit({ windowMs: 15 * 60_000, max: 60 }));
+
+// ── Tool registry (ADR-027, capability tools.tool.read) ──────
+// GET /api/v1/tools (tools.tool-list@1), /api/v1/tools/:id (tools.tool@1), /api/v1/tools/:id/schema.
+// Every tool, every family; satellite hosts answer the same routes for their own tools. Counted by
+// the /api/ limiter above. /api/catalog.json stays as it is (Network reads it).
+app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
 
 // ── Auth (OAuth2 client of OpenVibe.Network) ─────────────────
 auth = createAuthClient(config);
@@ -347,6 +359,9 @@ app.get('*', (req, res) => {
 });
 
 // ── Start ────────────────────────────────────────────────────
+// What each satellite says about its own tools (a program missing on the host → unavailable here too).
+toolRegistry.startSatellitePolling(SATELLITES);
+
 app.listen(config.port, config.host, () => {
     console.log(`\n╔════════════════════════════════════════════╗`);
     console.log(`║   🔧 openvibe.tools — Tools Gateway         ║`);
