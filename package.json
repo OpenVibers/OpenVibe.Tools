@@ -4,7 +4,7 @@
   "private": true,
   "description": "OpenVibe.Tools — the tools suite on openvibe.tools and *.openvibe.tools",
   "scripts": {
-    "install:all": "npm --prefix vendor/openvibe-shared install && npm --prefix apps/gateway install && npm --prefix apps/maps install && npm --prefix apps/food install && npm --prefix apps/img install && npm --prefix apps/yt install && npm --prefix apps/audio install && npm --prefix apps/text install && npm --prefix apps/docs install",
+    "install:all": "npm --prefix apps/gateway install && npm --prefix apps/maps install && npm --prefix apps/food install && npm --prefix apps/img install && npm --prefix apps/yt install && npm --prefix apps/audio install && npm --prefix apps/text install && npm --prefix apps/docs install",
     "start:gateway": "npm --prefix apps/gateway start",
     "start:maps": "npm --prefix apps/maps start",
     "start:food": "npm --prefix apps/food start",

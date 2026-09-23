@@ -22,8 +22,7 @@ apps/
 ├── audio     # Audio.OpenVibe — audio converter & effects
 ├── text      # Text.OpenVibe + Logo.OpenVibe — text generators & logo makers
 └── docs      # Docs.OpenVibe  — PDF & document tools
-vendor/
-└── openvibe-shared  # vendored shared package (canonical copy lives in OpenVibe.Network)
+(openvibe-shared is a pinned OpenVibe.Shared release in each app's package.json; no vendor/ copy)
 ```
 
 ## Ports
@@ -73,7 +72,7 @@ WARP were all tried on 2026-09-18 and all refused; what works is a different net
 ## Dev quickstart
 
 ```bash
-# install everything (vendored shared package first)
+# install every app's dependencies (openvibe-shared comes from the pinned release)
 npm run install:all
 
 # gateway — http://localhost:4001

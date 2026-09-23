@@ -31,7 +31,7 @@ Same pattern as Img.OpenVibe: domain → context → SPA adapts.
 
 - Node.js + Express
 - FFmpeg via fluent-ffmpeg
-- openvibe-shared (navbar, themes, auth JWT)
+- openvibe-shared (pinned OpenVibe.Shared release: navbar, themes, auth JWT)
 - No frameworks, no build step
 
 ## Deploy
@@ -49,7 +49,7 @@ sudo nginx -t && sudo systemctl reload nginx
 
 - Node.js 20+
 - FFmpeg installed system-wide (`apt install ffmpeg`)
-- openvibe-shared package (vendored at `vendor/openvibe-shared`)
+- openvibe-shared (pinned OpenVibe.Shared release)
 
 ## Port
 

@@ -279,7 +279,7 @@ app.get('/openvibe-sw.js', (req, res) => {
     res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
     res.setHeader('Service-Worker-Allowed', '/');
     res.setHeader('Cache-Control', 'no-cache');
-    res.sendFile(path.resolve(__dirname, '..', '..', '..', 'vendor', 'openvibe-shared', 'openvibe-sw.js'));
+    res.sendFile(require('openvibe-shared/files').path('openvibe-sw.js'));
 });
 
 // ── Static Files ─────────────────────────────────────────────

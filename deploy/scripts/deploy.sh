@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
-# Deploy OpenVibe.Tools on the host: pull, refresh the vendored shared package inside each app's
-# node_modules (npm copies file: dependencies on this host, so a pull alone leaves them stale),
-# install new dependencies when a package.json changed, restart the units, check health.
+# Deploy OpenVibe.Tools on the host: pull, install dependencies in each app whose package.json
+# changed (that includes a new openvibe-shared release tag), restart the units, check health.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 BEFORE=$(git rev-parse HEAD); git pull -q --ff-only; AFTER=$(git rev-parse HEAD)
 for app in apps/*/; do
   [ -f "$app/package.json" ] || continue
   if git diff --name-only "$BEFORE" "$AFTER" -- "$app/package.json" | grep -q . || [ ! -d "$app/node_modules" ]; then (cd "$app" && npm install --omit=dev --no-audit --no-fund --silent); fi
-  d="$app/node_modules/openvibe-shared"; [ -L "$d" ] || { mkdir -p "$d"; rsync -a --delete --exclude node_modules vendor/openvibe-shared/ "$d/"; }
 done
 UNITS=$(systemctl list-unit-files 'openvibe-tools*' --no-legend | awk '{print $1}')
 sudo systemctl restart $UNITS
