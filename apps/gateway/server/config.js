@@ -37,4 +37,6 @@ module.exports = {
     // Live owns the accounts these pastes belong to, so it is the only service that can
     // turn a signed-in visitor into the user id Media files the write under.
     liveUrl: process.env.LIVE_URL || 'http://127.0.0.1:3000',
+    // OpenVibe.Community owns pastes (roadmap Wave 5); the paste front-end's API goes straight there.
+    communityUrl: (process.env.OV_COMMUNITY_INTERNAL_URL || 'http://127.0.0.1:4200').replace(/\/$/, ''),
 };
