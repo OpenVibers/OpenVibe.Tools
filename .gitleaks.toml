@@ -9,3 +9,9 @@ description = "The public jwt.io sample token (sub 1234567890, iat 1516239022) p
 condition = "AND"
 paths = ['''^apps/gateway/public/dev\.html$''']
 regexes = ['''^eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkhvYm8iLCJpYXQiOjE1MTYyMzkwMjJ9\.''']
+
+[[allowlists]]
+description = "Hand-made sample JWTs ({\"alg\":\"HS256\"} with {\"exp\":1} and signature 'x', or {\"sub\":\"x\"} and signature 'sig') used as the JWT decoder's descriptor example and engine test input; they sign nothing"
+condition = "AND"
+paths = ['''^apps/gateway/(test/engines\.test\.js|server/dev/descriptors\.js)$''']
+regexes = ['''^eyJhbGciOiJIUzI1NiJ9\.(eyJleHAiOjF9\.x|eyJzdWIiOiJ4In0\.sig)$''']
