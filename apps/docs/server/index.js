@@ -25,6 +25,7 @@ const { buildOptions, defineJobs } = require('./process');
 const { hostGuard, ownHost } = require('../../_shared/host-role');
 const jobsRuntime = require('../../_shared/jobs');
 const contracts = require('openvibe-contracts');
+const sdk = require('openvibe-sdk');
 
 // ── Analytics ────────────────────────────────────────────────
 const Database = require('better-sqlite3');
@@ -251,7 +252,7 @@ app.post('/api/process/multi', burstLimiter, processLimiter, uploadMultiple, asy
 // The same operations as /api/process and /api/process/multi, asynchronous and durable: accepted
 // into data/jobs.db, followed over SSE, reattachable by id after a reload or a restart.
 const jobs = jobsRuntime.setupJobs({
-    app, service: 'docs', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts,
+    app, service: 'docs', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts, sdk,
     getPublicKey: auth.getPublicKey, issuer: auth.ISSUER,
     define: defineJobs,
     receive: uploadAny,

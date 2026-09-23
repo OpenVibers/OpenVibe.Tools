@@ -27,6 +27,7 @@ const { buildOptions, describe, defineJobs } = require('./process');
 const { hostGuard, ownHost } = require('../../_shared/host-role');
 const jobsRuntime = require('../../_shared/jobs');
 const contracts = require('openvibe-contracts');
+const sdk = require('openvibe-sdk');
 
 // ── Analytics ────────────────────────────────────────────────
 const Database = require('better-sqlite3');
@@ -204,7 +205,7 @@ app.post('/api/process', burstLimiter, processLimiter, uploadSingle, async (req,
 // followed over SSE (ffmpeg's own progress), cancellable (ffmpeg is killed), reattachable by id
 // after a reload or a restart (apps/_shared/jobs).
 const jobs = jobsRuntime.setupJobs({
-    app, service: 'audio', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts,
+    app, service: 'audio', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts, sdk,
     getPublicKey: auth.getPublicKey, issuer: auth.ISSUER,
     define: defineJobs,
     receive: uploadSingle,

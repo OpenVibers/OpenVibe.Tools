@@ -1,9 +1,9 @@
 'use strict';
 // ═══════════════════════════════════════════════════════════════
 // Tools job runtime (roadmap Wave 11). Shared by the satellites the way apps/_shared always is:
-// required by relative path, no dependencies of its own — each app passes its better-sqlite3 and
-// openvibe-contracts. See system.js (lifecycle), http.js (routes), media.js (results in Media),
-// client.js (browser helper).
+// required by relative path, no dependencies of its own — each app passes its better-sqlite3,
+// openvibe-contracts and openvibe-sdk. See system.js (lifecycle), http.js (routes), media.js (results
+// in Media), events.js (tools.job.* to OpenVibe.Events), client.js (browser helper).
 //
 // Environment (one /etc/openvibe/tools.env for every unit):
 //   TOOLS_JOBS_CONCURRENCY           jobs running at once per satellite (default 2)
@@ -14,7 +14,10 @@
 //   OV_MEDIA_INTERNAL_URL            Media on this host (default http://127.0.0.1:4100; MEDIA_URL is read as a fallback)
 //   OV_MEDIA_URL                     Media's public origin, for the CSP of previews (default https://openvibe.media)
 //   OV_NETWORK_INTERNAL_URL          token endpoint host (default http://127.0.0.1:4000)
-//   OV_OAUTH_CLIENT_ID / OV_OAUTH_CLIENT_SECRET   the tools client (client_credentials for Media)
+//   OV_OAUTH_CLIENT_ID / OV_OAUTH_CLIENT_SECRET   the tools client (client_credentials for Media and Events)
+//   EVENTS_URL                       OpenVibe.Events on this host; unset = job events are not published
+//   EVENTS_PUBLISH=off               keep them off with EVENTS_URL set
+//   EVENTS_RELAY_INTERVAL_MS         outbox relay poll (default 2000)
 // ═══════════════════════════════════════════════════════════════
 
 const fs = require('fs');
@@ -22,6 +25,7 @@ const path = require('path');
 const { createJobSystem, JobError } = require('./system');
 const { mountJobRoutes, createOwnerResolver, contentDisposition, CAPS } = require('./http');
 const { createMediaResults } = require('./media');
+const { createJobEvents, outboxFromEnv } = require('./events');
 
 function envInt(name, fallback) {
     const v = parseInt(process.env[name], 10);
@@ -65,6 +69,7 @@ function mediaOrigin(env = process.env) {
  * @param {string} o.dataDir
  * @param {Function} o.Database     require('better-sqlite3')
  * @param {object} o.contracts      require('openvibe-contracts')
+ * @param {object} [o.sdk]          require('openvibe-sdk') — the outbox relay to OpenVibe.Events
  * @param {() => string|null} o.getPublicKey
  * @param {string} o.issuer
  * @param {(system) => void} o.define   registers the app's job types
@@ -77,18 +82,33 @@ function setupJobs(o) {
     const db = new o.Database(path.join(o.dataDir, 'jobs.db'));
     const results = mediaFromEnv(o.contracts);
     if (results.reason && String(process.env.TOOLS_JOB_RESULTS || '').toLowerCase() === 'media') console.warn(`[Jobs] ${o.service}: results stay local — ${results.reason}`);
+    // tools.job.* → OpenVibe.Events through an outbox table in this same jobs.db (inert without EVENTS_URL).
+    const events = outboxFromEnv({ db, sdk: o.sdk });
+    if (events.reason && process.env.EVENTS_URL) console.warn(`[Jobs] ${o.service}: job events are not published — ${events.reason}`);
     const system = createJobSystem({
         db, contracts: o.contracts, service: o.service, dataDir: o.dataDir,
         concurrency: envInt(`TOOLS_JOBS_CONCURRENCY_${o.service.toUpperCase()}`, envInt('TOOLS_JOBS_CONCURRENCY', 2)),
         maxActivePerOwner: envInt('TOOLS_JOBS_MAX_ACTIVE', 10) || 10,
         media: results.media,
+        outbox: events.outbox,
     });
     o.define(system);
     const resolveOwner = createOwnerResolver({ contracts: o.contracts, getPublicKey: o.getPublicKey, issuer: o.issuer });
     mountJobRoutes(o.app, { system, contracts: o.contracts, resolveOwner, receive: o.receive, limiters: o.limiters, defaults: o.defaults });
     system.start();
+    let pruneOutbox = null;
+    if (events.outbox) {
+        events.outbox.start();
+        pruneOutbox = setInterval(() => { try { events.outbox.prune(); } catch { /* next time */ } }, 6 * 60 * 60 * 1000);
+        if (pruneOutbox.unref) pruneOutbox.unref();
+        console.log(`[Jobs] ${o.service}: job events → ${events.outbox.url} (${events.outbox.pending()} pending)`);
+    }
     system.db = db;
-    system.close = () => { system.stop(); try { db.close(); } catch { /* already closed */ } };
+    system.close = () => {
+        system.stop();
+        if (events.outbox) { events.outbox.stop(); clearInterval(pruneOutbox); }
+        try { db.close(); } catch { /* already closed */ }
+    };
     return system;
 }
 
@@ -113,4 +133,4 @@ function readyChecks(getSystem, env = process.env) {
     }];
 }
 
-module.exports = { setupJobs, readyChecks, createJobSystem, mountJobRoutes, createOwnerResolver, createMediaResults, mediaFromEnv, mediaOrigin, contentDisposition, JobError, CAPS };
+module.exports = { setupJobs, readyChecks, createJobSystem, mountJobRoutes, createOwnerResolver, createMediaResults, mediaFromEnv, mediaOrigin, contentDisposition, JobError, CAPS, createJobEvents, outboxFromEnv };

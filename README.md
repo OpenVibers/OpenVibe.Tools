@@ -107,14 +107,27 @@ reload reattaches.
   `media.object.upload` and `media.object.read` for audience `openvibe.media`, namespace `tools`, and a `tools`
   tenant in Media. Without them (or if an upload fails) results stay on local disk and the file says
   `storage: "local"`. Default: `local`.
+- **Lifecycle events to OpenVibe.Events** when `EVENTS_URL` is set (`apps/_shared/jobs/events.js`):
+  `tools.job.created` (submit or retry; actor the owner), `tools.job.started` (a worker claimed it; a job
+  re-queued after a restart is announced again when it starts), `tools.job.succeeded` and `tools.job.failed`
+  (payloads `openvibe-contracts` `tools.job.*@1`, validated before they are queued; subject `job <id>`, visibility
+  `internal`, source `tools`). Each is written to an `event_outbox` table in the satellite's `jobs.db` (openvibe-sdk
+  `createOutbox`) in the same SQLite transaction as the state change, so an event exists exactly when its
+  transition committed, and relayed to `EVENTS_URL/api/v1/events` (at least once; Events dedupes on `event_id`).
+  Payloads carry ids, type, owner, state, attempts, times, where result files are (index, mime, size, sha256,
+  `local` or a Media `media_id`) and the error (`status`, `code`, `detail` with server paths and the job's file
+  names taken out) — never the input, file names, output data or a browser session: a session's job has
+  `owner: null`. Cancelled jobs, progress and sandbox app jobs are not announced; an Idempotency-Key replay
+  creates no job and no event. The relay uses the `tools` client (`OV_OAUTH_CLIENT_ID`, `OV_OAUTH_CLIENT_SECRET`)
+  with `events.event.publish` on audience `openvibe.events`. Without `EVENTS_URL` (or with `EVENTS_PUBLISH=off`, or
+  no client secret) nothing is written or sent. `GET /api/health` shows `jobs.events` (pending, rejected).
 
 Environment (all in `/etc/openvibe/tools.env`): `TOOLS_JOBS_CONCURRENCY`, `TOOLS_JOBS_CONCURRENCY_<APP>`,
 `TOOLS_JOBS_MAX_ACTIVE`, `TOOLS_JOB_RESULTS`, `TOOLS_MEDIA_NAMESPACE`, `OV_MEDIA_INTERNAL_URL`, `OV_MEDIA_URL`,
-`OV_NETWORK_INTERNAL_URL`, `OV_OAUTH_CLIENT_ID`, `OV_OAUTH_CLIENT_SECRET`.
+`OV_NETWORK_INTERNAL_URL`, `OV_OAUTH_CLIENT_ID`, `OV_OAUTH_CLIENT_SECRET`, `EVENTS_URL`, `EVENTS_PUBLISH`,
+`EVENTS_RELAY_INTERVAL_MS`.
 
-Not done yet: job lifecycle events are not published to OpenVibe.Events (openvibe-contracts registers no
-`tools.job.*` event types, and Tools does not depend on openvibe-sdk yet); quotas for external developer apps are
-the per-owner limits above, not a Codes-issued quota.
+Not done yet: quotas for external developer apps are the per-owner limits above, not a Codes-issued quota.
 
 ## Canonical hosts and the service registry
 

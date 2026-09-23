@@ -20,6 +20,10 @@
 // (retry_of → the failed one, which records retried_by). Retrying the same failed job again
 // returns that same new job, so the call is idempotent.
 //
+// Events: with an outbox (./events, openvibe-sdk createOutbox on this same database), created,
+// started, succeeded and failed are also announced to OpenVibe.Events as tools.job.*, each written
+// in the transaction that records the transition. Without one, nothing is announced.
+//
 // No dependencies of its own: the app passes its better-sqlite3 handle and openvibe-contracts.
 // ═══════════════════════════════════════════════════════════════
 
@@ -28,6 +32,7 @@ const fsp = require('fs/promises');
 const path = require('path');
 const crypto = require('crypto');
 const { createStore, TERMINAL } = require('./store');
+const { createJobEvents } = require('./events');
 
 const HOUR = 60 * 60 * 1000;
 const PRUNE_RECHECK_MS = 24 * HOUR;   // an expired job the pruner could not finish is looked at again after this
@@ -71,6 +76,7 @@ const scrub = (msg) => String(msg || '').replace(/(?:\/[\w.-]+){2,}/g, '[file]')
  * @param {number} [o.concurrency=2]
  * @param {number} [o.maxActivePerOwner=10]
  * @param {object} [o.media]       result store from ./media (null = keep results on local disk)
+ * @param {object} [o.outbox]      openvibe-sdk outbox on `db` (./events outboxFromEnv); null = no platform events
  * @param {number} [o.pruneIntervalMs=300000]
  * @param {number} [o.progressThrottleMs=250]
  */
@@ -85,6 +91,7 @@ function createJobSystem(o) {
     const throttleMs = o.progressThrottleMs == null ? 250 : o.progressThrottleMs;
     const root = path.resolve(o.dataDir, 'jobs');
     fs.mkdirSync(root, { recursive: true });
+    const announce = createJobEvents({ contracts, service: o.service, outbox: o.outbox || null, referenceCount: (id) => store.referenceCount(id), log });
 
     const types = new Map();
     const active = new Map();      // id → { ctrl, reason, last: { pct, msg, at } }
@@ -234,6 +241,7 @@ function createJobSystem(o) {
                         idempotency_key: idempotencyKey == null ? null : String(idempotencyKey), request_hash: requestHash,
                         max_attempts: def.maxAttempts, ttl_ms: ttlMs, now: Date.now(), env,
                     });
+                    announce.created(store.get(id));
                 })();
             } catch (err) {
                 await fsp.rm(jobDir(id), { recursive: true, force: true });
@@ -262,7 +270,19 @@ function createJobSystem(o) {
             while (active.size < concurrency) {
                 const [row] = store.nextQueued(1);
                 if (!row) break;
-                if (!store.claim(row.id)) continue;
+                // The claim and its tools.job.started event commit together (or neither does).
+                let claimed;
+                try {
+                    claimed = store.transaction(() => {
+                        if (!store.claim(row.id)) return false;
+                        announce.started(store.get(row.id));
+                        return true;
+                    })();
+                } catch (err) {
+                    log.error(`[Jobs] could not start ${row.id}:`, err.message);
+                    break;   // it stays queued; the next kick tries again
+                }
+                if (!claimed) continue;
                 const entry = { ctrl: new AbortController(), reason: null, last: { pct: -1, msg: null, at: 0 } };
                 active.set(row.id, entry);
                 emit(row.id, 'job.running');
@@ -320,14 +340,20 @@ function createJobSystem(o) {
         } finally {
             clearTimeout(timer);
         }
+        let recorded = false;
         try {
-            store.transaction(() => store.finish(row.id, outcome))();
+            // The end state and its tools.job.succeeded|failed event commit together (or neither does).
+            store.transaction(() => { if (store.finish(row.id, outcome)) announce.finished(store.get(row.id)); })();
+            recorded = true;
             emit(row.id, EVENT_FOR[outcome.state]);
+        } catch (err) {
+            // Nothing committed: the row is still 'running' with its inputs, which the next start() recovers.
+            log.error(`[Jobs] could not record the end of ${row.id}:`, err.message);
         } finally {
             active.delete(row.id);
             // A failed job keeps its inputs (until it expires) so it can be retried.
-            if (outcome.state !== 'failed') fsp.rm(path.join(jobDir(row.id), 'in'), { recursive: true, force: true }).catch(() => {});
-            if (outcome.state !== 'succeeded') fsp.rm(outDir, { recursive: true, force: true }).catch(() => {});
+            if (recorded && outcome.state !== 'failed') fsp.rm(path.join(jobDir(row.id), 'in'), { recursive: true, force: true }).catch(() => {});
+            if (recorded && outcome.state !== 'succeeded') fsp.rm(outDir, { recursive: true, force: true }).catch(() => {});
             kick();
         }
     }
@@ -437,6 +463,7 @@ function createJobSystem(o) {
                     idempotency_key: null, request_hash: row.request_hash, max_attempts: def.maxAttempts, ttl_ms: row.ttl_ms, now: Date.now(),
                     env: row.env, retry_of: row.id,
                 });
+                announce.created(store.get(next));
             })();
         } catch (err) {
             if (moved) { try { fs.renameSync(newIn, oldIn); } catch { /* best effort */ } }
@@ -478,6 +505,11 @@ function createJobSystem(o) {
     }
 
     // ── Boot recovery, pruning ─────────────────────────────────
+    /** A job the restart ended as failed: the row and its tools.job.failed event in one transaction. */
+    function failRecovered(id, outcome) {
+        store.transaction(() => { if (store.finish(id, outcome)) announce.finished(store.get(id)); })();
+    }
+
     function recover() {
         let requeued = 0, failed = 0;
         for (const row of store.running()) {
@@ -486,14 +518,14 @@ function createJobSystem(o) {
                 store.finish(row.id, { state: 'cancelled', error: problem(409, 'tools.job.cancelled', 'The job was cancelled') });
                 emit(row.id, 'job.cancelled');
             } else if (!def) {
-                store.finish(row.id, { state: 'failed', error: problem(500, 'tools.job.unknown_type', `This service no longer runs "${row.type}" jobs`) });
+                failRecovered(row.id, { state: 'failed', error: problem(500, 'tools.job.unknown_type', `This service no longer runs "${row.type}" jobs`) });
                 emit(row.id, 'job.failed'); failed++;
             } else if (def.onRestart === 'requeue' && row.attempts < row.max_attempts) {
                 store.requeue(row.id);
                 emit(row.id, 'job.queued'); requeued++;
             } else {
                 const retryable = def.onRestart === 'fail';
-                store.finish(row.id, {
+                failRecovered(row.id, {
                     state: 'failed', retryable,
                     error: problem(503, 'tools.job.interrupted', retryable ? 'The service restarted while this job was running; submit it again' : `The service restarted during each of ${row.attempts} attempts`),
                 });
@@ -584,7 +616,8 @@ function createJobSystem(o) {
         types: () => [...types.keys()],
         media,
         // running (after the spread) is the store's count of rows in 'running'; executing is this process's.
-        stats: () => ({ running: active.size, concurrency, ...store.counts(), executing: active.size, results: media ? 'media' : 'local' }),
+        stats: () => ({ running: active.size, concurrency, ...store.counts(), executing: active.size, results: media ? 'media' : 'local', events: announce.status() }),
+        outbox: o.outbox || null,
         /** True between start() and stop(): the worker picks up queued jobs. */
         isRunning: () => started && !stopped,
         store,

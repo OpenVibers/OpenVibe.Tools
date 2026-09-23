@@ -1,5 +1,5 @@
 {
-  "version": "0.2.0",
+  "version": "0.3.0",
   "contractRanges": {
     "openvibe-contracts": ">=0.7.0 <1.0.0"
   },
@@ -17,10 +17,15 @@
     "tools.job.read",
     "tools.job.cancel"
   ],
-  "eventsProduced": [],
+  "eventsProduced": [
+    "tools.job.created",
+    "tools.job.started",
+    "tools.job.succeeded",
+    "tools.job.failed"
+  ],
   "eventsConsumed": [],
   "namespacesOwned": [
     "tools.*"
   ],
-  "notes": "Wave 11: asynchronous jobs on the img, audio and docs satellites (POST/GET/DELETE /api/v1/jobs, SSE events). Job lifecycle is not yet published to OpenVibe.Events, so eventsProduced stays empty. Tools consumes media.object.upload and media.object.read (namespace tools) when TOOLS_JOB_RESULTS=media."
+  "notes": "Wave 11: asynchronous jobs on the img, audio and docs satellites (POST/GET/DELETE /api/v1/jobs, SSE events). Job lifecycle events tools.job.created|started|succeeded|failed (openvibe-contracts v0.30.1 payloads) go to OpenVibe.Events through an outbox in each satellite's jobs.db when EVENTS_URL is set. Tools consumes media.object.upload and media.object.read (namespace tools) when TOOLS_JOB_RESULTS=media."
 }

@@ -28,11 +28,11 @@ for app in apps/*/; do
     fi
   done
 done
-# Apps that run jobs (apps/_shared/jobs, required by relative path) hand it their own better-sqlite3 and
-# openvibe-contracts: check both load under this Node (a native-module ABI mismatch shows up here, not in
-# a crash loop) and that the shared runtime itself loads.
+# Apps that run jobs (apps/_shared/jobs, required by relative path) hand it their own better-sqlite3,
+# openvibe-contracts and openvibe-sdk (the tools.job.* outbox relay): check they load under this Node (a
+# native-module ABI mismatch shows up here, not in a crash loop) and that the shared runtime itself loads.
 for app in img audio docs; do
-  (cd "apps/$app" && node -e "const D=require('better-sqlite3'); new D(':memory:').close(); require('openvibe-contracts'); require('../_shared/jobs')") \
+  (cd "apps/$app" && node -e "const D=require('better-sqlite3'); new D(':memory:').close(); require('openvibe-contracts'); require('openvibe-sdk'); require('../_shared/jobs')") \
     || { echo "ABORT: apps/$app cannot load the jobs runtime; nothing restarted" >&2; exit 1; }
 done
 UNITS=$(systemctl list-unit-files 'openvibe-tools*' --no-legend | awk '{print $1}')
