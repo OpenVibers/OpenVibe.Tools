@@ -29,6 +29,8 @@ const createDevRoutes = require('./dev/routes');
 const { DEV_TOOL_MAP, DEV_ALIASES } = require('./dev/config');
 
 const app = express();
+// What this deploy runs (ADR-016); the shared navbar's release-watch polls it on every tool host.
+{ const release = require('openvibe-shared/release').createRelease({ service: 'tools', root: require('path').join(__dirname, '..', '..', '..') }); app.get('/release.json', release.handler); }
 
 function getRequestHost(req) {
     return String(req.headers.host || '').split(':')[0].toLowerCase();

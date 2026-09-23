@@ -27,6 +27,8 @@ const PORT = parseInt(process.env.PORT) || 4011;
 const MAPS_API = process.env.MAPS_API || 'http://127.0.0.1:4010';
 
 const app = express();
+// What this deploy runs (ADR-016); the shared navbar's release-watch polls it on every tool host.
+{ const release = require('openvibe-shared/release').createRelease({ service: 'tools', root: require('path').join(__dirname, '..', '..', '..') }); app.get('/release.json', release.handler); }
 
 // Legal documents live on the apex; every tool host points there instead of answering 404.
 app.get(['/terms', '/privacy', '/dmca', '/tos'], (req, res) => res.redirect(301, 'https://openvibe.tools' + (req.path === '/tos' ? '/terms' : req.path)));
