@@ -14,7 +14,7 @@ const cookieParser = require('cookie-parser');
 
 // ── Analytics ────────────────────────────────────────────────
 const Database = require('better-sqlite3');
-const { AnalyticsTracker } = require('../../_shared/analytics'); // ADR-021: no IP/user id, route templates, raw rows pruned after 30 days
+const { AnalyticsTracker } = require('openvibe-shared/analytics'); // ADR-021: no IP/user id, route templates, raw rows pruned after 30 days, Sec-GPC/DNT not recorded
 const { internalOk } = require('../../_shared/internal-auth');
 const { hostGuard, stampedPage } = require('../../_shared/host-role');
 const analyticsDbPath = path.join(__dirname, '..', 'data', 'analytics.db');

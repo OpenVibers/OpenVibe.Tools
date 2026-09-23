@@ -1,5 +1,5 @@
 'use strict';
-// ADR-021 analytics bounds for every satellite (apps/_shared/analytics, scripts/analytics-prune.js):
+// ADR-021 analytics bounds for every satellite (openvibe-shared/analytics, scripts/analytics-prune.js):
 // a tracked request stores no IP, user id, city, raw user agent, raw referer or query string anywhere
 // in analytics.db; paths are route templates; uniques come from day-scoped hashes deleted after the
 // day's rollup; prune removes strictly-older raw rows in bounded batches and never touches rollups;
@@ -11,8 +11,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { dep } = require('./deps');
-const { AnalyticsTracker, privacy, retention } = require('../analytics');
-const { sqlTime } = require('../analytics/tracker');
+const { AnalyticsTracker, privacy, retention } = dep('openvibe-shared/analytics');
+const { sqlTime } = dep('openvibe-shared/analytics/tracker');
 const cli = require('../../../scripts/analytics-prune');
 
 const express = dep('express');
