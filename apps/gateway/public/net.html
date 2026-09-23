@@ -215,6 +215,9 @@
             border-radius: var(--radius-sm); color: var(--red); font-size: 14px;
         }
 
+        /* A tool this server cannot run */
+        .tool-unavailable p { font-size: 14px; color: var(--text-secondary, #b0b0b8); margin: 8px 0 12px; line-height: 1.5; }
+
         /* Pivot link */
         .pivot {
             display: inline-flex; align-items: center; gap: 4px;
@@ -556,7 +559,7 @@
                 <div class="stats-section">
                     <div class="stats-grid">
                         <div class="stat-card">
-                            <div class="stat-value">40+</div>
+                            <div class="stat-value" id="stat-tools">35</div>
                             <div class="stat-label">Tools</div>
                         </div>
                         <div class="stat-card">
@@ -564,8 +567,8 @@
                             <div class="stat-label">Login Required</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-value">∞</div>
-                            <div class="stat-label">Queries</div>
+                            <div class="stat-value">1</div>
+                            <div class="stat-label">Server, outside your network</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-value">⚡</div>
@@ -634,7 +637,8 @@
 
     const API_BASE = 'https://openvibe.tools/api/net';
 
-    // ── Tool definitions (mirrors server/net/config.js) ──────
+    // ── Tool definitions (mirrors server/net/config.js: endpoint and status must agree, which
+    //    test/registry-consistency.test.js checks) ──────
     const TOOLS = {
         // Hub
         net:              { name: 'Network Tools',            icon: 'fa-network-wired',     cat: 'hub',   endpoint: null,        placeholder: 'Enter a domain, IP, or URL…' },
@@ -649,13 +653,13 @@
         isp:              { name: 'ISP Lookup',            icon: 'fa-building',          cat: 'ip',    endpoint: '/ip',       placeholder: 'IP address or domain' },
         asn:              { name: 'ASN Lookup',            icon: 'fa-diagram-project',   cat: 'ip',    endpoint: '/ip',       placeholder: 'IP address or domain' },
         rdns:             { name: 'Reverse DNS Lookup',     icon: 'fa-rotate-left',       cat: 'ip',    endpoint: '/rdns',     placeholder: 'IP address for reverse DNS' },
-        whois:            { name: 'Whois Lookup',          icon: 'fa-address-book',      cat: 'ip',    endpoint: '/rdap',     placeholder: 'Domain or IP' },
+        whois:            { name: 'Whois Lookup',          icon: 'fa-address-book',      cat: 'ip',    endpoint: '/whois',    placeholder: 'Domain or IP' },
         rdap:             { name: 'RDAP Lookup',           icon: 'fa-id-card',           cat: 'ip',    endpoint: '/rdap',     placeholder: 'Domain or IP for RDAP lookup' },
         // DNS
         dns:              { name: 'DNS Lookup',            icon: 'fa-sitemap',           cat: 'dns',   endpoint: '/dns',      placeholder: 'Domain to query' },
         dig:              { name: 'Online dig',            icon: 'fa-terminal',          cat: 'dns',   endpoint: '/dns',      placeholder: 'Domain (dig-style query)',   dnsTypes: true },
         nslookup:         { name: 'NSLookup',       icon: 'fa-magnifying-glass-arrow-right', cat: 'dns', endpoint: '/dns', placeholder: 'Domain for nslookup' },
-        dnspropagation:   { name: 'DNS Propagation Checker', icon: 'fa-globe',            cat: 'dns',   endpoint: '/dns',      placeholder: 'Domain to check propagation' },
+        dnspropagation:   { name: 'DNS Propagation Checker', icon: 'fa-globe',            cat: 'dns',   endpoint: '/dnsprop',  placeholder: 'Domain to compare across public resolvers', propTypes: true },
         mx:               { name: 'MX Record Lookup',             icon: 'fa-envelope',          cat: 'dns',   endpoint: '/dns',      placeholder: 'Domain for MX records',     defaultTypes: 'MX' },
         txt:              { name: 'TXT Record Lookup',            icon: 'fa-file-lines',        cat: 'dns',   endpoint: '/dns',      placeholder: 'Domain for TXT records',    defaultTypes: 'TXT' },
         ns:               { name: 'Nameserver Lookup',             icon: 'fa-server',            cat: 'dns',   endpoint: '/dns',      placeholder: 'Domain for NS records',     defaultTypes: 'NS' },
@@ -663,28 +667,40 @@
         dkim:             { name: 'DKIM Record Lookup',           icon: 'fa-key',               cat: 'dns',   endpoint: '/dns',      placeholder: 'Domain for DKIM',           defaultTypes: 'TXT' },
         dmarc:            { name: 'DMARC Checker',          icon: 'fa-user-shield',       cat: 'dns',   endpoint: '/dns',      placeholder: 'Domain for DMARC',          defaultTypes: 'TXT' },
         // Active diagnostics
-        ping:             { name: 'Ping Test',           icon: 'fa-satellite-dish',    cat: 'diag',  endpoint: '/ping',     placeholder: 'Host to ping' },
-        traceroute:       { name: 'Traceroute',     icon: 'fa-route',             cat: 'diag',  endpoint: '/ping',     placeholder: 'Host for traceroute' },
-        mtr:              { name: 'MTR Report',            icon: 'fa-chart-line',        cat: 'diag',  endpoint: '/ping',     placeholder: 'Host for MTR' },
+        ping:             { name: 'Ping Test (TCP)',           icon: 'fa-satellite-dish',    cat: 'diag',  endpoint: '/ping',     placeholder: 'Host to ping (TCP port 443, from our server)' },
+        traceroute:       { name: 'Traceroute',     icon: 'fa-route',             cat: 'diag',  endpoint: null, unavailable: 'Traceroute needs raw network access that this server does not give the tools, so it is not available. The TCP ping test shows whether a host answers and how fast.', instead: 'ping' },
+        mtr:              { name: 'MTR Report',            icon: 'fa-chart-line',        cat: 'diag',  endpoint: null, unavailable: 'MTR needs raw network access that this server does not give the tools, so it is not available. The TCP ping test shows latency and loss to the host.', instead: 'ping' },
         port:             { name: 'Port Checker',      icon: 'fa-door-open',         cat: 'diag',  endpoint: '/port',     placeholder: 'Host to scan ports' },
         headers:          { name: 'HTTP Header Checker',        icon: 'fa-list',              cat: 'diag',  endpoint: '/headers',  placeholder: 'URL or domain' },
         redirects:        { name: 'Redirect Checker',      icon: 'fa-share',             cat: 'diag',  endpoint: '/redirects', placeholder: 'URL to follow redirects' },
         ssl:              { name: 'SSL Certificate Checker',            icon: 'fa-lock',              cat: 'diag',  endpoint: '/ssl',      placeholder: 'Domain for SSL check' },
         curl:             { name: 'Online curl',           icon: 'fa-download',          cat: 'diag',  endpoint: '/headers',  placeholder: 'URL' },
         httpstatus:       { name: 'HTTP Status Codes',     icon: 'fa-circle-check',      cat: 'diag',  endpoint: '/headers',  placeholder: 'URL to check' },
-        latency:          { name: 'Latency Test',        icon: 'fa-gauge-high',        cat: 'diag',  endpoint: '/ping',     placeholder: 'Host to measure latency' },
+        latency:          { name: 'TCP Latency Test',        icon: 'fa-gauge-high',        cat: 'diag',  endpoint: '/ping',     placeholder: 'Host (10 timed TCP connections to port 443)', count: 10 },
+        // Email & reputation
+        blacklist:        { name: 'Blacklist Checker',     icon: 'fa-ban',               cat: 'mail',  endpoint: '/blacklist', placeholder: 'IPv4 address or domain' },
+        reputation:       { name: 'Domain Reputation Checker', icon: 'fa-star',          cat: 'mail',  endpoint: null, unavailable: 'A combined reputation report is not available yet. The blacklist, SPF, DKIM and DMARC checkers cover its parts.', instead: 'blacklist' },
+        smtp:             { name: 'SMTP Server Test',      icon: 'fa-paper-plane',       cat: 'mail',  endpoint: '/smtp',     placeholder: 'Mail server or domain (its MX is used)', smtpPorts: true },
+        // Website checks
+        uptime:           { name: 'Website Uptime Checker', icon: 'fa-heart-pulse',      cat: 'web',   endpoint: '/uptime',   placeholder: 'URL or domain' },
+        robots:           { name: 'Robots.txt Tester',     icon: 'fa-robot',             cat: 'web',   endpoint: '/robots',   placeholder: 'Domain or URL', robotsTest: true },
+        sitemap:          { name: 'Sitemap Validator',     icon: 'fa-sitemap',           cat: 'web',   endpoint: '/sitemap',  placeholder: 'Sitemap URL or domain' },
     };
 
     const CATS = {
         ip: { label: 'IP / Identity / Ownership', icon: 'fa-fingerprint' },
         dns: { label: 'DNS Tools', icon: 'fa-sitemap' },
         diag: { label: 'Active Diagnostics', icon: 'fa-satellite-dish' },
+        mail: { label: 'Email & Reputation', icon: 'fa-envelope' },
+        web: { label: 'Website Checks', icon: 'fa-globe' },
     };
 
     // ── Detect active tool from subdomain ────────────────────
     const host = location.hostname;
     const subdomain = host.replace(/\.openvibe\.tools$/, '');
-    let activeTool = TOOLS[subdomain] ? subdomain : 'net';
+    // The gateway names the tool in <meta name="ov-tool"> (descriptive hosts, mirrors, custom domains).
+    const META_TOOL = (document.querySelector('meta[name="ov-tool"]') || {}).content || '';
+    let activeTool = TOOLS[META_TOOL] ? META_TOOL : TOOLS[subdomain] ? subdomain : 'net';
     // Aliases
     if (subdomain === 'network') activeTool = 'net';
     if (subdomain === 'ptr') activeTool = 'rdns';
@@ -738,6 +754,8 @@
         if (isHub) {
             document.getElementById('showcase-section').style.display = '';
             buildShowcaseGrid();
+            const n = Object.values(TOOLS).filter(t => t.endpoint && !t.unavailable).length;
+            document.getElementById('stat-tools').textContent = String(n);
         }
 
         // If tool auto-runs (myip), do it immediately
@@ -782,8 +800,28 @@
         if (tool.placeholder) {
             searchInput.placeholder = tool.placeholder;
         }
-        if (tool.auto) {
+        if (tool.auto || tool.unavailable) {
             document.getElementById('search-bar').style.display = 'none';
+        }
+        // A tool this server cannot run: say so where the results would be, and point at what works.
+        if (tool.unavailable) {
+            const box = document.createElement('div');
+            box.className = 'card tool-unavailable';
+            box.setAttribute('role', 'status');
+            const head = document.createElement('div');
+            head.className = 'card-head';
+            head.textContent = 'Not available';
+            const p = document.createElement('p');
+            p.textContent = tool.unavailable;
+            box.append(head, p);
+            if (tool.instead && TOOLS[tool.instead]) {
+                const a = document.createElement('a');
+                a.className = 'pivot';
+                a.href = `https://${tool.instead}.openvibe.tools`;
+                a.textContent = `Open the ${TOOLS[tool.instead].name}`;
+                box.append(a);
+            }
+            document.getElementById('results').append(box);
         }
         if (tool.btnText) {
             btnGo.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i> ${tool.btnText}`;
@@ -802,13 +840,30 @@
             }).join('')}</div>`;
         } else {
             // Tool page: show related tools as mini-nav
-            const related = Object.entries(TOOLS).filter(([,t]) => t.cat === tool.cat && !t.auto);
+            const related = Object.entries(TOOLS).filter(([,t]) => t.cat === tool.cat && !t.auto && !t.unavailable);
             if (related.length > 1) {
                 chipsArea.innerHTML = `<div class="tool-selector">${related.map(([id, t]) => {
                     const active = id === activeTool ? ' active' : '';
                     return `<button class="ts-btn${active}" onclick="goTool('${id}')"><i class="fa-solid ${t.icon}"></i> ${t.name.replace('OpenVibe', '')}</button>`;
                 }).join('')}</div>`;
             }
+        }
+
+        // Tool options
+        const opts = document.getElementById('options-area');
+        if (tool.propTypes) {
+            opts.innerHTML = `<div class="options-row"><label for="prop-type">Record type:</label>
+                <select id="prop-type">${['A', 'AAAA', 'CNAME', 'MX', 'NS', 'TXT'].map(t => `<option value="${t}">${t}</option>`).join('')}</select></div>`;
+        }
+        if (tool.smtpPorts) {
+            opts.innerHTML = `<div class="options-row"><label for="smtp-port">Port:</label>
+                <select id="smtp-port"><option value="25">25 (server to server)</option><option value="587">587 (submission)</option></select></div>`;
+        }
+        if (tool.robotsTest) {
+            opts.innerHTML = `<div class="options-row"><label for="robots-path">Test a path (optional):</label>
+                <input id="robots-path" type="text" placeholder="/private/page.html" spellcheck="false" style="min-width:200px">
+                <label for="robots-ua">as</label>
+                <select id="robots-ua"><option value="*">any crawler (*)</option><option>Googlebot</option><option>Bingbot</option><option>GPTBot</option></select></div>`;
         }
 
         // DNS type options
@@ -836,7 +891,7 @@
                         <div class="tc-icon"><i class="fa-solid ${t.icon}"></i></div>
                         <div class="tc-info">
                             <h3>${t.name}</h3>
-                            <p>${t.placeholder || ''}</p>
+                            <p>${t.unavailable ? 'Not available' : (t.placeholder || '')}</p>
                             <div class="tc-domain">${id}.openvibe.tools</div>
                         </div>
                     </a>
@@ -866,7 +921,7 @@
             return;
         }
 
-        if (!tool.endpoint) return;
+        if (!tool.endpoint || tool.unavailable) return;
         if (!target && !tool.auto) { toast('Please enter a domain, IP, or URL', 'error'); return; }
 
         // Show loading
@@ -897,6 +952,13 @@
             }
             // SPF: just TXT
             if (activeTool === 'spf') params.set('types', 'TXT');
+            if (tool.count) params.set('count', String(tool.count));
+            if (tool.propTypes) params.set('type', document.getElementById('prop-type').value);
+            if (tool.smtpPorts) params.set('port', document.getElementById('smtp-port').value);
+            if (tool.robotsTest) {
+                const p = document.getElementById('robots-path').value.trim();
+                if (p) { params.set('path', p); params.set('ua', document.getElementById('robots-ua').value); }
+            }
 
             const qs = params.toString();
             if (qs) url += (url.includes('?') ? '&' : '?') + qs;
@@ -932,6 +994,12 @@
         if (tool.endpoint === '/redirects') return renderRedirects(el, data);
         if (tool.endpoint === '/port') return renderPort(el, data);
         if (tool.endpoint === '/ping') return renderPing(el, data);
+        if (tool.endpoint === '/dnsprop') return renderDnsProp(el, data);
+        if (tool.endpoint === '/blacklist') return renderBlacklist(el, data);
+        if (tool.endpoint === '/smtp') return renderSMTP(el, data);
+        if (tool.endpoint === '/uptime') return renderUptime(el, data);
+        if (tool.endpoint === '/robots') return renderRobots(el, data);
+        if (tool.endpoint === '/sitemap') return renderSitemap(el, data);
 
         // Fallback: raw JSON
         el.innerHTML = `<div class="card"><div class="raw-block">${esc(JSON.stringify(data, null, 2))}</div></div>`;
@@ -1221,6 +1289,139 @@
             </div>
         </div>`;
         el.innerHTML = html;
+    }
+
+    // ── Website, mail and DNS checks ─────────────────────────
+    const row = (k, v) => `<tr><td class="key">${esc(k)}</td><td class="val">${v}</td></tr>`;
+    const from = (data) => data.checkedFrom ? `<p style="color:var(--text-muted);font-size:12px;margin-top:8px">Checked from ${esc(data.checkedFrom)}.</p>` : '';
+
+    function renderDnsProp(el, data) {
+        const list = data.resolvers || [];
+        let html = `<div class="badges">
+            <span class="badge badge-cyan">${esc(data.target)} ${esc(data.type)}</span>
+            <span class="badge ${data.agree ? 'badge-green' : 'badge-yellow'}">${data.agree ? 'All resolvers agree' : 'Resolvers disagree'}</span>
+            <span class="badge">${data.answered}/${list.length} answered</span>
+        </div>`;
+        html += `<div class="card"><div class="card-head"><i class="fa-solid fa-globe"></i> Public resolvers</div>
+            <table class="res-table"><tr><th>Resolver</th><th>Answer</th><th>Time</th></tr>
+            ${list.map(r => `<tr>
+                <td class="val">${esc(r.name)}<br><span style="color:var(--text-muted);font-size:11px">${esc(r.ip)}</span></td>
+                <td class="val">${r.status === 'ok' ? r.answers.map(a => esc(a)).join('<br>') : `<span class="badge ${r.status === 'error' ? 'badge-red' : ''}">${esc(r.status === 'error' ? (r.error || 'error') : r.status === 'nxdomain' ? 'NXDOMAIN (no such name)' : 'no record')}</span>`}
+                    ${r.differs ? ' <span class="badge badge-yellow">differs</span>' : ''}</td>
+                <td class="val">${r.ms}ms</td></tr>`).join('')}
+            </table>${from(data)}</div>`;
+        el.innerHTML = html;
+    }
+
+    function renderBlacklist(el, data) {
+        const lists = data.lists || [];
+        let html = `<div class="badges">
+            <span class="badge badge-cyan">${esc(data.domain || data.ip || data.target)}${data.domain && data.ip ? ` (${esc(data.ip)})` : ''}</span>
+            <span class="badge ${data.listedCount ? 'badge-red' : 'badge-green'}">${data.listedCount ? `Listed on ${data.listedCount}` : 'Not listed'}</span>
+            ${data.unknownCount ? `<span class="badge badge-yellow">${data.unknownCount} could not be checked</span>` : ''}
+        </div>`;
+        if (data.domain && !data.ip) html += `<p style="color:var(--text-muted);font-size:13px">${esc(data.domain)} has no IPv4 address, so only the domain lists were checked.</p>`;
+        html += `<div class="card"><div class="card-head"><i class="fa-solid fa-ban"></i> Blacklists</div>
+            <table class="res-table"><tr><th>List</th><th>Checked</th><th>Result</th></tr>
+            ${lists.map(l => `<tr>
+                <td class="val">${esc(l.name)}<br><span style="color:var(--text-muted);font-size:11px">${esc(l.zone)}</span></td>
+                <td class="val">${esc(l.query)}</td>
+                <td>${l.listed === true ? `<span class="badge badge-red">Listed</span> ${l.reason ? `<div style="font-size:12px;margin-top:4px">${esc(l.reason)}</div>` : ''} <a class="pivot" href="${esc(l.delist)}" target="_blank" rel="noopener">Delisting</a>`
+                    : l.listed === false ? '<span class="badge badge-green">Not listed</span>'
+                        : `<span class="badge badge-yellow" title="${esc(l.error || '')}">Unknown</span><div style="font-size:11px;color:var(--text-muted);margin-top:4px">${esc(l.error || '')}</div>`}</td>
+            </tr>`).join('')}
+            </table>${from(data)}</div>`;
+        el.innerHTML = html;
+    }
+
+    function renderSMTP(el, data) {
+        let html = `<div class="badges">
+            <span class="badge badge-cyan">${esc(data.host)}:${data.port} (${esc(data.ip)})</span>
+            <span class="badge ${data.connected ? 'badge-green' : 'badge-red'}">${data.connected ? 'Connected' : 'No connection'}</span>
+            ${data.starttls ? `<span class="badge ${data.starttls.ok ? 'badge-green' : data.starttls.offered ? 'badge-yellow' : 'badge-red'}">${data.starttls.ok ? 'STARTTLS ' + esc(data.starttls.protocol || '') : data.starttls.offered ? 'STARTTLS failed' : 'No STARTTLS'}</span>` : ''}
+        </div>`;
+        if (data.mx && data.mx.length) html += `<p style="color:var(--text-muted);font-size:13px">${esc(data.target)} receives mail at ${data.mx.map(m => `${esc(m.exchange)} (${m.priority})`).join(', ')}; tested the first.</p>`;
+        if (data.error) html += `<div class="error-msg" style="margin-bottom:12px">${esc(data.error)}</div>`;
+        html += `<div class="card"><div class="card-head"><i class="fa-solid fa-paper-plane"></i> Conversation</div><table class="res-table">
+            ${data.connectMs != null ? row('Connect time', `${data.connectMs}ms`) : ''}
+            ${data.banner ? row('Greeting', `${data.banner.code} ${esc(data.banner.text)}`) : ''}
+            ${data.ehlo ? row('EHLO', `${data.ehlo.code} ${esc(data.ehlo.greeting)}`) : ''}
+            ${data.ehlo ? row('Extensions', (data.starttls && data.starttls.extensions ? data.starttls.extensions : data.ehlo.extensions).map(e => esc(e)).join('<br>') || '—') : ''}
+            ${data.auth ? row('Login methods', data.auth.length ? data.auth.map(esc).join(', ') : 'none offered') : ''}
+        </table></div>`;
+        const c = data.starttls && data.starttls.certificate;
+        if (c) {
+            html += `<div class="card"><div class="card-head"><i class="fa-solid fa-lock"></i> STARTTLS certificate</div><table class="res-table">
+                ${row('Protocol', esc(data.starttls.protocol || '—'))}${row('Cipher', esc(data.starttls.cipher || '—'))}
+                ${row('Subject', esc(c.subject || '—'))}${row('Issuer', esc(c.issuer || '—'))}
+                ${row('Valid to', `${esc(c.validTo || '—')}${c.daysLeft != null ? ` (${c.daysLeft} days)` : ''}`)}
+                ${row('Trusted chain', c.trusted ? '✅ yes' : `❌ no${c.error ? ' — ' + esc(c.error) : ''}`)}
+                ${c.hostnameMatch != null ? row('Name matches', c.hostnameMatch ? '✅ yes' : '❌ no') : ''}
+            </table></div>`;
+        }
+        el.innerHTML = html + from(data);
+    }
+
+    function renderUptime(el, data) {
+        let html = `<div class="badges">
+            <span class="badge ${data.state === 'up' ? 'badge-green' : 'badge-red'}">${data.state === 'up' ? '🟢 Up' : '🔴 Down'}</span>
+            ${data.status ? `<span class="badge">HTTP ${data.status} ${esc(data.statusText || '')}</span>` : ''}
+            <span class="badge badge-cyan">⚡ ${data.ms}ms</span>
+        </div>`;
+        html += `<div class="card"><div class="card-head"><i class="fa-solid fa-heart-pulse"></i> ${esc(data.url)}</div><table class="res-table">
+            ${data.error ? row('Problem', esc(data.error)) : ''}
+            ${data.finalUrl && data.finalUrl !== data.url ? row('Ended at', esc(data.finalUrl)) : ''}
+            ${data.redirects ? row('Redirects', (data.chain || []).map(h => `${h.status} ${esc(h.url)}`).join('<br>')) : ''}
+            ${data.server ? row('Server', esc(data.server)) : ''}
+            ${row('Checked at', esc(data.checkedAt || ''))}
+        </table>${from(data)}</div>`;
+        el.innerHTML = html;
+    }
+
+    function renderRobots(el, data) {
+        let html = `<div class="badges">
+            <span class="badge ${data.found ? 'badge-green' : 'badge-yellow'}">HTTP ${data.status}</span>
+            <span class="badge badge-cyan">${esc(data.verdict || '')}</span>
+            ${data.found ? `<span class="badge">${data.size} bytes</span>` : ''}
+        </div>`;
+        if (data.test) {
+            const t = data.test;
+            html += `<div class="card"><div class="card-head"><i class="fa-solid fa-vial"></i> ${esc(t.path)} as ${esc(t.ua)}</div>
+                <p><span class="badge ${t.allowed ? 'badge-green' : 'badge-red'}">${t.allowed ? 'Allowed' : 'Blocked'}</span>
+                ${t.rule ? ` by <code>${esc(t.rule.type)}: ${esc(t.rule.path)}</code> (line ${t.rule.line})` : ' (no rule matches)'}</p></div>`;
+        }
+        for (const w of data.warnings || []) html += `<div class="error-msg" style="margin-bottom:8px;text-align:left">${w.line ? `Line ${w.line}: ` : ''}${esc(w.text)}</div>`;
+        for (const g of data.groups || []) {
+            html += `<div class="card"><div class="card-head"><i class="fa-solid fa-robot"></i> User-agent: ${g.agents.map(esc).join(', ')}</div>
+                <table class="res-table">${g.rules.map(r => `<tr><td class="key">${esc(r.type)}</td><td class="val">${esc(r.path) || '<span style="color:var(--text-muted)">(empty: allows everything)</span>'}</td></tr>`).join('') || '<tr><td class="val">No rules</td></tr>'}
+                ${g.crawlDelay ? row('crawl-delay', esc(g.crawlDelay)) : ''}</table></div>`;
+        }
+        if ((data.sitemaps || []).length) html += `<div class="card"><div class="card-head"><i class="fa-solid fa-sitemap"></i> Sitemaps</div>${data.sitemaps.map(u => `<div class="raw-block">${esc(u)}</div>`).join('')}</div>`;
+        el.innerHTML = html + from(data);
+    }
+
+    function renderSitemap(el, data) {
+        const issues = data.issues || [];
+        const errors = issues.filter(i => i.level === 'error');
+        let html = `<div class="badges">
+            <span class="badge ${data.valid ? 'badge-green' : 'badge-red'}">${data.valid ? 'Valid' : `${errors.length} problem${errors.length === 1 ? '' : 's'}`}</span>
+            ${data.kind ? `<span class="badge badge-cyan">${data.kind === 'index' ? `Sitemap index: ${data.count} sitemaps` : `${Number(data.count).toLocaleString('en-US')} URLs`}</span>` : ''}
+            <span class="badge">HTTP ${data.status}${data.gzip ? ' · gzip' : ''}</span>
+        </div>`;
+        html += `<p style="color:var(--text-muted);font-size:13px">${esc(data.finalUrl || data.url)}${data.source === 'robots.txt' ? ' (from robots.txt)' : data.source === 'default' ? ' (the default location)' : ''}</p>`;
+        for (const i of issues) {
+            html += `<div class="card"><div class="card-head"><span class="badge ${i.level === 'error' ? 'badge-red' : 'badge-yellow'}">${i.level}</span> ${esc(i.message)}${i.count > 1 ? ` (${i.count}×)` : ''}</div>
+                ${i.examples && i.examples.length ? i.examples.map(x => `<div class="raw-block">${esc(x)}</div>`).join('') : ''}</div>`;
+        }
+        if ((data.sample || []).length) {
+            html += `<div class="card"><div class="card-head"><i class="fa-solid fa-list"></i> First entries</div><table class="res-table">
+                ${data.sample.map(u => `<tr><td class="val">${esc(u.loc)}</td><td class="val">${esc(u.lastmod || '')}</td></tr>`).join('')}</table></div>`;
+        }
+        if ((data.childResults || []).length) {
+            html += `<div class="card"><div class="card-head"><i class="fa-solid fa-sitemap"></i> First ${data.childResults.length} of ${data.childrenTotal} sitemaps</div><table class="res-table">
+                ${data.childResults.map(c => `<tr><td class="val">${esc(c.url)}</td><td>${c.error ? `<span class="badge badge-red">${esc(c.error)}</span>` : `<span class="badge ${c.valid ? 'badge-green' : 'badge-red'}">${c.valid ? 'valid' : 'problems'}</span> ${Number(c.count || 0).toLocaleString('en-US')} URLs`}</td></tr>`).join('')}</table></div>`;
+        }
+        el.innerHTML = html + from(data);
     }
 
     function renderLookup(el, data) {

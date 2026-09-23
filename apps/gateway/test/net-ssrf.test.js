@@ -63,7 +63,9 @@ const egress = createEgress({
 
 (async () => {
     const app = express();
-    app.use('/api/net', createNetRoutes(null, null, { egress }));
+    // DNS answers for the SMTP tool's MX lookup (none: the name itself is dialled) come from a mock too.
+    const noDns = () => { const no = () => Promise.reject(Object.assign(new Error('ENODATA'), { code: 'ENODATA' })); return { resolveMx: no, resolve4: no, resolveTxt: no, resolve: no }; };
+    app.use('/api/net', createNetRoutes(null, null, { egress, resolverFor: noDns }));
     app.use('/api/dev', createDevRoutes(null, null, { egress }));
     const srv = await new Promise(r => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
     const base = `http://127.0.0.1:${srv.address().port}`;
@@ -75,7 +77,7 @@ const egress = createEgress({
         '0.0.0.0', '::ffff:127.0.0.1', 'fd00::1', '2130706433', 'rebind.example', 'meta.example', 'lan.example'];
     for (const h of hosts) {
         for (const path of [`/api/net/port?target=${q(h)}&ports=3000,4000,4910,8000`, `/api/net/ping?target=${q(h)}&count=1`,
-            `/api/net/ssl?target=${q(h)}`, `/api/net/lookup?target=${q(h)}`]) {
+            `/api/net/ssl?target=${q(h)}`, `/api/net/lookup?target=${q(h)}`, `/api/net/smtp?target=${q(h)}&port=25`]) {
             dialled.length = 0;
             const r = await get(path);
             assert.equal(r.status, 403, `${path} → ${r.status} ${JSON.stringify(r.body)}`);
@@ -88,7 +90,8 @@ const egress = createEgress({
     const urls = ['http://localhost:3000/', 'http://127.0.0.1:4000/api', 'http://[::1]:8000/', 'http://10.1.1.1/', 'http://192.168.0.1/',
         'http://169.254.169.254/latest/meta-data/', 'https://rebind.example/', 'http://meta.example/', 'http://0x7f000001:3000/', 'localhost:4100'];
     for (const u of urls) {
-        for (const path of [`/api/net/headers?target=${q(u)}`, `/api/net/redirects?target=${q(u)}`, `/api/dev/opengraph?url=${q(u)}`]) {
+        for (const path of [`/api/net/headers?target=${q(u)}`, `/api/net/redirects?target=${q(u)}`, `/api/dev/opengraph?url=${q(u)}`,
+            `/api/net/robots?target=${q(u)}`, `/api/net/sitemap?target=${q(u)}`, `/api/net/uptime?target=${q(u)}`]) {
             dialled.length = 0;
             const r = await get(path);
             assert.equal(r.status, 403, `${path} → ${r.status} ${JSON.stringify(r.body)}`);
@@ -118,6 +121,13 @@ const egress = createEgress({
         const og = await get(`/api/dev/opengraph?url=${q(`https://redirector.example${hop}`)}`);
         assert.equal(og.status, 403, `opengraph ${hop}`);
         assert.deepEqual(dialled, ['93.184.216.35']);
+
+        for (const tool of ['uptime', 'sitemap']) {
+            dialled.length = 0;
+            const t = await get(`/api/net/${tool}?target=${q(`https://redirector.example${hop}`)}`);
+            assert.equal(t.status, 403, `${tool} ${hop}`);
+            assert.deepEqual(dialled, ['93.184.216.35'], `${tool} ${hop}: the internal hop was never dialled`);
+        }
     }
     // Headers does not follow at all.
     dialled.length = 0;

@@ -171,6 +171,20 @@ function createEgress({
     }
 
     /**
+     * An open TCP socket to a checked address, for tools that talk a protocol themselves (SMTP).
+     * → Promise<net.Socket> (connected; the caller owns it and must destroy it).
+     */
+    function connect(address, port, { timeoutMs = 8000 } = {}) {
+        assertChecked(address);
+        return new Promise((ok, fail) => {
+            const socket = tcpConnect({ host: address, port });
+            const timer = setTimeout(() => { socket.destroy(); fail(Object.assign(new Error('Connection timed out'), { code: 'ETIMEDOUT' })); }, timeoutMs);
+            socket.once('connect', () => { clearTimeout(timer); ok(socket); });
+            socket.once('error', (err) => { clearTimeout(timer); socket.destroy(); fail(err); });
+        });
+    }
+
+    /**
      * TLS handshake with a checked address, SNI = the hostname. → Promise<{ cert, protocol, cipher }>.
      * `target` is the result of resolve().
      */
@@ -273,7 +287,7 @@ function createEgress({
         }
     }
 
-    return { resolve, pinnedLookup, tcpProbe, tlsHandshake, parseUrl, request, follow, isAllowed };
+    return { resolve, pinnedLookup, tcpProbe, connect, tlsHandshake, parseUrl, request, follow, isAllowed };
 }
 
 module.exports = { createEgress, isPublicAddress, embeddedV4, normalizeHost, TargetRefused };

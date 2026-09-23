@@ -13,11 +13,11 @@ const FAMILIES = [
     {
         id: 'net', name: 'Network Tools', icon: 'network', path: '/network-tools', hub: 'net', hubAliases: ['network'], port: null,
         tagline: 'Look up DNS, IPs, domains, certificates and mail servers',
-        description: 'Diagnostics for anyone who runs a website, a mail server or a home network. Look up DNS records, find out who owns an IP address or a domain, check an SSL certificate, trace a route, test a port and see whether a site is reachable from other parts of the world.',
+        description: 'Diagnostics for anyone who runs a website, a mail server or a home network. Look up DNS records, find out who owns an IP address or a domain, check an SSL certificate, test a port or a mail server, check blacklists and see whether a site is up from outside your own network.',
         intro: 'These tools answer the questions that come up when something on the internet does not work: where does this domain point, why is mail bouncing, is the certificate about to expire, is the site down for everyone. Each one takes a domain, an IP address or a URL and gives a readable answer in a few seconds.',
         faq: [
             ['Do I need to install anything?', 'No. Every lookup runs from our servers and the result appears in your browser, so the tools work on a phone, a locked-down work laptop or a Chromebook.'],
-            ['Where do the lookups run from?', 'DNS, WHOIS and certificate checks run from the OpenVibe servers. Ping, traceroute and latency tests can run from several regions so you can compare results around the world.'],
+            ['Where do the lookups run from?', 'Every check runs from the OpenVibe server, outside your own network. Ping and latency are timed TCP connections; traceroute and MTR are not available because they need raw network access the server does not give the tools.'],
             ['Can I check a server inside my own network?', 'No. The checks come from the public internet, so the target has to be reachable from outside your network.'],
         ],
     },

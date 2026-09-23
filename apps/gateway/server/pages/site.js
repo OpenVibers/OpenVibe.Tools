@@ -195,7 +195,7 @@ function pageTool(t) {
     const hosts = [...(t.hosts.short ? [[t.hosts.short, 'Easiest to remember']] : []), [t.hosts.canonical, t.hosts.short ? 'Search-friendly address' : 'Primary'], ...(t.hosts.mirrors || []).map(a => [a, 'Mirror']), ...t.hosts.aliases.map(a => [a, 'Redirects here'])];
     const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> › ${f && f.path ? `<a href="${esc(f.path)}">${esc(f.name)}</a> › ` : ''}${esc(t.name)}</nav>
 <div class="page-h">${icon(t.icon, 56)}<h1>${esc(t.name)}</h1></div><p class="lead">${esc(t.description)}</p>
-<a class="cta" href="${esc(t.url)}">Open ${esc(t.name)}</a>
+${t.status === 'unavailable' ? `<p class="lead"><strong>Not available yet.</strong> ${esc(t.unavailable || '')}</p>` : `<a class="cta" href="${esc(t.url)}">Open ${esc(t.name)}</a>`}
 <section><div class="sec-h"><h2>Where to find it</h2></div><p class="sec-p">Every address below opens the same tool. The first address is the one to bookmark and share.</p>
 <ul class="hosts">${hosts.map(([h, tag], i) => `<li${i === 0 ? ' class="primary"' : ''}><a href="https://${esc(h)}/"${i === 0 ? '' : ' rel="nofollow"'}>${esc(h)}</a><span class="tag">${tag}</span></li>`).join('')}</ul></section>
 ${t.keywords && t.keywords.length ? `<section><div class="sec-h"><h2>People also call this</h2></div><ul class="kw">${t.keywords.map(k => `<li>${esc(k)}</li>`).join('')}</ul></section>` : ''}

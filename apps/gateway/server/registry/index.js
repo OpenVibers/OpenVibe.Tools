@@ -13,6 +13,7 @@
 const { FAMILIES } = require('./families');
 const { SATELLITE_COPY } = require('./copy-satellites');
 const { CATALOG: SEO } = require('../seo/catalog');
+const { NET_TOOL_MAP } = require('../net/config');
 const { createServiceDirectory } = require('./services');
 
 const ZONE = 'openvibe.tools';
@@ -56,10 +57,13 @@ function baseTools() {
     const out = [];
     for (const rec of SEO.values()) {
         if (rec.hub) continue;
+        // A net tool without an implementation says so (net/config.js status 'unavailable').
+        const net = rec.family === 'net' ? NET_TOOL_MAP.get(rec.sub) : null;
         out.push({
             id: rec.sub, family: rec.family, name: rec.name, tagline: firstSentence(rec.desc), description: rec.about || rec.desc,
             keywords: String(rec.kw || '').split(',').map(k => k.trim()).filter(Boolean),
             icon: (rec.family === 'net' && NET_ICONS[rec.sub]) || (rec.sub.includes('json') ? 'json' : FAMILY_ICON[rec.family]) || 'tools',
+            ...(net && net.status === 'unavailable' && { status: 'unavailable', unavailable: net.unavailable }),
         });
     }
     for (const t of SATELLITE_COPY) out.push({ ...t });
@@ -170,7 +174,7 @@ function catalog() {
         services: services.snapshot(),
         families: r.families.map(f => ({ id: f.id, name: f.name, tagline: f.tagline, description: f.description, icon: f.icon, url: f.url, path: f.path, page: f.page, count: r.tools.filter(t => t.family === f.id).length })),
         planned: r.planned.map(t => ({ id: t.id, family: t.family, name: t.name, tagline: t.tagline, icon: t.icon, status: 'planned' })),
-        tools: r.tools.map(t => ({ id: t.id, family: t.family, alsoIn: t.alsoIn, name: t.name, tagline: t.tagline, description: t.description, keywords: t.keywords, icon: t.icon, hosts: t.hosts, url: t.url, page: `https://${APEX}/tool/${t.id}` })),
+        tools: r.tools.map(t => ({ id: t.id, family: t.family, alsoIn: t.alsoIn, name: t.name, tagline: t.tagline, description: t.description, keywords: t.keywords, icon: t.icon, hosts: t.hosts, url: t.url, page: `https://${APEX}/tool/${t.id}`, status: t.status || 'available', ...(t.unavailable && { unavailable: t.unavailable }) })),
     };
 }
 

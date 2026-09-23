@@ -14,6 +14,11 @@ const { URL } = require('url');
 const net = require('net');
 const { getNetConfig, NET_TOOLS } = require('./config');
 const { createEgress, TargetRefused } = require('../../../_shared/egress');
+const { createCache } = require('./cache');
+const { createChecks } = require('./checks');
+
+const HOUR = 60 * 60_000;
+const IPAPI_FIELDS = 'status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,asname,reverse,query';
 
 /**
  * Every tool here that connects to the target (ssl, headers, redirects, port, ping, lookup, and a
@@ -23,6 +28,11 @@ const { createEgress, TargetRefused } = require('../../../_shared/egress');
 module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
     const router = express.Router();
     const egress = opts.egress || createEgress();
+    // Upstream answers are cached: ip-api's free tier is rate limited (and plain HTTP), RDAP and DoH
+    // answers change slowly. Tests pass their own fetch.
+    const fetchImpl = opts.fetch || fetch;
+    const cache = opts.cache || createCache({ max: 5000, ttlMs: HOUR });
+    const checks = createChecks({ egress, cache, ...(opts.resolverFor && { resolverFor: opts.resolverFor }), ...(opts.tlsUpgrade && { tlsUpgrade: opts.tlsUpgrade }) });
 
     // ── Helpers ──────────────────────────────────────────────
 
@@ -59,9 +69,52 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), timeoutMs);
         try {
-            const res = await fetch(url, { ...opts, signal: controller.signal });
+            const res = await fetchImpl(url, { ...opts, signal: controller.signal });
             return res;
         } finally { clearTimeout(timer); }
+    }
+
+    /**
+     * Geolocation + network owner of an IP, in ip-api's shape. With NET_IPINFO_TOKEN it comes from
+     * ipinfo.io over HTTPS; without, from ip-api.com's free tier (HTTP only). Cached an hour per IP.
+     */
+    function geoLookup(ip) {
+        return cache.wrap(`geo:${ip}`, async () => {
+            const c = cfg();
+            if (c.ipinfo.token) {
+                const r = await timedFetch(`${c.ipinfo.baseUrl}/${encodeURIComponent(ip)}/json?token=${encodeURIComponent(c.ipinfo.token)}`, { headers: { Accept: 'application/json' } });
+                const d = await r.json();
+                if (!r.ok || d.error) return { status: 'fail', message: (d.error && (d.error.message || d.error.title)) || `ipinfo HTTP ${r.status}` };
+                if (d.bogon) return { status: 'fail', message: 'reserved range', query: ip };
+                const [lat, lon] = String(d.loc || '').split(',').map(Number);
+                const org = d.org || '';
+                const asMatch = /^(AS\d+)\s+(.*)$/.exec(org);
+                return {
+                    status: 'success', query: d.ip || ip, country: d.country, countryCode: d.country, region: d.region, regionName: d.region,
+                    city: d.city, zip: d.postal, lat: Number.isFinite(lat) ? lat : undefined, lon: Number.isFinite(lon) ? lon : undefined,
+                    timezone: d.timezone, isp: asMatch ? asMatch[2] : org, org: asMatch ? asMatch[2] : org, as: org, asname: asMatch ? asMatch[2] : '', reverse: d.hostname || '',
+                };
+            }
+            const r = await timedFetch(`${c.ipapi.baseUrl}/json/${encodeURIComponent(ip)}?fields=${IPAPI_FIELDS}`);
+            return r.json();
+        }, (d) => (d && d.status === 'success' ? HOUR : 0));
+    }
+
+    /** RDAP for a domain or an IP. → { ok, status, data }. 200s are kept an hour, 404s ten minutes. */
+    function rdapLookup(type, target) {
+        return cache.wrap(`rdap:${type}:${target}`, async () => {
+            const r = await timedFetch(`${cfg().rdap.baseUrl}/${type}/${encodeURIComponent(target)}`, { headers: { Accept: 'application/rdap+json, application/json' } });
+            return { ok: r.ok, status: r.status, data: r.ok ? await r.json() : null };
+        }, (v) => (v.ok ? HOUR : v.status === 404 ? 10 * 60_000 : 0));
+    }
+
+    /** DNS-over-HTTPS (Google JSON API) for one name and type. Kept for the answers' TTL (30 s – 5 min). */
+    function dohQuery(name, type) {
+        return cache.wrap(`doh:${type}:${name}`, async () => {
+            const r = await timedFetch(`${cfg().doh.google}?name=${encodeURIComponent(name)}&type=${encodeURIComponent(type)}`, { headers: { Accept: 'application/dns-json' } });
+            const data = await r.json();
+            return (data.Answer || []).map(a => ({ name: a.name, type: a.type, TTL: a.TTL, data: a.data }));
+        }, (answers) => Math.min(300, Math.max(30, ...answers.map(a => a.TTL || 0))) * 1000);
     }
 
     function ok(res, data) { return res.json({ ok: true, ...data }); }
@@ -112,11 +165,11 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
     // IP Info / GeoIP / ISP / ASN / MyIP
     // ═══════════════════════════════════════════════════════════
 
+    // The address Express resolved through `trust proxy` (one nginx hop, which sets X-Forwarded-For
+    // from $remote_addr). The first X-Forwarded-For entry is whatever the client sent: never used.
     router.get('/myip', (req, res) => {
-        const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
-                || req.headers['x-real-ip']
-                || req.socket.remoteAddress || '';
-        ok(res, { ip });
+        const ip = String(req.ip || req.socket.remoteAddress || '').replace(/^::ffff:(?=\d+\.)/, '');
+        ok(res, { ip, version: net.isIP(ip) || null });
     });
 
     router.get('/ip/:target?', async (req, res) => {
@@ -137,11 +190,8 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
                 hostname = target;
             }
 
-            // GeoIP via ip-api.com (free, no key, JSON)
-            const c = cfg();
-            const ipUrl = `${c.ipapi.baseUrl}/json/${ip}?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,asname,reverse,query`;
-            const r = await timedFetch(ipUrl);
-            const data = await r.json();
+            // GeoIP (ipinfo with a token, else ip-api.com; cached)
+            const data = await geoLookup(ip);
 
             if (data.status === 'fail') return fail(res, data.message || 'Lookup failed');
 
@@ -204,11 +254,8 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
             const isLoopback = ip.startsWith('127.');
             const isLinkLocal = ip.startsWith('169.254.');
 
-            // GeoIP via ip-api.com
-            const c = cfg();
-            const ipUrl = `${c.ipapi.baseUrl}/json/${ip}?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,asname,reverse,query`;
-            const r = await timedFetch(ipUrl);
-            const data = await r.json();
+            // GeoIP (ipinfo with a token, else ip-api.com; cached)
+            const data = await geoLookup(ip);
 
             if (data.status === 'fail') return fail(res, data.message || 'Lookup failed');
 
@@ -316,13 +363,7 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
             for (const type of validTypes) {
                 try {
                     if (useDoh) {
-                        const r = await timedFetch(`${c.doh.google}?name=${encodeURIComponent(target)}&type=${type}`, {
-                            headers: { Accept: 'application/dns-json' },
-                        });
-                        const data = await r.json();
-                        results[type] = (data.Answer || []).map(a => ({
-                            name: a.name, type: a.type, TTL: a.TTL, data: a.data,
-                        }));
+                        results[type] = await dohQuery(target, type);
                     } else {
                         const resolver = new dns.Resolver();
                         if (server) resolver.setServers([server]);
@@ -336,11 +377,7 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
                             results[type] = await resolver[method](target);
                         } else {
                             // Fallback to DoH for unsupported types
-                            const r = await timedFetch(`${c.doh.google}?name=${encodeURIComponent(target)}&type=${type}`, {
-                                headers: { Accept: 'application/dns-json' },
-                            });
-                            const data = await r.json();
-                            results[type] = (data.Answer || []).map(a => ({ name: a.name, type: a.type, TTL: a.TTL, data: a.data }));
+                            results[type] = await dohQuery(target, type);
                         }
                     }
                 } catch (err) {
@@ -390,15 +427,12 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
         try {
             const target = parseTarget(req.params.target || req.query.target);
             if (!target) return fail(res, 'Please provide a domain or IP');
-            const c = cfg();
-
-            // RDAP queries: domain → /domain/, IP → /ip/
+            // RDAP queries: domain → /domain/, IP → /ip/ (cached)
             const rdapType = isIP(target) ? 'ip' : 'domain';
-            const url = `${c.rdap.baseUrl}/${rdapType}/${encodeURIComponent(target)}`;
-            const r = await timedFetch(url, { headers: { Accept: 'application/rdap+json, application/json' } });
+            const r = await rdapLookup(rdapType, target);
 
             if (!r.ok) return fail(res, `RDAP lookup failed (${r.status})`, r.status >= 500 ? 502 : 404);
-            const data = await r.json();
+            const data = r.data;
 
             // Extract key fields from RDAP response
             const summary = {
@@ -690,9 +724,7 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
                         const addrs = await dns.resolve4(target).catch(() => []);
                         if (addrs.length) ip = addrs[0]; else return null;
                     }
-                    const c = cfg();
-                    const r = await timedFetch(`${c.ipapi.baseUrl}/json/${ip}?fields=status,message,country,countryCode,region,regionName,city,lat,lon,timezone,isp,org,as,asname,reverse,query`);
-                    const data = await r.json();
+                    const data = await geoLookup(ip);
                     if (data.status === 'fail') return null;
                     return data;
                 })(),
@@ -711,13 +743,8 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
                 })(),
                 // RDAP
                 (async () => {
-                    const c = cfg();
-                    const rdapType = isIP(target) ? 'ip' : 'domain';
-                    const r = await timedFetch(`${c.rdap.baseUrl}/${rdapType}/${encodeURIComponent(target)}`, {
-                        headers: { Accept: 'application/rdap+json, application/json' },
-                    });
-                    if (!r.ok) return null;
-                    return await r.json();
+                    const r = await rdapLookup(isIP(target) ? 'ip' : 'domain', target);
+                    return r.ok ? r.data : null;
                 })(),
                 // SSL (domain only)
                 (async () => {
@@ -815,6 +842,23 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
             fail(res, err.message || 'Lookup failed', 500);
         }
     });
+
+    // ═══════════════════════════════════════════════════════════
+    // Website, mail and DNS checks (server/net/checks.js)
+    // ═══════════════════════════════════════════════════════════
+
+    const raw = (req) => String(req.params.target || req.query.target || '').trim();
+    const host = (req) => { const t = parseTarget(raw(req)); if (!t) throw Object.assign(new Error('Please provide a domain or IP'), { status: 400 }); return t; };
+    const run = (label, fn) => async (req, res) => {
+        try { ok(res, await fn(req)); } catch (err) { failFrom(res, err, `${label} failed`); }
+    };
+
+    router.get('/robots/:target?', run('robots.txt check', (req) => checks.robots(raw(req), { path: req.query.path, ua: req.query.ua })));
+    router.get('/sitemap/:target?', run('Sitemap check', (req) => checks.sitemap(raw(req))));
+    router.get('/uptime/:target?', run('Uptime check', (req) => checks.uptime(raw(req))));
+    router.get('/smtp/:target?', run('SMTP test', (req) => checks.smtp(host(req), { port: req.query.port })));
+    router.get('/blacklist/:target?', run('Blacklist check', (req) => checks.blacklist(host(req))));
+    router.get('/dnsprop/:target?', run('DNS propagation check', (req) => checks.dnsprop(host(req), { type: req.query.type })));
 
     return router;
 };

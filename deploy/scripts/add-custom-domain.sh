@@ -44,7 +44,9 @@ server { listen 443 ssl http2; listen [::]:443 ssl http2; server_name $DOMAIN;
   location / {
     proxy_pass http://127.0.0.1:$PORT; proxy_http_version 1.1;
     proxy_set_header Host \$host; proxy_set_header X-Real-IP \$remote_addr;
-    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for; proxy_set_header X-Forwarded-Proto https;
+    # The client address from \$remote_addr only (Cloudflare's real IP is applied globally): a client's own
+    # X-Forwarded-For is never passed on, so the apps' one-hop trust proxy cannot be fooled.
+    proxy_set_header X-Forwarded-For \$remote_addr; proxy_set_header CF-Connecting-IP \$remote_addr; proxy_set_header X-Forwarded-Proto https;
     # Host-role headers come from the gateway only, never from a client.
     proxy_set_header X-OV-Tool ""; proxy_set_header X-OV-Host-Role ""; proxy_set_header X-OV-Canonical-Host ""; proxy_set_header X-OV-Short-Host "";
     proxy_buffering off; proxy_read_timeout 600s; proxy_send_timeout 600s;

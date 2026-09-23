@@ -78,7 +78,10 @@ function getRequestHost(req) {
 }
 
 // ── Security ─────────────────────────────────────────────────
-app.set('trust proxy', 2); // Cloudflare → Nginx → Node
+// One hop: the host's nginx, which applies Cloudflare's real IP (real_ip_header CF-Connecting-IP) and
+// sets X-Forwarded-For to $remote_addr. req.ip is that address; anything a client put in its own
+// X-Forwarded-For stays to the left of it and is never believed (myip, rate limits, forwarded IPs).
+app.set('trust proxy', 1);
 
 app.use(helmet({
     contentSecurityPolicy: {
