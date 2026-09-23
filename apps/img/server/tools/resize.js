@@ -5,7 +5,7 @@
 // Resizes images using Sharp with multiple fit modes.
 // ═══════════════════════════════════════════════════════════════
 
-const sharp = require('sharp');
+const codec = require('./codec');
 
 const VALID_FITS = ['cover', 'contain', 'fill', 'inside', 'outside'];
 const MAX_DIMENSION = 16384; // Sharp max pixel dimension
@@ -23,8 +23,9 @@ const MAX_DIMENSION = 16384; // Sharp max pixel dimension
  * @returns {Promise<{ buffer: Buffer, mime: string, ext: string, dimensions: Object }>}
  */
 async function resize(inputBuffer, options = {}) {
-    const metadata = await sharp(inputBuffer).metadata();
-    const fmt = metadata.format || 'png';
+    const img = await codec.open(inputBuffer);   // BMP, ICO and HEIC too
+    const metadata = await img.sharp().metadata();
+    const fmt = img.format || 'png';
 
     let width = parseInt(options.width, 10) || null;
     let height = parseInt(options.height, 10) || null;
@@ -60,14 +61,13 @@ async function resize(inputBuffer, options = {}) {
         }
     }
 
-    let pipeline = sharp(inputBuffer)
+    const pipeline = img.sharp()
         .resize(width, height, { fit, withoutEnlargement, background });
 
-    // Re-encode to same format
-    const { mime, ext } = applyFormat(pipeline, fmt);
-    const buffer = await pipeline.toBuffer();
-
-    const outMeta = await sharp(buffer).metadata();
+    // Re-encode to same format (a BMP stays a BMP)
+    const out = await encodeSame(pipeline, fmt);
+    const { buffer, mime, ext } = out;
+    const outMeta = { width: out.width, height: out.height };
     return {
         buffer, mime, ext,
         dimensions: {
@@ -75,6 +75,16 @@ async function resize(inputBuffer, options = {}) {
             resized: { width: outMeta.width, height: outMeta.height },
         },
     };
+}
+
+async function encodeSame(pipeline, fmt) {
+    if (fmt === 'bmp') {
+        const r = await codec.toBmp(pipeline);
+        return { buffer: r.buffer, mime: 'image/bmp', ext: 'bmp', width: r.width, height: r.height };
+    }
+    const { mime, ext } = applyFormat(pipeline, fmt);
+    const { data, info } = await pipeline.toBuffer({ resolveWithObject: true });
+    return { buffer: data, mime, ext, width: info.width, height: info.height };
 }
 
 function applyFormat(pipeline, fmt) {

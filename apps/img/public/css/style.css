@@ -464,3 +464,16 @@ body {
     .subdomain-grid { grid-template-columns: 1fr 1fr; }
     .footer-inner { flex-direction: column; text-align: center; }
 }
+
+/* A tool (or an input format) the server cannot run yet: said on the page, not discovered on upload. */
+.tool-notice {
+    max-width: 720px;
+    margin: 0 auto 20px;
+    padding: 12px 16px;
+    border: 1px solid var(--accent-dark);
+    border-radius: var(--radius-md);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.5;
+}

@@ -5,7 +5,7 @@
 // Reduces image file size using format-specific optimization.
 // ═══════════════════════════════════════════════════════════════
 
-const sharp = require('sharp');
+const codec = require('./codec');
 
 /**
  * Compress an image buffer.
@@ -20,11 +20,11 @@ async function compress(inputBuffer, options = {}) {
     const quality = Math.max(1, Math.min(100, parseInt(options.quality, 10) || 75));
     const originalSize = inputBuffer.length;
 
-    // Detect input format from metadata
-    const metadata = await sharp(inputBuffer).metadata();
-    const fmt = options.inputFormat || metadata.format || 'png';
+    // Detect input format (BMP, ICO and HEIC are decoded by ./codec; they compress to WebP)
+    const img = await codec.open(inputBuffer);
+    const fmt = options.inputFormat || img.format || 'png';
 
-    let pipeline = sharp(inputBuffer);
+    let pipeline = img.sharp();
     let mime, ext;
 
     switch (fmt) {

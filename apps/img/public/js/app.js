@@ -56,6 +56,7 @@
         }
 
         applyBranding();
+        showUnavailableInputs();
         initNavbar();
         initNotifications();
         if (typeof OpenVibeAccountSwitcher !== 'undefined') OpenVibeAccountSwitcher.init({ apiBase: 'https://openvibe.network' });
@@ -107,6 +108,21 @@
         // Update meta description
         const metaDesc = document.querySelector('meta[name="description"]');
         if (metaDesc && ctx.seoDescription) metaDesc.content = ctx.seoDescription;
+    }
+
+    // A format this server cannot read yet (HEIC before libheif's decoder is installed): say so up
+    // front on the page that is about it, instead of letting the upload fail.
+    function showUnavailableInputs() {
+        const heicPage = ctx.toolId === 'heic';
+        if (!ctx.inputs || ctx.inputs.heic !== false || !heicPage) return;
+        const zone = document.getElementById('upload-zone');
+        if (!zone || document.getElementById('input-notice')) return;
+        const note = document.createElement('div');
+        note.id = 'input-notice';
+        note.className = 'tool-notice';
+        note.setAttribute('role', 'status');
+        note.textContent = 'HEIC (iPhone) photos cannot be converted yet: the decoder is being set up on the server. JPG, PNG, WebP, AVIF and the other formats work now.';
+        zone.parentNode.insertBefore(note, zone);
     }
 
     // ── Navbar ───────────────────────────────────────────────

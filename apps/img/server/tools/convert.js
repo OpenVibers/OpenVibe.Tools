@@ -2,12 +2,16 @@
 
 // ═══════════════════════════════════════════════════════════════
 // Img.OpenVibe — Format Conversion Tool
-// Converts images between formats using Sharp.
+// Converts images between formats using Sharp. BMP is written by ./codec (sharp cannot);
 // ICO output uses to-ico for multi-size favicon generation.
 // ═══════════════════════════════════════════════════════════════
 
 const sharp = require('sharp');
 const toIco = require('to-ico');
+const codec = require('./codec');
+
+const ICO_SIZES = [16, 32, 48, 64, 128, 256];
+const CLEAR = { r: 0, g: 0, b: 0, alpha: 0 };
 
 // Supported output formats and their Sharp method / mime
 const FORMAT_CONFIG = {
@@ -17,7 +21,7 @@ const FORMAT_CONFIG = {
     webp: { method: 'webp', mime: 'image/webp', ext: 'webp' },
     avif: { method: 'avif', mime: 'image/avif', ext: 'avif' },
     tiff: { method: 'tiff', mime: 'image/tiff', ext: 'tiff' },
-    bmp:  { method: 'raw',  mime: 'image/bmp',  ext: 'bmp', custom: true },
+    bmp:  { method: null,   mime: 'image/bmp',  ext: 'bmp', custom: true },
     gif:  { method: 'gif',  mime: 'image/gif',  ext: 'gif' },
     ico:  { method: null,   mime: 'image/x-icon', ext: 'ico', custom: true },
 };
@@ -36,29 +40,33 @@ async function convert(inputBuffer, options = {}) {
     if (!cfg) throw new Error(`Unsupported output format: ${format}`);
 
     const quality = Math.max(1, Math.min(100, parseInt(options.quality, 10) || 80));
+    const img = await codec.open(inputBuffer);   // decoded once (BMP, ICO and HEIC included)
 
     // ── ICO (multi-size favicon) ─────────────────────────────
+    // One decode, scaled once to the largest icon size; the smaller sizes come from those
+    // 256×256 pixels one after another (not six full decodes of the upload in parallel).
     if (format === 'ico') {
-        const sizes = [16, 32, 48, 64, 128, 256];
-        const pngs = await Promise.all(
-            sizes.map(s => sharp(inputBuffer).resize(s, s, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer())
-        );
+        const base = await img.sharp()
+            .resize(256, 256, { fit: 'contain', background: CLEAR })
+            .ensureAlpha().raw({ depth: 'uchar' })
+            .toBuffer({ resolveWithObject: true });
+        const raw = { width: base.info.width, height: base.info.height, channels: base.info.channels };
+        const pngs = [];
+        for (const s of ICO_SIZES) {
+            pngs.push(await sharp(base.data, { raw }).resize(s, s, { fit: 'contain', background: CLEAR }).png().toBuffer());
+        }
         const icoBuffer = await toIco(pngs);
         return { buffer: Buffer.from(icoBuffer), mime: cfg.mime, ext: cfg.ext };
     }
 
-    // ── BMP (Sharp raw → manual BMP headers) ────────────────
+    // ── BMP (sharp decodes, ./codec writes the file) ────────
     if (format === 'bmp') {
-        // Sharp doesn't output BMP directly — convert to PNG then use raw pixel approach
-        // For simplicity, output as PNG with .bmp extension indicator — or use raw
-        const pngBuffer = await sharp(inputBuffer).png().toBuffer();
-        // Actually, Sharp >=0.33 supports bmp output via ensureAlpha + raw, but let's just do PNG
-        // Users will get a lossless PNG essentially. For true BMP we'd need a dedicated library.
-        return { buffer: pngBuffer, mime: 'image/png', ext: 'bmp' };
+        const { buffer } = await codec.toBmp(img.sharp());
+        return { buffer, mime: cfg.mime, ext: cfg.ext };
     }
 
     // ── Standard Sharp formats ───────────────────────────────
-    let pipeline = sharp(inputBuffer);
+    let pipeline = img.sharp();
 
     const methodOpts = {};
     if (['jpeg', 'webp', 'avif'].includes(cfg.method)) {

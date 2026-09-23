@@ -22,6 +22,7 @@ const { uploadSingle } = require('./middleware/upload');
 const { apiLimiter, processLimiter, burstLimiter } = require('./middleware/rate-limit');
 const retention = require('./retention/manager');
 const { buildOptions, describe, processBuffer, defineJobs } = require('./process');
+const codec = require('./tools/codec');
 const { hostGuard, ownHost } = require('../../_shared/host-role');
 const jobsRuntime = require('../../_shared/jobs');
 const contracts = require('openvibe-contracts');
@@ -55,6 +56,7 @@ observe({
         ready.sqlite('analytics_db', analyticsDb, { required: false, description: 'visit analytics only; tools work without it' }),
         ready.networkKey('network_key', auth.getPublicKey, { description: 'verifies signed-in users and service tokens on the job API; anonymous use works without it' }),
         ...jobsRuntime.readyChecks(() => jobs),
+        codec.heif.readyCheck('HEIC (iPhone) photos: heif-dec or heif-convert with an HEVC decoder plugin (libheif-examples + libheif-plugin-libde265); other formats work without it'),
     ],
     jobs: () => jobs,
 });
@@ -139,6 +141,8 @@ app.get('/api/context', (req, res) => {
         seoTitle: ctx.seoTitle,
         seoDescription: ctx.seoDescription,
         tools,
+        // HEIC needs libheif's decoder on the server; until it is installed the HEIC page says so.
+        inputs: { heic: codec.heif.available() },
         user: req.user ? { username: req.user.username, display_name: req.user.display_name } : null,
     });
 });
@@ -171,6 +175,7 @@ app.post('/api/process', burstLimiter, processLimiter, uploadSingle, async (req,
 
         res.json({ success: true, download: saved, ...describe(toolId, result) });
     } catch (err) {
+        if (err.status === 503) return contracts.http.sendProblem(res, 503, err.code, { detail: err.message, ctx: req.ov });
         console.error('[Process] Error:', err.message);
         res.status(422).json({ error: err.message || 'Image processing failed' });
     }
@@ -193,6 +198,7 @@ app.post('/api/process/direct', burstLimiter, processLimiter, uploadSingle, asyn
         });
         res.send(result.buffer);
     } catch (err) {
+        if (err.status === 503) return contracts.http.sendProblem(res, 503, err.code, { detail: err.message, ctx: req.ov });
         console.error('[Process/Direct] Error:', err.message);
         res.status(422).json({ error: err.message || 'Image processing failed' });
     }
@@ -277,6 +283,8 @@ const server = app.listen(config.port, config.host, () => {
     console.log(`║  Port: ${String(config.port).padEnd(30)}║`);
     console.log(`║  Host: ${config.host.padEnd(30)}║`);
     console.log(`╚═══════════════════════════════════════╝\n`);
+    const h = codec.heif.detect();
+    console.log(h.available ? `[Img.OpenVibe] HEIC decoder: ${h.path}` : `[Img.OpenVibe] HEIC uploads answer 503 until libheif's decoder is installed (${h.detail})`);
 });
 
 // ── Graceful Shutdown ────────────────────────────────────────

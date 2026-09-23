@@ -5,7 +5,7 @@
 // Crops images by pixel coordinates or aspect ratio presets.
 // ═══════════════════════════════════════════════════════════════
 
-const sharp = require('sharp');
+const codec = require('./codec');
 
 const ASPECT_RATIOS = {
     '16:9':  16 / 9,
@@ -31,8 +31,9 @@ const ASPECT_RATIOS = {
  * @returns {Promise<{ buffer: Buffer, mime: string, ext: string, crop: Object }>}
  */
 async function crop(inputBuffer, options = {}) {
-    const metadata = await sharp(inputBuffer).metadata();
-    const fmt = metadata.format || 'png';
+    const img = await codec.open(inputBuffer);   // BMP, ICO and HEIC too
+    const metadata = await img.sharp().metadata();
+    const fmt = img.format || 'png';
 
     let left, top, cropW, cropH;
 
@@ -68,11 +69,17 @@ async function crop(inputBuffer, options = {}) {
     cropW = Math.max(1, Math.min(cropW, metadata.width - left));
     cropH = Math.max(1, Math.min(cropH, metadata.height - top));
 
-    let pipeline = sharp(inputBuffer).extract({ left, top, width: cropW, height: cropH });
+    const pipeline = img.sharp().extract({ left, top, width: cropW, height: cropH });
 
-    // Re-encode to same format
-    const { mime, ext } = applyFormat(pipeline, fmt);
-    const buffer = await pipeline.toBuffer();
+    // Re-encode to same format (a BMP stays a BMP)
+    let buffer, mime, ext;
+    if (fmt === 'bmp') {
+        ({ buffer } = await codec.toBmp(pipeline));
+        mime = 'image/bmp'; ext = 'bmp';
+    } else {
+        ({ mime, ext } = applyFormat(pipeline, fmt));
+        buffer = await pipeline.toBuffer();
+    }
 
     return {
         buffer, mime, ext,
