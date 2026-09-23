@@ -11,10 +11,14 @@
 //
 // Each page already carries a good hand-written <title> and description, so this module reuses
 // those rather than inventing a second source of truth.
+//
+// Through the gateway (X-OV-* headers) the tool comes from X-OV-Tool and the canonical host from
+// X-OV-Canonical-Host — a descriptive host or a custom domain; reached directly, the primary host.
 // ═══════════════════════════════════════════════════════════════
 
 const fs = require('fs');
 const path = require('path');
+const { canonicalHostFor, ownHost } = require('../../_shared/host-role');
 
 const PUBLIC = path.join(__dirname, '..', 'public');
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -92,13 +96,15 @@ function renderPage(file, primaryHost) {
 }
 
 /** Express handler factory: serves the host's page with its SEO tags applied. */
-function pageSender(hostnameMap, getHostname) {
+function pageSender(hostnameMap) {
     const primary = buildPrimaryHosts(hostnameMap);
+    const has = (h) => Object.prototype.hasOwnProperty.call(hostnameMap, h);
     return function sendPage(req, res) {
-        const hostname = getHostname(req);
-        const file = hostnameMap[hostname] || 'index.html';
+        const hostname = ownHost(req, has);
+        const file = (has(hostname) && hostnameMap[hostname]) || 'index.html';
         res.setHeader('Cache-Control', 'no-cache');
-        const rendered = renderPage(file, primary.get(file) || hostname);
+        res.setHeader('Vary', 'X-OV-Canonical-Host');
+        const rendered = renderPage(file, canonicalHostFor(req, primary.get(file) || hostname));
         if (!rendered) return res.sendFile(path.join(PUBLIC, file));
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
         res.send(rendered);

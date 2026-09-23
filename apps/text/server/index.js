@@ -14,7 +14,8 @@ const config = require('./config');
 const Database = require('better-sqlite3');
 const { AnalyticsTracker } = require('openvibe-shared/analytics');
 const { internalOk } = require('../../_shared/internal-auth');
-const analyticsDbPath = path.join(__dirname, '..', 'data', 'analytics.db');
+const { hostGuard } = require('../../_shared/host-role');
+const analyticsDbPath = path.resolve(__dirname, '..', process.env.DATA_DIR || 'data', 'analytics.db');
 fs.mkdirSync(path.dirname(analyticsDbPath), { recursive: true });
 const analyticsDb = new Database(analyticsDbPath);
 analyticsDb.pragma('journal_mode = WAL');
@@ -147,9 +148,10 @@ const HOSTNAME_MAP = {
     'slang.openvibe.tools':      'slang.html',
 };
 
-function getHostname(req) {
-    return String(req.headers.host || '').split(':')[0].toLowerCase();
-}
+// ── Hosts ────────────────────────────────────────────────────
+// Through the gateway the X-OV-* headers name the tool and its canonical host; aliases the gateway
+// missed are redirected. Hosts this app does not serve go to the tools index (APIs never redirect).
+app.use(hostGuard({ knows: (h) => Object.prototype.hasOwnProperty.call(HOSTNAME_MAP, h) }));
 
 // ── Internal Analytics API ────────────────────────────────────
 app.get('/api/internal/analytics', (req, res) => {
@@ -183,7 +185,7 @@ app.use(express.static(path.join(__dirname, '..', 'public'), {
 // hosts deliberately share one file (smallcaps/fancy, glitch/zalgo); without a canonical those
 // are duplicate pages competing with each other in search results.
 const textSeo = require('./seo');
-const sendPage = textSeo.pageSender(HOSTNAME_MAP, getHostname);
+const sendPage = textSeo.pageSender(HOSTNAME_MAP);
 
 app.get('/sitemap.xml', (_req, res) => {
     res.setHeader('Content-Type', 'application/xml; charset=utf-8');

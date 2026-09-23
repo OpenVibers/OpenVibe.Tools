@@ -16,6 +16,7 @@ const cookieParser = require('cookie-parser');
 const Database = require('better-sqlite3');
 const { AnalyticsTracker } = require('openvibe-shared/analytics');
 const { internalOk } = require('../../_shared/internal-auth');
+const { hostGuard, stampedPage } = require('../../_shared/host-role');
 const analyticsDbPath = path.join(__dirname, '..', 'data', 'analytics.db');
 fs.mkdirSync(path.dirname(analyticsDbPath), { recursive: true });
 const analyticsDb = new Database(analyticsDbPath);
@@ -60,8 +61,16 @@ app.use(cookieParser());
 // ── Analytics Middleware ─────────────────────────────────────
 app.use(analytics.middleware());
 
+// ── Hosts + the page ───────────────────────────────────────
+// Through the gateway the X-OV-* headers name the canonical host (a custom domain included) and the
+// page's canonical / og:url / JSON-LD follow it; aliases are redirected; other hosts go to the tools index.
+const HOST = 'food.openvibe.tools';
+app.use(hostGuard({ knows: (h) => h === HOST }));
+const sendIndex = stampedPage(path.join(__dirname, '..', 'public', 'index.html'), HOST);
+app.get(['/', '/index.html'], sendIndex);
+
 // Static files
-app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: '1d' }));
+app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: '1d', index: false }));
 
 // Proxy food-related API calls to openvibe-maps backend
 function proxyToMaps(apiPath) {
@@ -97,7 +106,7 @@ app.get('/api/internal/analytics/bots', (req, res) => {
 });
 
 // SPA fallback
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'index.html')));
+app.get('*', (req, res) => sendIndex(req, res));
 
 const server = app.listen(PORT, '127.0.0.1', () => {
   console.log(`[Food.OpenVibe] 🍽️  food.openvibe.tools listening on 127.0.0.1:${PORT}`);

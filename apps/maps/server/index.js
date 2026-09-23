@@ -21,6 +21,7 @@ const config = require('./config');
 const Database = require('better-sqlite3');
 const { AnalyticsTracker } = require('openvibe-shared/analytics');
 const { internalOk } = require('../../_shared/internal-auth');
+const { hostGuard, stampedPage } = require('../../_shared/host-role');
 const analyticsDbPath = path.join(__dirname, '..', 'data', 'analytics.db');
 fs.mkdirSync(path.dirname(analyticsDbPath), { recursive: true });
 const analyticsDb = new Database(analyticsDbPath);
@@ -64,10 +65,19 @@ app.use('/api/', apiLimiter);
 // ── Analytics Middleware ─────────────────────────────────────
 app.use(analytics.middleware());
 
+// ── Hosts + the page ───────────────────────────────────────
+// Through the gateway the X-OV-* headers name the canonical host (a custom domain included) and the
+// page's canonical / og:url / JSON-LD follow it; aliases are redirected; other hosts go to the tools index.
+const HOST = 'maps.openvibe.tools';
+app.use(hostGuard({ knows: (h) => h === HOST }));
+const sendIndex = stampedPage(path.join(__dirname, '..', 'public', 'index.html'), HOST);
+app.get(['/', '/index.html'], sendIndex);
+
 // ── Static files ───────────────────────────────────────────
 app.use(express.static(path.join(__dirname, '..', 'public'), {
   maxAge: '1h',
   extensions: ['html'],
+  index: false,
 }));
 
 // ── Source modules ─────────────────────────────────────────
@@ -427,7 +437,7 @@ app.get('/api/internal/analytics/bots', (req, res) => {
 
 // ── SPA fallback ───────────────────────────────────────────
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+  sendIndex(req, res);
 });
 
 // ── Start ──────────────────────────────────────────────────
