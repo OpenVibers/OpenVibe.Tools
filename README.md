@@ -22,7 +22,9 @@ apps/
 ├── audio     # Audio.OpenVibe — audio converter & effects
 ├── text      # Text.OpenVibe + Logo.OpenVibe — text generators & logo makers
 └── docs      # Docs.OpenVibe  — PDF & document tools
-apps/_shared   # code the apps require by relative path: host roles, internal auth, the job runtime (jobs/)
+apps/_shared   # code the apps require by relative path: host roles, internal auth, the job runtime (jobs/),
+               # visit analytics within ADR-021 (analytics/)
+scripts/analytics-prune.js   # operator CLI: raw analytics retention + one-time scrub (dry run by default)
 (openvibe-shared is a pinned OpenVibe.Shared release in each app's package.json; no vendor/ copy)
 ```
 
@@ -153,6 +155,31 @@ process: the job runtime end to end (restart, reattach, cancel, idempotency, own
 Media results with a stand-in Media), img/audio/docs as real processes killed with SIGKILL mid-job, canonical
 hosts on every satellite, and the registry-driven catalog. The audio test needs `ffmpeg` and skips without it.
 Install first with `npm run install:all`.
+
+## Analytics (ADR-021)
+
+Every satellite except the gateway keeps visit analytics in its own `data/analytics.db` through
+`apps/_shared/analytics` (the same module as OpenVibe.Live's `server/analytics/`). Bound by ADR-021
+(OpenVibe.Contracts `docs/adr/ADR-021-analytics.md`):
+
+- **A raw row carries** event type, service, route template (matched Express route, else a normaliser: no
+  query string, ids/hashes → `:id`, the segment after `watch`, `jobs`, `recipe`, `place`, … → `:param`,
+  `/@x` → `/@:user`), method, status, response time, a rotating session id, country (CDN header),
+  user-agent class (`chrome/windows/desktop`, `bot:googlebot`) + browser/os/device, referer origin, bot
+  flags, a signed-in flag, timestamp. **Never** an IP, a user id, a city, the UA string or a full referer
+  (`ip`/`user_id`/`city` stay as always-NULL columns for compatibility).
+- **Session id:** random, in memory against the visitor hash, new after 30 idle minutes and at UTC midnight.
+- **Bot rate check:** per-IP counters in memory only (current + previous minute); `analytics_rate_tracking`
+  is emptied at boot and no longer written.
+- **Unique visitors:** `HMAC-SHA256(day salt, ip + "\n" + ua)` (16 hex chars), random salt per UTC day. Hashes
+  and the salt are kept only until the first hourly aggregation after their day ends (right after the
+  day's final rollup), never in raw rows. Rollups keep counts; sub-48 h raw summaries count sessions.
+- **Retention:** each satellite prunes raw rows older than 30 days in batches of 5000, 5 minutes after boot
+  and every 24 h after; rollups stay.
+- **CLI:** `node scripts/analytics-prune.js` (dry run over every `apps/*/data/analytics.db`; `--app`, `--db`
+  to narrow). `--apply` needs `--backup <file|dir>` (verified online backup; a directory when several
+  databases are targeted) or `--no-backup`; `--scrub` also rewrites rows written before ADR-021 and the
+  rollups' top lists (counts unchanged). Ends with VACUUM unless `--no-vacuum`.
 
 ## YouTube downloader: when YouTube refuses the server
 

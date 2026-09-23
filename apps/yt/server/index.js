@@ -21,13 +21,13 @@ const { hostGuard } = require('../../_shared/host-role');
 
 // ── Analytics ────────────────────────────────────────────────
 const Database = require('better-sqlite3');
-const { AnalyticsTracker } = require('openvibe-shared/analytics');
+const { AnalyticsTracker } = require('../../_shared/analytics'); // ADR-021: no IP/user id, route templates, raw rows pruned after 30 days
 const { internalOk } = require('../../_shared/internal-auth');
 const analyticsDbPath = path.join(__dirname, '..', 'data', 'analytics.db');
 fs.mkdirSync(path.dirname(analyticsDbPath), { recursive: true });
 const analyticsDb = new Database(analyticsDbPath);
 analyticsDb.pragma('journal_mode = WAL');
-const analytics = new AnalyticsTracker(analyticsDb, 'openvibe-yt');
+const analytics = new AnalyticsTracker(analyticsDb, 'openvibe-yt', { retention: { days: 30 } });
 
 const app = express();
 // What this deploy runs (ADR-016); the shared navbar's release-watch polls it on every tool host.

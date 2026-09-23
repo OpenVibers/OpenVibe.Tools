@@ -14,14 +14,14 @@ const cookieParser = require('cookie-parser');
 
 // ── Analytics ────────────────────────────────────────────────
 const Database = require('better-sqlite3');
-const { AnalyticsTracker } = require('openvibe-shared/analytics');
+const { AnalyticsTracker } = require('../../_shared/analytics'); // ADR-021: no IP/user id, route templates, raw rows pruned after 30 days
 const { internalOk } = require('../../_shared/internal-auth');
 const { hostGuard, stampedPage } = require('../../_shared/host-role');
 const analyticsDbPath = path.join(__dirname, '..', 'data', 'analytics.db');
 fs.mkdirSync(path.dirname(analyticsDbPath), { recursive: true });
 const analyticsDb = new Database(analyticsDbPath);
 analyticsDb.pragma('journal_mode = WAL');
-const analytics = new AnalyticsTracker(analyticsDb, 'openvibe-food');
+const analytics = new AnalyticsTracker(analyticsDb, 'openvibe-food', { retention: { days: 30 } });
 
 const PORT = parseInt(process.env.PORT) || 4011;
 const MAPS_API = process.env.MAPS_API || 'http://127.0.0.1:4010';
