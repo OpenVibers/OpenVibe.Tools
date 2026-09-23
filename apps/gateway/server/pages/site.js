@@ -94,16 +94,24 @@ details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px
 @media (prefers-reduced-motion:reduce){.tool{transition:none}}
 ${icons.CSS}`;
 
-const NETWORK = [
-    ['live', 'OpenVibe.Live', 'Live streams, clips and chat', 'https://openvibe.live/'],
-    ['community', 'OpenVibe.Community', 'Pastes, posts and people', 'https://openvibe.community/'],
-    ['games', 'OpenVibe.Games', 'Browser games', 'https://openvibe.games/'],
-    ['media', 'OpenVibe.Media', 'VODs, clips and files', 'https://openvibe.media/'],
-    ['network', 'OpenVibe.Network', 'One account for every site', 'https://openvibe.network/'],
+// "Elsewhere on OpenVibe": which services, their names and origins come from Network's registry
+// (registry.services); only the one-line descriptions are ours. A service the registry lists as a
+// placeholder or retired is not linked.
+const NETWORK_COPY = [
+    ['live', 'Live streams, clips and chat'],
+    ['community', 'Pastes, posts and people'],
+    ['games', 'Browser games'],
+    ['media', 'VODs, clips and files'],
+    ['network', 'One account for every site'],
 ];
+function networkLinks() {
+    const up = new Map(registry.services.linkable().map(s => [s.id, s]));
+    return NETWORK_COPY.filter(([id]) => up.has(id)).map(([id, d]) => [id, up.get(id).name, d, `${up.get(id).origin}/`]);
+}
 
 function shell({ head, body, families }) {
     // Every icon on the page once, as a sprite; the markup above only references them.
+    const NETWORK = networkLinks();
     const spriteSvg = icons.sprite([..._used, ...NETWORK.map(n => n[0])]); _used = new Set();
     return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 ${head}

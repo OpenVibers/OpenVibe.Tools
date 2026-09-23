@@ -126,7 +126,7 @@ async function requireAuth(req, res, next) {
 
 // ── Basic API ────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', service: 'openvibe-tools-gateway', version: '2.0.0' });
+    res.json({ status: 'ok', service: 'openvibe-tools-gateway', version: '2.0.0', registry: registry.services.status() });
 });
 
 app.get('/api/brand', (_req, res) => res.json(BRAND));
@@ -256,7 +256,7 @@ app.use((req, res, next) => {
     if (isStaticPath(req.path)) return next();
     // Pastes live on openvibe.community. Old links keep their paste: /<slug> and /p/<slug> → /p/<slug> there
     // (the page used to drop the slug and show the index). Signed-in visitors go through its silent sign-in.
-    const COMMUNITY = (process.env.OV_COMMUNITY_URL || 'https://openvibe.community').replace(/\/$/, '');
+    const COMMUNITY = (process.env.OV_COMMUNITY_URL || registry.services.origin('community', 'https://openvibe.community')).replace(/\/$/, '');   // Community's origin from Network's registry
     const m = /^\/(?:p\/)?([A-Za-z0-9][A-Za-z0-9_-]{1,80})\/?$/.exec(req.path);
     const target = m && !['new', 'my', 'pastes'].includes(m[1]) ? `/p/${m[1]}` : (req.path === '/new' ? '/new' : req.path === '/my' ? '/my' : '/pastes');
     if (/(?:^|;\s*)ov_sso_hint=account(?:;|$)/.test(String(req.headers.cookie || ''))) {

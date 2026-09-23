@@ -13,6 +13,7 @@
 const { FAMILIES } = require('./families');
 const { SATELLITE_COPY } = require('./copy-satellites');
 const { CATALOG: SEO } = require('../seo/catalog');
+const { createServiceDirectory } = require('./services');
 
 const ZONE = 'openvibe.tools';
 const APEX = ZONE;
@@ -79,6 +80,10 @@ const PLANNED = [
 ];
 
 const familyById = new Map(FAMILIES.map(f => [f.id, f]));
+// Other services' origins come from Network's registry; a change rebuilds the catalog (and the page caches).
+const services = createServiceDirectory({ onChange: () => build() });
+// Tools that live on another service: where they are, by registry service id.
+const EXTERNAL = { pastes: { service: 'community', path: '/pastes' } };
 let overrides = [];            // [{ tool_id, host, role }]
 let overridesAt = 0;
 let built = null;              // { tools, families, byHost, updated }
@@ -110,7 +115,8 @@ function build() {
     const tools = all.filter(t => !MERGED[t.id] || !all.some(x => x.id === MERGED[t.id].into)).map(t => {
         const fam = familyById.get(t.family);
         const hosts = hostsFor(t.id, HOST_DEFAULTS[t.id]);
-        const external = t.id === 'pastes' ? 'https://openvibe.community/pastes' : null;
+        const ext = EXTERNAL[t.id];
+        const external = ext ? `${services.origin(ext.service)}${ext.path}` : null;
         const folded = all.filter(x => MERGED[x.id] && MERGED[x.id].into === t.id);
         const alsoIn = [...new Set(folded.map(x => MERGED[x.id].alsoIn).filter(f => f && f !== t.family))];
         // Keywords from the folded build come along, so search finds the tool under either vocabulary.
@@ -161,6 +167,7 @@ function catalog() {
     const r = get();
     return {
         updated: r.updated,
+        services: services.snapshot(),
         families: r.families.map(f => ({ id: f.id, name: f.name, tagline: f.tagline, description: f.description, icon: f.icon, url: f.url, path: f.path, page: f.page, count: r.tools.filter(t => t.family === f.id).length })),
         planned: r.planned.map(t => ({ id: t.id, family: t.family, name: t.name, tagline: t.tagline, icon: t.icon, status: 'planned' })),
         tools: r.tools.map(t => ({ id: t.id, family: t.family, alsoIn: t.alsoIn, name: t.name, tagline: t.tagline, description: t.description, keywords: t.keywords, icon: t.icon, hosts: t.hosts, url: t.url, page: `https://${APEX}/tool/${t.id}` })),
@@ -188,6 +195,6 @@ async function refresh(fetchImpl = fetch) {
     } catch { return false; /* keep the last good copy */ }
 }
 
-function start() { refresh(); const t = setInterval(refresh, 60_000); t.unref(); return t; }
+function start() { refresh(); services.start(); const t = setInterval(refresh, 60_000); t.unref(); return t; }
 
-module.exports = { get, catalog, resolveHost, setOverrides, refresh, start, ZONE, APEX, FAMILIES };
+module.exports = { get, catalog, resolveHost, setOverrides, refresh, start, services, ZONE, APEX, FAMILIES };
