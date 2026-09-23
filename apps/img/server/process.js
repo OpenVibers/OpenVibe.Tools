@@ -10,13 +10,16 @@ const fsp = require('fs/promises');
 const path = require('path');
 const { getTool, listTools } = require('./tools');
 
-const OPTION_KEYS = ['format', 'quality', 'width', 'height', 'percentage', 'fit', 'background', 'left', 'top', 'aspect'];
+// defaultFormat: the output format when the caller names none (a format tool's own, e.g. png for
+// png.openvibe.tools; its descriptor's run.job.preset). An explicit format always wins, as on the page.
+const OPTION_KEYS = ['format', 'defaultFormat', 'quality', 'width', 'height', 'percentage', 'fit', 'background', 'left', 'top', 'aspect'];
 
 /** Tool options from a request body or a job input, with the host's defaults. */
 function buildOptions(src, ctx, inputMime) {
     const options = {};
     for (const k of OPTION_KEYS) options[k] = src[k] != null && src[k] !== '' ? src[k] : undefined;
-    if (!options.format && ctx && ctx.defaultFormat) options.format = ctx.defaultFormat;
+    if (!options.format) options.format = options.defaultFormat || (ctx && ctx.defaultFormat) || undefined;
+    delete options.defaultFormat;
     options.inputFormat = String(inputMime || '').split('/')[1];
     return options;
 }
