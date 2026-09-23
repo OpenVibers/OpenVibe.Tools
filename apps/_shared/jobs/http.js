@@ -7,6 +7,9 @@
 //                                        → 202 + Location (new) | 200 + Idempotent-Replayed: true
 //   GET    /api/v1/jobs/:id              the job (reattach by id)
 //   DELETE /api/v1/jobs/:id              cancel → 200 cancelled | 202 cancel requested (running)
+//   POST   /api/v1/jobs/:id/retry        retry a failed job as a new job → 202 + Location (new) |
+//                                        200 + Idempotent-Replayed: true (it was already retried: that job)
+//                                        | 409 tools.job.not_failed | 410 tools.job.inputs_gone
 //   GET    /api/v1/jobs/:id/events       SSE: job.queued|running|progress|cancel_requested|succeeded|failed|cancelled;
 //                                        every event has an id; reconnecting with Last-Event-ID replays
 //                                        only what came after it; 204 once there is nothing left to say
@@ -192,6 +195,23 @@ function mountJobRoutes(app, o) {
         if (row.state === 'succeeded' || row.state === 'failed') return send(res, 409, 'tools.job.already_finished', `The job already ${row.state}`, { state: row.state });
         const { job } = system.cancel(row.id);
         return res.status(job.state === 'cancelled' ? 200 : 202).json(system.view(job));
+    });
+
+    // Retry is a write: a principal needs tools.job.create, like a submit.
+    app.post('/api/v1/jobs/:id/retry', ...(o.limiters || []), (req, res) => {
+        noStore(res);
+        const row = load(req, res, 'create');
+        if (!row) return;
+        try {
+            const { job, replayed } = system.retry(row.id);
+            res.set('Location', `/api/v1/jobs/${job.id}`);
+            if (replayed) res.set('Idempotent-Replayed', 'true');
+            return res.status(replayed ? 200 : 202).json(system.view(job));
+        } catch (err) {
+            if (err instanceof system.JobError) return send(res, err.status, err.code, err.detail, err.extra);
+            console.error('[Jobs] retry failed:', err.message);
+            return send(res, 500, 'tools.job.retry_failed', 'The job could not be retried');
+        }
     });
 
     app.get('/api/v1/jobs/:id/events', (req, res) => {

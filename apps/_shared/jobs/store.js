@@ -52,20 +52,26 @@ CREATE TABLE IF NOT EXISTS tool_job_events (
 CREATE INDEX IF NOT EXISTS tool_job_events_job ON tool_job_events(job_id, seq);
 `;
 
+// Columns added after the first release, each added when missing (idempotent).
+const ADDED_COLUMNS = [
+    ['env', "TEXT NOT NULL DEFAULT 'production' CHECK (env IN ('production','sandbox'))"],   // developer-app sandboxes
+    ['retry_of', 'TEXT'],       // the failed job this one retries
+    ['retried_by', 'TEXT'],     // set on a failed job once it has been retried: the retry's id
+];
+
 const parse = (s, fallback) => { if (s == null) return fallback; try { return JSON.parse(s); } catch { return fallback; } };
 
 function createStore(db) {
     db.pragma('journal_mode = WAL');
     db.pragma('busy_timeout = 5000');
     db.exec(SCHEMA);
-    // Databases created before developer-app sandboxes: add the env column.
-    if (!db.prepare('PRAGMA table_info(tool_jobs)').all().some((c) => c.name === 'env')) {
-        db.exec("ALTER TABLE tool_jobs ADD COLUMN env TEXT NOT NULL DEFAULT 'production' CHECK (env IN ('production','sandbox'))");
-    }
+    const have = new Set(db.prepare('PRAGMA table_info(tool_jobs)').all().map((c) => c.name));
+    for (const [name, decl] of ADDED_COLUMNS) if (!have.has(name)) db.exec(`ALTER TABLE tool_jobs ADD COLUMN ${name} ${decl}`);
 
     const q = {
-        insert: db.prepare(`INSERT INTO tool_jobs (id, type, type_version, owner, state, input_json, files_json, idempotency_key, request_hash, max_attempts, ttl_ms, created_at, updated_at, env)
-            VALUES (@id, @type, @type_version, @owner, 'queued', @input_json, @files_json, @idempotency_key, @request_hash, @max_attempts, @ttl_ms, @now, @now, @env)`),
+        insert: db.prepare(`INSERT INTO tool_jobs (id, type, type_version, owner, state, input_json, files_json, idempotency_key, request_hash, max_attempts, ttl_ms, created_at, updated_at, env, retry_of)
+            VALUES (@id, @type, @type_version, @owner, 'queued', @input_json, @files_json, @idempotency_key, @request_hash, @max_attempts, @ttl_ms, @now, @now, @env, @retry_of)`),
+        markRetried: db.prepare("UPDATE tool_jobs SET retried_by = @next, updated_at = @now WHERE id = @id AND state = 'failed' AND retried_by IS NULL"),
         get: db.prepare('SELECT * FROM tool_jobs WHERE id = ?'),
         byIdem: db.prepare('SELECT * FROM tool_jobs WHERE owner = ? AND idempotency_key = ?'),
         nextQueued: db.prepare("SELECT * FROM tool_jobs WHERE state = 'queued' ORDER BY id LIMIT ?"),
@@ -96,7 +102,8 @@ function createStore(db) {
     return {
         db,
         TERMINAL, STATES,
-        insert(row) { q.insert.run(row); },
+        insert(row) { q.insert.run({ retry_of: null, ...row }); },
+        markRetried: (id, next, now = Date.now()) => q.markRetried.run({ id, next, now }).changes === 1,
         get: (id) => q.get.get(id) || null,
         byIdempotencyKey: (owner, key) => q.byIdem.get(owner, key) || null,
         nextQueued: (limit) => q.nextQueued.all(limit),

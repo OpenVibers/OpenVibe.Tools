@@ -13,6 +13,10 @@
 // most `maxActivePerOwner` queued + running jobs. Finished jobs expire (ttl chosen at submit),
 // and the pruner deletes the row, its events, its files and any Media objects it made.
 //
+// Retry: a failed job keeps its input files until it expires; retry(id) moves them to a new job
+// (retry_of → the failed one, which records retried_by). Retrying the same failed job again
+// returns that same new job, so the call is idempotent.
+//
 // No dependencies of its own: the app passes its better-sqlite3 handle and openvibe-contracts.
 // ═══════════════════════════════════════════════════════════════
 
@@ -136,10 +140,14 @@ function createJobSystem(o) {
             result: publicResult(store.parse(row.result_json, null), row.id),
             error: store.parse(row.error_json, null),
             retryable: !!row.retryable,
+            retry_of: row.retry_of || null,
+            retried_by: row.retried_by || null,
             links: {
                 self: `/api/v1/jobs/${row.id}`,
                 events: `/api/v1/jobs/${row.id}/events`,
                 cancel: live ? `/api/v1/jobs/${row.id}` : null,
+                retry: row.state === 'failed' ? `/api/v1/jobs/${row.id}/retry` : null,
+                retried_by: row.retried_by ? `/api/v1/jobs/${row.retried_by}` : null,
             },
         };
     }
@@ -308,7 +316,8 @@ function createJobSystem(o) {
             emit(row.id, EVENT_FOR[outcome.state]);
         } finally {
             active.delete(row.id);
-            fsp.rm(path.join(jobDir(row.id), 'in'), { recursive: true, force: true }).catch(() => {});
+            // A failed job keeps its inputs (until it expires) so it can be retried.
+            if (outcome.state !== 'failed') fsp.rm(path.join(jobDir(row.id), 'in'), { recursive: true, force: true }).catch(() => {});
             if (outcome.state !== 'succeeded') fsp.rm(outDir, { recursive: true, force: true }).catch(() => {});
             kick();
         }
@@ -375,6 +384,59 @@ function createJobSystem(o) {
         if (entry && !entry.reason) { entry.reason = 'cancel'; entry.ctrl.abort(new Error('cancelled')); }
         emit(id, 'job.cancel_requested');
         return { job: store.get(id), changed: true };
+    }
+
+    // ── Retry ──────────────────────────────────────────────────
+    /**
+     * Retry a failed job as a new job with the same type, input, files and lifetime.
+     * → { job, replayed } | null (no such job). Idempotent: a failed job is retried once, and asking
+     * again returns that retry, whatever state it is in now. Only failed jobs can be retried.
+     * Everything up to the insert is synchronous, so two concurrent calls cannot both retry it.
+     */
+    function retry(id) {
+        const row = store.get(id);
+        if (!row) return null;
+        if (row.retried_by) {
+            const next = store.get(row.retried_by);
+            if (next) return { job: next, replayed: true };
+            throw new JobError(410, 'tools.job.retry_gone', 'This job was retried and the retry has since expired', { retried_by: row.retried_by });
+        }
+        if (row.state !== 'failed') throw new JobError(409, 'tools.job.not_failed', `Only failed jobs can be retried; this one is ${row.state}`, { state: row.state });
+        if (stopped) throw new JobError(503, 'tools.job.unavailable', 'The job system is shutting down');
+        const def = types.get(row.type);
+        if (!def) throw new JobError(409, 'tools.job.unknown_type', `This service no longer runs "${row.type}" jobs`);
+        const limit = row.env === 'sandbox' ? Math.min(SANDBOX_MAX_ACTIVE, maxActivePerOwner) : maxActivePerOwner;
+        if (store.activeForOwner(row.owner) >= limit) throw new JobError(429, 'tools.job.too_many_active', `At most ${limit} unfinished jobs at a time; wait for one to finish or cancel one`);
+        const inputs = store.parse(row.files_json, []);
+        if (inputs.some(f => !f._path || !fs.existsSync(f._path))) throw new JobError(410, 'tools.job.inputs_gone', 'The input files of this job are no longer kept; submit it again');
+
+        const next = `job_${contracts.ids.ulid()}`;
+        const oldIn = path.join(jobDir(row.id), 'in');
+        const newIn = path.join(jobDir(next), 'in');
+        let moved = false;
+        if (inputs.length) {
+            fs.mkdirSync(jobDir(next), { recursive: true });
+            fs.renameSync(oldIn, newIn);   // same directory tree, so one atomic rename
+            moved = true;
+        }
+        const stored = inputs.map(f => ({ ...f, _path: path.join(newIn, path.basename(f._path)) }));
+        try {
+            store.transaction(() => {
+                if (!store.markRetried(row.id, next)) throw new JobError(409, 'tools.job.not_failed', 'This job cannot be retried any more');
+                store.insert({
+                    id: next, type: row.type, type_version: def.version, owner: row.owner, input_json: row.input_json, files_json: JSON.stringify(stored),
+                    idempotency_key: null, request_hash: row.request_hash, max_attempts: def.maxAttempts, ttl_ms: row.ttl_ms, now: Date.now(),
+                    env: row.env, retry_of: row.id,
+                });
+            })();
+        } catch (err) {
+            if (moved) { try { fs.renameSync(newIn, oldIn); } catch { /* best effort */ } }
+            fs.rmSync(jobDir(next), { recursive: true, force: true });
+            throw err;
+        }
+        emit(next, 'job.queued');
+        kick();
+        return { job: store.get(next), replayed: false };
     }
 
     // ── Boot recovery, pruning ─────────────────────────────────
@@ -458,7 +520,7 @@ function createJobSystem(o) {
     }
 
     const api = {
-        define, submit, cancel, subscribe, start, stop, onStop, prune, recover, view, resultFile,
+        define, submit, cancel, retry, subscribe, start, stop, onStop, prune, recover, view, resultFile,
         get: (id) => store.get(id),
         eventsAfter: (id, seq) => store.eventsAfter(id, seq),
         lastSeq: (id) => store.lastSeq(id),

@@ -4,6 +4,7 @@
  *   OVJobs.remember(job.id);                         // ?job=<id> in the address + sessionStorage: a reload reattaches
  *   OVJobs.watch(job.id, { onUpdate(job) {…}, onDone(job) {…} });
  *   const pending = OVJobs.recall();                 // on load: the job to reattach to, if any
+ *   const next = await OVJobs.retry(failed.id);      // a failed job, again, as a new job (idempotent)
  *
  * Progress arrives over SSE (EventSource resumes with Last-Event-ID by itself); if the stream cannot be
  * kept open the helper polls GET /api/v1/jobs/:id instead. Errors are problem+json; submit() throws an
@@ -48,6 +49,12 @@
 
     function cancel(id) {
         return fetch('/api/v1/jobs/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin', headers: { Accept: 'application/json' } })
+            .then(function (res) { return readJson(res).then(function (body) { if (!res.ok) throw problemError(res, body); return body; }); });
+    }
+
+    /** Retry a failed job. → the new job (or, if it was already retried, that retry). */
+    function retry(id) {
+        return fetch('/api/v1/jobs/' + encodeURIComponent(id) + '/retry', { method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' } })
             .then(function (res) { return readJson(res).then(function (body) { if (!res.ok) throw problemError(res, body); return body; }); });
     }
 
@@ -112,5 +119,5 @@
         return job && job.expires_at ? Math.max(0, Date.parse(job.expires_at) - Date.now()) : null;
     }
 
-    window.OVJobs = { submit: submit, get: get, cancel: cancel, watch: watch, remember: remember, recall: recall, forget: forget, fileUrl: fileUrl, expiresIn: expiresIn, TERMINAL: TERMINAL };
+    window.OVJobs = { submit: submit, get: get, cancel: cancel, retry: retry, watch: watch, remember: remember, recall: recall, forget: forget, fileUrl: fileUrl, expiresIn: expiresIn, TERMINAL: TERMINAL };
 })();

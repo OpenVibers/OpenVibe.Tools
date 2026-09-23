@@ -2,8 +2,8 @@
 // Wave 11 exit criteria for the shared job runtime, end to end over HTTP:
 //   an accepted job survives a restart (DB and app closed and reopened), running jobs are re-queued
 //   or failed-retryable per type, reattach by id, cancel (queued and running), idempotency keys,
-//   owner scoping, SSE resume with Last-Event-ID, bounded concurrency, pruning, and results stored
-//   as Media objects through Media's v2 object API (with the local fallback).
+//   owner scoping, SSE resume with Last-Event-ID, bounded concurrency, pruning, results stored
+//   as Media objects through Media's v2 object API (with the local fallback), and retrying a failed job.
 const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
@@ -63,7 +63,18 @@ function define(system) {
         },
     });
     system.define({ type: 'test.boom', async run() { throw new Error('This input at /srv/secret/path/x.png is not an image'); } });
+    // Upper-cases its file; fails while its input.tag is in `flaky` (a transient failure, then fixed).
+    system.define({
+        type: 'test.flaky', maxFiles: 1,
+        async run({ input, files, outDir }) {
+            if (flaky.has(input.tag)) throw Object.assign(new Error('upstream hiccup'), { retryable: true });
+            const out = path.join(outDir, 'flaky.txt');
+            fs.writeFileSync(out, fs.readFileSync(files[0].path, 'utf8').toUpperCase());
+            return { files: [{ path: out, name: 'flaky.txt', mime: 'text/plain' }] };
+        },
+    });
 }
+const flaky = new Set();
 
 // ── A fake OpenVibe.Media (object API v2) ────────────────────
 function fakeMedia() {
@@ -359,6 +370,52 @@ async function readSse(url, { headers = {}, stop = () => false, ms = 5000 } = {}
         assert.ok(fm.state.deleted.includes(f0.media.media_id), 'pruning deletes the Media object');
         await s.close();
         mediaServer.close();
+
+        // ── Retry a failed job ──────────────────────────────────
+        s = await satellite(path.join(root, 'h'));
+        const hal = client(s.base, { user: USER_B });
+        flaky.add('t1');
+        const fd3 = new FormData();
+        fd3.append('type', 'test.flaky'); fd3.append('input', JSON.stringify({ tag: 't1' })); fd3.append('file', new Blob(['retry me']), 'in.txt');
+        const failedId = (await hal('/api/v1/jobs', { method: 'POST', body: fd3 })).body.id;
+        const failedJob = await until(async () => { const g = await hal(`/api/v1/jobs/${failedId}`); return g.body.state === 'failed' && g.body; }, 'flaky job fails');
+        assert.strictEqual(failedJob.links.retry, `/api/v1/jobs/${failedId}/retry`);
+        assert.ok(fs.readdirSync(path.join(root, 'h', 'jobs', failedId, 'in')).length === 1, 'a failed job keeps its input for a retry');
+        assert.strictEqual((await client(s.base, { user: USER_A })(`/api/v1/jobs/${failedId}/retry`, { method: 'POST' })).status, 404, 'only the owner can retry');
+        flaky.delete('t1');
+        // Two retries at once: one new job, and the other call gets the same one.
+        const [ra, rb] = await Promise.all([hal(`/api/v1/jobs/${failedId}/retry`, { method: 'POST' }), hal(`/api/v1/jobs/${failedId}/retry`, { method: 'POST' })]);
+        assert.deepStrictEqual([ra.status, rb.status].sort(), [200, 202]);
+        assert.strictEqual(ra.body.id, rb.body.id, 'retrying is idempotent');
+        const retried = ra.body.id;
+        assert.notStrictEqual(retried, failedId);
+        assert.strictEqual((ra.status === 202 ? ra : rb).headers.get('location'), `/api/v1/jobs/${retried}`);
+        assert.strictEqual((ra.status === 200 ? ra : rb).headers.get('idempotent-replayed'), 'true');
+        assert.strictEqual(ra.body.retry_of, failedId);
+        const ok = await until(async () => { const g = await hal(`/api/v1/jobs/${retried}`); return g.body.state === 'succeeded' && g.body; }, 'retry succeeds');
+        assert.strictEqual((await hal(ok.result.files[0].url)).body, 'RETRY ME', 'the retry ran on the original input');
+        const old = (await hal(`/api/v1/jobs/${failedId}`)).body;
+        assert.strictEqual(old.state, 'failed', 'the failed job stays failed');
+        assert.strictEqual(old.retried_by, retried);
+        r = await hal(`/api/v1/jobs/${failedId}/retry`, { method: 'POST' });
+        assert.strictEqual(r.status, 200); assert.strictEqual(r.body.id, retried, 'asking again later still answers with the same retry');
+        r = await hal(`/api/v1/jobs/${retried}/retry`, { method: 'POST' });
+        assert.strictEqual(r.status, 409); assert.strictEqual(r.body.code, 'tools.job.not_failed', 'only failed jobs can be retried');
+        const running = (await hal('/api/v1/jobs', json({ type: 'test.upper', input: { gate: 'retry-running' } }))).body.id;
+        await until(async () => (await hal(`/api/v1/jobs/${running}`)).body.state === 'running', 'running job');
+        assert.strictEqual((await hal(`/api/v1/jobs/${running}/retry`, { method: 'POST' })).body.code, 'tools.job.not_failed');
+        gate('retry-running').open();
+        // A failed job whose inputs are gone cannot be retried.
+        flaky.add('t2');
+        const fd4 = new FormData();
+        fd4.append('type', 'test.flaky'); fd4.append('input', JSON.stringify({ tag: 't2' })); fd4.append('file', new Blob(['x']), 'x.txt');
+        const lost = (await hal('/api/v1/jobs', { method: 'POST', body: fd4 })).body.id;
+        await until(async () => (await hal(`/api/v1/jobs/${lost}`)).body.state === 'failed', 'second flaky job fails');
+        fs.rmSync(path.join(root, 'h', 'jobs', lost, 'in'), { recursive: true, force: true });
+        r = await hal(`/api/v1/jobs/${lost}/retry`, { method: 'POST' });
+        assert.strictEqual(r.status, 410); assert.strictEqual(r.body.code, 'tools.job.inputs_gone');
+        assert.strictEqual((await hal(`/api/v1/jobs/${lost}`)).body.retried_by, null, 'a refused retry changes nothing');
+        await s.close();
 
         // ── Service/app principals (tools.job.* capabilities) ───
         s = await satellite(path.join(root, 'f'));

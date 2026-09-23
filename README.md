@@ -74,6 +74,7 @@ routes answer on every host of the img, audio and docs satellites:
 | `DELETE /api/v1/jobs/:id` | Cancel: queued → `200` cancelled at once; running → `202` (signalled; ffmpeg is killed, sharp/pdf-lib work finishes and is discarded) and ends `cancelled`; finished → `409 tools.job.already_finished`. |
 | `GET /api/v1/jobs/:id/events` | SSE: `job.queued`, `job.running`, `job.progress`, `job.cancel_requested`, `job.succeeded`, `job.failed`, `job.cancelled`, each with an `id`. Reconnecting with `Last-Event-ID` (or `?last_event_id=`) replays only later events; a finished job with nothing newer answers `204`. |
 | `GET /api/v1/jobs/:id/files/:n` | A result file (attachment); `?inline=1` for previews. |
+| `POST /api/v1/jobs/:id/retry` | Retry a **failed** job: a new job with the same type, input and files (`retry_of` → the failed one, which gets `retried_by`) → `202` + `Location`. Idempotent: asking again returns that same retry with `200` + `Idempotent-Replayed: true`. Not failed → `409 tools.job.not_failed`; inputs gone → `410 tools.job.inputs_gone`. A failed job keeps its input files until it expires. |
 
 Job types: `img.process` (input `{ tool: convert|compress|resize|crop, format, quality, width, … }`, one image),
 `audio.process` (`{ tool, …options }` as `/api/process` takes them, one audio/video file; progress from ffmpeg),
@@ -106,9 +107,9 @@ Environment (all in `/etc/openvibe/tools.env`): `TOOLS_JOBS_CONCURRENCY`, `TOOLS
 `TOOLS_JOBS_MAX_ACTIVE`, `TOOLS_JOB_RESULTS`, `TOOLS_MEDIA_NAMESPACE`, `OV_MEDIA_INTERNAL_URL`, `OV_MEDIA_URL`,
 `OV_NETWORK_INTERNAL_URL`, `OV_OAUTH_CLIENT_ID`, `OV_OAUTH_CLIENT_SECRET`.
 
-Not done yet: job lifecycle events are not published to OpenVibe.Events; there is no retry endpoint (a failed
-retryable job is submitted again); quotas for external developer apps are the per-owner limits above, not a
-Codes-issued quota.
+Not done yet: job lifecycle events are not published to OpenVibe.Events (openvibe-contracts registers no
+`tools.job.*` event types, and Tools does not depend on openvibe-sdk yet); quotas for external developer apps are
+the per-owner limits above, not a Codes-issued quota.
 
 ## Canonical hosts and the service registry
 
