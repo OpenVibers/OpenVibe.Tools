@@ -1171,10 +1171,10 @@
             ${chain.map((h, i) => `<tr>
                 <td class="val">${i + 1}</td>
                 <td class="val" style="max-width:400px;overflow:hidden;text-overflow:ellipsis">${esc(h.url)}</td>
-                <td><span class="badge ${h.status < 400 ? (h.status >= 300 ? 'badge-yellow' : 'badge-green') : 'badge-red'}">${h.status}</span></td>
+                <td>${h.status == null ? `<span class="badge badge-red" title="${esc(h.error || '')}">${h.refused ? 'refused' : 'error'}</span>` : `<span class="badge ${h.status < 400 ? (h.status >= 300 ? 'badge-yellow' : 'badge-green') : 'badge-red'}">${h.status}</span>`}</td>
                 <td class="val">${h.ms}ms</td>
             </tr>`).join('')}
-            </table></div>`;
+            </table>${data.stopped ? `<p style="color:var(--text-muted);font-size:13px">Stopped: ${esc(data.stopped)}</p>` : ''}</div>`;
         el.innerHTML = html;
     }
 

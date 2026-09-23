@@ -23,7 +23,9 @@ apps/
 ├── text      # Text.OpenVibe + Logo.OpenVibe — text generators & logo makers
 └── docs      # Docs.OpenVibe  — PDF & document tools
 apps/_shared   # code the apps require by relative path: host roles, internal auth, the job runtime (jobs/),
-               # visit analytics within ADR-021 (analytics/)
+               # visit analytics within ADR-021 (analytics/), the SSRF guard (egress.js) that every tool
+               # reaching a visitor-chosen host or URL goes through (public addresses only, checked after
+               # DNS and dialled as checked, redirect hops re-checked)
 scripts/analytics-prune.js   # operator CLI: raw analytics retention + one-time scrub (dry run by default)
 (openvibe-shared is a pinned OpenVibe.Shared release in each app's package.json; no vendor/ copy)
 ```

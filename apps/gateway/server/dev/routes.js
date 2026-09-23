@@ -9,6 +9,7 @@
 const { Router } = require('express');
 const crypto = require('crypto');
 const { DEV_TOOLS } = require('./config');
+const { createEgress, TargetRefused } = require('../../../_shared/egress');
 
 // ── In-memory webhook bin storage ────────────────────────────
 const webhookBins = new Map();
@@ -22,21 +23,10 @@ function cleanupBins() {
         if (now - bin.created > WEBHOOK_BIN_TTL) webhookBins.delete(id);
     }
 }
-setInterval(cleanupBins, 5 * 60 * 1000);
+setInterval(cleanupBins, 5 * 60 * 1000).unref();
 
 // ── Helpers ──────────────────────────────────────────────────
-async function timedFetch(url, opts = {}, timeoutMs = 10000) {
-    const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), timeoutMs);
-    try {
-        const res = await fetch(url, { ...opts, signal: ac.signal, redirect: 'follow' });
-        clearTimeout(timer);
-        return res;
-    } catch (err) {
-        clearTimeout(timer);
-        throw err;
-    }
-}
+const OG_MAX_BYTES = 2 * 1024 * 1024;   // Open Graph tags live in <head>; never buffer more than this
 
 function extractOGTags(html) {
     const tags = {};
@@ -60,8 +50,10 @@ function extractOGTags(html) {
 }
 
 // ═════════════════════════════════════════════════════════════
-module.exports = function createDevRoutes(db, requireAuth) {
+// `opts.egress` is for tests: the shared SSRF guard with a mock resolver and transports.
+module.exports = function createDevRoutes(db, requireAuth, opts = {}) {
     const router = Router();
+    const egress = opts.egress || createEgress();
 
     // Optional auth — attaches req.user if token present, but doesn't block.
     // Verifies the shared ov_token OFFLINE against the Network public key.
@@ -102,13 +94,19 @@ module.exports = function createDevRoutes(db, requireAuth) {
         }
 
         try {
-            const response = await timedFetch(targetUrl, {
+            // Public addresses only, checked after DNS and dialled as checked; each redirect hop is
+            // checked again (shared SSRF guard).
+            const response = await egress.follow(targetUrl, {
+                method: 'GET',
                 headers: {
                     'User-Agent': 'OpenVibeOpenGraph/1.0 (https://opengraph.openvibe.tools)',
                     'Accept': 'text/html,application/xhtml+xml',
                 },
+                timeoutMs: 10000,
+                maxBytes: OG_MAX_BYTES,
+                maxRedirects: 5,
             });
-            const html = await response.text();
+            const html = response.body.toString('utf8');
             const tags = extractOGTags(html);
 
             // Build structured result
@@ -141,6 +139,8 @@ module.exports = function createDevRoutes(db, requireAuth) {
 
             res.json(result);
         } catch (err) {
+            if (err instanceof TargetRefused) return res.status(403).json({ error: err.message, code: err.code });
+            if (err && err.status === 400) return res.status(400).json({ error: err.message });
             res.status(502).json({ error: `Failed to fetch: ${err.message}` });
         }
     });

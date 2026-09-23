@@ -11,15 +11,18 @@
 const express = require('express');
 const dns = require('dns').promises;
 const { URL } = require('url');
-const tls = require('tls');
 const net = require('net');
-const https = require('https');
-const http = require('http');
 const { getNetConfig, NET_TOOLS } = require('./config');
+const { createEgress, TargetRefused } = require('../../../_shared/egress');
 
-const router = express.Router();
-
-module.exports = function createNetRoutes(db, requireAuth) {
+/**
+ * Every tool here that connects to the target (ssl, headers, redirects, port, ping, lookup, and a
+ * custom DNS server) goes through the shared SSRF guard: only public addresses, checked after DNS
+ * and dialled as checked. `opts.egress` is for tests (a guard with a mock resolver and transports).
+ */
+module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
+    const router = express.Router();
+    const egress = opts.egress || createEgress();
 
     // ── Helpers ──────────────────────────────────────────────
 
@@ -29,8 +32,11 @@ module.exports = function createNetRoutes(db, requireAuth) {
         let t = input.trim();
         // Strip protocol if URL
         try {
-            if (/^https?:\/\//.test(t)) { t = new URL(t).hostname; }
+            if (/^https?:\/\//i.test(t)) { t = new URL(t).hostname; }
         } catch {}
+        // [IPv6] with or without a port
+        const bracketed = /^\[([0-9a-f:.]+)\](?::\d+)?(?:\/.*)?$/i.exec(t);
+        if (bracketed) t = bracketed[1];
         // Strip trailing dots, slashes
         t = t.replace(/\/.*$/, '').replace(/\.+$/, '').toLowerCase();
         // Strip port only if it looks like IPv4:port (not IPv6 which has multiple colons)
@@ -59,7 +65,26 @@ module.exports = function createNetRoutes(db, requireAuth) {
     }
 
     function ok(res, data) { return res.json({ ok: true, ...data }); }
-    function fail(res, msg, status = 400) { return res.status(status).json({ ok: false, error: msg }); }
+    function fail(res, msg, status = 400, code) { return res.status(status).json({ ok: false, error: msg, ...(code ? { code } : {}) }); }
+
+    /** A guard refusal (403) or unresolvable name (400) as itself; anything else as `fallback` / 500. */
+    function failFrom(res, err, fallback) {
+        if (err instanceof TargetRefused) return fail(res, err.message, 403, err.code);
+        if (err && err.status >= 400 && err.status < 500) return fail(res, err.message, err.status);
+        return fail(res, (err && err.message) || fallback, 500);
+    }
+
+    /** A custom DNS server must be a public IP (optionally with a port). → 'ip' / 'ip:port', or throws. */
+    function checkDnsServer(raw) {
+        const s = String(raw).trim();
+        const m = /^\[([0-9a-f:.]+)\](?::(\d{1,5}))?$/i.exec(s) || (net.isIP(s) ? [s, s, null] : /^([0-9.]+):(\d{1,5})$/.exec(s));
+        if (!m || !net.isIP(m[1])) throw Object.assign(new Error('The DNS server must be an IP address'), { status: 400 });
+        const port = m[2] ? parseInt(m[2], 10) : null;
+        if (port !== null && (port < 1 || port > 65535)) throw Object.assign(new Error('Invalid DNS server port'), { status: 400 });
+        if (!egress.isAllowed(m[1])) throw new TargetRefused(`${m[1]} is not a public internet address; the network tools only reach public hosts`);
+        if (port === null) return m[1];
+        return net.isIPv6(m[1]) ? `[${m[1]}]:${port}` : `${m[1]}:${port}`;
+    }
 
     /** Get config (live — reads DB each time for admin changes) */
     function cfg() { return getNetConfig(db); }
@@ -279,7 +304,10 @@ module.exports = function createNetRoutes(db, requireAuth) {
             const validTypes = types.filter(t => c.dnsTypes.includes(t));
             if (!validTypes.length) return fail(res, 'No valid record types specified');
 
-            const server = req.query.server || null; // custom DNS server
+            let server = null; // custom DNS server — public IPs only
+            if (req.query.server) {
+                try { server = checkDnsServer(req.query.server); } catch (err) { return failFrom(res, err, 'Invalid DNS server'); }
+            }
             const results = {};
 
             // Optionally try DNS-over-HTTPS for cleaner results
@@ -411,25 +439,12 @@ module.exports = function createNetRoutes(db, requireAuth) {
             const target = parseTarget(req.params.target || req.query.target);
             if (!target) return fail(res, 'Please provide a domain');
             const port = parseInt(req.query.port) || 443;
+            if (port < 1 || port > 65535) return fail(res, 'Invalid port');
 
-            // Resolve first to include IPs
-            let ip = target;
-            if (!isIP(target)) {
-                const addrs = await dns.resolve4(target).catch(() => []);
-                if (addrs.length) ip = addrs[0];
-            }
-
-            const cert = await new Promise((resolve, reject) => {
-                const socket = tls.connect({ host: target, port, servername: target, timeout: 10000 }, () => {
-                    const peerCert = socket.getPeerCertificate(true);
-                    const proto = socket.getProtocol();
-                    const cipher = socket.getCipher();
-                    socket.end();
-                    resolve({ cert: peerCert, protocol: proto, cipher });
-                });
-                socket.on('error', reject);
-                socket.setTimeout(10000, () => { socket.destroy(new Error('Timeout')); });
-            });
+            // Resolve + check, then handshake with the checked address (SNI = the name).
+            const dest = await egress.resolve(target, { prefer: 4 });
+            const ip = dest.address;
+            const cert = await egress.tlsHandshake(dest, port, { timeoutMs: 10000 });
 
             const c = cert.cert;
             const now = Date.now();
@@ -478,7 +493,7 @@ module.exports = function createNetRoutes(db, requireAuth) {
                 chain,
             });
         } catch (err) {
-            fail(res, err.message || 'SSL check failed', 500);
+            failFrom(res, err, 'SSL check failed');
         }
     });
 
@@ -492,17 +507,13 @@ module.exports = function createNetRoutes(db, requireAuth) {
             if (!target) return fail(res, 'Please provide a URL or domain');
             if (!/^https?:\/\//.test(target)) target = `https://${target}`;
 
-            const ua = req.query.ua || 'Mozilla/5.0 (compatible; Net.OpenVibe/1.0)';
+            const ua = String(req.query.ua || 'Mozilla/5.0 (compatible; Net.OpenVibe/1.0)').replace(/[\r\n]/g, ' ').slice(0, 300);
             const start = Date.now();
-            const r = await timedFetch(target, {
-                method: 'HEAD',
-                headers: { 'User-Agent': ua },
-                redirect: 'manual',
-            });
+            // One hop, not followed (the Redirects tool shows the chain).
+            const r = await egress.request(target, { method: 'HEAD', headers: { 'User-Agent': ua }, timeoutMs: 12000 });
             const elapsed = Date.now() - start;
 
-            const headers = {};
-            r.headers.forEach((v, k) => { headers[k] = v; });
+            const headers = r.headers;
 
             // Security header analysis
             const security = {
@@ -528,7 +539,7 @@ module.exports = function createNetRoutes(db, requireAuth) {
                 contentType: headers['content-type'] || null,
             });
         } catch (err) {
-            fail(res, err.message || 'Headers check failed', 500);
+            failFrom(res, err, 'Headers check failed');
         }
     });
 
@@ -546,27 +557,38 @@ module.exports = function createNetRoutes(db, requireAuth) {
             let current = target;
             const maxHops = 15;
 
+            let refused = null;
             for (let i = 0; i < maxHops; i++) {
                 const start = Date.now();
-                const r = await timedFetch(current, {
-                    method: 'HEAD',
-                    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Net.OpenVibe/1.0)' },
-                    redirect: 'manual',
-                });
+                let r;
+                try {
+                    // Every hop goes through the guard again: a public site redirecting to an
+                    // internal address stops here, before anything connects to it.
+                    r = await egress.request(current, {
+                        method: 'HEAD',
+                        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Net.OpenVibe/1.0)' },
+                        timeoutMs: 12000,
+                    });
+                } catch (err) {
+                    if (i === 0) throw err;
+                    if (!(err instanceof TargetRefused) && !(err && err.status === 400)) throw err;
+                    if (err instanceof TargetRefused) refused = err.message;
+                    chain.push({ url: current, status: null, refused: err instanceof TargetRefused, error: err.message, ms: Date.now() - start });
+                    break;
+                }
                 const elapsed = Date.now() - start;
 
                 chain.push({
                     url: current,
                     status: r.status,
                     statusText: r.statusText,
-                    location: r.headers.get('location') || null,
-                    server: r.headers.get('server') || null,
+                    location: r.headers.location || null,
+                    server: r.headers.server || null,
                     ms: elapsed,
                 });
 
-                if (r.status >= 300 && r.status < 400 && r.headers.get('location')) {
-                    const loc = r.headers.get('location');
-                    current = loc.startsWith('/') ? new URL(loc, current).href : loc;
+                if (r.status >= 300 && r.status < 400 && r.headers.location) {
+                    current = new URL(r.headers.location, current).href;
                 } else {
                     break;
                 }
@@ -577,9 +599,10 @@ module.exports = function createNetRoutes(db, requireAuth) {
                 finalUrl: chain[chain.length - 1]?.url || target,
                 hops: chain.length,
                 chain,
+                ...(refused ? { stopped: refused } : {}),
             });
         } catch (err) {
-            fail(res, err.message || 'Redirect check failed', 500);
+            failFrom(res, err, 'Redirect check failed');
         }
     });
 
@@ -596,39 +619,16 @@ module.exports = function createNetRoutes(db, requireAuth) {
             const ports = portsStr.split(',').map(p => parseInt(p.trim())).filter(p => p > 0 && p <= 65535).slice(0, 20);
             if (!ports.length) return fail(res, 'No valid ports specified');
 
-            // Resolve domain
-            let ip = target;
-            if (!isIP(target)) {
-                const addrs = await dns.resolve4(target).catch(() => []);
-                if (!addrs.length) return fail(res, `Cannot resolve ${target}`);
-                ip = addrs[0];
-            }
+            // Resolve + check; every probe dials the checked address.
+            const dest = await egress.resolve(target, { prefer: 4 });
+            const ip = dest.address;
 
-            const results = await Promise.all(ports.map(port => {
-                return new Promise(resolve => {
-                    const start = Date.now();
-                    const socket = new net.Socket();
-                    socket.setTimeout(5000);
-                    socket.on('connect', () => {
-                        const ms = Date.now() - start;
-                        socket.destroy();
-                        resolve({ port, status: 'open', ms });
-                    });
-                    socket.on('timeout', () => {
-                        socket.destroy();
-                        resolve({ port, status: 'filtered', ms: 5000 });
-                    });
-                    socket.on('error', (err) => {
-                        const ms = Date.now() - start;
-                        resolve({ port, status: err.code === 'ECONNREFUSED' ? 'closed' : 'filtered', ms });
-                    });
-                    socket.connect(port, ip);
-                });
-            }));
+            const results = await Promise.all(ports.map(port =>
+                egress.tcpProbe(ip, port, { timeoutMs: 5000 }).then(r => ({ port, status: r.status, ms: r.ms }))));
 
             ok(res, { target, ip, ports: results });
         } catch (err) {
-            fail(res, err.message || 'Port check failed', 500);
+            failFrom(res, err, 'Port check failed');
         }
     });
 
@@ -642,34 +642,15 @@ module.exports = function createNetRoutes(db, requireAuth) {
             if (!target) return fail(res, 'Please provide a host');
             const count = Math.min(parseInt(req.query.count) || 4, 10);
 
-            // Resolve domain
-            let ip = target;
-            if (!isIP(target)) {
-                const addrs = await dns.resolve4(target).catch(() => []);
-                if (!addrs.length) return fail(res, `Cannot resolve ${target}`);
-                ip = addrs[0];
-            }
+            // Resolve + check; every ping dials the checked address.
+            const dest = await egress.resolve(target, { prefer: 4 });
+            const ip = dest.address;
 
             // TCP ping (more reliable than ICMP from Node.js + doesn't require root)
             const results = [];
             for (let i = 0; i < count; i++) {
-                const start = Date.now();
-                try {
-                    await new Promise((resolve, reject) => {
-                        const socket = new net.Socket();
-                        socket.setTimeout(5000);
-                        socket.on('connect', () => {
-                            const ms = Date.now() - start;
-                            socket.destroy();
-                            resolve(ms);
-                        });
-                        socket.on('timeout', () => { socket.destroy(); reject(new Error('timeout')); });
-                        socket.on('error', reject);
-                        socket.connect(443, ip);
-                    }).then(ms => results.push({ seq: i + 1, ms, status: 'ok' }));
-                } catch (err) {
-                    results.push({ seq: i + 1, ms: Date.now() - start, status: err.message });
-                }
+                const r = await egress.tcpProbe(ip, 443, { timeoutMs: 5000 });
+                results.push({ seq: i + 1, ms: r.ms, status: r.status === 'open' ? 'ok' : (r.error || r.status) });
                 // Small delay between pings
                 if (i < count - 1) await new Promise(r => setTimeout(r, 200));
             }
@@ -684,7 +665,7 @@ module.exports = function createNetRoutes(db, requireAuth) {
 
             ok(res, { target, ip, count, results, stats });
         } catch (err) {
-            fail(res, err.message || 'Ping failed', 500);
+            failFrom(res, err, 'Ping failed');
         }
     });
 
@@ -696,6 +677,9 @@ module.exports = function createNetRoutes(db, requireAuth) {
         try {
             const target = parseTarget(req.params.target || req.query.target);
             if (!target) return fail(res, 'Please provide a domain, IP, or URL');
+
+            // Internal targets are refused outright; a name that does not resolve still gets DNS/RDAP.
+            try { await egress.resolve(target); } catch (err) { if (err instanceof TargetRefused) return failFrom(res, err); }
 
             // Run multiple lookups in parallel
             const [ipResult, dnsResult, rdapResult, sslResult, headersResult, rdnsResult] = await Promise.allSettled([
@@ -738,35 +722,29 @@ module.exports = function createNetRoutes(db, requireAuth) {
                 // SSL (domain only)
                 (async () => {
                     if (isIP(target)) return null;
-                    return new Promise((resolve) => {
-                        const socket = tls.connect({ host: target, port: 443, servername: target, timeout: 8000 }, () => {
-                            const c = socket.getPeerCertificate();
-                            const proto = socket.getProtocol();
-                            socket.end();
-                            const validTo = new Date(c.valid_to);
-                            resolve({
-                                subject: c.subject?.CN,
-                                issuer: c.issuer?.CN || c.issuer?.O,
-                                validFrom: c.valid_from,
-                                validTo: c.valid_to,
-                                daysLeft: Math.ceil((validTo - Date.now()) / 86400000),
-                                protocol: proto,
-                                sans: c.subjectaltname ? c.subjectaltname.split(', ').map(s => s.replace('DNS:', '')).slice(0, 10) : [],
-                            });
-                        });
-                        socket.on('error', () => resolve(null));
-                        socket.setTimeout(8000, () => { socket.destroy(); resolve(null); });
-                    });
+                    try {
+                        const dest = await egress.resolve(target, { prefer: 4 });
+                        const { cert: c, protocol: proto } = await egress.tlsHandshake(dest, 443, { timeoutMs: 8000, detailed: false });
+                        const validTo = new Date(c.valid_to);
+                        return {
+                            subject: c.subject?.CN,
+                            issuer: c.issuer?.CN || c.issuer?.O,
+                            validFrom: c.valid_from,
+                            validTo: c.valid_to,
+                            daysLeft: Math.ceil((validTo - Date.now()) / 86400000),
+                            protocol: proto,
+                            sans: c.subjectaltname ? c.subjectaltname.split(', ').map(s => s.replace('DNS:', '')).slice(0, 10) : [],
+                        };
+                    } catch { return null; }
                 })(),
-                // Headers
+                // Headers (redirects followed, each hop re-checked)
                 (async () => {
                     if (isIP(target)) return null;
                     const url = `https://${target}`;
                     const start = Date.now();
-                    const r = await timedFetch(url, { method: 'HEAD', headers: { 'User-Agent': 'Net.OpenVibe/1.0' }, redirect: 'follow' });
+                    const r = await egress.follow(url, { method: 'HEAD', headers: { 'User-Agent': 'Net.OpenVibe/1.0' }, timeoutMs: 12000, maxRedirects: 5 });
                     const ms = Date.now() - start;
-                    const headers = {};
-                    r.headers.forEach((v, k) => { headers[k] = v; });
+                    const headers = r.headers;
                     return { status: r.status, ms, headers, server: headers['server'] || null };
                 })(),
                 // Reverse DNS
