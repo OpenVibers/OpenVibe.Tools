@@ -117,6 +117,8 @@ app.use('/api/', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store
 // Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the limiter above. The
 // gateway (openvibe.tools) answers the same routes for every tool and reads this list for status.
 const toolRegistry = createLocalRegistry({ specs: require('./descriptors').SPECS, statusOf: requiresStatus((p) => (p === 'yt-dlp' ? !!which(config.ytdlpPath) : true)) });
+// A signed-in person's page view of a tool goes into their tools.usage module (the launchers' recent tools).
+app.use(require('../../_shared/usage').usagePages({ snapshot: toolRegistry.snapshot }));
 app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
 
 // ── Analytics Middleware ─────────────────────────────────────

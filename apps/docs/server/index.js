@@ -147,6 +147,8 @@ app.use('/api/', apiLimiter, guard.apiQuota);
 // gateway (openvibe.tools) answers the same routes for every tool and reads this list for status.
 const pdfPrograms = require('./tools/pdf');
 const toolRegistry = createLocalRegistry({ specs: require('./descriptors').SPECS, statusOf: requiresStatus((p) => (pdfPrograms[p] ? pdfPrograms[p].available() : true)) });
+// A signed-in person's page view of a tool goes into their tools.usage module (the launchers' recent tools).
+app.use(require('../../_shared/usage').usagePages({ snapshot: toolRegistry.snapshot }));
 app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
 
 // ── Analytics Middleware ─────────────────────────────────────

@@ -181,6 +181,8 @@ app.use(exceptRegistry(cors({
 
 // ── Who is asking, then rate limits (sign-in first, so a signed-in tier applies) ──
 app.use(guard.identify);
+// A signed-in person's page view of a tool goes into their tools.usage module (the launchers' recent tools).
+app.use(require('../../_shared/usage').usagePages({ snapshot: toolRegistry.snapshot }));
 app.use('/api/', guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: 120, signedIn: 240, message: 'Too many requests. Please try again later.' }), guard.apiQuota);
 app.use('/auth/', rateLimit({ windowMs: 15 * 60_000, max: 60, keyGenerator: (req) => guard.caller(req).ipKey }));
 
@@ -253,7 +255,7 @@ async function requireAuth(req, res, next) {
 
 // ── Basic API ────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', service: 'openvibe-tools-gateway', version: '2.0.0', registry: registry.services.status(), run: runApi.stats(), jobs: jobsFacade.stats() });
+    res.json({ status: 'ok', service: 'openvibe-tools-gateway', version: '2.0.0', registry: registry.services.status(), run: runApi.stats(), jobs: jobsFacade.stats(), search_index: searchIndex.indexer ? searchIndex.indexer.stats() : { enabled: false, reason: searchIndex.reason } });
 });
 
 app.get('/api/brand', (_req, res) => res.json(BRAND));
@@ -432,6 +434,10 @@ app.get('*', (req, res) => {
 // ── Start ────────────────────────────────────────────────────
 // What each satellite says about its own tools (a program missing on the host → unavailable here too).
 toolRegistry.startSatellitePolling(SATELLITES);
+
+// Every tool as an OpenVibe.Search document (owner tools), kept in step with the registry (S9).
+const searchIndex = require('./search-index').searchIndexerFromEnv({ snapshot: toolRegistry.snapshot, dataDir: require('path').resolve(__dirname, '..', process.env.DATA_DIR || 'data') });
+if (searchIndex.indexer) searchIndex.indexer.start(); else console.log(`[SearchIndex] off: ${searchIndex.reason}`);
 
 app.listen(config.port, config.host, () => {
     console.log(`\n╔════════════════════════════════════════════╗`);

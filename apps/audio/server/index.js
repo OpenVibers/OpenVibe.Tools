@@ -130,6 +130,8 @@ app.use('/api/', apiLimiter, guard.apiQuota);
 // Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the limiter above. The
 // gateway (openvibe.tools) answers the same routes for every tool and reads this list for status.
 const toolRegistry = createLocalRegistry({ specs: require('./descriptors').SPECS, statusOf: requiresStatus((p) => (p === 'ffmpeg' ? !!which(process.env.FFMPEG_PATH || 'ffmpeg') : true)) });
+// A signed-in person's page view of a tool goes into their tools.usage module (the launchers' recent tools).
+app.use(require('../../_shared/usage').usagePages({ snapshot: toolRegistry.snapshot }));
 app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
 
 // ── Analytics Middleware ─────────────────────────────────────

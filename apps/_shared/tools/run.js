@@ -248,6 +248,8 @@ function createRunApi(o) {
             guard.record(req, c, { reason: 'session', tool: d.id, enforced: true });
             throw new Refusal(401, 'tools.session_required', `${d.id} needs a browser session (open its page first), a sign-in or an API token.`);
         }
+        // A person running a tool through the API counts in their recent tools (tools.usage).
+        if (c.kind === 'user' && c.claims && c.claims.subject_id) { try { require('../usage').recorder().record(c.claims.subject_id, d.id); } catch { /* best-effort */ } }
         return c;
     }
 
