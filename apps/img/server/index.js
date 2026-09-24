@@ -19,7 +19,8 @@ const { resolveContext, DOMAIN_MAP } = require('./domain-map');
 const { getTool, listTools } = require('./tools');
 const { uploadSingle } = require('./middleware/upload');
 const retention = require('./retention/manager');
-const { buildOptions, describe, processBuffer, defineJobs } = require('./process');
+const { buildOptions, describe, runProcess, defineJobs } = require('./process');
+const { poolFromEnv } = require('../../_shared/jobs/pool');
 const codec = require('./tools/codec');
 const { hostGuard, ownHost } = require('../../_shared/host-role');
 const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
@@ -53,6 +54,30 @@ const { apiLimiter, processLimiter, burstLimiter } = guard.legacyLimiters(rateLi
 const hostTool = (req) => (guard.tool(req.ctx.toolId) ? req.ctx.toolId : (guard.toolForJob('img.process', req.ctx.defaultOp || 'convert', null) || { id: null }).id);
 /** The tool a parsed request runs: its `tool` (operation) on this host. */
 const toolOf = (req) => { const d = guard.toolForJob('img.process', String((req.body && req.body.tool) || req.ctx.defaultOp || 'convert'), req.ctx.toolId); return d ? d.id : hostTool(req); };
+
+// ── Worker pool (apps/_shared/jobs/pool.js) ─────────────────
+// sharp and the BMP/ICO codecs run in worker threads, never on the event loop: TOOLS_WORKERS (2) at
+// once for the synchronous endpoints and the jobs together, each with a heap limit
+// (TOOLS_WORKER_MEMORY_MB, 512) and terminated at its timeout, on cancel, or when the client goes away.
+const pool = poolFromEnv('img', path.join(__dirname, 'worker.js'));
+/** The sync endpoints' bounds for a run: the tool's descriptor timeout, and the client leaving. */
+function syncRun(req, res) {
+    const ac = new AbortController();
+    res.on('close', () => { if (!res.writableFinished) ac.abort(); });
+    const d = guard.tool(toolOf(req));
+    return { signal: ac.signal, timeoutMs: (d && d.limits && d.limits.timeoutMs) || 5 * 60 * 1000, transfer: true };
+}
+/** A tool's failure on the synchronous endpoints: its own 503 (with Retry-After when busy), else { error }. */
+function syncError(req, res, err, label) {
+    if (guard.toolRefused(req, res, err, toolOf(req))) return;
+    if (err.status === 503) {
+        if (err.retryAfter) res.set('Retry-After', String(err.retryAfter));
+        return contracts.http.sendProblem(res, 503, err.code, { detail: err.message, ctx: req.ov });
+    }
+    if (err.code === 'tools.job.cancelled') return;   // the client went away
+    console.error(`[${label}] Error:`, err.message);
+    res.status(422).json({ error: err.message || 'Image processing failed' });
+}
 
 const app = express();
 // What this deploy runs (ADR-016); the shared navbar's release-watch polls it on every tool host.
@@ -146,7 +171,7 @@ app.use((req, _res, next) => {
 // Health check
 app.get('/api/health', (_req, res) => {
     const stats = retention.getStats();
-    res.json({ status: 'ok', service: 'openvibe-img', version: '1.0.0', files: stats, jobs: jobs.stats() });
+    res.json({ status: 'ok', service: 'openvibe-img', version: '1.0.0', files: stats, jobs: jobs.stats(), workers: pool.stats() });
 });
 
 // Domain context (frontend calls this on load to get branding). It also starts this browser's session
@@ -185,8 +210,8 @@ app.post('/api/process', burstLimiter, processLimiter, guard.toolQuota(hostTool)
             return res.status(400).json({ error: `Unknown tool: ${toolId}` });
         }
 
-        // Execute the tool (the same code the img.process job runs)
-        const result = await processBuffer(req.file.buffer, toolId, buildOptions(req.body, req.ctx, req.file.mimetype));
+        // Execute the tool (the same code, pool and limits the img.process job uses)
+        const result = await runProcess(pool, req.file.buffer, toolId, buildOptions(req.body, req.ctx, req.file.mimetype), syncRun(req, res));
 
         // Save to retention
         const saved = retention.saveOutput(
@@ -199,10 +224,7 @@ app.post('/api/process', burstLimiter, processLimiter, guard.toolQuota(hostTool)
 
         res.json({ success: true, download: saved, ...describe(toolId, result) });
     } catch (err) {
-        if (guard.toolRefused(req, res, err, toolOf(req))) return;
-        if (err.status === 503) return contracts.http.sendProblem(res, 503, err.code, { detail: err.message, ctx: req.ov });
-        console.error('[Process] Error:', err.message);
-        res.status(422).json({ error: err.message || 'Image processing failed' });
+        syncError(req, res, err, 'Process');
     }
 });
 
@@ -213,7 +235,7 @@ app.post('/api/process/direct', burstLimiter, processLimiter, guard.toolQuota(ho
         const tool = getTool(toolId);
         if (!tool) return res.status(400).json({ error: `Unknown tool: ${toolId}` });
 
-        const result = await processBuffer(req.file.buffer, toolId, buildOptions(req.body, req.ctx, req.file.mimetype));
+        const result = await runProcess(pool, req.file.buffer, toolId, buildOptions(req.body, req.ctx, req.file.mimetype), syncRun(req, res));
         const baseName = path.basename(req.file.originalname, path.extname(req.file.originalname));
 
         res.set({
@@ -223,10 +245,7 @@ app.post('/api/process/direct', burstLimiter, processLimiter, guard.toolQuota(ho
         });
         res.send(result.buffer);
     } catch (err) {
-        if (guard.toolRefused(req, res, err, toolOf(req))) return;
-        if (err.status === 503) return contracts.http.sendProblem(res, 503, err.code, { detail: err.message, ctx: req.ov });
-        console.error('[Process/Direct] Error:', err.message);
-        res.status(422).json({ error: err.message || 'Image processing failed' });
+        syncError(req, res, err, 'Process/Direct');
     }
 });
 
@@ -236,7 +255,7 @@ app.post('/api/process/direct', burstLimiter, processLimiter, guard.toolQuota(ho
 const jobs = jobsRuntime.setupJobs({
     app, service: 'img', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts, sdk,
     getPublicKey: guard.keys.get, issuer: config.networkUrl, guard,
-    define: defineJobs,
+    define: (system) => defineJobs(system, pool),
     receive: uploadSingle,
     limiters: [burstLimiter, processLimiter, guard.toolQuota(hostTool)],
     jobTool: (req, type, input) => { const d = guard.toolForJob('img.process', String((input && input.tool) || req.ctx.defaultOp || 'convert'), req.ctx.toolId); return d ? d.id : null; },
@@ -320,6 +339,7 @@ function shutdown() {
     analytics.destroy();
     analyticsDb.close();
     jobs.close();   // running jobs stay 'running' in data/jobs.db; the next boot re-queues them
+    pool.close();
     guard.close();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(1), 5000);

@@ -108,7 +108,7 @@ routes answer on every host of the img, audio and docs satellites:
 |---|---|
 | `POST /api/v1/jobs` | Submit: multipart `type`, `input` (JSON text), `file` / `files`, or JSON `{ type, input }`. `Idempotency-Key` header (8–200 chars). → `202` + `Location`; a repeat with the same key and request → `200` + `Idempotent-Replayed: true` (same job); same key, different request → `409 tools.job.idempotency_conflict`. |
 | `GET /api/v1/jobs/:id` | The job: `state` (`queued`, `running`, `succeeded`, `failed`, `cancelled`), `progress {percent, message}`, `attempts`, `result {files, data}`, `error` (problem+json), `retryable`, `expires_at`. |
-| `DELETE /api/v1/jobs/:id` | Cancel: queued → `200` cancelled at once; running → `202` (signalled; ffmpeg is killed, sharp/pdf-lib work finishes and is discarded) and ends `cancelled`; finished → `409 tools.job.already_finished`. |
+| `DELETE /api/v1/jobs/:id` | Cancel: queued → `200` cancelled at once; running → `202` (signalled; ffmpeg is killed, a sharp/pdf-lib worker thread is terminated) and ends `cancelled`; finished → `409 tools.job.already_finished`. |
 | `GET /api/v1/jobs/:id/events` | SSE: `job.queued`, `job.running`, `job.progress`, `job.cancel_requested`, `job.succeeded`, `job.failed`, `job.cancelled`, each with an `id`. Reconnecting with `Last-Event-ID` (or `?last_event_id=`) replays only later events; a finished job with nothing newer answers `204`. |
 | `GET /api/v1/jobs/:id/files/:n` | A result file (attachment); `?inline=1` for previews. |
 | `POST /api/v1/jobs/:id/retry` | Retry a **failed** job: a new job with the same type, input and files (`retry_of` → the failed one, which gets `retried_by`) → `202` + `Location`. Idempotent: asking again returns that same retry with `200` + `Idempotent-Replayed: true`. Not failed → `409 tools.job.not_failed`; inputs gone → `410 tools.job.inputs_gone`. A failed job keeps its input files until it expires. |
@@ -129,6 +129,15 @@ reload reattaches.
   `ov_token` subject), an app/service principal (Network client-credentials token, audience `openvibe.tools`,
   capabilities `tools.job.create|read|cancel`), or else this browser's `ov_tools_jobs` cookie (only its hash is
   stored). Anyone else gets `404 tools.job.not_found`.
+- **Worker threads.** sharp (img) and pdf-lib (docs) never run on the event loop: `apps/_shared/jobs/pool.js`
+  runs them in `worker_threads`, `TOOLS_WORKERS` at once per satellite (default 2; `TOOLS_WORKERS_<APP>`), shared
+  by the jobs and the synchronous `/api/process` endpoints (which submit to the pool and wait), with
+  `TOOLS_WORKER_QUEUE` (64) more waiting before `503 tools.busy`. Each worker has a V8 heap limit
+  (`TOOLS_WORKER_MEMORY_MB`, 512; `TOOLS_WORKER_MEMORY_MB_<APP>`): a run that needs more fails with
+  `413 tools.input.too_large` and its worker is replaced. A run past its timeout (the job's, or the descriptor's
+  `limits.timeoutMs` on the sync endpoints: `504 tools.run.timeout`), a cancelled job or a sync client that went
+  away has its worker terminated at once. Idle workers stop after `TOOLS_WORKER_IDLE_MS` (60 s). qpdf and poppler
+  tools stay on the main thread (their child processes have their own timeouts). `GET /api/health` shows `workers`.
 - **Bounded.** `TOOLS_JOBS_CONCURRENCY` jobs run at once per satellite (default 2; `TOOLS_JOBS_CONCURRENCY_<APP>`
   overrides), `TOOLS_JOBS_MAX_ACTIVE` unfinished jobs per owner (default 10, then `429`), and all browser sessions
   from one address together `TOOLS_JOBS_MAX_ACTIVE_PER_ADDRESS` (default 3 × that; jobs keep only the guard's hashed
@@ -163,7 +172,8 @@ reload reattaches.
   with `events.event.publish` on audience `openvibe.events`. Without `EVENTS_URL` (or with `EVENTS_PUBLISH=off`, or
   no client secret) nothing is written or sent. `GET /api/health` shows `jobs.events` (pending, rejected).
 
-Environment (all in `/etc/openvibe/tools.env`): `TOOLS_JOBS_CONCURRENCY`, `TOOLS_JOBS_CONCURRENCY_<APP>`,
+Environment (all in `/etc/openvibe/tools.env`): `TOOLS_WORKERS`, `TOOLS_WORKERS_<APP>`, `TOOLS_WORKER_MEMORY_MB`,
+`TOOLS_WORKER_MEMORY_MB_<APP>`, `TOOLS_WORKER_QUEUE`, `TOOLS_WORKER_IDLE_MS`, `TOOLS_JOBS_CONCURRENCY`, `TOOLS_JOBS_CONCURRENCY_<APP>`,
 `TOOLS_JOBS_MAX_ACTIVE`, `TOOLS_JOB_RESULTS`, `TOOLS_MEDIA_NAMESPACE`, `OV_MEDIA_INTERNAL_URL`, `OV_MEDIA_URL`,
 `OV_NETWORK_INTERNAL_URL`, `OV_OAUTH_CLIENT_ID`, `OV_OAUTH_CLIENT_SECRET`, `EVENTS_URL`, `EVENTS_PUBLISH`,
 `EVENTS_RELAY_INTERVAL_MS`.
@@ -193,8 +203,10 @@ One module used by the gateway and every satellite, driven by each tool's descri
   `RateLimit-Limit`/`-Remaining`/`-Reset`; a refusal is `429` problem+json `tools.quota.exceeded` with `Retry-After`
   and `quota_class`, `scope`, `tier`.
 - **Heavy work.** Synchronous `/api/process` (img, audio, docs) holds one of `TOOLS_SYNC_CONCURRENCY` slots
-  (default 2; `TOOLS_SYNC_QUEUE` may wait, 8, for `TOOLS_SYNC_WAIT_MS`, 30 s), else `503 tools.busy`. Audio's sync
-  path is killed at the descriptor's `timeoutMs` (`504 tools.run.timeout`) or when the client goes away.
+  (default 2; `TOOLS_SYNC_QUEUE` may wait, 8, for `TOOLS_SYNC_WAIT_MS`, 30 s), else `503 tools.busy`. Every sync
+  path is stopped at the descriptor's `timeoutMs` (`504 tools.run.timeout`) or when the client goes away: audio's
+  ffmpeg is killed, img's and docs' worker thread is terminated (Jobs → Worker threads). Liveness and readiness
+  probes (`GET /api/health`, `/api/ready`) are never rate limited.
 - **Uploads.** The bytes are checked against the descriptor's `files.accept` (`415 tools.file.unsupported_type`;
   a misleading extension is corrected); docs uploads go to disk. Tools whose descriptor says `auth.anonymous: false`
   (audio, PDF) need a session, a sign-in or a token (`401 tools.session_required`). Images: no input over

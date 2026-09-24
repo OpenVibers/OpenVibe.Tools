@@ -2,7 +2,9 @@
 
 // ═══════════════════════════════════════════════════════════════
 // Img.OpenVibe — one image operation, shared by the synchronous endpoints
-// (/api/process, /api/process/direct) and the img.process job (server/jobs.js).
+// (/api/process, /api/process/direct) and the img.process job (defineJobs). Both run it through
+// runProcess(): the worker pool (./worker.js), so they share one concurrency cap, one heap limit and
+// terminate-on-timeout or cancel.
 // ═══════════════════════════════════════════════════════════════
 
 const fs = require('fs');
@@ -41,8 +43,19 @@ async function processBuffer(buffer, toolId, options) {
     return tool.handler(buffer, options);
 }
 
+/**
+ * Run an operation in the worker pool (inline without one: tests).
+ * @param {object|null} pool     apps/_shared/jobs/pool.js
+ * @param {{ timeoutMs?: number, signal?: AbortSignal }} [opts]
+ */
+function runProcess(pool, buffer, toolId, options, opts = {}) {
+    if (!pool) return processBuffer(buffer, toolId, options);
+    if (!getTool(toolId)) return Promise.reject(Object.assign(new Error(`Unknown tool: ${toolId}`), { code: 'tools.job.invalid', status: 400 }));
+    return pool.run('process', { tool: toolId, buffer, options }, opts);
+}
+
 /** Job type img.process: input { tool, format?, quality?, width?, … } + one image file. */
-function defineJobs(system) {
+function defineJobs(system, pool = null) {
     const known = new Set(listTools().map(t => t.id));
     system.define({
         type: 'img.process',
@@ -64,7 +77,8 @@ function defineJobs(system) {
             const buffer = await fsp.readFile(src.path);
             if (signal.aborted) throw new Error('cancelled');
             progress(20, 'Processing');
-            const result = await processBuffer(buffer, toolId, buildOptions(input, null, src.mime));
+            // Cancel and the job's timeout abort `signal`: a worker is terminated at once.
+            const result = await runProcess(pool, buffer, toolId, buildOptions(input, null, src.mime), { signal, transfer: true });
             progress(90, 'Saving');
             const base = path.basename(src.name || 'image', path.extname(src.name || '')) || 'openvibeimg-output';
             const name = `${base}.${result.ext}`;
@@ -75,4 +89,4 @@ function defineJobs(system) {
     });
 }
 
-module.exports = { buildOptions, describe, processBuffer, defineJobs, OPTION_KEYS };
+module.exports = { buildOptions, describe, processBuffer, runProcess, defineJobs, OPTION_KEYS };

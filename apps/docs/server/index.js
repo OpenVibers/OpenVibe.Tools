@@ -20,7 +20,8 @@ const { resolveContext, DOMAIN_MAP } = require('./domain-map');
 const { getTool, listTools, BINARIES } = require('./tools');
 const { uploadSingle, uploadMultiple, uploadAny } = require('./middleware/upload');
 const retention = require('./retention/manager');
-const { buildOptions, defineJobs } = require('./process');
+const { buildOptions, defineJobs, runTool } = require('./process');
+const { poolFromEnv } = require('../../_shared/jobs/pool');
 const { hostGuard, ownHost } = require('../../_shared/host-role');
 const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
 const { createLocalRegistry, requiresStatus } = require('../../_shared/tools/local');
@@ -54,6 +55,19 @@ const { apiLimiter, processLimiter, burstLimiter } = guard.legacyLimiters(rateLi
 const hostTool = (req) => (guard.tool(req.ctx.toolId) ? req.ctx.toolId : (guard.toolForJob('docs.process', req.ctx.defaultOp || 'merge', null) || { id: null }).id);
 /** The tool a parsed request runs: its `tool` (operation) on this host. */
 const toolOf = (req) => { const op = String((req.body && req.body.tool) || req.ctx.defaultOp || ''); const d = op ? guard.toolForJob('docs.process', op, req.ctx.toolId) : null; return d ? d.id : hostTool(req); };
+// ── Worker pool (apps/_shared/jobs/pool.js) ─────────────────
+// pdf-lib runs in worker threads, never on the event loop: TOOLS_WORKERS (2) at once for the
+// synchronous endpoints and the jobs together, each with a heap limit (TOOLS_WORKER_MEMORY_MB, 512)
+// and terminated at its timeout, on cancel, or when the client goes away.
+const pool = poolFromEnv('docs', path.join(__dirname, 'worker.js'));
+/** The sync endpoints' bounds for a run: the tool's descriptor timeout, and the client leaving. */
+function syncRun(req, res) {
+    const ac = new AbortController();
+    res.on('close', () => { if (!res.writableFinished) ac.abort(); });
+    const d = guard.tool(toolOf(req));
+    return { signal: ac.signal, timeoutMs: (d && d.limits && d.limits.timeoutMs) || 10 * 60 * 1000 };
+}
+
 /** Read the uploaded files (on disk) and delete them. */
 async function readUploads(files) {
     try { return await Promise.all(files.map(f => fsp.readFile(f.path))); } finally { for (const f of files) fs.unlink(f.path, () => {}); }
@@ -151,7 +165,10 @@ app.use((req, _res, next) => {
 /** A tool's error on the synchronous endpoints: 503 problem when a tool is not set up, else { error }. */
 function sendToolError(req, res, err, label) {
     if (guard.toolRefused(req, res, err, toolOf(req))) return undefined;
-    if (err.status === 503) return contracts.http.sendProblem(res, 503, err.code || 'tools.unavailable', { detail: err.message, ctx: req.ov });
+    if (err.status === 503) {
+        if (err.retryAfter) res.set('Retry-After', String(err.retryAfter));
+        return contracts.http.sendProblem(res, 503, err.code || 'tools.unavailable', { detail: err.message, ctx: req.ov });
+    }
     if (!err.expose) console.error(`[${label}] Error:`, err.message);
     const status = Number.isInteger(err.status) && err.status >= 400 && err.status < 500 ? err.status : 422;
     return res.status(status).json({ error: err.message || 'Document processing failed', ...(err.code && { code: err.code }) });
@@ -160,7 +177,7 @@ function sendToolError(req, res, err, label) {
 // Health check
 app.get('/api/health', (_req, res) => {
     const stats = retention.getStats();
-    res.json({ status: 'ok', service: 'openvibe-docs', version: '1.0.0', files: stats, jobs: jobs.stats() });
+    res.json({ status: 'ok', service: 'openvibe-docs', version: '1.0.0', files: stats, jobs: jobs.stats(), workers: pool.stats() });
 });
 
 // Domain context (frontend calls this on load to get branding). It also starts this browser's session
@@ -193,7 +210,7 @@ app.post('/api/info', burstLimiter, processLimiter, guard.toolQuota(hostTool), u
     try {
         const tool = getTool('metadata');
         const [buffer] = await readUploads([req.file]);
-        const result = await tool.handler(buffer, { mode: 'view' });
+        const result = await runTool(pool, tool, buffer, { mode: 'view' }, syncRun(req, res));
         res.json({ success: true, ...result });
     } catch (err) {
         sendToolError(req, res, err, 'Info');
@@ -209,9 +226,9 @@ app.post('/api/process', burstLimiter, processLimiter, guard.toolQuota(hostTool)
         const tool = getTool(toolId);
         if (!tool) { fs.unlink(req.file.path, () => {}); return res.status(400).json({ error: `Unknown tool: ${toolId}` }); }
 
-        // Same options and code path as the docs.process job
+        // Same options and code path as the docs.process job (the worker pool, its cap and its limits)
         const [buffer] = await readUploads([req.file]);
-        const result = await tool.handler(buffer, buildOptions(req.body, req.ctx, false));
+        const result = await runTool(pool, tool, buffer, buildOptions(req.body, req.ctx, false), syncRun(req, res));
 
         // Some tools return view-only results (like metadata view)
         if (result.viewOnly) {
@@ -260,7 +277,7 @@ app.post('/api/process/multi', burstLimiter, processLimiter, guard.toolQuota(hos
         }
 
         const buffers = await readUploads(req.files);
-        const result = await tool.handler(buffers, buildOptions(req.body, req.ctx, true));
+        const result = await runTool(pool, tool, buffers, buildOptions(req.body, req.ctx, true), syncRun(req, res));
 
         // Save output
         const firstName = req.files[0]?.originalname || 'output';
@@ -296,7 +313,7 @@ app.post('/api/process/multi', burstLimiter, processLimiter, guard.toolQuota(hos
 const jobs = jobsRuntime.setupJobs({
     app, service: 'docs', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts, sdk,
     getPublicKey: guard.keys.get, issuer: config.networkUrl, guard,
-    define: defineJobs,
+    define: (system) => defineJobs(system, pool),
     receive: uploadAny,
     limiters: [burstLimiter, processLimiter, guard.toolQuota(hostTool)],
     jobTool: (req, type, input) => { const op = String((input && input.tool) || req.ctx.defaultOp || ''); const d = op ? guard.toolForJob('docs.process', op, req.ctx.toolId) : null; return d ? d.id : null; },
@@ -382,6 +399,7 @@ function shutdown() {
     analytics.destroy();
     analyticsDb.close();
     jobs.close();   // running jobs stay 'running' in data/jobs.db; the next boot re-queues them
+    pool.close();
     guard.close();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(1), 5000);

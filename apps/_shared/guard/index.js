@@ -389,7 +389,7 @@ function createGuard(o = {}) {
             standardHeaders: headers,
             legacyHeaders: false,
             keyGenerator: (req) => { const c = caller(req); return signed(c) || c.tier === 'sandbox' ? c.key : c.ipKey; },
-            skip: () => enforcing,
+            skip: (req) => enforcing || isProbe(req),   // liveness and readiness probes are never limited
             message: { error: message },
         });
     }

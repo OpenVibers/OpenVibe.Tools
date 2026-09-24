@@ -84,7 +84,7 @@ function tool(id, extra = {}) {
         files: { ...o.files, maxBytes: MAX_BYTES },
         output: { kind: 'file', mime: o.mime, schema: RESULT },
         limits: { timeoutMs: TIMEOUT_MS, ...(op !== 'img2pdf' && { maxPages: o.maxPages || MAX_PAGES }) },
-        // PDF work runs on the satellite's main thread today: a browser session, a person or a token.
+        // Heavy work (a worker thread each, apps/_shared/jobs/pool.js): a browser session, a person or a token.
         auth: { anonymous: false, capability: 'tools.tool.run' },
         quotaClass: 'tools-job', cost: o.cost, egress: false,
         ...(o.requires && { requires: o.requires }),
