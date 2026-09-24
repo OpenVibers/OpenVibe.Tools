@@ -25,6 +25,10 @@
 //              HMAC(address, today's salt), principal or user id, tool, reason — 30 days, no raw
 //              address anywhere; metric tools_guard_refused_total{reason,tool}
 //   challenge  a hook for a person-check (Turnstile later; ./challenge.js, a no-op now)
+//   origin     a mutation that rides on the browser's cookies (ov_token, the jobs session) must come
+//              from an OpenVibe.Tools page: https://openvibe.tools, https://*.openvibe.tools, the tool's
+//              own hosts (custom domains included) or the request's own host (CSRF); calls with a
+//              Bearer token and calls without those cookies do not need it. 403 tools.origin.refused
 //
 // Mode: TOOLS_GUARD=report (default) logs and counts what it would refuse and refuses nothing, except
 // the hard limits that apply in both modes: the image pixel limit, ffmpeg's protocol and format
@@ -70,9 +74,9 @@ function uploadsOf(req) {
     return req.file ? [req.file] : [];
 }
 
-/** Delete the files multer wrote to disk for a request that is refused. */
+/** Delete the files multer wrote to disk for a request that is refused (before the answer goes out). */
 function discardUploads(req) {
-    for (const f of uploadsOf(req)) if (f.path) fs.unlink(f.path, () => {});
+    for (const f of uploadsOf(req)) if (f.path) { try { fs.unlinkSync(f.path); } catch { /* already gone */ } }
 }
 
 /**
@@ -223,7 +227,9 @@ function createGuard(o = {}) {
     }
     // Liveness and readiness probes (the gateway polls every satellite's) are never counted.
     const PROBES = new Set(['/api/health', '/api/ready']);
-    const isProbe = (req) => req.method === 'GET' && PROBES.has(`${req.baseUrl || ''}${req.path}`);
+    // …nor the gateway's loopback question "which satellite holds this job?" (GET /api/internal/jobs/:id).
+    const directLoopback = (req) => ip.isLoopback(req.socket && req.socket.remoteAddress) && !req.headers['x-forwarded-for'] && !req.headers['x-real-ip'];
+    const isProbe = (req) => req.method === 'GET' && (PROBES.has(`${req.baseUrl || ''}${req.path}`) || (`${req.baseUrl || ''}${req.path}`.startsWith('/api/internal/jobs/') && directLoopback(req)));
 
     /**
      * Middleware: charge the tool's own class and cost (its descriptor). toolOf(req) → a tool id. Records
@@ -349,6 +355,47 @@ function createGuard(o = {}) {
         return !refuse(req, res, { status: 503, code: 'tools.busy', detail: busy.detail, reason: `busy.${busy.reason}`, tool: toolId, retryAfter: busy.retryAfter || 30 });
     }
 
+    // ── Cross-site requests (CSRF) ───────────────────────────
+    const SAFE = new Set(['GET', 'HEAD', 'OPTIONS']);
+    const FIRST_PARTY = /^([a-z0-9-]+\.)*openvibe\.tools$/;
+    const production = String(env.NODE_ENV || '') === 'production';
+    /** May a page at `origin` use this request's cookies? First-party, the tool's hosts, the same host. */
+    function allowedOrigin(origin, req, hosts) {
+        let u;
+        try { u = new URL(origin); } catch { return false; }
+        const hostname = u.hostname.toLowerCase();
+        if (u.protocol === 'https:' && FIRST_PARTY.test(hostname)) return true;
+        if (u.protocol === 'https:' && (hosts || []).some(h => String(h).toLowerCase() === hostname)) return true;
+        const own = String(req.headers['x-forwarded-host'] || req.headers.host || '').toLowerCase();
+        if (own && u.host.toLowerCase() === own && (u.protocol === 'https:' || !production)) return true;   // same origin
+        if (!production && (hostname === 'localhost' || hostname === '127.0.0.1')) return true;
+        return false;
+    }
+    /**
+     * A mutation carried by the browser's cookies must come from one of our pages (Origin, else
+     * Referer; a request with neither is not a browser's cross-site request). Bearer calls and calls
+     * without our cookies pass. Refused in enforce mode (403 tools.origin.refused), recorded in report
+     * mode. → ok
+     */
+    function originOk(req, res, { hosts = [], tool: toolId = null } = {}) {
+        if (SAFE.has(req.method)) return true;
+        if (/^Bearer\s+\S/i.test(String(req.headers.authorization || ''))) return true;
+        const cookies = req.cookies || {};
+        if (!cookies.ov_token && !cookies.token && !cookies[callers.cookieName]) return true;
+        let origin = req.headers.origin;
+        if (origin == null || origin === '') {
+            const ref = req.headers.referer;
+            if (!ref) return true;
+            try { origin = new URL(String(ref)).origin; } catch { origin = 'null'; }
+        }
+        if (origin !== 'null' && allowedOrigin(String(origin), req, hosts)) return true;
+        return !refuse(req, res, { status: 403, code: 'tools.origin.refused', reason: 'origin', tool: toolId, detail: 'This request came from another site with your OpenVibe.Tools cookies. Send it from an OpenVibe.Tools page, or with an API token.', extra: { origin: String(origin).slice(0, 200) } });
+    }
+    /** Middleware form: hostsOf(req) → the tool's own hosts. */
+    function originCheck(hostsOf, toolOf) {
+        return (req, res, next) => (originOk(req, res, { hosts: hostsOf ? hostsOf(req) : [], tool: toolOf ? toolOf(req) : null }) ? next() : undefined);
+    }
+
     // ── Egress ───────────────────────────────────────────────
     /** Per-target throttle (hard). → ok */
     function target(req, res, { tool: toolId, target: t, perMinute }) {
@@ -391,6 +438,18 @@ function createGuard(o = {}) {
             keyGenerator: (req) => { const c = caller(req); return signed(c) || c.tier === 'sandbox' ? c.key : c.ipKey; },
             skip: (req) => enforcing || isProbe(req),   // liveness and readiness probes are never limited
             message: { error: message },
+            // The platform API (/api/v1/…) answers like the guard does: problem+json tools.quota.exceeded
+            // with Retry-After; the older routes keep their { error } shape.
+            handler: (req, res, _next, options) => {
+                const reset = req.rateLimit && req.rateLimit.resetTime ? new Date(req.rateLimit.resetTime).getTime() : 0;
+                const retry = Math.max(1, Math.ceil(((reset || (now() + windowMs)) - now()) / 1000));
+                res.setHeader('Retry-After', String(retry));
+                if (/^\/api\/v1\//.test(String(req.originalUrl || req.url || ''))) {
+                    const c = caller(req);
+                    return sendProblem(req, res, 429, 'tools.quota.exceeded', message, { scope: 'legacy', tier: c.tier, retry_after: retry }, o.contracts);
+                }
+                return res.status(options.statusCode).json(options.message);
+            },
         });
     }
     /** The three limiters an upload app had (LEGACY numbers in ./limits.js). */
@@ -440,6 +499,7 @@ function createGuard(o = {}) {
         heavy, sync, jobsBusy,
         target, portScan, targets, ports, normalizeTarget,
         legacyLimiter, legacyLimiters, toolRefused,
+        originOk, originCheck, allowedOrigin, tokens,
         attachMetrics, prune,
         close() { if (pruneTimer) clearInterval(pruneTimer); if (keys.stop) keys.stop(); store.close(); },
     };

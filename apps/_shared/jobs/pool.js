@@ -96,9 +96,11 @@ function createPool(o) {
         counts.started++;
         w.worker.on('message', (msg) => settle(w, msg));
         w.worker.on('error', (err) => {
-            // An uncaught throw or the heap limit: the worker is gone either way.
+            // An uncaught throw or the heap limit: the worker is gone either way. It leaves the pool now
+            // (its 'exit' may come later, or not at all), so no new run is ever handed to it.
             const t = w.task;
             w.task = null;
+            retire(w);
             if (!t) return;
             if (err && err.code === 'ERR_WORKER_OUT_OF_MEMORY') {
                 counts.out_of_memory++;
@@ -108,21 +110,35 @@ function createPool(o) {
             }
         });
         w.worker.on('exit', () => {
-            workers.delete(w);
-            clearTimeout(w.idleTimer);
-            if (w.task) { const t = w.task; w.task = null; finish(t, fail('The tool stopped unexpectedly while working on this file.', { status: 500, code: 'tools.job.failed' })); }
-            dispatch();
+            const t = w.task;
+            w.task = null;
+            retire(w);
+            if (t) finish(t, fail('The tool stopped unexpectedly while working on this file.', { status: 500, code: 'tools.job.failed' }));
+        });
+        w.worker.on('messageerror', () => {
+            const t = w.task;
+            w.task = null;
+            retire(w);
+            if (t) finish(t, fail('The tool\'s answer could not be read.', { status: 500, code: 'tools.job.failed' }));
         });
         workers.add(w);
         return w;
     }
 
-    function kill(w) {
-        w.task = null;
+    /** Take a worker out of the pool for good and make sure its thread ends. */
+    function retire(w) {
+        if (w.dead) return;
+        w.dead = true;
         workers.delete(w);
         clearTimeout(w.idleTimer);
-        counts.killed++;
         w.worker.terminate().catch(() => {});
+        setImmediate(dispatch);
+    }
+
+    function kill(w) {
+        w.task = null;
+        counts.killed++;
+        retire(w);
     }
 
     function finish(t, err, result) {
@@ -151,7 +167,7 @@ function createPool(o) {
         clearTimeout(w.idleTimer);
         w.worker.unref();
         if (idleMs > 0) {
-            w.idleTimer = setTimeout(() => { if (!w.task && !queue.length) { workers.delete(w); w.worker.terminate().catch(() => {}); } }, idleMs);
+            w.idleTimer = setTimeout(() => { if (!w.task && !queue.length) retire(w); }, idleMs);
             if (w.idleTimer.unref) w.idleTimer.unref();
         }
     }
@@ -186,7 +202,7 @@ function createPool(o) {
     function dispatch() {
         if (closed) return;
         while (queue.length) {
-            let w = [...workers].find(x => !x.task);
+            let w = [...workers].find(x => !x.task && !x.dead);
             if (!w) {
                 if (workers.size >= size) return;
                 w = spawn();
@@ -239,7 +255,7 @@ function createPool(o) {
     async function close() {
         closed = true;
         for (const t of queue.splice(0)) finish(t, fail('The worker pool is shutting down', { status: 503, code: 'tools.busy', retryAfter: 5 }));
-        await Promise.all([...workers].map(w => { const t = w.task; w.task = null; if (t) finish(t, fail('The worker pool is shutting down', { status: 503, code: 'tools.busy', retryAfter: 5 })); clearTimeout(w.idleTimer); return w.worker.terminate().catch(() => {}); }));
+        await Promise.all([...workers].map(w => { const t = w.task; w.task = null; w.dead = true; if (t) finish(t, fail('The worker pool is shutting down', { status: 503, code: 'tools.busy', retryAfter: 5 })); clearTimeout(w.idleTimer); return w.worker.terminate().catch(() => {}); }));
         workers.clear();
     }
 

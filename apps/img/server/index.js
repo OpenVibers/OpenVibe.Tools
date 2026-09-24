@@ -24,6 +24,9 @@ const { poolFromEnv } = require('../../_shared/jobs/pool');
 const codec = require('./tools/codec');
 const { hostGuard, ownHost } = require('../../_shared/host-role');
 const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
+const { satelliteRunApi, ajvFrom } = require('../../_shared/tools/run');
+const { satellitePorts } = require('../../_shared/tools/satellites');
+const { deprecated, runPath } = require('../../_shared/tools/deprecation');
 const { createLocalRegistry, requiresStatus } = require('../../_shared/tools/local');
 const jobsRuntime = require('../../_shared/jobs');
 const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
@@ -138,7 +141,7 @@ app.use(exceptRegistry(cors({
         return callback(new Error('Origin not allowed by CORS'));
     },
     credentials: true,
-})));
+}), { isFirstParty: (origin) => /^https:\/\/([a-z0-9-]+\.)?openvibe\.tools$/.test(origin) || (process.env.NODE_ENV === 'development' && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) }));
 
 // ── Who is asking, then rate limits (sign-in first, so a signed-in tier applies) ──
 app.use(guard.identify);
@@ -202,7 +205,7 @@ app.get('/api/tools', (_req, res) => {
 });
 
 // ── Main Processing Endpoint ─────────────────────────────────
-app.post('/api/process', burstLimiter, processLimiter, guard.toolQuota(hostTool), uploadSingle, guard.admitUpload(toolOf), guard.heavy(toolOf), async (req, res) => {
+app.post('/api/process', deprecated((req) => runPath(hostTool(req))), guard.originCheck(), burstLimiter, processLimiter, guard.toolQuota(hostTool), uploadSingle, guard.admitUpload(toolOf), guard.heavy(toolOf), async (req, res) => {
     try {
         const toolId = req.body.tool || req.ctx.defaultOp || 'convert';
         const tool = getTool(toolId);
@@ -229,7 +232,7 @@ app.post('/api/process', burstLimiter, processLimiter, guard.toolQuota(hostTool)
 });
 
 // ── Direct Download (inline preview) ─────────────────────────
-app.post('/api/process/direct', burstLimiter, processLimiter, guard.toolQuota(hostTool), uploadSingle, guard.admitUpload(toolOf), guard.heavy(toolOf), async (req, res) => {
+app.post('/api/process/direct', deprecated((req) => runPath(hostTool(req))), guard.originCheck(), burstLimiter, processLimiter, guard.toolQuota(hostTool), uploadSingle, guard.admitUpload(toolOf), guard.heavy(toolOf), async (req, res) => {
     try {
         const toolId = req.body.tool || req.ctx.defaultOp || 'convert';
         const tool = getTool(toolId);
@@ -266,6 +269,17 @@ const jobs = jobsRuntime.setupJobs({
         return out;
     },
 });
+
+// ── Run API (ADR-027): POST /api/v1/tools/:id/run for this app's tools ──
+// tools.run-request@1 (JSON, or multipart with `file` parts and the text parts input, files, wait_ms)
+// → tools.run@1: each tool runs as a job of this satellite (the preset and operation from its
+// descriptor), answered finished within wait_ms or 202 with the job. The gateway streams runs here.
+const runApi = satelliteRunApi({
+    app: 'img', guard, contracts, snapshot: toolRegistry.snapshot, system: () => jobs,
+    multer: require('multer'), uploadsDir: path.resolve(config.uploadsDir), ...ajvFrom(require), ports: () => satellitePorts(),
+    limiters: [burstLimiter, processLimiter],
+});
+app.use(runApi.handle);
 
 // ── File Download ────────────────────────────────────────────
 app.get('/api/download/:id', (req, res) => {

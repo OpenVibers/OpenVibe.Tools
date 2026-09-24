@@ -27,6 +27,16 @@ const TLS_PORTS = [443, 465, 636, 853, 990, 993, 995, 2083, 2087, 5061, 8443];  
 const PROBES = new Set(['port', 'ping', 'latency', 'traceroute', 'mtr']);
 
 const KiB = 1024;
+const MIN = 60 * 1000;
+// How long the run API may reuse a lookup's answer (same tool, same input). Records and registration
+// data move slowly (and the routes cache their upstreams anyway); live checks (ping, ports, headers,
+// redirects, uptime, SMTP) and myip (the caller's own address) are never reused.
+const CACHE_TTL = {
+    dns: MIN, dig: MIN, nslookup: MIN, mx: MIN, txt: MIN, ns: MIN, spf: MIN, dkim: MIN, dmarc: MIN, dnspropagation: MIN,
+    ip: 10 * MIN, geoip: 10 * MIN, isp: 10 * MIN, asn: 10 * MIN, ipv4: 10 * MIN, ipv6: 10 * MIN,
+    hostname: 5 * MIN, rdns: 5 * MIN, whois: 60 * MIN, rdap: 60 * MIN,
+    blacklist: 5 * MIN, ssl: 5 * MIN, robots: 5 * MIN, sitemap: 5 * MIN, lookup: 5 * MIN,
+};
 const target = (description) => ({ type: 'string', minLength: 1, maxLength: 253 + 2048, description });
 const HOST = 'A domain or an IP address';
 const URL_OR_DOMAIN = 'A URL, or a domain (https:// is assumed)';
@@ -130,6 +140,7 @@ function spec(id) {
             route: { method: 'GET', path: `/api/net${endpoint}`, ...(t.query && { query: t.query }), ...(t.targetTemplate && { target: t.targetTemplate }) },
         }),
         example: { input: endpoint === '/myip' ? {} : { target: 'example.com' } },
+        cacheTtlMs: CACHE_TTL[id] || 0,
     };
 }
 

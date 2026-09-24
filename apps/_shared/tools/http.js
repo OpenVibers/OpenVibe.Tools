@@ -33,12 +33,38 @@ function openCors(res) {
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 }
 
-/** Wrap an app's CORS middleware: registry paths skip it and are open to every origin instead. */
-function exceptRegistry(corsMiddleware) {
+// The run API and the jobs API take calls from any site's page with a token (openvibe-sdk in a
+// browser): such an origin gets CORS without credentials (so the browser never sends our cookies
+// along); first-party pages keep the app's own credentialed CORS.
+const RUN_OR_JOBS_RE = /^\/api\/v1\/(?:tools\/[a-z][a-z0-9-]{0,39}\/run|jobs(?:\/.*)?)\/?$/;
+const isPublicApiPath = (p) => RUN_OR_JOBS_RE.test(String(p || ''));
+const API_HEADERS = 'Authorization, Content-Type, Idempotency-Key, Last-Event-ID, Cache-Control, traceparent, X-OpenVibe-Request-Id';
+const API_EXPOSE = 'Location, Idempotent-Replayed, Retry-After, RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset, X-OpenVibe-Request-Id, traceparent, Content-Disposition, Deprecation, Sunset, Link';
+
+/**
+ * Wrap an app's CORS middleware: registry paths skip it and are open to every origin instead; run and
+ * jobs paths from an origin the app does not know (isFirstParty false) get CORS without credentials.
+ * @param {Function} corsMiddleware
+ * @param {{ isFirstParty?: (origin) => boolean }} [opts]
+ */
+function exceptRegistry(corsMiddleware, opts = {}) {
     return function corsExceptToolRegistry(req, res, next) {
-        if (!isRegistryPath(req.path)) return corsMiddleware(req, res, next);
-        openCors(res);
-        return next();
+        if (isRegistryPath(req.path)) { openCors(res); return next(); }
+        const origin = req.headers.origin;
+        if (opts.isFirstParty && origin && isPublicApiPath(req.path) && !opts.isFirstParty(origin)) {
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Expose-Headers', API_EXPOSE);
+            res.setHeader('Vary', 'Origin');
+            if (req.method === 'OPTIONS') {
+                res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+                res.setHeader('Access-Control-Allow-Headers', API_HEADERS);
+                res.setHeader('Access-Control-Max-Age', '600');
+                res.statusCode = 204;
+                return res.end();
+            }
+            return next();
+        }
+        return corsMiddleware(req, res, next);
     };
 }
 
@@ -158,4 +184,4 @@ function createToolsApi(o) {
     };
 }
 
-module.exports = { createToolsApi, exceptRegistry, isRegistryPath, parseFilters, PATH_RE };
+module.exports = { createToolsApi, exceptRegistry, isRegistryPath, isPublicApiPath, parseFilters, PATH_RE };

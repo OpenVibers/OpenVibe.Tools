@@ -110,6 +110,7 @@ function setupJobs(o) {
     mountJobRoutes(o.app, {
         system, contracts: o.contracts, resolveOwner, receive: o.receive, limiters: o.limiters, defaults: o.defaults,
         ...(g && {
+            originCheck: g.originCheck(),
             admit: (req, res, job) => g.admitJob(req, res, { ...job, toolId: o.jobTool ? o.jobTool(req, job.type, job.input) : null }),
             onBusy: (req, res, busy) => g.jobsBusy(req, res, busy, o.jobTool ? o.jobTool(req, null, {}) : null),
             onAddressFull: (req, res, full) => !g.refuse(req, res, { status: 429, code: 'tools.job.too_many_active', reason: 'jobs.address', tool: o.jobTool ? o.jobTool(req, null, {}) : null, retryAfter: 30, detail: `At most ${full.limit} unfinished jobs from one address at a time; wait for one to finish.`, extra: { scope: 'address' } }),

@@ -44,6 +44,14 @@ const get = async (url, headers = {}, method = 'GET') => {
         const ports = Object.entries(sat).map(([n, p]) => `${n}=${p.port}`).join(',');
         const gw = await start('gateway', { TOOLS_SATELLITE_PORTS: ports, OV_DOMAINS_URL: 'http://127.0.0.1:9/api/domains', OV_REGISTRY_URL: 'http://127.0.0.1:9/registry' });
         const G = gw.base;
+        // The gateway reads every satellite's own status on boot: wait for all seven, so the list does
+        // not change between the ETag checks below (a busy machine answers slower than the first request).
+        for (let i = 0; i < 200; i++) {
+            const rd = (await get(`${G}/api/ready`)).body;
+            const d = rd && rd.checks && rd.checks.tool_registry && rd.checks.tool_registry.detail;
+            if (d && d.satellites_polled >= 7) break;
+            await new Promise(res => setTimeout(res, 100));
+        }
 
         // ── The list: a tools.tool-list@1 document with every tool ──
         let r = await get(`${G}/api/v1/tools`, { Origin: 'https://someone-elses-site.example' });

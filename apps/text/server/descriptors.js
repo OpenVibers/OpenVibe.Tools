@@ -128,4 +128,9 @@ const SPECS = [
     page('peso', { kind: 'text' }), page('spanish', { kind: 'text' }), page('slang', { kind: 'text' }), page('ice', { kind: 'text' }),
 ];
 
+// The run API reuses an engine's answer for 10 minutes (same tool, same input): not for these, whose
+// output is random (zalgo, the mocking case, shuffle, the bio and nickname generators).
+const FRESH = new Set(['zalgo', 'case', 'sort', 'bio', 'nickname']);
+for (const spec of SPECS) if (FRESH.has(spec.id)) spec.cacheTtlMs = 0;
+
 module.exports = { SPECS };

@@ -22,7 +22,7 @@ async function waitFor(app, id, cookie, pred, what, ms = 30000) {
         const job = await (await fetch(`${app.base}/api/v1/jobs/${id}`, { headers: { cookie } })).json();
         if (pred(job)) return job;
         if (Date.now() - t0 > ms) throw new Error(`timed out waiting for ${what}: ${JSON.stringify(job)}`);
-        await sleep(50);
+        await sleep(150);   // the older /api/ limiter allows an address 60 requests a minute
     }
 }
 

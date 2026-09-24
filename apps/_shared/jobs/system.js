@@ -151,6 +151,7 @@ function createJobSystem(o) {
             id: row.id,
             object: 'tools.job',
             service: o.service,
+            ...(row.tool && { tool: row.tool }),
             type: row.type,
             type_version: row.type_version,
             state: row.state,
@@ -202,7 +203,7 @@ function createJobSystem(o) {
     // Developer-app sandbox jobs: fewer at a time, kept briefly, results never leave this server.
     const SANDBOX_MAX_ACTIVE = Math.max(1, o.sandboxMaxActivePerOwner || 2);
     const SANDBOX_TTL_MS = 30 * 60 * 1000;
-    async function submit({ owner, type, input = {}, files = [], idempotencyKey = null, ttlMs = HOUR, env = 'production', ipKey = null }) {
+    async function submit({ owner, type, input = {}, files = [], idempotencyKey = null, ttlMs = HOUR, env = 'production', ipKey = null, tool = null }) {
         if (env !== 'sandbox') env = 'production';
         if (env === 'sandbox') ttlMs = Math.min(ttlMs, SANDBOX_TTL_MS);
         if (stopped) throw new JobError(503, 'tools.job.unavailable', 'The job system is shutting down');
@@ -252,6 +253,7 @@ function createJobSystem(o) {
                         idempotency_key: idempotencyKey == null ? null : String(idempotencyKey), request_hash: requestHash,
                         max_attempts: def.maxAttempts, ttl_ms: ttlMs, now: Date.now(), env,
                         ip_key: String(owner).startsWith('session:') && ipKey ? String(ipKey) : null,
+                        tool: tool && /^[a-z][a-z0-9-]{0,39}$/.test(String(tool)) ? String(tool) : null,
                     });
                     announce.created(store.get(id));
                 })();
@@ -474,7 +476,7 @@ function createJobSystem(o) {
                 store.insert({
                     id: next, type: row.type, type_version: def.version, owner: row.owner, input_json: row.input_json, files_json: JSON.stringify(stored),
                     idempotency_key: null, request_hash: row.request_hash, max_attempts: def.maxAttempts, ttl_ms: row.ttl_ms, now: Date.now(),
-                    env: row.env, retry_of: row.id, ip_key: row.ip_key || null,
+                    env: row.env, retry_of: row.id, ip_key: row.ip_key || null, tool: row.tool || null,
                 });
                 announce.created(store.get(next));
             })();
@@ -664,6 +666,16 @@ function createJobSystem(o) {
     /** Run fn when the system stops; → a function that removes it. */
     function onStop(fn) { stopHooks.add(fn); return () => stopHooks.delete(fn); }
 
+    /** The owner's succeeded job with a result file stored as Media object `mediaId` → { row, index } or null. */
+    function findResultMedia(owner, mediaId) {
+        for (const row of store.byResultMedia(owner, mediaId)) {
+            const files = (store.parse(row.result_json, null) || {}).files || [];
+            const index = files.findIndex(f => f.media && f.media.media_id === mediaId);
+            if (index >= 0) return { row, index };
+        }
+        return null;
+    }
+
     /** Where a result file's bytes are: { local: path } or { media: MediaRef }. */
     function resultFile(row, n) {
         const result = store.parse(row.result_json, null);
@@ -673,9 +685,10 @@ function createJobSystem(o) {
     }
 
     const api = {
-        define, submit, cancel, retry, reference, unreference, subscribe, start, stop, onStop, prune, recover, view, resultFile,
+        define, submit, cancel, retry, reference, unreference, subscribe, start, stop, onStop, prune, recover, view, resultFile, findResultMedia,
         busy, refreshDisk, addressFull, bounds: { maxQueued, diskBudgetBytes: diskBudget, maxActivePerAddress },
         get: (id) => store.get(id),
+        service: o.service,
         eventsAfter: (id, seq) => store.eventsAfter(id, seq),
         lastSeq: (id) => store.lastSeq(id),
         types: () => [...types.keys()],

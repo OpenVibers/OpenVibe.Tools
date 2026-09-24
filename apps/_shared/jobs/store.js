@@ -67,6 +67,7 @@ const ADDED_COLUMNS = [
     ['retried_by', 'TEXT'],     // set on a failed job once it has been retried: the retry's id
     ['ip_key', 'TEXT'],         // a browser session's job: the guard's hashed address key (never the address), so
                                 // unfinished jobs are also bounded per address (a new cookie is no new allowance)
+    ['tool', 'TEXT'],           // the tool (tools.tool@1 id) whose run created the job (POST /api/v1/tools/:id/run)
 ];
 
 const parse = (s, fallback) => { if (s == null) return fallback; try { return JSON.parse(s); } catch { return fallback; } };
@@ -80,11 +81,13 @@ function createStore(db) {
     db.exec("CREATE INDEX IF NOT EXISTS tool_jobs_ip ON tool_jobs(ip_key, state) WHERE ip_key IS NOT NULL");
 
     const q = {
-        insert: db.prepare(`INSERT INTO tool_jobs (id, type, type_version, owner, state, input_json, files_json, idempotency_key, request_hash, max_attempts, ttl_ms, created_at, updated_at, env, retry_of, ip_key)
-            VALUES (@id, @type, @type_version, @owner, 'queued', @input_json, @files_json, @idempotency_key, @request_hash, @max_attempts, @ttl_ms, @now, @now, @env, @retry_of, @ip_key)`),
+        insert: db.prepare(`INSERT INTO tool_jobs (id, type, type_version, owner, state, input_json, files_json, idempotency_key, request_hash, max_attempts, ttl_ms, created_at, updated_at, env, retry_of, ip_key, tool)
+            VALUES (@id, @type, @type_version, @owner, 'queued', @input_json, @files_json, @idempotency_key, @request_hash, @max_attempts, @ttl_ms, @now, @now, @env, @retry_of, @ip_key, @tool)`),
         markRetried: db.prepare("UPDATE tool_jobs SET retried_by = @next, updated_at = @now WHERE id = @id AND state = 'failed' AND retried_by IS NULL"),
         get: db.prepare('SELECT * FROM tool_jobs WHERE id = ?'),
         byIdem: db.prepare('SELECT * FROM tool_jobs WHERE owner = ? AND idempotency_key = ?'),
+        // A result file stored in Media, by its media_id (a run's { media_id } reference); the owner's only.
+        byResultMedia: db.prepare("SELECT * FROM tool_jobs WHERE owner = ? AND state = 'succeeded' AND result_json LIKE ? ORDER BY id DESC LIMIT 5"),
         nextQueued: db.prepare("SELECT * FROM tool_jobs WHERE state = 'queued' ORDER BY id LIMIT ?"),
         claim: db.prepare("UPDATE tool_jobs SET state = 'running', attempts = attempts + 1, started_at = @now, updated_at = @now, progress = NULL, progress_message = NULL WHERE id = @id AND state = 'queued'"),
         running: db.prepare("SELECT * FROM tool_jobs WHERE state = 'running'"),
@@ -124,7 +127,8 @@ function createStore(db) {
     return {
         db,
         TERMINAL, STATES,
-        insert(row) { q.insert.run({ retry_of: null, ip_key: null, ...row }); },
+        insert(row) { q.insert.run({ retry_of: null, ip_key: null, tool: null, ...row }); },
+        byResultMedia: (owner, mediaId) => q.byResultMedia.all(owner, `%"media_id":"${String(mediaId).replace(/[%"\\]/g, '')}"%`),
         markRetried: (id, next, now = Date.now()) => q.markRetried.run({ id, next, now }).changes === 1,
         get: (id) => q.get.get(id) || null,
         byIdempotencyKey: (owner, key) => q.byIdem.get(owner, key) || null,

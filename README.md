@@ -99,6 +99,75 @@ answers for every tool; each satellite answers the same routes for its own tools
   library or isolation (XML minify, HTML to Markdown, the JS minifier/beautifier, the regex tester, the canvas
   graphics makers) say `api: false`, as does the YouTube downloader (page-only by decision).
 
+## Run API (ADR-027)
+
+`POST /api/v1/tools/:id/run` runs any tool whose descriptor says `api: true` (capability `tools.tool.run`;
+`tools.net.probe` for the network probes). The gateway (`https://openvibe.tools`) answers for every tool; img,
+audio and docs answer the same route for their own tools. `openvibe-sdk/tools` (v0.6.0) is its client.
+
+- **Request** (`tools.run-request@1`): JSON `{ input, files, wait_ms, idempotency_key }`, or
+  `multipart/form-data` with each upload as a `file` part and the text parts `input` (JSON), `files` (the
+  file references' JSON), `wait_ms`, `idempotency_key` — exactly what the SDK sends. `?wait_ms=` does the same
+  as the field; the `Idempotency-Key` header wins over `idempotency_key`. A file reference is
+  `{ job_id, index }` (a result file of one of your own jobs, on any satellite: one tool's output feeds the
+  next) or `{ media_id }` (a result of one of your own jobs stored in OpenVibe.Media). Uploads come first,
+  then references, in order; the count must fit the descriptor's `files`.
+- **Answers** (`tools.run@1`): `200 { state: succeeded, tool, result: { data | text | files }, took_ms[, job] }`;
+  `200 { state: failed | cancelled, tool, error, took_ms[, job] }` when the tool itself fails (its
+  problem+json: `tools.job.failed`, `tools.pdf.wrong_password`, `tools.net.target_not_public`, …);
+  `202 { state: queued | running, tool, job, location }` + `Location: /api/v1/jobs/:id` when a job tool has not
+  finished within `wait_ms` (default 0); `200 + Idempotent-Replayed: true` for a replay.
+- **Refusals** (problem+json, before the tool runs): `400 tools.run.invalid`, `401 token.missing |
+  token.invalid | tools.session_required`, `403 capability.denied | tools.origin.refused`,
+  `404 tools.tool.not_found | tools.tool.not_runnable` (`api: false`: the YouTube downloader, the regex tester,
+  the canvas makers…) `| tools.run.file_not_found`, `405`, `409 tools.job.idempotency_conflict`,
+  `413 tools.file.too_large | tools.input.too_large` (over `limits.maxInputBytes`), `415
+  tools.file.unsupported_type` (the bytes are checked), `422 tools.input.invalid` (`errors[]` with JSON
+  pointers, against the descriptor's input schema), `429 tools.quota.exceeded` (`Retry-After`), `503
+  tools.tool.unavailable` (the descriptor's status is `unavailable`: traceroute, or Protect PDF while qpdf is
+  missing), `503 tools.unavailable` (the engine found a program it needs missing: e.g. an HEIC upload without
+  libheif), `503 tools.busy` (`Retry-After`).
+- **Who.** Always enforced (authorization, not a quota): an app or service token needs the descriptor's
+  `auth.capability`; the network probes (port, ping, latency) run only for tokens holding `tools.net.probe`
+  (anonymous `401`, a person `403`: people use the probe pages); `auth.anonymous: false` tools (audio, PDF, SMTP)
+  need a browser session, a sign-in or a token; a Bearer token that does not verify is `401 token.invalid`, not
+  anonymity. Then the guard: the tool's `quotaClass` × the caller's tier, weighted by `cost` (mode-dependent),
+  the per-target throttle for egress tools and upload sniffing (hard).
+- **Where it runs.** Dev and text tools with a server engine: the page's own engine code in the gateway's
+  worker pool (`TOOLS_WORKERS_GATEWAY`, default 2, 256 MB each; the descriptor's `timeoutMs` terminates a
+  runaway input). Net tools and Open Graph: the same `/api/net` and `/api/dev` route the page calls, in
+  process, with the run's input as its query (`myip` is the caller's address). Job tools (img, audio, docs): a
+  job of the satellite that owns the tool (`{ ...input, ...preset, tool: operation }`), the run streamed there
+  by the gateway, uploads included; the job's `tool` names the tool.
+- **Cache and replays.** An inline answer is reused per tool and input where that is safe (spec `cacheTtlMs`:
+  engines 10 minutes unless random or time-dependent — uuid, lorem, timestamp, cron, jwt, zalgo, case, sort, bio,
+  nickname never; DNS 1 minute, IP 10, RDAP/whois 60, a few other lookups 5; probes, headers, redirects, uptime,
+  SMTP and myip never), answered with `X-OV-Cache: hit` and without touching the target. An inline run's
+  `Idempotency-Key` replays its first answer for 15 minutes (per caller); a job tool's key is its job's.
+- **CORS.** First-party pages keep the credentialed rules; any other site's page gets `Access-Control-Allow-Origin: *`
+  without credentials on the run and jobs routes (so its calls carry a token, never our cookies).
+- `GET /api/health` on the gateway shows `run` (counts, cache, engine pool) and `jobs` (the facade).
+
+## Jobs facade (gateway)
+
+`https://openvibe.tools/api/v1/jobs…` fronts every satellite's job routes (below), so one origin serves the
+run API's `Location`, `openvibe-sdk/jobs` without a `baseUrl`, and anything else. A submit is routed by its job
+type's prefix (`img.process` → img …): `?type=`, the JSON body's `type`, or the multipart `type` part (read from
+the first 64 KB of the stream — send it before the files; the uploads then stream through untouched). Every other
+route (`GET`/`DELETE /:id`, `/:id/events`, `/:id/files/:n`, `/:id/retry`, `/:id/references/:ref`) is routed by the
+job id: the satellite that answered its submit or run (remembered, 50,000 ids), else the one that says it holds
+the job when asked on loopback (`GET /api/internal/jobs/:id`, direct loopback callers only, never rate
+limited). Events (SSE) and files stream through. Owners, quotas, the Origin check and idempotency stay the
+satellite's: the request reaches it with the caller's credentials and address.
+
+## Older endpoints (deprecated, still answered)
+
+`/api/process`, `/api/process/direct`, `/api/process/multi` (img, audio, docs), `/api/net/*` and `/api/dev/*`
+keep their response shapes and add `Deprecation: true`, `Sunset: Thu, 31 Dec 2026 23:59:59 GMT` and
+`Link: </api/v1/tools/{id}/run>; rel="successor-version"` (the host's own tool; `/api/net/tools` and
+`/api/dev/tools` point at `/api/v1/tools?family=…`). The webhook bins (`/api/dev/webhook/…`, page-only) have no
+successor and are not marked.
+
 ## Jobs (Img, Audio, Docs)
 
 Heavy operations run as durable asynchronous jobs (`apps/_shared/jobs`, roadmap Wave 11). The same
@@ -227,9 +296,17 @@ One module used by the gateway and every satellite, driven by each tool's descri
   `tools_guard_enforcing`, `tools_guard_sync{kind}`.
 - **Challenge hook.** `createGuard({ challenge })` takes a person-check provider (`required`, `verify`; Turnstile
   later); the default challenges nobody.
+- **Cross-site requests (CSRF).** A mutation that rides on the browser's cookies (`ov_token`, the jobs session)
+  must come from an OpenVibe.Tools page: `Origin` (else `Referer`) `https://openvibe.tools`,
+  `https://*.openvibe.tools`, one of the tool's own hosts (custom domains included) or the request's own host.
+  Calls with a Bearer token, calls without those cookies and requests with neither header pass. Checked on the
+  run API, the job routes' writes, `/api/process…`, `/api/info`, `/api/probe` and the webhook bins' create and
+  delete; `403 tools.origin.refused`, recorded as reason `origin`.
 - **Mode.** `TOOLS_GUARD=report` (default) records and counts what it would refuse and refuses nothing, and the
   apps' older express-rate-limit limiters stay in force (now keyed by the resolved caller, after sign-in is read).
-  `TOOLS_GUARD=enforce` refuses and the older limiters step aside. Hard limits apply in both modes: the pixel limit,
+  `TOOLS_GUARD=enforce` refuses and the older limiters step aside. (On `/api/v1/…` an older limiter's refusal is
+  problem+json `tools.quota.exceeded`, `scope: "legacy"`, with `Retry-After`; job runs through the run API pass the
+  same burst and processing limiters as job submits.) Hard limits apply in both modes: the pixel limit,
   ffmpeg's whitelists and duration cap, upload sniffing, the port-scan cap and the per-target throttle.
 
 Default quotas (units = descriptor `cost` per run; `perMinute` / `burst` / `perDay`, 0 = none):
@@ -298,7 +375,14 @@ hosts on every satellite, the registry-driven catalog, and `registry-consistency
 tool resolves to an operation, endpoint or page that exists, or is marked unavailable. `descriptors.test.js`
 holds every descriptor to the contracts and to the code (a job's operation, validation, files and limits; a sync
 tool's route), `engines.test.js` runs every browser tool's server engine in plain Node against its output schema,
-and `tools-api.test.js` checks the three routes on the gateway and all seven satellites. The audio tests need
+and `tools-api.test.js` checks the three routes on the gateway and all seven satellites. `run-api.test.js` runs
+the run API on the gateway, img and docs (with a stand-in Network for tokens, `apps/_shared/test/network.js`):
+every answer against `tools.run@1`, the refusal codes, probes, quotas, idempotency, job tools and references
+across satellites, the Origin check and the deprecation headers; `jobs-facade.test.js` routes jobs through the
+gateway (by type, by id after a restart, events, files, retry, cancel); `sdk-client.test.js` drives
+openvibe-sdk v0.6.0's `createToolsClient` against the real gateway (it requires a checkout of OpenVibe.SDK next to
+this repo, or `OV_SDK_DIR`, and says it skipped without one); `pool.test.js` (shared and docs) hold the worker
+pool to its limits. The audio tests need
 `ffmpeg` and skip without it. The docs and img tests always check the 503 path with qpdf, poppler and libheif
 pointed at nothing, and also run the real encrypt/decrypt, page rendering and HEIC decoding when those programs
 are installed (or `QPDF_PATH` / `HEIF_DEC_PATH` point at them). Install first with `npm run install:all`.

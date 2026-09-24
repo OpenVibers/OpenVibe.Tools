@@ -33,13 +33,9 @@ const app = express();
 // What this deploy runs (ADR-016); the shared navbar's release-watch polls it on every tool host.
 const release = require('openvibe-shared/release').createRelease({ service: 'tools', root: require('path').join(__dirname, '..', '..', '..') });
 
-// The satellites on this host (ports), for readiness and the analytics roll-up.
-// TOOLS_SATELLITE_PORTS="img=5012,yt=5013" overrides single entries (tests, a moved unit).
-const SATELLITES = { maps: 4010, food: 4011, img: 4012, yt: 4013, audio: 4014, text: 4015, docs: 4016 };
-for (const pair of String(process.env.TOOLS_SATELLITE_PORTS || '').split(',')) {
-    const [name, port] = pair.split('=').map(x => String(x || '').trim());
-    if (SATELLITES[name] && /^\d{2,5}$/.test(port)) SATELLITES[name] = Number(port);
-}
+// The satellites on this host (ports), for readiness, the analytics roll-up, the run API and the
+// jobs facade. TOOLS_SATELLITE_PORTS="img=5012,yt=5013" overrides single entries (tests, a moved unit).
+const SATELLITES = require('../../_shared/tools/satellites').satellitePorts();
 const SATELLITE_BY_PORT = new Map(Object.entries(SATELLITES).map(([name, port]) => [port, name]));
 
 // Metrics (GET /metrics, direct loopback callers only) and readiness (roadmap Track O). The metrics
@@ -132,8 +128,15 @@ app.use(hostRoles({
 app.get('/api/ready', obs.readiness.handler);
 
 app.use(cookieParser());
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true }));
+// The run API and the jobs facade read their own bodies: uploads and SSE stream through to the
+// satellites untouched, and a local run parses its JSON itself (run/index.js).
+const { isRunPath } = require('../../_shared/tools/run');
+const { isJobsPath } = require('./run/jobs-facade');
+const jsonBody = express.json({ limit: '1mb' });
+const formBody = express.urlencoded({ extended: true });
+const streamed = (req) => isRunPath(req.path) || isJobsPath(req.path);
+app.use((req, res, next) => (streamed(req) ? next() : jsonBody(req, res, next)));
+app.use((req, res, next) => (streamed(req) ? next() : formBody(req, res, next)));
 
 // ── CORS ─────────────────────────────────────────────────────
 // Every *.openvibe.tools subdomain (satellites included) may call the
@@ -162,6 +165,8 @@ function isAllowedOrigin(origin) {
 app.use('/auth/fedcm', fedcmCors);
 
 // The tool registry (/api/v1/tools…) is public and read-only: open to every origin, no credentials.
+// The run API and the jobs facade take any site's page with a token: CORS without credentials for an
+// origin that is not ours (so no cookie rides along), the credentialed rules below for ours.
 app.use(exceptRegistry(cors({
     origin(origin, callback) {
         if (!origin) return callback(null, true); // curl / server-to-server
@@ -169,7 +174,8 @@ app.use(exceptRegistry(cors({
         return callback(new Error('Origin not allowed by CORS'));
     },
     credentials: true,
-})));
+    exposedHeaders: ['Location', 'Idempotent-Replayed', 'Retry-After', 'RateLimit-Limit', 'RateLimit-Remaining', 'RateLimit-Reset', 'X-OpenVibe-Request-Id', 'Deprecation', 'Sunset', 'Link'],
+}), { isFirstParty: isAllowedOrigin }));
 
 // ── Who is asking, then rate limits (sign-in first, so a signed-in tier applies) ──
 app.use(guard.identify);
@@ -181,6 +187,49 @@ app.use('/auth/', rateLimit({ windowMs: 15 * 60_000, max: 60, keyGenerator: (req
 // Every tool, every family; satellite hosts answer the same routes for their own tools. Counted by
 // the /api/ limiter above. /api/catalog.json stays as it is (Network reads it).
 app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
+
+// ── Net.OpenVibe and Dev.OpenVibe routes (the pages' API; the run API calls the same handlers) ──
+const netRouter = createNetRoutes(null, requireAuth, { guard });
+const devRouter = createDevRoutes(null, requireAuth, { guard });
+
+// ── Run API and jobs facade (ADR-027) ────────────────────────
+// POST /api/v1/tools/:id/run (tools.run-request@1 → tools.run@1) for every tool with an API: net and
+// Open Graph through their routes, dev and text engines in a worker pool, img/audio/docs streamed to
+// their satellite. /api/v1/jobs… fronts every satellite's job routes (routed by type, then by job id).
+const { createGatewayRun } = require('./run');
+const { createJobsFacade, createJobIndex } = require('./run/jobs-facade');
+const { ajvFrom } = require('../../_shared/tools/run');
+const jobIndex = createJobIndex();
+const runApi = createGatewayRun({
+    guard, contracts: require('openvibe-contracts'), toolRegistry, routers: { net: netRouter, dev: devRouter },
+    ports: () => SATELLITES, parseJson: jsonBody, jobIndex, ...ajvFrom(require),
+});
+const jobsFacade = createJobsFacade({ ports: () => SATELLITES, index: jobIndex, contracts: require('openvibe-contracts') });
+app.use(runApi.handle);
+app.use((req, res, next) => { jobsFacade.handle(req, res, next); });
+
+// ── The older tool endpoints: still answered, and they say what replaces them ──
+const { deprecated, runPath } = require('../../_shared/tools/deprecation');
+const NET_BY_ENDPOINT = new Map();
+for (const sp of require('./net/descriptors').SPECS) {
+    if (!sp.route || !sp.api) continue;
+    const ep = sp.route.path.replace(/^\/api\/net/, '');
+    (NET_BY_ENDPOINT.get(ep) || NET_BY_ENDPOINT.set(ep, []).get(ep)).push(sp.id);
+}
+/** /api/net/<endpoint>… → the run route of the tool it serves here (the host's own, else the one named after it). */
+function netSuccessor(req) {
+    const ep = `/${String(req.path || '').split('/')[1] || ''}`;
+    if (ep === '/tools') return '/api/v1/tools?family=net';
+    const ids = NET_BY_ENDPOINT.get(ep);
+    if (!ids) return null;
+    const host = req.ovHost && req.ovHost.tool;
+    return runPath(ids.find(i => i === host) || ids.find(i => i === ep.slice(1)) || ids[0]);
+}
+function devSuccessor(req) {
+    if (req.path === '/opengraph') return runPath('opengraph');
+    if (req.path === '/tools') return '/api/v1/tools?family=dev';
+    return null;   // webhook bins: page-only (api false), no successor
+}
 
 // ── Auth (OAuth2 client of OpenVibe.Network) ─────────────────
 auth = createAuthClient(config);
@@ -202,7 +251,7 @@ async function requireAuth(req, res, next) {
 
 // ── Basic API ────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', service: 'openvibe-tools-gateway', version: '2.0.0', registry: registry.services.status() });
+    res.json({ status: 'ok', service: 'openvibe-tools-gateway', version: '2.0.0', registry: registry.services.status(), run: runApi.stats(), jobs: jobsFacade.stats() });
 });
 
 app.get('/api/brand', (_req, res) => res.json(BRAND));
@@ -239,10 +288,13 @@ app.use('/api/pastes', guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonym
 });
 
 // ── Net.OpenVibe — Network Tools API ─────────────────────────
-app.use('/api/net', guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: 60, signedIn: 120, message: 'Too many requests. Please try again later.' }), createNetRoutes(null, requireAuth, { guard }));
+app.use('/api/net', deprecated(netSuccessor), guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: 60, signedIn: 120, message: 'Too many requests. Please try again later.' }), netRouter);
 
 // ── Dev.OpenVibe — Developer & SEO Tools API ─────────────────
-app.use('/api/dev', guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: 60, signedIn: 120, message: 'Too many requests. Please try again later.' }), createDevRoutes(null, requireAuth, { guard }));
+// Webhook bins are created and deleted with the browser's session cookie: those writes must come from
+// our pages (the /in URL a bin receives on is anyone's to call).
+const devOrigin = guard.originCheck();
+app.use('/api/dev', deprecated(devSuccessor), (req, res, next) => (/^\/webhook\/bins\/[^/]+\/in(\/|$)/.test(req.path) ? next() : devOrigin(req, res, next)), guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: 60, signedIn: 120, message: 'Too many requests. Please try again later.' }), devRouter);
 
 // ── Host-header subdomain routing ────────────────────────────
 function subdomainOf(req) {

@@ -103,4 +103,12 @@ const SPECS = [
     engine('md2html', obj({ text: text() }), TEXT, { text: '# Hi\n\n- one' }),
 ];
 
+// The run API reuses an engine's answer for 10 minutes (same tool, same input): not for these, whose
+// output is random or depends on the time. Open Graph (a page's tags) may be reused for 10 minutes.
+const FRESH = new Set(['jwt', 'uuid', 'timestamp', 'cron', 'lorem']);
+for (const spec of SPECS) {
+    if (FRESH.has(spec.id)) spec.cacheTtlMs = 0;
+    if (spec.id === 'opengraph') spec.cacheTtlMs = 10 * 60 * 1000;
+}
+
 module.exports = { SPECS };

@@ -18,6 +18,8 @@
 //                                        only what came after it; 204 once there is nothing left to say
 //   GET    /api/v1/jobs/:id/files/:n     a result file (attachment; ?inline=1 for previews)
 //   GET    /js/ov-jobs.js                the browser helper (submit, watch, reattach)
+//   GET    /api/internal/jobs/:id        direct loopback callers only (the gateway's jobs facade asking
+//                                        which satellite holds a job): 200 { id, service } | 404
 //
 // Owner scoping: a job is visible only to whoever created it —
 //   a Network user (user:usr_…, from the ov_token subject_id), a service/app principal presenting a
@@ -31,6 +33,7 @@ const path = require('path');
 const { Readable } = require('stream');
 
 const { createCallerResolver, jobOwnerResolver, JOB_CAPS: CAPS } = require('../guard/caller');
+const { isLoopback } = require('../guard/ip');
 
 const ID_RE = /^job_[0-9A-HJKMNP-TV-Z]{26}$/;
 const TERMINAL = new Set(['succeeded', 'failed', 'cancelled']);
@@ -77,6 +80,8 @@ function createOwnerResolver(o) {
  *        without it a busy store answers 503 tools.busy
  * @param {(req, res, full) => boolean} [o.onAddressFull]  a browser session's address already has its
  *        unfinished jobs (system.addressFull): true = go on (report mode); without it 429
+ * @param {Function} [o.originCheck]  middleware for the writes (submit, cancel, retry, references): the
+ *        guard's Origin check on cookie-authenticated calls (CSRF)
  */
 function mountJobRoutes(app, o) {
     const { system, contracts } = o;
@@ -98,6 +103,19 @@ function mountJobRoutes(app, o) {
         if (!row || !w.owner || row.owner !== w.owner) { send(res, 404, 'tools.job.not_found', 'No such job'); return null; }
         return row;
     }
+
+    const origin = o.originCheck || ((_req, _res, next) => next());
+
+    // Which satellite holds a job? Only for a caller on this host with no proxy in between (the
+    // gateway's facade); through nginx or the gateway's own proxy it is not found. Says nothing but
+    // whether the id exists here.
+    app.get('/api/internal/jobs/:id', (req, res) => {
+        res.set('Cache-Control', 'no-store');
+        const direct = isLoopback(req.socket && req.socket.remoteAddress) && !req.headers['x-forwarded-for'] && !req.headers['x-real-ip'];
+        const id = String(req.params.id || '');
+        if (!direct || !ID_RE.test(id) || !system.get(id)) return send(res, 404, 'tools.job.not_found', 'No such job');
+        return res.json({ id, service: system.service || null });
+    });
 
     app.get('/js/ov-jobs.js', (_req, res) => {
         res.set({ 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache' });
@@ -126,7 +144,7 @@ function mountJobRoutes(app, o) {
         return send(res, 503, 'tools.busy', busy.detail);
     };
 
-    app.post('/api/v1/jobs', ...(o.limiters || []), notBusy, multipartOnly, async (req, res) => {
+    app.post('/api/v1/jobs', origin, ...(o.limiters || []), notBusy, multipartOnly, async (req, res) => {
         noStore(res);
         const w = who(req, res, { create: true, action: 'create' });
         if (!w) return;
@@ -173,7 +191,7 @@ function mountJobRoutes(app, o) {
         if (row) res.json(system.view(row));
     });
 
-    app.delete('/api/v1/jobs/:id', (req, res) => {
+    app.delete('/api/v1/jobs/:id', origin, (req, res) => {
         noStore(res);
         const row = load(req, res, 'cancel');
         if (!row) return;
@@ -183,7 +201,7 @@ function mountJobRoutes(app, o) {
     });
 
     // Retry and references are writes: a principal needs tools.job.create, like a submit.
-    app.post('/api/v1/jobs/:id/retry', ...(o.limiters || []), notBusy, (req, res) => {
+    app.post('/api/v1/jobs/:id/retry', origin, ...(o.limiters || []), notBusy, (req, res) => {
         noStore(res);
         const row = load(req, res, 'create');
         if (!row) return;
@@ -214,8 +232,8 @@ function mountJobRoutes(app, o) {
             }
         };
     }
-    app.put('/api/v1/jobs/:id/references/:ref', referenceRoute((id, ref) => system.reference(id, ref)));
-    app.delete('/api/v1/jobs/:id/references/:ref', referenceRoute((id, ref) => system.unreference(id, ref)));
+    app.put('/api/v1/jobs/:id/references/:ref', origin, referenceRoute((id, ref) => system.reference(id, ref)));
+    app.delete('/api/v1/jobs/:id/references/:ref', origin, referenceRoute((id, ref) => system.unreference(id, ref)));
 
     app.get('/api/v1/jobs/:id/events', (req, res) => {
         const row = load(req, res, 'read');

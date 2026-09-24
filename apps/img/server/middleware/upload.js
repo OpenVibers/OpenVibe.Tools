@@ -19,7 +19,9 @@ const upload = multer({
         files: 1,
     },
     fileFilter(_req, file, cb) {
-        if (ALLOWED_MIMES.has(file.mimetype)) {
+        // A part without a type of its own (application/octet-stream: API clients, openvibe-sdk) is let
+        // through: the guard checks the bytes of every upload against the tool's accepted types.
+        if (ALLOWED_MIMES.has(file.mimetype) || file.mimetype === 'application/octet-stream') {
             cb(null, true);
         } else {
             cb(new Error(`Unsupported file type: ${file.mimetype}. Accepted: ${config.upload.allowedMimes.join(', ')}`));

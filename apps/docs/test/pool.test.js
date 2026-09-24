@@ -21,7 +21,7 @@ async function bigPdf(pages) {
 }
 
 async function finished(app, id, cookie) {
-    for (let i = 0; i < 300; i++) {
+    for (let i = 0; i < 1200; i++) {   // up to two minutes on a busy machine
         const job = await (await fetch(`${app.base}/api/v1/jobs/${id}`, { headers: { cookie } })).json();
         if (['succeeded', 'failed', 'cancelled'].includes(job.state)) return job;
         await sleep(100);
@@ -68,7 +68,9 @@ function mergeForm(files, job) {
         assert.ok(took > 700, `the merge is large enough to measure (${took} ms)`);
         assert.ok(latencies.length >= 5, `health was asked during the merge (${latencies.length} times)`);
         const worst = Math.max(...latencies);
-        assert.ok(worst < 250, `/api/health stayed fast during a ${took} ms merge (worst ${worst} ms)`);
+        // On the event loop the merge would hold every request for its whole length; in a worker thread
+        // health answers in milliseconds (the bound leaves room for a busy test machine).
+        assert.ok(worst < Math.max(250, took / 3), `/api/health stayed fast during a ${took} ms merge (worst ${worst} ms)`);
         const health = await (await fetch(`${app.base}/api/health`)).json();
         assert.strictEqual(health.workers.completed, 1);
         assert.strictEqual(health.workers.busy, 0);

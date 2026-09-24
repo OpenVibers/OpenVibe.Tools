@@ -352,6 +352,54 @@ async function serve(app) {
         g.close();
     }
 
+    // ── Cross-site requests (CSRF): cookie-carried mutations must come from our pages ──
+    {
+        const res = () => ({ statusCode: 200, headers: {}, body: null, headersSent: false, setHeader(k, v) { this.headers[k.toLowerCase()] = v; }, end(b) { this.body = JSON.parse(b); } });
+        const post = (headers, cookies = { ov_tools_jobs: 'a'.repeat(32) }, method = 'POST') => ({ method, ip: '198.51.100.60', headers: { host: 'png.openvibe.tools', ...headers }, cookies });
+        for (const mode of ['report', 'enforce']) {
+            const g = makeGuard({ mode });
+            const ok = (req, hosts) => g.originOk(req, res(), { hosts, tool: 'png' });
+            // Allowed: our pages, the tool's own hosts, the same host, no cookies, a Bearer token, safe methods, no Origin at all.
+            for (const o of ['https://openvibe.tools', 'https://png.openvibe.tools', 'https://img.openvibe.tools', 'https://a.b.openvibe.tools']) assert.ok(ok(post({ origin: o })), `${mode}: ${o}`);
+            assert.ok(ok(post({ origin: 'https://bestpngconverter.example' }), ['bestpngconverter.example']), `${mode}: the tool's own custom domain`);
+            assert.ok(ok(post({ origin: 'https://mydomain.example', host: 'mydomain.example' })), `${mode}: the same host`);
+            assert.ok(ok(post({ origin: 'https://evil.example' }, {})), `${mode}: no cookies, nothing to forge`);
+            assert.ok(ok(post({ origin: 'https://evil.example', authorization: 'Bearer x.y.z' })), `${mode}: a token, not a cookie`);
+            assert.ok(ok(post({ origin: 'https://evil.example' }, undefined, 'GET')), `${mode}: GET is not a mutation`);
+            assert.ok(ok(post({})), `${mode}: neither Origin nor Referer: not a browser's cross-site request`);
+            // Refused (enforce) or only recorded (report).
+            const cases = [
+                post({ origin: 'https://evil.example' }),
+                post({ origin: 'http://img.openvibe.tools' }),                       // not https
+                post({ origin: 'https://openvibe.tools.evil.example' }),
+                post({ origin: 'null' }),                                           // a sandboxed frame, a data: page
+                post({ referer: 'https://evil.example/form' }),                      // no Origin, a foreign Referer
+                post({ origin: 'https://evil.example' }, { ov_token: 'x.y.z' }),     // the sign-in cookie
+            ];
+            for (const req of cases) {
+                const out = res();
+                const allowed = g.originOk(req, out, { tool: 'png' });
+                if (mode === 'enforce') {
+                    assert.strictEqual(allowed, false, JSON.stringify(req.headers));
+                    assert.deepStrictEqual([out.statusCode, out.body.code], [403, 'tools.origin.refused']);
+                } else {
+                    assert.strictEqual(allowed, true, `report mode records ${JSON.stringify(req.headers)}`);
+                    assert.strictEqual(out.body, null);
+                }
+            }
+            const logged = g.store.abuseRows().filter(x => x.reason === 'origin').reduce((n, x) => n + x.count, 0);
+            assert.strictEqual(logged, cases.length, `${mode}: every refusal is in the abuse log`);
+            g.close();
+        }
+        // localhost pages outside production (dev servers), never in production.
+        const dev = makeGuard({ mode: 'enforce', env: { NODE_ENV: 'development' } });
+        assert.ok(dev.originOk(post({ origin: 'http://localhost:5173' }), res()));
+        dev.close();
+        const prod = makeGuard({ mode: 'enforce', env: { NODE_ENV: 'production' } });
+        assert.strictEqual(prod.originOk(post({ origin: 'http://localhost:5173' }), res()), false);
+        prod.close();
+    }
+
     // ── The sync semaphore holds heavy calls to the cap ──
     {
         const sem = createSemaphore({ max: 2, queue: 3, waitMs: 200 });
@@ -466,5 +514,5 @@ async function serve(app) {
         system.stop(); db.close(); fs.rmSync(dataDir, { recursive: true, force: true });
     }
 
-    console.log('guard: callers (/64, one loopback hop, services by token, aud-checked users, sessions, sandbox), bucket math + cost, session sharing, report vs enforce, headers + problem+json, day counters across restarts, sniffing, target throttle, port cap, abuse log + prune + metric, semaphore, job bounds (queue, disk, per address), challenge hook: all checks passed');
+    console.log('guard: callers (/64, one loopback hop, services by token, aud-checked users, sessions, sandbox), bucket math + cost, session sharing, report vs enforce, headers + problem+json, day counters across restarts, sniffing, target throttle, port cap, abuse log + prune + metric, semaphore, job bounds (queue, disk, per address), challenge hook, Origin check (CSRF): all checks passed');
 })().catch((err) => { console.error(err); process.exit(1); });

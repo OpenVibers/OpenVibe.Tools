@@ -14,13 +14,15 @@
 //   requires  programs the tool needs on the host ('qpdf', 'heif-dec', …); the satellite marks it
 //             unavailable while one is missing
 //   example   { input } that runs: used by the tests, later by the docs
+//   cacheTtlMs how long the run API may reuse an inline answer (0: never — random or time-dependent
+//             output; unset: engines 10 minutes, routes never)
 //
 // Like the rest of apps/_shared this file has no dependencies.
 // ═══════════════════════════════════════════════════════════════
 
 const SITE = 'https://openvibe.tools';
 const JSON_SCHEMA = 'https://json-schema.org/draft/2020-12/schema';
-const INTERNAL = new Set(['id', 'engine', 'route', 'requires', 'example', 'job', 'legacy', 'status', 'statusReason']);
+const INTERNAL = new Set(['id', 'engine', 'route', 'requires', 'example', 'job', 'legacy', 'status', 'statusReason', 'cacheTtlMs']);
 const ANYONE = Object.freeze({ anonymous: true, capability: 'tools.tool.run' });
 
 const runPath = (id) => `/api/v1/tools/${id}/run`;
