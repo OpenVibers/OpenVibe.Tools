@@ -11,6 +11,7 @@
 // and served from memory with an ETag.
 // ═══════════════════════════════════════════════════════════════
 const crypto = require('crypto');
+const frame = require('openvibe-shared/frame');
 const express = require('express');
 const seo = require('openvibe-shared/seo');
 const icons = require('openvibe-shared/icons');
@@ -124,7 +125,7 @@ ${appIcon.headTags({ site: 'tools', iconBase: '/assets' })}
 <main class="wrap">${body}
 <section aria-labelledby="net-h"><div class="sec-h"><h2 id="net-h">The rest of OpenVibe</h2></div><p class="sec-p">One account works on every site. Open source and community-run.</p>
 <div class="net">${NETWORK.map(([ic, n, d, u]) => `<a class="tool" href="${u}">${icon(ic, 36)}<span class="tool-t"><b>${n}</b><small>${d}</small></span></a>`).join('')}</div></section>
-</main>${require('openvibe-shared/footer').ssr({ service: 'tools', variant: 'full' })}
+</main>${frame.footer({ service: 'tools', variant: 'full', updates: '/updates' })}
 <script src="https://openvibe.network/shared/navbar.js" defer></script><script src="https://openvibe.network/shared/footer.js" defer></script><script src="/js/site.js" defer></script>
 </body></html>`;
 }
@@ -163,6 +164,7 @@ ${searchForm('')}
 <section id="recent" hidden aria-labelledby="recent-h"><div class="sec-h"><h2 id="recent-h">Your recent tools</h2><span class="more" id="recent-note"></span></div><div class="grid" id="recent-grid"></div></section>
 <section aria-labelledby="pop-h"><div class="sec-h"><h2 id="pop-h">What people reach for</h2><a class="more" href="/all-tools">A to Z list</a></div><div class="grid">${popular.slice(0, 8).map(toolCard).join('')}</div></section>
 ${fams.map(f => { const list = tools.filter(t => t.family === f.id); const next = planned.filter(t => t.family === f.id); return `<section class="fam" aria-labelledby="f-${f.id}"><div class="sec-h">${icon(f.icon, 40)}<div><h2 id="f-${f.id}"><a href="${esc(f.path)}">${esc(f.name)}</a></h2><p class="fam-tag">${esc(f.tagline)}</p></div><a class="more" href="${esc(f.path)}">About these ${list.length}</a></div><div class="tiles">${list.map(tile).join('')}${next.map(soon).join('')}</div></section>`; }).join('')}
+${frame.shipped({ service: 'tools', title: 'Recently shipped on OpenVibe.Tools' })}
 <section aria-labelledby="acct-h"><div class="sec-h"><h2 id="acct-h">Better with an account, fine without</h2></div><div class="perks">
 <div><b>Without signing in</b><p>Every tool works. Results stay available for an hour, then they are deleted.</p></div>
 <div><b>Signed in</b><p>Results keep for 24 hours, your recent tools follow you across devices, and your theme and notifications come along from the rest of OpenVibe.</p></div>
@@ -232,6 +234,12 @@ function cached(key, render) {
     return e;
 }
 /** /developers: how to call any tool from code (run API, jobs, SDK, auth tiers, limits). */
+function pageUpdates() {
+    const { families } = registry.get();
+    const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> › Updates</nav>${frame.updatesBody({ service: 'tools', siteName: NAME })}${frame.shippedScript()}`;
+    return shell({ families, body, head: head({ title: 'What shipped on OpenVibe.Tools', description: 'Every change deployed to OpenVibe.Tools, newest first, with the Patch notes that gather them.', canonical: SITE + '/updates' }) });
+}
+
 function pageDevelopers() {
     const { families } = registry.get();
     const snap = require('../registry/descriptors').snapshot();
@@ -278,7 +286,7 @@ function send(req, res, key, render, type) {
 function sitemapEntries() {
     const { tools, families } = registry.get();
     const today = new Date().toISOString().slice(0, 10);
-    return [{ loc: SITE + '/', changefreq: 'daily', priority: 1 }, { loc: SITE + '/all-tools', changefreq: 'weekly', priority: 0.8 }, { loc: SITE + '/developers', changefreq: 'weekly', priority: 0.7 },
+    return [{ loc: SITE + '/', changefreq: 'daily', priority: 1 }, { loc: SITE + '/all-tools', changefreq: 'weekly', priority: 0.8 }, { loc: SITE + '/developers', changefreq: 'weekly', priority: 0.7 }, { loc: SITE + '/updates', changefreq: 'daily', priority: 0.4 },
         ...families.filter(f => f.path).map(f => ({ loc: SITE + f.path, changefreq: 'weekly', priority: 0.9 })),
         ...families.filter(f => f.hosts).map(f => ({ loc: f.url, changefreq: 'weekly', priority: 0.9 })),
         ...tools.filter(t => !t.external).flatMap(t => [{ loc: t.url, changefreq: 'weekly', priority: 0.8 }, { loc: `${SITE}/tool/${t.id}`, changefreq: 'monthly', priority: 0.5 }]),
@@ -291,6 +299,8 @@ function createSiteRouter() {
     router.use(apexOnly);
     router.get('/api/v1/openapi.json', (req, res) => { res.set('Access-Control-Allow-Origin', '*'); send(req, res, 'openapi', () => JSON.stringify(require('../openapi').openapi(require('../registry/descriptors').snapshot(), SITE)), 'application/json; charset=utf-8'); });
     router.get('/developers', (req, res) => send(req, res, 'developers', pageDevelopers));
+    // What shipped on OpenVibe.Tools: the shared update log every OpenVibe site has.
+    router.get('/updates', (req, res) => send(req, res, 'updates', pageUpdates));
     router.get('/api/catalog.json', (req, res) => { res.set('Access-Control-Allow-Origin', '*'); send(req, res, 'catalog', () => JSON.stringify(registry.catalog()), 'application/json; charset=utf-8'); });
     router.get('/', (req, res) => send(req, res, '/', pageIndex));
     router.get('/all-tools', (req, res) => send(req, res, '/all-tools', pageAll));

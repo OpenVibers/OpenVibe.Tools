@@ -7,7 +7,7 @@
     var cookie = function (n) { var m = document.cookie.match(new RegExp('(?:^|; )' + n + '=([^;]*)')); return m ? decodeURIComponent(m[1]) : null; };
     var token = null; try { token = cookie('ov_token') || localStorage.getItem('ov_token'); } catch (e) { token = cookie('ov_token'); }
     try { if (window.OpenVibeNavbar) OpenVibeNavbar.init({ service: 'tools', apiBase: 'https://openvibe.network', token: token, history: { type: 'tool', title: document.title }, silentLogin: 'https://openvibe.tools/auth/login?silent=1&next={url}' }); } catch (e) { /* non-critical */ }
-    try { if (window.OpenVibeFooter) OpenVibeFooter.init({ service: 'tools', variant: 'full', mount: '#ov-footer', apiBase: 'https://openvibe.network' }); } catch (e) { /* */ }
+    try { if (window.OpenVibeFooter) OpenVibeFooter.init({ service: 'tools', variant: 'full', mount: '#ov-footer', apiBase: 'https://openvibe.network', updates: '/updates' }); } catch (e) { /* */ }
 
     // Cards link to the search-friendly host; people go straight to the short one (no redirect hop).
     document.addEventListener('click', function (e) {
