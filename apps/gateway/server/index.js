@@ -193,15 +193,22 @@ app.use('/auth/', rateLimit({ windowMs: 15 * 60_000, max: 60, keyGenerator: (req
 app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
 
 // The launcher's recent tools: a signed-in person's tools.usage module (every device), otherwise this
-// browser's ov_recent_tools cookie. Only tools the registry still lists; never cached.
+// browser's ov_recent_tools cookie. Only tools the registry still lists; never cached. Guest conversion
+// (WS-B task 8): the first time an account asks from a browser, the tools this browser used as a guest
+// join the account's list (once per account and browser: ov_recent_merged).
 app.get('/api/v1/me/recent-tools', async (req, res) => {
     const usage = require('../../_shared/usage');
     res.set('Cache-Control', 'private, no-store');
     const known = new Set((toolRegistry.snapshot().tools || []).filter((t) => t.status !== 'unavailable').map((t) => t.id));
     const sid = req.user && req.user.subject_id;
-    let mode = 'device', recent = usage.recentFromCookie(req).map((tool) => ({ tool }));
+    const fromCookie = usage.recentFromCookie(req);
+    let mode = 'device', recent = fromCookie.map((tool) => ({ tool }));
     if (sid && usage.recorder().enabled) {
-        try { recent = await usage.recorder().recent(sid); mode = 'account'; } catch { /* the cookie list stands in */ }
+        try {
+            recent = await usage.recorder().recent(sid); mode = 'account';
+            const merged = usage.mergeGuestTools(req, res, sid, recent, fromCookie);
+            if (merged.length) recent = [...merged.map((tool) => ({ tool })), ...recent];
+        } catch { /* the cookie list stands in */ }
     }
     res.json({ mode, recent: recent.filter((e) => e && known.has(e.tool)).slice(0, 12) });
 });

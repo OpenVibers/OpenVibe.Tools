@@ -132,6 +132,24 @@ function rememberInCookie(req, res, tool, host) {
 let _recorder = null;
 function recorder() { if (!_recorder) _recorder = createRecorder(); return _recorder; }
 
+const MERGED_COOKIE = 'ov_recent_merged';
+/**
+ * Guest conversion (roadmap WS-B task 8): tools this browser used before the person signed in join
+ * their account's list, once per account and browser (a marker cookie names the subject merged).
+ * Returns the tools added (newest first); records them through the recorder.
+ */
+function mergeGuestTools(req, res, subject, accountRecent, fromCookie, rec = recorder()) {
+    if (!subject || !rec.enabled || !fromCookie.length) return [];
+    const raw = String(req.headers.cookie || '');
+    const m = new RegExp(`(?:^|;\\s*)${MERGED_COOKIE}=([^;]*)`).exec(raw);
+    if (m && decodeURIComponent(m[1]) === subject) return [];
+    const have = new Set((accountRecent || []).map((e) => e && e.tool));
+    const add = fromCookie.filter((t) => !have.has(t));
+    for (const tool of [...add].reverse()) rec.record(subject, tool);
+    res.append('Set-Cookie', `${MERGED_COOKIE}=${encodeURIComponent(subject)}; Domain=.openvibe.tools; Path=/; Max-Age=${365 * 24 * 3600}; SameSite=Lax; Secure; HttpOnly`);
+    return add;
+}
+
 /**
  * Middleware: a GET of a tool's page by a signed-in person (req.user.subject_id from guard.identify)
  * records that tool. The host names the tool (the registry's hosts, or the X-OV-Tool the gateway sends).
@@ -169,4 +187,4 @@ function usagePages({ snapshot, rec = null }) {
     };
 }
 
-module.exports = { createRecorder, recorder, usagePages, recentFromCookie, NS, COOKIE };
+module.exports = { createRecorder, recorder, usagePages, recentFromCookie, mergeGuestTools, NS, COOKIE, MERGED_COOKIE };

@@ -77,6 +77,22 @@ const fetchImpl = async (url, opts) => {
     mirror(req('yaml.example.org', '/', { 'sec-fetch-dest': 'document' }, null), { append: (k, v) => cookies.push(v) }, () => {});
     assert.strictEqual(cookies.length, 0, 'no zone cookie from a custom domain');
 
+    // Guest conversion (WS-B task 8): the guest's tools join the account once per account and browser.
+    const { mergeGuestTools, MERGED_COOKIE } = require('../usage');
+    const recorded = [];
+    const fake = { enabled: true, record: (s, tool) => { recorded.push([s, tool]); return true; } };
+    const set = [];
+    const resOf = () => ({ append: (k, v) => set.push(v) });
+    let added = mergeGuestTools({ headers: { cookie: 'ov_recent_tools=png.yaml.jsonminify' } }, resOf(), USR, [{ tool: 'yaml' }], ['png', 'yaml', 'jsonminify'], fake);
+    assert.deepStrictEqual(added, ['png', 'jsonminify'], 'only what the account lacks, newest first');
+    assert.deepStrictEqual(recorded, [[USR, 'jsonminify'], [USR, 'png']], 'recorded oldest first so the newest ends on top');
+    assert.ok(set[0].startsWith(`${MERGED_COOKIE}=${USR};`) && /HttpOnly/.test(set[0]) && /Domain=\.openvibe\.tools/.test(set[0]));
+    added = mergeGuestTools({ headers: { cookie: `ov_recent_tools=png; ${MERGED_COOKIE}=${USR}` } }, resOf(), USR, [], ['png'], fake);
+    assert.deepStrictEqual(added, [], 'merged once per account and browser');
+    assert.deepStrictEqual(mergeGuestTools({ headers: { cookie: `${MERGED_COOKIE}=${USR}` } }, resOf(), 'usr_01JAB2C3D4E5F6G7H8J9K0OTHR', [], ['png'], fake), ['png'], 'another account on the same browser gets them too');
+    assert.deepStrictEqual(mergeGuestTools({ headers: {} }, resOf(), USR, [], [], fake), [], 'nothing to merge');
+    assert.deepStrictEqual(mergeGuestTools({ headers: {} }, resOf(), USR, [], ['png'], { enabled: false }), [], 'recorder off');
+
     const off = createRecorder({ env: {}, fetchImpl });
     assert.strictEqual(off.enabled, false);
     assert.strictEqual(off.record(USR, 'yaml'), false, 'off without a service secret');
