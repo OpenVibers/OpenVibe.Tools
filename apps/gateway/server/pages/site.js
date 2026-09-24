@@ -165,7 +165,7 @@ ${fams.map(f => { const list = tools.filter(t => t.family === f.id); const next 
 <section aria-labelledby="acct-h"><div class="sec-h"><h2 id="acct-h">Better with an account, fine without</h2></div><div class="perks">
 <div><b>Without signing in</b><p>Every tool works. Results stay available for an hour, then they are deleted.</p></div>
 <div><b>Signed in</b><p>Results keep for 24 hours, your recent tools follow you across devices, and your theme and notifications come along from the rest of OpenVibe.</p></div>
-<div><b>For developers</b><p>The whole catalog is public JSON at <a href="/api/catalog.json">/api/catalog.json</a>, with a plain-text map at <a href="/llms.txt">/llms.txt</a>.</p></div></div></section>`;
+<div><b>For developers</b><p>Run any tool from code: see <a href="/developers">the Tools API</a> (<a href="/api/v1/openapi.json">OpenAPI</a>). The catalog is public JSON at <a href="/api/catalog.json">/api/catalog.json</a>, with a plain-text map at <a href="/llms.txt">/llms.txt</a>.</p></div></div></section>`;
     return shell({ families, body, head: head({
         title: 'Online Tools for Files, Text, Code & Networks', description: `${tools.length} online tools in one place: video and audio converters, image and PDF tools, developer utilities and network diagnostics. Open source and community-run.`,
         canonical: SITE + '/', keywords: 'online tools, converter, pdf tools, image converter, developer tools, network tools, youtube downloader',
@@ -230,6 +230,41 @@ function cached(key, render) {
     if (!e || e.ver !== ver) { const html = render(); e = { ver, html, etag: '"' + crypto.createHash('sha1').update(html).digest('base64url').slice(0, 20) + '"' }; cache.set(key, e); }
     return e;
 }
+/** /developers: how to call any tool from code (run API, jobs, SDK, auth tiers, limits). */
+function pageDevelopers() {
+    const { families } = registry.get();
+    const snap = require('../registry/descriptors').snapshot();
+    const withApi = snap.tools.filter((t) => t.api && t.status !== 'unavailable');
+    const code = (s) => `<pre><code>${esc(s)}</code></pre>`;
+    const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> › Developers</nav><div class="page-h">${icon('code', 56)}<h1>Tools API</h1></div>
+<p class="lead">${withApi.length} of ${snap.tools.length} tools can be called from code, with the same engines the pages use. One request shape for all of them; long work runs as a job you can follow.</p>
+<section><div class="sec-h"><h2>Discover</h2></div><p class="sec-p">Every tool is described by a machine-readable descriptor (inputs as JSON Schema, file limits, how it runs, who may call it).</p>
+<ul><li><a href="/api/v1/tools">/api/v1/tools</a>: the registry (filter with <code>?family=</code>, <code>?q=</code>, <code>?api=true</code>)</li>
+<li><code>/api/v1/tools/{id}</code> and <code>/api/v1/tools/{id}/schema</code>: one tool</li>
+<li><a href="/api/v1/openapi.json">/api/v1/openapi.json</a>: OpenAPI 3.1, generated from the descriptors</li></ul></section>
+<section><div class="sec-h"><h2>Run a tool</h2></div>
+${code(`curl -X POST ${SITE}/api/v1/tools/jsonminify/run \\
+  -H 'Content-Type: application/json' \\
+  -d '{"input":{"text":"{ \\"a\\": 1 }"}}'
+# → {"state":"succeeded","tool":"jsonminify","result":{"text":"{\\"a\\":1}"},"took_ms":3}`)}
+<p class="sec-p">File tools take <code>multipart/form-data</code> (<code>file</code> parts plus an <code>input</code> JSON part). Work that outlasts <code>wait_ms</code> answers <b>202</b> with a job: follow it at <code>/api/v1/jobs/{id}/events</code> (server-sent events) and download results from <code>/api/v1/jobs/{id}/files/{n}</code>. Send an <code>Idempotency-Key</code> header to make retries safe.</p></section>
+<section><div class="sec-h"><h2>From JavaScript</h2></div>
+${code(`const { createClient } = require('openvibe-sdk/core');
+const { createToolsClient } = require('openvibe-sdk/tools');
+const tools = createToolsClient(createClient({}));
+const out = await tools.run('jsonminify', { text: '{ "a": 1 }' });
+const job = await tools.run('png', { format: 'png' }, { files: [fileBlob] });
+const done = await job.wait();   // any tool, sync or job`)}
+<p class="sec-p">The SDK is <a href="https://github.com/OpenVibers/OpenVibe.SDK">openvibe-sdk</a> (tag v0.6.0+). It retries on 429 after <code>Retry-After</code> and generates idempotency keys for you.</p></section>
+<section><div class="sec-h"><h2>Access and limits</h2></div>
+<ul><li><b>Anonymous</b>: most tools, on the lowest quota tier, per address. Tools that handle files people should not share anonymously (audio, PDF) need a browser session or a token.</li>
+<li><b>Apps and services</b>: a token from <a href="https://openvibe.network">OpenVibe.Network</a> for audience <code>openvibe.tools</code> with <code>tools.tool.run</code> (developer sandbox apps get it by default) raises the tier.</li>
+<li><b>Network probes</b> (port checks, ping, latency) need <code>tools.net.probe</code>, granted to partners only. The YouTube downloader has no API.</li>
+<li>Every answer carries <code>RateLimit-*</code> headers; over the limit is <b>429</b> with <code>Retry-After</code>. Errors are RFC 9457 problems with a stable <code>code</code>.</li></ul></section>`;
+    return shell({ families, body, head: head({ title: 'Tools API for developers', description: `Call ${withApi.length} OpenVibe tools from code: one run API, jobs for long work, an OpenAPI document and the openvibe-sdk client.`, canonical: SITE + '/developers',
+        jsonLd: [seo.jsonLd.breadcrumbs([{ name: 'Tools', url: SITE + '/' }, { name: 'Developers', url: SITE + '/developers' }])] }) });
+}
+
 function send(req, res, key, render, type) {
     const e = cached(key, render);
     res.set('Content-Type', type || 'text/html; charset=utf-8');
@@ -242,7 +277,7 @@ function send(req, res, key, render, type) {
 function sitemapEntries() {
     const { tools, families } = registry.get();
     const today = new Date().toISOString().slice(0, 10);
-    return [{ loc: SITE + '/', changefreq: 'daily', priority: 1 }, { loc: SITE + '/all-tools', changefreq: 'weekly', priority: 0.8 },
+    return [{ loc: SITE + '/', changefreq: 'daily', priority: 1 }, { loc: SITE + '/all-tools', changefreq: 'weekly', priority: 0.8 }, { loc: SITE + '/developers', changefreq: 'weekly', priority: 0.7 },
         ...families.filter(f => f.path).map(f => ({ loc: SITE + f.path, changefreq: 'weekly', priority: 0.9 })),
         ...families.filter(f => f.hosts).map(f => ({ loc: f.url, changefreq: 'weekly', priority: 0.9 })),
         ...tools.filter(t => !t.external).flatMap(t => [{ loc: t.url, changefreq: 'weekly', priority: 0.8 }, { loc: `${SITE}/tool/${t.id}`, changefreq: 'monthly', priority: 0.5 }]),
@@ -253,6 +288,8 @@ function createSiteRouter() {
     const router = express.Router();
     const apexOnly = (req, res, next) => (!req.ovHost || req.ovHost.kind === 'apex' || (req.ovHost.kind === 'unknown' && !req.ovHost.inZone) ? next() : next('router'));
     router.use(apexOnly);
+    router.get('/api/v1/openapi.json', (req, res) => { res.set('Access-Control-Allow-Origin', '*'); send(req, res, 'openapi', () => JSON.stringify(require('../openapi').openapi(require('../registry/descriptors').snapshot(), SITE)), 'application/json; charset=utf-8'); });
+    router.get('/developers', (req, res) => send(req, res, 'developers', pageDevelopers));
     router.get('/api/catalog.json', (req, res) => { res.set('Access-Control-Allow-Origin', '*'); send(req, res, 'catalog', () => JSON.stringify(registry.catalog()), 'application/json; charset=utf-8'); });
     router.get('/', (req, res) => send(req, res, '/', pageIndex));
     router.get('/all-tools', (req, res) => send(req, res, '/all-tools', pageAll));
@@ -261,7 +298,7 @@ function createSiteRouter() {
     router.get('/sitemap.xml', (req, res) => send(req, res, 'sitemap', () => seo.sitemapXml(sitemapEntries()), 'application/xml; charset=utf-8'));
     router.get('/robots.txt', (req, res) => send(req, res, 'robots', () => seo.robotsTxt({ sitemaps: [SITE + '/sitemap.xml'], disallow: ['/api/', '/auth/'], allow: ['/api/catalog.json'], allowAI: true }), 'text/plain; charset=utf-8'));
     router.get('/llms.txt', (req, res) => send(req, res, 'llms', () => { const { tools, families } = registry.get(); return seo.llmsTxt({ name: NAME, summary: `${tools.length} online tools for files, text, code and networks. Open source and community-run. A machine-readable catalog is at ${SITE}/api/catalog.json.`,
-        sections: families.filter(f => f.path).map(f => ({ title: f.name, links: tools.filter(t => t.family === f.id).map(t => ({ title: t.name, url: t.url, note: t.tagline })) })) }); }, 'text/plain; charset=utf-8'));
+        sections: [{ title: 'API', links: [{ title: 'Developer guide', url: SITE + '/developers', note: 'run any tool from code' }, { title: 'OpenAPI 3.1', url: SITE + '/api/v1/openapi.json' }, { title: 'Tool registry (JSON)', url: SITE + '/api/v1/tools' }] }].concat(families.filter(f => f.path).map(f => ({ title: f.name, links: tools.filter(t => t.family === f.id).map(t => ({ title: t.name, url: t.url, note: t.tagline })) }))) }); }, 'text/plain; charset=utf-8'));
     router.get('/:slug', (req, res, next) => { const f = registry.get().families.find(x => x.path === '/' + req.params.slug); return f ? send(req, res, f.path, () => pageFamily(f)) : next(); });
     return router;
 }
