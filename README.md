@@ -23,6 +23,7 @@ apps/
 ├── text      # Text.OpenVibe + Logo.OpenVibe — text generators & logo makers
 └── docs      # Docs.OpenVibe  — PDF & document tools
 apps/_shared   # code the apps require by relative path: host roles, internal auth, the job runtime (jobs/),
+               # the guard (guard/: callers, quotas, sniffing, ffmpeg hardening, egress throttles, abuse log),
                # the SSRF guard (egress.js) that every tool reaching a visitor-chosen host or URL goes
                # through (public addresses only, checked after DNS and dialled as checked, redirect hops
                # re-checked). Visit analytics come from openvibe-shared/analytics.
@@ -129,8 +130,12 @@ reload reattaches.
   capabilities `tools.job.create|read|cancel`), or else this browser's `ov_tools_jobs` cookie (only its hash is
   stored). Anyone else gets `404 tools.job.not_found`.
 - **Bounded.** `TOOLS_JOBS_CONCURRENCY` jobs run at once per satellite (default 2; `TOOLS_JOBS_CONCURRENCY_<APP>`
-  overrides), `TOOLS_JOBS_MAX_ACTIVE` unfinished jobs per owner (default 10, then `429`), plus the satellites'
-  existing burst and processing rate limits on submit.
+  overrides), `TOOLS_JOBS_MAX_ACTIVE` unfinished jobs per owner (default 10, then `429`), and all browser sessions
+  from one address together `TOOLS_JOBS_MAX_ACTIVE_PER_ADDRESS` (default 3 × that; jobs keep only the guard's hashed
+  address key), at most
+  `TOOLS_JOBS_MAX_QUEUED` queued jobs in all (default 200) and `TOOLS_DISK_BUDGET_MB` under `data/jobs` (default
+  8192) before a submit answers `503 tools.busy` with `Retry-After` (through the guard, below), plus the guard's
+  quotas and the satellites' older burst and processing limits on submit.
 - **Retention.** Finished jobs expire after 1 hour (browser sessions) or 24 hours (signed-in people, principals);
   the pruner deletes the row, its events, its files and its Media objects. It never touches a job that has a
   reference (above). If Media will not delete a result object (a retention hold, `409 media.object.held`), cannot
@@ -163,7 +168,74 @@ Environment (all in `/etc/openvibe/tools.env`): `TOOLS_JOBS_CONCURRENCY`, `TOOLS
 `OV_NETWORK_INTERNAL_URL`, `OV_OAUTH_CLIENT_ID`, `OV_OAUTH_CLIENT_SECRET`, `EVENTS_URL`, `EVENTS_PUBLISH`,
 `EVENTS_RELAY_INTERVAL_MS`.
 
-Not done yet: quotas for external developer apps are the per-owner limits above, not a Codes-issued quota.
+Not done yet: quotas for external developer apps are the guard's service and sandbox tiers, not a Codes-issued quota.
+
+## Guard (anti-abuse, `apps/_shared/guard`)
+
+One module used by the gateway and every satellite, driven by each tool's descriptor (`quotaClass`, `cost`, `auth`,
+`files.accept`, `limits`) and the numbers in `apps/_shared/guard/limits.js` (the one place they live).
+
+- **Who is asking** (`caller.js`, replacing the four copied `auth.js` files): a **service or app principal**
+  (Bearer client-credentials token, audience `openvibe.tools`; a developer app's sandbox token is tier `sandbox`), a
+  **user** (the `ov_token` cookie or a Bearer Network token, verified offline, issuer **and audience
+  `openvibe.tools`** — the Network puts that audience on every browser sign-in; its `/internal/issue-token` tokens
+  carry none and are not believed), a **session** (this browser's `ov_tools_jobs` cookie; the page's `/api/context`
+  call and the first job or webhook bin start one) or else **anonymous**, counted by address (IPv6 by its /64).
+  Tiers: anonymous < session < user < service.
+- **One address source.** Every app sets `trust proxy` to `TRUST_PROXY`: exactly one hop, and only on loopback (the
+  host's nginx, which sets `X-Forwarded-For` from `$remote_addr` after Cloudflare's real IP). `req.ip` is the only
+  address anything reads. The gateway's proxy to a satellite passes its own `req.ip` as that one hop; food passes its
+  visitor's to maps. A first-party service calling on loopback is identified by its service token (each has its own
+  bucket at the service tier); without one it is anonymous, counted by the address it forwarded or its own.
+- **Quotas.** A token bucket per quota class × tier in memory (`perMinute`, `burst`) and a UTC-day allowance in the
+  app's `data/guard.db` (survives restarts), both counting the tool's `cost`. Browser sessions from one address share
+  3 × one session's allowance, so dropping the cookie never resets anything. Counted answers carry
+  `RateLimit-Limit`/`-Remaining`/`-Reset`; a refusal is `429` problem+json `tools.quota.exceeded` with `Retry-After`
+  and `quota_class`, `scope`, `tier`.
+- **Heavy work.** Synchronous `/api/process` (img, audio, docs) holds one of `TOOLS_SYNC_CONCURRENCY` slots
+  (default 2; `TOOLS_SYNC_QUEUE` may wait, 8, for `TOOLS_SYNC_WAIT_MS`, 30 s), else `503 tools.busy`. Audio's sync
+  path is killed at the descriptor's `timeoutMs` (`504 tools.run.timeout`) or when the client goes away.
+- **Uploads.** The bytes are checked against the descriptor's `files.accept` (`415 tools.file.unsupported_type`;
+  a misleading extension is corrected); docs uploads go to disk. Tools whose descriptor says `auth.anonymous: false`
+  (audio, PDF) need a session, a sign-in or a token (`401 tools.session_required`). Images: no input over
+  `TOOLS_MAX_INPUT_PIXELS` (40 MP, as Media) is decoded (header first, sharp `limitInputPixels` behind it).
+- **ffmpeg.** Every input and probe: `-protocol_whitelist file,pipe`, `-format_whitelist` of the operation's
+  demuxers (never hls, concat, image2, lavfi…), `-t` = the descriptor's `limits.maxDurationSec` (3 h); inputs are
+  probed first and a longer one is refused (`413`).
+- **Egress.** A per-target throttle across all callers and tools (`limits.perTargetPerMinute`; a host's minute is
+  shared by headers, SSL, ping…); the port checker takes at most 20 ports a request and 100 ports / 10 hosts per
+  caller in 10 minutes (sessions counted by address). Probes through a token need `tools.net.probe`. Webhook bins
+  belong to their maker (session, sign-in or token; anyone else gets 404), at most 5 per owner and 10 per address.
+  YouTube downloads belong to whoever started them. Nominatim is paced to one request a second; Overpass waits are
+  capped.
+- **Abuse log.** Every refusal, and every would-be refusal in report mode, goes to `guard.db`: time, `HMAC-SHA256`
+  of the address (or /64) with a random daily salt (only today's is kept, so older hashes cannot be tied to
+  anything), principal or user id, tool, reason, enforced or not; repeats within a minute are one row with a count;
+  kept 30 days. No raw address is stored anywhere (pseudonymous, ADR-021). Metrics: `tools_guard_refused_total{reason,tool}`,
+  `tools_guard_enforcing`, `tools_guard_sync{kind}`.
+- **Challenge hook.** `createGuard({ challenge })` takes a person-check provider (`required`, `verify`; Turnstile
+  later); the default challenges nobody.
+- **Mode.** `TOOLS_GUARD=report` (default) records and counts what it would refuse and refuses nothing, and the
+  apps' older express-rate-limit limiters stay in force (now keyed by the resolved caller, after sign-in is read).
+  `TOOLS_GUARD=enforce` refuses and the older limiters step aside. Hard limits apply in both modes: the pixel limit,
+  ffmpeg's whitelists and duration cap, upload sniffing, the port-scan cap and the per-target throttle.
+
+Default quotas (units = descriptor `cost` per run; `perMinute` / `burst` / `perDay`, 0 = none):
+
+| Class | anonymous | session | user | service | sandbox |
+|---|---|---|---|---|---|
+| `tools-api` (every `/api/` call, cost 1) | 120 / 60 / – | 180 / 90 / – | 480 / 240 / – | 2400 / 1200 / – | 60 / 30 / – |
+| `tools-run` (text, dev engines) | 120 / 60 / 5000 | 180 / 90 / 10000 | 480 / 240 / 50000 | 2400 / 1200 / 500000 | 60 / 30 / 1000 |
+| `tools-fetch` (lookups, Open Graph) | 60 / 30 / 2000 | 90 / 45 / 4000 | 240 / 120 / 20000 | 1200 / 600 / 200000 | 30 / 15 / 500 |
+| `tools-probe` (port, ping, latency) | 30 / 15 / 600 | 45 / 25 / 1000 | 120 / 60 / 5000 | 600 / 300 / 50000 | 15 / 10 / 200 |
+| `tools-job` (img, audio, docs) | 60 / 30 / 1500 | 90 / 45 / 3000 | 240 / 120 / 20000 | 1200 / 600 / 200000 | 30 / 15 / 300 |
+| `tools-map` (maps, food) | 60 / 40 / 6000 | 90 / 60 / 8000 | 240 / 120 / 20000 | 1200 / 600 / 200000 | 30 / 20 / 500 |
+| `tools-download` (yt, cost 50) | 50 / 100 / 1500 | 75 / 150 / 2500 | 150 / 300 / 5000 | 300 / 600 / 10000 | 25 / 50 / 100 |
+
+Environment: `TOOLS_GUARD`, `TOOLS_GUARD_LIMITS` (JSON merged into the table, e.g.
+`{"tools-job":{"anonymous":{"perDay":800}}}`), `TOOLS_SYNC_CONCURRENCY`, `TOOLS_SYNC_QUEUE`, `TOOLS_SYNC_WAIT_MS`,
+`TOOLS_JOBS_MAX_QUEUED`, `TOOLS_JOBS_MAX_ACTIVE_PER_ADDRESS`, `TOOLS_DISK_BUDGET_MB`, `TOOLS_MAX_INPUT_PIXELS`, `TOOLS_PORTS_PER_CALLER`,
+`TOOLS_PORT_TARGETS_PER_CALLER`, `AUDIO_MAX_DURATION`, `OV_TOOLS_AUDIENCE` (white-label installs).
 
 ## Canonical hosts and the service registry
 
@@ -338,7 +410,11 @@ The full OAuth round-trip needs OpenVibe.Network running on port 4000
   `PORT` is set in each systemd unit, so tools.env must NOT define PORT.
 - Units: `openvibe-tools.service` (gateway) and
   `openvibe-tools-<name>.service` per satellite
-  (`apps/<name>/deploy/systemd/`).
+  (`apps/<name>/deploy/systemd/`). Resource bounds: `MemoryMax=2G` (img, audio,
+  docs), `1G` (yt), `768M` (gateway, text, maps, food); `TasksMax=256`; `Nice=5`
+  for img, audio, docs and yt. Every app writes `data/guard.db` (the gateway
+  too: `ReadWritePaths=/opt/openvibe.tools/apps/gateway/data`; `deploy.sh`
+  creates each `data/` before restarting).
 - Nginx: satellites have specific `server_name` blocks; the gateway's
   wildcard `*.openvibe.tools` block catches everything else. TLS via
   `/etc/letsencrypt/live/openvibe.tools/`.

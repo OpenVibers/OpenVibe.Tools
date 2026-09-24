@@ -35,6 +35,14 @@ for app in img audio docs; do
   (cd "apps/$app" && node -e "const D=require('better-sqlite3'); new D(':memory:').close(); require('openvibe-contracts'); require('openvibe-sdk'); require('../_shared/jobs')") \
     || { echo "ABORT: apps/$app cannot load the jobs runtime; nothing restarted" >&2; exit 1; }
 done
+# Every app keeps its guard (apps/_shared/guard) state in data/guard.db through its own better-sqlite3;
+# the units' ReadWritePaths name each data directory, which must exist before systemd starts them.
+for app in apps/*/; do
+  [ -f "$app/package.json" ] || continue
+  mkdir -p "$app/data"
+  (cd "$app" && node -e "const D=require('better-sqlite3'); new D(':memory:').close(); require('../_shared/guard')") \
+    || { echo "ABORT: $app cannot load the guard; nothing restarted" >&2; exit 1; }
+done
 UNITS=$(systemctl list-unit-files 'openvibe-tools*' --no-legend | awk '{print $1}')
 sudo systemctl restart $UNITS
 sleep 5

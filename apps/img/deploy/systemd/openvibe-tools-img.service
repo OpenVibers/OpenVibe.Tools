@@ -14,6 +14,11 @@ Environment=PATH=/usr/local/bin:/usr/bin:/bin
 ExecStart=/usr/bin/env node /opt/openvibe.tools/apps/img/server/index.js
 Restart=always
 RestartSec=5
+# Resource bounds (the host has 15 GB of RAM and 4 cores): the kernel stops this unit, not the host,
+# when it runs away; Nice 5 keeps heavy conversions behind the web-facing services.
+MemoryMax=2G
+TasksMax=256
+Nice=5
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
