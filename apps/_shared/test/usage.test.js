@@ -53,15 +53,29 @@ const fetchImpl = async (url, opts) => {
     // The page middleware: a signed-in document request for a tool host counts; assets, APIs and unknown hosts do not.
     const got = [];
     const mw = usagePages({ snapshot: () => ({ tools: [{ id: 'jsonminify', hosts: ['json-minifier.openvibe.tools', 'jsonminify.openvibe.tools'] }] }), rec: { enabled: true, record: (s, id) => got.push(id) } });
-    const req = (host, p, headers = {}, user = { subject_id: USR }) => ({ method: 'GET', hostname: host, path: p, user, get: (h) => headers[h.toLowerCase()] });
-    const run = (q) => mw(q, {}, () => {});
+    const req = (host, p, headers = {}, user = { subject_id: USR }) => ({ method: 'GET', hostname: host, path: p, user, headers, get: (h) => headers[h.toLowerCase()] });
+    const cookies = [];
+    const run = (q) => mw(q, { append: (k, v) => { assert.strictEqual(k, 'Set-Cookie'); cookies.push(v); } }, () => {});
     run(req('json-minifier.openvibe.tools', '/', { 'sec-fetch-dest': 'document' }));
     run(req('jsonminify.openvibe.tools', '/', { accept: 'text/html' }));
     run(req('json-minifier.openvibe.tools', '/app.js', { 'sec-fetch-dest': 'script' }));
     run(req('json-minifier.openvibe.tools', '/api/x', { accept: 'text/html' }));
     run(req('openvibe.tools', '/', { 'sec-fetch-dest': 'document', 'x-ov-tool': 'evil' }));
-    run(req('json-minifier.openvibe.tools', '/', { 'sec-fetch-dest': 'document' }, null));
     assert.deepStrictEqual(got, ['jsonminify', 'jsonminify']);
+
+    // Anonymous history: no account write, but the browser's cookie list gets the tool on top.
+    cookies.length = 0;
+    run(req('json-minifier.openvibe.tools', '/', { 'sec-fetch-dest': 'document', cookie: 'a=1; ov_recent_tools=png.jsonminify.yaml; b=2' }, null));
+    assert.deepStrictEqual(got, ['jsonminify', 'jsonminify'], 'nobody signed in: no module write');
+    assert.strictEqual(cookies.length, 1);
+    assert.ok(cookies[0].startsWith('ov_recent_tools=jsonminify.png.yaml;'), cookies[0]);
+    assert.ok(/Domain=\.openvibe\.tools/.test(cookies[0]) && /Secure/.test(cookies[0]) && /SameSite=Lax/.test(cookies[0]));
+    const { recentFromCookie } = require('../usage');
+    assert.deepStrictEqual(recentFromCookie({ headers: { cookie: 'ov_recent_tools=a-b.x..<script>.a-b' } }), ['a-b', 'x'], 'only tool ids, deduplicated');
+    cookies.length = 0;
+    const mirror = usagePages({ snapshot: () => ({ tools: [{ id: 'yaml', hosts: ['yaml.example.org'] }] }), rec: { enabled: false } });
+    mirror(req('yaml.example.org', '/', { 'sec-fetch-dest': 'document' }, null), { append: (k, v) => cookies.push(v) }, () => {});
+    assert.strictEqual(cookies.length, 0, 'no zone cookie from a custom domain');
 
     const off = createRecorder({ env: {}, fetchImpl });
     assert.strictEqual(off.enabled, false);

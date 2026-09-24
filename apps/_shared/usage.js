@@ -7,6 +7,10 @@
 //   app.use(usagePages({ snapshot: toolRegistry.snapshot }))   after guard.identify: a page view of
 //                                                                a tool by a signed-in person counts
 //   recorder().record(subjectId, toolId)                        e.g. a run API call by a person
+//   recorder().recent(subjectId), recentFromCookie(req)          what the launcher shows
+//
+// Everyone's page views (signed in or not) also go into the ov_recent_tools cookie on .openvibe.tools:
+// the launcher's anonymous history.
 //
 // Cheap by design: a person counts once per tool per 10 minutes, and a process flushes what it
 // gathered every minute: per person one read and one conditional write (If-Match), merged with what
@@ -96,7 +100,33 @@ function createRecorder({ env = process.env, fetchImpl = globalThis.fetch, now =
     function start() { if (timer || !enabled) return; timer = setInterval(() => { flush().catch(() => {}); }, flushMs); if (timer.unref) timer.unref(); }
     function stop() { if (timer) clearInterval(timer); timer = null; }
 
-    return { enabled, record, flush, stop, stats: () => ({ enabled, pending: pending.size, ...stats }) };
+    /** The person's recent tools (the module, with anything not yet flushed on top): [{ tool, at }]. */
+    async function recent(subject) {
+        if (!enabled || !USR_RE.test(String(subject || ''))) return [];
+        const cur = await call('GET', subject);
+        const had = cur.status === 200 && cur.body && cur.body.data && Array.isArray(cur.body.data.recent) ? cur.body.data.recent : [];
+        const fresh = pending.get(subject);
+        const top = fresh ? [...fresh].reverse().map(([tool, at]) => ({ tool, at })) : [];
+        return [...top, ...had.filter((e) => e && (!fresh || !fresh.has(e.tool)))].slice(0, MAX);
+    }
+
+    return { enabled, record, recent, flush, stop, stats: () => ({ enabled, pending: pending.size, ...stats }) };
+}
+
+// Anonymous history: the same list, per browser, in a first-party cookie on the tools zone, so every
+// tool host (each its own origin) adds to one list without any page script.
+const COOKIE = 'ov_recent_tools';
+const COOKIE_MAX = 12;
+function recentFromCookie(req) {
+    const m = String((req.headers && req.headers.cookie) || '').match(/(?:^|;\s*)ov_recent_tools=([^;]*)/);
+    if (!m) return [];
+    let v = ''; try { v = decodeURIComponent(m[1]); } catch { return []; }
+    return [...new Set(v.split('.').filter((id) => TOOL_RE.test(id)))].slice(0, COOKIE_MAX);
+}
+function rememberInCookie(req, res, tool, host) {
+    if (!res || typeof res.append !== 'function' || !/(^|\.)openvibe\.tools$/.test(host)) return;
+    const list = [tool, ...recentFromCookie(req).filter((id) => id !== tool)].slice(0, COOKIE_MAX);
+    res.append('Set-Cookie', `${COOKIE}=${list.join('.')}; Domain=.openvibe.tools; Path=/; Max-Age=${180 * 24 * 3600}; SameSite=Lax; Secure`);
 }
 
 let _recorder = null;
@@ -117,18 +147,21 @@ function usagePages({ snapshot, rec = null }) {
         mapFor = s;
         return map;
     };
-    return function toolUsage(req, _res, next) {
+    return function toolUsage(req, res, next) {
         try {
-            const sid = req.user && req.user.subject_id;
-            const r = rec || recorder();
-            if (sid && r.enabled && req.method === 'GET' && !req.path.startsWith('/api/') && !/\.[a-z0-9]{1,8}$/i.test(req.path)) {
+            if (req.method === 'GET' && !req.path.startsWith('/api/') && !/\.[a-z0-9]{1,8}$/i.test(req.path)) {
                 const dest = req.get('sec-fetch-dest');
                 if (dest ? dest === 'document' : /text\/html/.test(req.get('accept') || '')) {
                     const host = String(req.hostname || '').toLowerCase();
                     const m = hostMap();
                     const named = String(req.get('x-ov-tool') || '');
                     const tool = m.get(host) || (m.ids.has(named) ? named : null);
-                    if (tool) r.record(sid, tool);
+                    if (tool) {
+                        rememberInCookie(req, res, tool, host);
+                        const sid = req.user && req.user.subject_id;
+                        const r = rec || recorder();
+                        if (sid && r.enabled) r.record(sid, tool);
+                    }
                 }
             }
         } catch { /* usage is best-effort */ }
@@ -136,4 +169,4 @@ function usagePages({ snapshot, rec = null }) {
     };
 }
 
-module.exports = { createRecorder, recorder, usagePages, NS };
+module.exports = { createRecorder, recorder, usagePages, recentFromCookie, NS, COOKIE };

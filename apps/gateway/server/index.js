@@ -192,6 +192,20 @@ app.use('/auth/', rateLimit({ windowMs: 15 * 60_000, max: 60, keyGenerator: (req
 // the /api/ limiter above. /api/catalog.json stays as it is (Network reads it).
 app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
 
+// The launcher's recent tools: a signed-in person's tools.usage module (every device), otherwise this
+// browser's ov_recent_tools cookie. Only tools the registry still lists; never cached.
+app.get('/api/v1/me/recent-tools', async (req, res) => {
+    const usage = require('../../_shared/usage');
+    res.set('Cache-Control', 'private, no-store');
+    const known = new Set((toolRegistry.snapshot().tools || []).filter((t) => t.status !== 'unavailable').map((t) => t.id));
+    const sid = req.user && req.user.subject_id;
+    let mode = 'device', recent = usage.recentFromCookie(req).map((tool) => ({ tool }));
+    if (sid && usage.recorder().enabled) {
+        try { recent = await usage.recorder().recent(sid); mode = 'account'; } catch { /* the cookie list stands in */ }
+    }
+    res.json({ mode, recent: recent.filter((e) => e && known.has(e.tool)).slice(0, 12) });
+});
+
 // ── Net.OpenVibe and Dev.OpenVibe routes (the pages' API; the run API calls the same handlers) ──
 const netRouter = createNetRoutes(null, requireAuth, { guard });
 const devRouter = createDevRoutes(null, requireAuth, { guard });

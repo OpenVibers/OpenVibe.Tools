@@ -19,7 +19,8 @@
     var input = document.getElementById('q'), results = document.getElementById('results');
     if (!input || !results) return;
     var grid = document.getElementById('results-grid'), empty = document.getElementById('results-empty');
-    var catalog = null, loading = null, others = [].slice.call(document.querySelectorAll('main > section:not(#results)'));
+    var catalog = null, loading = null, others = [].slice.call(document.querySelectorAll('main > section:not(#results):not(#recent)'));
+    var recentSec = document.getElementById('recent'), recentReady = false;
 
     function load() {
         if (catalog) return Promise.resolve(catalog);
@@ -49,11 +50,11 @@
         q = q.trim();
         var url = new URL(location.href); if (q) url.searchParams.set('q', q); else url.searchParams.delete('q');
         if (url.href !== location.href) history[push ? 'pushState' : 'replaceState']({ q: q }, '', url);
-        if (!q) { results.hidden = true; others.forEach(function (s) { s.hidden = false; }); return; }
+        if (!q) { results.hidden = true; others.forEach(function (s) { s.hidden = false; }); if (recentSec) recentSec.hidden = !recentReady; return; }
         load().then(function () {
             if (input.value.trim() !== q) return;
             var hits = find(q); grid.replaceChildren.apply(grid, hits.map(card)); empty.hidden = hits.length > 0;
-            results.hidden = false; others.forEach(function (s) { s.hidden = true; });
+            results.hidden = false; others.forEach(function (s) { s.hidden = true; }); if (recentSec) recentSec.hidden = true;
             if (window.OpenVibeIcons) OpenVibeIcons.mount(grid); else if (!document.getElementById('ov-icons-loader')) { var sc = document.createElement('script'); sc.id = 'ov-icons-loader'; sc.src = 'https://openvibe.network/shared/ov-icons.js'; document.head.appendChild(sc); }
         });
     }
@@ -62,6 +63,24 @@
     input.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(function () { show(input.value, false); }, 90); });
     input.form.addEventListener('submit', function (e) { e.preventDefault(); show(input.value, true); var first = grid.querySelector('a'); if (first && input.value.trim()) first.focus(); });
     window.addEventListener('popstate', function () { var q = new URL(location.href).searchParams.get('q') || ''; input.value = q; show(q, false); });
-    document.addEventListener('keydown', function (e) { if (e.key === '/' && document.activeElement !== input && !/input|textarea|select/i.test(document.activeElement.tagName)) { e.preventDefault(); input.focus(); } });
+    document.addEventListener('keydown', function (e) {
+        var k = (e.key || '').toLowerCase();
+        if ((k === 'k' && (e.ctrlKey || e.metaKey) && !e.altKey) || (e.key === '/' && document.activeElement !== input && !/input|textarea|select/i.test(document.activeElement.tagName))) { e.preventDefault(); input.focus(); input.select(); }
+    });
+
+    // Recent tools: this person's (every device they sign in to) or this browser's. Filled in after load.
+    function mountIcons(el) { if (window.OpenVibeIcons) OpenVibeIcons.mount(el); else if (!document.getElementById('ov-icons-loader')) { var sc = document.createElement('script'); sc.id = 'ov-icons-loader'; sc.src = 'https://openvibe.network/shared/ov-icons.js'; document.head.appendChild(sc); } }
+    if (recentSec) fetch('/api/v1/me/recent-tools', { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+        if (!d || !d.recent || !d.recent.length) return null;
+        return load().then(function () {
+            var byId = {}; catalog.forEach(function (c) { byId[c.t.id] = c.t; });
+            var list = d.recent.map(function (e) { return byId[e.tool]; }).filter(Boolean).slice(0, 8);
+            if (!list.length) return;
+            var g = document.getElementById('recent-grid'); g.replaceChildren.apply(g, list.map(card));
+            document.getElementById('recent-note').textContent = d.mode === 'account' ? 'On every device you sign in to' : 'On this browser';
+            recentReady = true; if (!input.value.trim()) recentSec.hidden = false;
+            mountIcons(g);
+        });
+    }).catch(function () { /* optional */ });
     var q0 = new URL(location.href).searchParams.get('q'); if (q0) { input.value = q0; show(q0, false); }
 })();
