@@ -82,7 +82,7 @@ function build() {
         if (!s) { problems.push(`${t.id}: a catalogue tool without a descriptor`); continue; }
         const own = live.get(t.id) || (t.status === 'unavailable' ? { status: 'unavailable', statusReason: t.unavailable } : null);
         const d = compose(s.spec, {
-            family: t.family, name: t.name, summary: summaryOf(t),
+            family: t.family, name: t.name, summary: summaryOf(t), keywords: t.keywords,
             hosts: t.external ? [] : [t.hosts.canonical, t.hosts.short].filter(Boolean),
             ...(own && { status: own.status, statusReason: own.statusReason }),
         });

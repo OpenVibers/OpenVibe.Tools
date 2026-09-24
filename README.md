@@ -364,7 +364,15 @@ Every server (gateway and satellites) mounts `apps/_shared/observe.js` with `ope
 | food (4011) | `maps` (every food API is proxied to it) | `analytics_db` |
 | maps, text (4010, 4015) | — | `analytics_db` (maps' external data sources are not probed) |
 
-`TOOLS_SATELLITE_PORTS="img=5012,…"` overrides the gateway's satellite ports (tests, a moved unit).
+`TOOLS_SATELLITE_PORTS="img=5012,…"` overrides the gateway's satellite ports (tests, a moved unit); every app reads
+it (`apps/_shared/tools/satellites.js`), so set it for all units if a port moves.
+
+**Releases (ADR-016).** Every app mounts openvibe-shared's `release.mount` (`apps/_shared/release.js`): `GET
+/release.json` and `POST /release-metrics` (the shared navbar's release-watch outcomes →
+`release_client_updates_total` on `/metrics`). The gateway, img, audio and docs (which pin openvibe-contracts) serve
+manifest 1.1.0 components: `shell` (what their pages are made of: `public/`, the server files that stamp the pages,
+the job helper) and `server` (the rest), so a release that changes only API code no longer reloads open tabs. Maps,
+food, text and yt serve the 1.0.0 fields.
 
 ## Tests
 

@@ -13,7 +13,8 @@
 //   route     the server route that runs a sync tool today ({ method, path, query })
 //   requires  programs the tool needs on the host ('qpdf', 'heif-dec', …); the satellite marks it
 //             unavailable while one is missing
-//   example   { input } that runs: used by the tests, later by the docs
+//   example   { input } that runs: used by the tests, and published as the descriptor's `examples` (a tool
+//             with an API; a job tool's sample files are named after its accepted types)
 //   cacheTtlMs how long the run API may reuse an inline answer (0: never — random or time-dependent
 //             output; unset: engines 10 minutes, routes never)
 //
@@ -38,10 +39,43 @@ function summaryOf(rec) {
     return /[.!?]$/.test(t) ? t : `${t}.`;
 }
 
+// Sample file names for a job tool's example, by media type (what people would upload).
+const SAMPLE = {
+    'application/pdf': 'document.pdf', 'image/png': 'image.png', 'image/jpeg': 'photo.jpg', 'image/webp': 'image.webp',
+    'image/gif': 'animation.gif', 'image/avif': 'image.avif', 'image/tiff': 'scan.tiff', 'image/bmp': 'image.bmp',
+    'audio/mpeg': 'song.mp3', 'audio/wav': 'recording.wav', 'audio/ogg': 'clip.ogg', 'audio/flac': 'track.flac',
+};
+
+/** The catalogue's search terms, as tools.tool@1 allows them (1–100 characters, unique, at most 50). */
+function keywordsOf(list) {
+    const out = [];
+    for (const k of list || []) {
+        const v = String(k).replace(/\s+/g, ' ').trim();
+        if (v && v.length <= 100 && !out.includes(v)) out.push(v);
+        if (out.length === 50) break;
+    }
+    return out;
+}
+
+/** The spec's example as tools.tool@1 `examples` (API tools only); a job tool's gets sample files. */
+function examplesOf(spec, api) {
+    if (!api || !spec.example || !spec.example.input) return null;
+    const ex = { input: clone(spec.example.input) };
+    const f = spec.files;
+    if (f && f.min > 0) {
+        const mime = (f.accept || []).find(m => !m.endsWith('/*') && SAMPLE[m]) || (f.accept || []).find(m => !m.endsWith('/*'));
+        if (mime) {
+            const name = SAMPLE[mime] || `file.${mime.split('/')[1].replace(/[^a-z0-9]/g, '') || 'bin'}`;
+            ex.files = Array.from({ length: f.min }, (_, i) => ({ name: f.min > 1 ? name.replace(/(\.[^.]+)$/, `-${i + 1}$1`) : name, mime }));
+        }
+    }
+    return [ex];
+}
+
 /**
  * spec + catalogue facts → a tools.tool@1 descriptor with its schemas embedded.
  * @param {object} spec  the app's spec (see the header)
- * @param {object} meta  { family, name, summary, hosts: string[], docs?, status?, statusReason? } — a
+ * @param {object} meta  { family, name, summary, hosts: string[], keywords?, docs?, status?, statusReason? } — a
  *                       status here (the host is missing a program, the catalogue marks it) wins
  */
 function compose(spec, meta) {
@@ -63,6 +97,10 @@ function compose(spec, meta) {
     d.egress = spec.egress === true;
     d.hosts = [...(meta.hosts || [])];
     d.docs = meta.docs || docsUrl(spec.id);
+    const keywords = keywordsOf(meta.keywords);
+    if (keywords.length) d.keywords = keywords;
+    const examples = examplesOf(spec, api);
+    if (examples) d.examples = examples;
     return d;
 }
 

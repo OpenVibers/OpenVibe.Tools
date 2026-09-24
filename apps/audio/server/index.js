@@ -61,7 +61,7 @@ const toolOf = (req) => { const d = guard.toolForJob('audio.process', String((re
 
 const app = express();
 // What this deploy runs (ADR-016); the shared navbar's release-watch polls it on every tool host.
-const release = require('openvibe-shared/release').createRelease({ service: 'tools', root: require('path').join(__dirname, '..', '..', '..') });
+const release = require('../../_shared/release').toolsRelease('audio', require);   // its components: apps/_shared/release.js
 // Metrics (GET /metrics, direct loopback callers only) and GET /api/ready from this server's real
 // dependencies (roadmap Track O). First, so the HTTP metrics see every request.
 const { observe, checks: ready, which } = require('../../_shared/observe');
@@ -82,7 +82,9 @@ const obs = observe({
     jobs: () => jobs,
 });
 guard.attachMetrics(obs.registry);
-app.get('/release.json', release.handler);
+// GET /release.json (ADR-016) and POST /release-metrics, which the shared navbar's release-watch reports
+// its update outcomes to (release_client_updates_total on /metrics): openvibe-shared release.mount.
+release.mount(app, { registry: obs.registry });
 
 // Legal documents live on the apex; every tool host points there instead of answering 404.
 app.get(['/terms', '/privacy', '/dmca', '/tos'], (req, res) => res.redirect(301, 'https://openvibe.tools' + (req.path === '/tos' ? '/terms' : req.path)));

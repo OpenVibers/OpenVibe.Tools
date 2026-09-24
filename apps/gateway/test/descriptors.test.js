@@ -54,6 +54,19 @@ for (const d of snap.tools) {
     for (const k of ['execution', 'files', 'output', 'limits', 'auth', 'quotaClass', 'egress']) if (k in spec) assert.deepStrictEqual(d[k], spec[k] === undefined ? null : spec[k], `${d.id}.${k}`);
 }
 
+// Published since openvibe-contracts v0.33.1: the catalogue's keywords, and each API tool's example (a job
+// tool's with sample files that fit files.min and files.accept); no API, no examples. checkDescriptor
+// (above) holds every example to the input schema, maxInputBytes and files.
+for (const d of snap.tools) {
+    const s = reg.internal(d.id).spec;
+    assert.ok(Array.isArray(d.keywords) && d.keywords.length, `${d.id}: keywords`);
+    if (!d.api) { assert.ok(!d.examples, `${d.id}: no API, no examples`); continue; }
+    assert.strictEqual(d.examples.length, 1, d.id);
+    assert.deepStrictEqual(d.examples[0].input, s.example.input, `${d.id}: the spec's example`);
+    if (d.files && d.files.min) assert.strictEqual(d.examples[0].files.length, d.files.min, `${d.id}: sample files`);
+}
+assert.strictEqual(snap.tools.filter(d => d.examples).length, snap.tools.filter(d => d.api).length);
+
 // ── Schemas compile; examples match their input ──
 for (const d of snap.tools) {
     if (d.input) {

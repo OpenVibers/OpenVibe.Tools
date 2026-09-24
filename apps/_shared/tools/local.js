@@ -47,7 +47,7 @@ function createLocalRegistry(o) {
         const tools = rows.map(({ spec, c }, i) => {
             const h = defaultHosts(spec.id);
             return compose(spec, {
-                family: c.family, name: c.name, summary: summaryOf(c),
+                family: c.family, name: c.name, summary: summaryOf(c), keywords: c.keywords,
                 hosts: [h.canonical, h.short].filter(Boolean),
                 ...(live[i] && { status: live[i].status, statusReason: live[i].statusReason }),
             });
