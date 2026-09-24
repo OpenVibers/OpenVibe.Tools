@@ -12,7 +12,9 @@
 //         it a HEIC upload answers 503 tools.unavailable. AVIF and other HEIF files go to sharp.
 //
 // open(buffer) is the one way the tools read an upload: it decodes once and hands out fresh
-// sharp pipelines over the decoded pixels.
+// sharp pipelines over the decoded pixels. No input larger than the guard's pixel limit (40
+// megapixels, TOOLS_MAX_INPUT_PIXELS; apps/_shared/guard/limits.js) is ever decoded: the size is
+// read from the header first, and every sharp pipeline carries limitInputPixels as the backstop.
 // ═══════════════════════════════════════════════════════════════
 
 const { spawn, spawnSync } = require('child_process');
@@ -21,13 +23,30 @@ const os = require('os');
 const path = require('path');
 const sharp = require('sharp');
 const { createBinary, Unavailable } = require('../../../_shared/binaries');
+const guardLimits = require('../../../_shared/guard/limits');
 
-// Largest picture read from or written to BMP (and ICO): 100 megapixels, 400 MB of RGBA.
+// Largest picture written to BMP: 100 megapixels, 400 MB of RGBA (what is read is limited by inputPixels()).
 const MAX_PIXELS = 100 * 1024 * 1024;
 const HEIF_TIMEOUT_MS = 60_000;
 
 class ImageError extends Error {
     constructor(message) { super(message); this.status = 422; this.expose = true; }
+}
+
+/** The largest input picture (width × height) any tool decodes. */
+const inputPixels = () => guardLimits.bounds().maxInputPixels;
+
+/** A picture over the pixel limit: 413, recorded by the guard as a hard refusal ('pixels'). */
+function tooManyPixels(width, height) {
+    const mp = (n) => `${Math.round(n / 1e5) / 10} megapixels`;
+    const err = new ImageError(`This picture is ${width}×${height} (${mp(width * height)}); the limit is ${mp(inputPixels())}.`);
+    err.status = 413;
+    err.code = 'tools.file.too_large';
+    err.guardReason = 'pixels';
+    return err;
+}
+function checkPixels(width, height) {
+    if (width * height > inputPixels()) throw tooManyPixels(width, height);
 }
 
 // ── Format sniffing ──────────────────────────────────────────
@@ -96,7 +115,7 @@ function decodeDib(buf, dib, pixelsAt, ico) {
     const topDown = height < 0;
     height = Math.abs(height);
     if (!(width > 0 && height > 0)) throw new ImageError('This BMP file has no pixels');
-    if (width * height > MAX_PIXELS) throw new ImageError(`This BMP picture is larger than ${MAX_PIXELS / 1024 / 1024} megapixels`);
+    checkPixels(width, height);
     if (![1, 4, 8, 16, 24, 32].includes(bpp)) throw new ImageError(`${bpp}-bit BMP files are not supported`);
     if (![0, 1, 2, 3, 6].includes(compression)) throw new ImageError('This BMP compression (JPEG/PNG inside BMP) is not supported');
 
@@ -206,6 +225,17 @@ function decodeBmp(buf) {
 
 // ── ICO reader ───────────────────────────────────────────────
 
+/** The largest entry's size as the directory states it (0 means 256). */
+function icoLargest(buf) {
+    let best = null;
+    for (let i = 0; i < buf.readUInt16LE(4) && 6 + i * 16 + 16 <= buf.length; i++) {
+        const e = 6 + i * 16;
+        const width = buf[e] || 256, height = buf[e + 1] || 256;
+        if (!best || width * height > best.width * best.height) best = { width, height };
+    }
+    return best;
+}
+
 /** The largest (then deepest) entry of an .ico → a sharp input: PNG bytes, or RGBA pixels. */
 function decodeIco(buf) {
     const n = buf.readUInt16LE(4);
@@ -272,20 +302,30 @@ function decodeHeic(buf) {
  * Decode an upload once. → { format: 'bmp'|'ico'|'heic'|<sharp format>, sharp(): a fresh pipeline }
  */
 async function open(buf) {
+    const limitInputPixels = inputPixels();
+    /** Header size first (metadata reads the header only): a picture over the limit is refused before anything is decoded. */
+    const sized = async (input) => {
+        let meta;
+        try { meta = await sharp(input, { limitInputPixels: false }).metadata(); } catch { throw new ImageError('This file is not an image this tool can read'); }
+        checkPixels(meta.width || 0, meta.pageHeight || meta.height || 0);
+        return meta;
+    };
     const kind = sniff(buf);
     if (kind === 'bmp' || kind === 'ico') {
+        // An ICO entry's header says its size before it is decoded; PNG entries are checked by sharp's header.
+        if (kind === 'ico') { const e = icoLargest(buf); if (e) checkPixels(e.width, e.height); }
         const d = kind === 'bmp' ? decodeBmp(buf) : decodeIco(buf);
-        if (d.png) return { format: kind, sharp: () => sharp(d.png) };
+        if (d.png) { await sized(d.png); return { format: kind, sharp: () => sharp(d.png, { limitInputPixels }) }; }
         const raw = { width: d.width, height: d.height, channels: 4 };
-        return { format: kind, sharp: () => sharp(d.data, { raw }) };
+        return { format: kind, sharp: () => sharp(d.data, { raw, limitInputPixels }) };
     }
     if (kind === 'heic') {
         const png = await decodeHeic(buf);
-        return { format: 'heic', sharp: () => sharp(png) };
+        await sized(png);
+        return { format: 'heic', sharp: () => sharp(png, { limitInputPixels }) };
     }
-    let format = null;
-    try { format = (await sharp(buf).metadata()).format || null; } catch { throw new ImageError('This file is not an image this tool can read'); }
-    return { format, sharp: () => sharp(buf) };
+    const meta = await sized(buf);
+    return { format: meta.format || null, sharp: () => sharp(buf, { limitInputPixels }) };
 }
 
 // ── BMP writer ───────────────────────────────────────────────
@@ -334,4 +374,4 @@ async function toBmp(pipeline) {
     return { buffer: encodeBmp(data, info.width, info.height), width: info.width, height: info.height };
 }
 
-module.exports = { open, sniff, decodeBmp, decodeIco, encodeBmp, toBmp, heif, ImageError, MAX_PIXELS, HEIC_SETTING_UP };
+module.exports = { open, sniff, decodeBmp, decodeIco, encodeBmp, toBmp, heif, ImageError, MAX_PIXELS, HEIC_SETTING_UP, inputPixels, checkPixels };

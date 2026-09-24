@@ -6,8 +6,14 @@
 //
 // Jobs can be cancelled and report progress although the tools build their own ffmpeg commands:
 // FfmpegCommand#run is wrapped once, and a command started inside a job's AsyncLocalStorage
-// context reports ffmpeg's percent to the job and is killed when the job's signal aborts.
-// Commands started outside a job (the synchronous endpoint) are untouched.
+// context reports ffmpeg's percent to the job and is killed when the job's signal aborts. The
+// synchronous endpoint runs in the same kind of context (runSync): a deadline (the descriptor's
+// limits.timeoutMs) and a client that goes away abort it, and ffmpeg is killed.
+//
+// Hardening (apps/_shared/guard/ffmpeg.js, in both paths): every input of every command and every
+// probe reads only local files and pipes, only through the operation's demuxers (never hls, concat,
+// image2, lavfi…), and at most limits.maxDurationSec of it; inputs are probed first and a longer one
+// is refused before any work starts.
 // ═══════════════════════════════════════════════════════════════
 
 const fs = require('fs');
@@ -15,21 +21,36 @@ const path = require('path');
 const { AsyncLocalStorage } = require('async_hooks');
 const ffmpeg = require('fluent-ffmpeg');
 const { getTool, listTools } = require('./tools');
+const { probe } = require('./tools/ffmpeg-helper');
+const hardening = require('../../_shared/guard/ffmpeg');
+const { SPECS } = require('./descriptors');
 
 const jobContext = new AsyncLocalStorage();
 const RESERVED = new Set(['tool', 'file', 'files']);
+
+/** An operation's limits from its descriptor (every audio tool on one operation has the same). */
+const LIMITS = new Map();
+for (const s of SPECS) if (!LIMITS.has(s.job.operation)) LIMITS.set(s.job.operation, s.limits);
+function limitsFor(op) {
+    const l = LIMITS.get(op) || LIMITS.get('convert') || {};
+    return { formats: hardening.formatsFor(op), maxDurationSec: l.maxDurationSec || null, timeoutMs: l.timeoutMs || 15 * 60 * 1000 };
+}
+
+// Every command and probe: the whitelists and the duration cap of the operation running (a command
+// outside any context gets the widest audio list).
+hardening.harden(ffmpeg, () => jobContext.getStore() || { formats: hardening.formatsFor('extract') });
 
 const proto = ffmpeg.prototype;
 if (!proto.__ovJobs) {
     const run = proto.run;
     proto.run = function runInJob(...args) {
         const job = jobContext.getStore();
-        if (job) {
+        if (job && job.signal) {
             const kill = () => {
                 if (this.ffmpegProc) { try { this.ffmpegProc.kill('SIGKILL'); } catch { /* already gone */ } } else this.once('start', () => { try { this.ffmpegProc.kill('SIGKILL'); } catch { /* gone */ } });
             };
             if (job.signal.aborted) kill(); else job.signal.addEventListener('abort', kill, { once: true });
-            this.on('progress', (p) => { if (p && Number.isFinite(p.percent)) job.progress(10 + Math.min(100, Math.max(0, p.percent)) * 0.8, 'Encoding'); });
+            if (job.progress) this.on('progress', (p) => { if (p && Number.isFinite(p.percent)) job.progress(10 + Math.min(100, Math.max(0, p.percent)) * 0.8, 'Encoding'); });
         }
         return run.apply(this, args);
     };
@@ -53,6 +74,38 @@ function describe(toolId, result, size, inputSize) {
         ...(result.metadata && { metadata: result.metadata }),
         ...(result.preset && { preset: result.preset }),
     };
+}
+
+/** Probe the inputs (hardened) and run the tool inside the current context. */
+async function runTool(toolId, arg, options) {
+    const tool = getTool(toolId);
+    const lim = jobContext.getStore() || limitsFor(toolId);
+    await hardening.probeInputs(probe, Array.isArray(arg) ? arg : [arg], lim);
+    return tool.handler(arg, options);
+}
+
+/**
+ * The synchronous endpoint's run: the job context without a job — hardened, killed at the
+ * descriptor's timeout (504 tools.run.timeout) or when the client goes away.
+ */
+async function runSync(res, toolId, arg, options, override = {}) {
+    const lim = { ...limitsFor(toolId), ...override };
+    const ctrl = new AbortController();
+    let why = null;
+    const timer = setTimeout(() => { why = 'timeout'; ctrl.abort(); }, lim.timeoutMs);
+    const gone = () => { if (!res.writableFinished && !why) { why = 'client'; ctrl.abort(); } };
+    res.on('close', gone);
+    try {
+        return await jobContext.run({ signal: ctrl.signal, progress: () => {}, ...lim }, () => runTool(toolId, arg, options));
+    } catch (err) {
+        if (why === 'timeout') {
+            throw Object.assign(new Error(`This took longer than ${Math.round(lim.timeoutMs / 60000)} minutes and was stopped.`), { status: 504, code: 'tools.run.timeout', guardReason: 'timeout', expose: true });
+        }
+        throw err;
+    } finally {
+        clearTimeout(timer);
+        res.removeListener('close', gone);
+    }
 }
 
 /** Job type audio.process: input { tool, …options } + one audio or video file (2–5 for merge). */
@@ -84,7 +137,7 @@ function defineJobs(system) {
             const src = files[0];
             progress(5, files.length > 1 ? `Reading ${files.length} files` : 'Reading the audio');
             const arg = tool.multiFile ? files.map(f => f.path) : src.path;
-            const result = await jobContext.run({ signal, progress }, () => tool.handler(arg, buildOptions(input, toolId, null)));
+            const result = await jobContext.run({ signal, progress, ...limitsFor(toolId) }, () => runTool(toolId, arg, buildOptions(input, toolId, null)));
             if (signal.aborted) { fs.rm(result.outputPath, { force: true }, () => {}); throw new Error('cancelled'); }
             const size = fs.statSync(result.outputPath).size;
             const base = path.basename(src.name || 'audio', path.extname(src.name || '')) || 'openvibeaudio-output';
@@ -97,4 +150,4 @@ function defineJobs(system) {
     });
 }
 
-module.exports = { buildOptions, describe, defineJobs, jobContext };
+module.exports = { buildOptions, describe, defineJobs, jobContext, runSync, runTool, limitsFor };

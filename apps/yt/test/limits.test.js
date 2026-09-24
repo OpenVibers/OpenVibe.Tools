@@ -89,8 +89,14 @@ process.exit(0);   // the match filter skipped it: no file
         r = await post('/api/download', { url: 'https://www.youtube.com/watch?v=SHORTxx1234', quality: 'best' });
         body = await r.json();
         assert.strictEqual(r.status, 200, JSON.stringify(body));
+        // The download belongs to the browser session the start minted: only it sees the status.
+        const cookie = String(r.headers.get('set-cookie') || '').split(';')[0];
+        assert.match(cookie, /^ov_tools_jobs=/, 'starting a download starts a session');
+        assert.strictEqual((await fetch(`${app.base}/api/status/${body.id}`)).status, 404, 'someone else gets 404');
+        assert.strictEqual((await fetch(`${app.base}/api/status/${body.id}/stream`)).status, 404);
+        assert.strictEqual((await fetch(`${app.base}/api/download/${body.id}`, { method: 'DELETE' })).status, 404, 'and cannot cancel it');
         let st;
-        for (let i = 0; i < 50; i++) { st = await (await fetch(`${app.base}/api/status/${body.id}`)).json(); if (st.status !== 'downloading') break; await sleep(50); }
+        for (let i = 0; i < 50; i++) { st = await (await fetch(`${app.base}/api/status/${body.id}`, { headers: { cookie } })).json(); if (st.status !== 'downloading') break; await sleep(50); }
         const args = JSON.parse(fs.readFileSync(path.join(data, 'args.json'), 'utf8'));
         assert.strictEqual(args[args.indexOf('--match-filter') + 1], 'duration<=600 & !is_live');
         assert.strictEqual(args[args.indexOf('--max-filesize') + 1], '100M');

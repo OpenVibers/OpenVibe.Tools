@@ -31,8 +31,12 @@ function proxyTo(port, info, req, res) {
     headers['x-ov-short-host'] = info.shortHost;
     headers['x-forwarded-host'] = info.host;
     headers['x-forwarded-proto'] = 'https';
-    const prior = req.headers['x-forwarded-for'];
-    headers['x-forwarded-for'] = (prior ? prior + ', ' : '') + (req.socket.remoteAddress || '');
+    // The gateway is the satellite's one trusted hop (TRUST_PROXY): it passes on the address it
+    // resolved itself (req.ip, from nginx), never a chain a client could have started.
+    const client = String(req.ip || req.socket.remoteAddress || '');
+    headers['x-forwarded-for'] = client;
+    headers['x-real-ip'] = client;
+    headers['cf-connecting-ip'] = client;
     const up = http.request({ host: '127.0.0.1', port, method: req.method, path: req.originalUrl || req.url, headers }, (r) => {
         const out = {};
         for (const [k, v] of Object.entries(r.headers)) if (!HOP.has(k)) out[k] = v;

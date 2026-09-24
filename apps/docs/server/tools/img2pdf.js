@@ -8,6 +8,16 @@
 
 const { PDFDocument } = require('pdf-lib');
 const sharp = require('sharp');
+const guardLimits = require('../../../_shared/guard/limits');
+
+/** No picture larger than the guard's pixel limit (40 MP, TOOLS_MAX_INPUT_PIXELS) is decoded. */
+function checkPixels(metadata, i, count) {
+    const limit = guardLimits.bounds().maxInputPixels;
+    const w = metadata.width || 0, h = metadata.pageHeight || metadata.height || 0;
+    if (w * h <= limit) return;
+    const mp = (n) => `${Math.round(n / 1e5) / 10} megapixels`;
+    throw Object.assign(new Error(`${count > 1 ? `Image ${i + 1}` : 'The image'} is ${w}×${h} (${mp(w * h)}); the limit is ${mp(limit)}.`), { status: 413, code: 'tools.file.too_large', guardReason: 'pixels', expose: true });
+}
 
 /**
  * Convert images to PDF.
@@ -30,19 +40,21 @@ async function img2pdf(buffers, options = {}) {
         legal: { width: 612, height: 1008 },
     };
 
-    for (const imgBuf of buffers) {
+    const limitInputPixels = guardLimits.bounds().maxInputPixels;
+    for (const [i, imgBuf] of buffers.entries()) {
         // Convert to PNG or JPG using sharp for consistency
-        const metadata = await sharp(imgBuf).metadata();
+        const metadata = await sharp(imgBuf, { limitInputPixels: false }).metadata();   // the header only; checked next
+        checkPixels(metadata, i, buffers.length);
         const imgWidth = metadata.width || 800;
         const imgHeight = metadata.height || 600;
 
         // Determine if we should embed as PNG or JPG
         let embeddedImage;
         if (metadata.format === 'jpeg' || metadata.format === 'jpg') {
-            const jpgBuf = await sharp(imgBuf).jpeg({ quality: 90 }).toBuffer();
+            const jpgBuf = await sharp(imgBuf, { limitInputPixels }).jpeg({ quality: 90 }).toBuffer();
             embeddedImage = await pdf.embedJpg(jpgBuf);
         } else {
-            const pngBuf = await sharp(imgBuf).png().toBuffer();
+            const pngBuf = await sharp(imgBuf, { limitInputPixels }).png().toBuffer();
             embeddedImage = await pdf.embedPng(pngBuf);
         }
 

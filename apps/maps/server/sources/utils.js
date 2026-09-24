@@ -13,6 +13,7 @@ const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 const _overpassQueue = [];
 let _overpassRunning = 0;
 const MAX_CONCURRENT_OVERPASS = 2;      // Max parallel Overpass requests
+const MAX_QUEUED_OVERPASS = 60;         // More waiting than this: refuse (a search asks a handful at most)
 const OVERPASS_RETRY_DELAYS = [2000, 5000, 12000]; // Backoff per retry
 
 async function _processOverpassQueue() {
@@ -61,6 +62,9 @@ async function _runOverpassJob({ query, timeout, resolve, reject, attempt = 0 })
  */
 function overpassQuery(query, timeout = 45000) {
   return new Promise((resolve, reject) => {
+    if (_overpassQueue.length >= MAX_QUEUED_OVERPASS) {
+      return reject(Object.assign(new Error('OpenStreetMap is busy with other searches; try again in a minute.'), { status: 503, busy: true }));
+    }
     _overpassQueue.push({ query, timeout, resolve, reject });
     _processOverpassQueue();
   });

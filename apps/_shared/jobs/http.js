@@ -28,16 +28,13 @@
 
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
 const { Readable } = require('stream');
 
+const { createCallerResolver, jobOwnerResolver, JOB_CAPS: CAPS } = require('../guard/caller');
+
 const ID_RE = /^job_[0-9A-HJKMNP-TV-Z]{26}$/;
-const SESSION_RE = /^[A-Za-z0-9_-]{32,64}$/;
 const TERMINAL = new Set(['succeeded', 'failed', 'cancelled']);
 const CLIENT_JS = path.join(__dirname, 'client.js');
-const CAPS = { create: 'tools.job.create', read: 'tools.job.read', cancel: 'tools.job.cancel' };
-
-const b64json = (part) => { try { return JSON.parse(Buffer.from(String(part).replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')); } catch { return null; } };
 
 function contentDisposition(kind, name) {
     const ascii = String(name || 'result').replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
@@ -45,7 +42,9 @@ function contentDisposition(kind, name) {
 }
 
 /**
- * Who is asking. → { owner, kind: 'principal'|'user'|'session', claims? } | { error: [status, code, detail] } | null
+ * Who is asking. → { owner, kind: 'principal'|'user'|'session', claims?, env } | { error: [status, code, detail] } | null
+ * The guard's one caller resolver (apps/_shared/guard/caller.js); an app with a guard passes
+ * guard.ownerResolver() instead, which is the same resolver with the guard's daily address salt.
  *
  * @param {object} o
  * @param {object} o.contracts
@@ -56,54 +55,7 @@ function contentDisposition(kind, name) {
  * @param {boolean} [o.secureCookie]
  */
 function createOwnerResolver(o) {
-    const audience = o.audience || 'openvibe.tools';
-    const cookieName = o.cookieName || 'ov_tools_jobs';
-    const { contracts } = o;
-
-    function principalCapability(claims, cap) {
-        const c = contracts.capabilities.check(claims, cap);
-        if (c.allowed) return null;
-        // The tools.job.* manifests are proposed for the next contracts release; until the installed
-        // version knows them, an explicit grant in the token (which only Network can sign) is enough.
-        if (c.code === 'capability.unknown' && contracts.capabilities.grants(claims.cap, cap)) return null;
-        return [403, c.code === 'capability.unknown' ? 'capability.denied' : c.code, `${cap} not granted`];
-    }
-
-    return function resolveOwner(req, res, { create = false, action = 'read' } = {}) {
-        const auth = String(req.headers.authorization || '');
-        if (auth.startsWith('Bearer ')) {
-            const token = auth.slice(7).trim();
-            const parts = token.split('.');
-            const claims = parts.length === 3 ? b64json(parts[1]) : null;
-            const looksLikePrincipal = claims && (Array.isArray(claims.cap) || /^(svc|app|mod):/.test(String(claims.sub || '')));
-            if (looksLikePrincipal) {
-                // Job routes are the only Tools routes that take sandbox tokens (developer apps, ADR-014), and
-                // only from apps: a sandbox token that is not an app's is refused.
-                const r = contracts.serviceAuth.verifyServiceToken(token, { publicKey: o.getPublicKey(), issuer: o.issuer, audience, acceptSandbox: true });
-                if (r.ok && r.claims.env === 'sandbox' && !(r.claims.actor_type === 'app' && /^app:/.test(String(r.claims.sub || '')))) {
-                    return { error: [401, 'token.sandbox_refused', 'sandbox tokens are accepted only from developer apps'] };
-                }
-                if (!r.ok) return { error: [401, r.code, r.reason] };
-                const denied = principalCapability(r.claims, CAPS[action] || CAPS.read);
-                if (denied) return { error: denied };
-                return { owner: r.claims.sub, kind: 'principal', claims: r.claims, env: r.claims.env === 'sandbox' ? 'sandbox' : 'production' };
-            }
-        }
-        const sid = req.user && req.user.subject_id;
-        if (sid && contracts.ids.isSubjectId('user', sid)) return { owner: `user:${sid}`, kind: 'user' };
-
-        let session = req.cookies && req.cookies[cookieName];
-        if (!SESSION_RE.test(String(session || ''))) {
-            if (!create) return null;
-            session = crypto.randomBytes(24).toString('base64url');
-            res.cookie(cookieName, session, {
-                httpOnly: true, sameSite: 'lax', path: '/', maxAge: 7 * 24 * 60 * 60 * 1000,
-                secure: o.secureCookie != null ? o.secureCookie : process.env.NODE_ENV === 'production',
-            });
-        }
-        // Only a hash of the cookie is stored, so the database cannot be used to take over a session.
-        return { owner: `session:${crypto.createHash('sha256').update(session).digest('hex').slice(0, 40)}`, kind: 'session' };
-    };
+    return jobOwnerResolver(createCallerResolver({ contracts: o.contracts, getPublicKey: o.getPublicKey, issuer: o.issuer, audience: o.audience, cookieName: o.cookieName, secureCookie: o.secureCookie }));
 }
 
 /**
@@ -118,6 +70,13 @@ function createOwnerResolver(o) {
  * @param {function[]} [o.limiters] middleware run before accepting a submit (rate limits)
  * @param {(req, who) => number} [o.ttlMs] how long a finished job is kept
  * @param {(req, input) => object} [o.defaults] fills input from the host (e.g. the format a png.* host implies)
+ * @param {(req, res, { type, input, files }) => Promise<boolean>} [o.admit]  the guard's admission of a
+ *        submit once its body is parsed (session rule, the bytes against the tool's accept, the quota
+ *        difference); false = it answered
+ * @param {(req, res, busy) => boolean} [o.onBusy]  system.busy() said so: true = go on (report mode);
+ *        without it a busy store answers 503 tools.busy
+ * @param {(req, res, full) => boolean} [o.onAddressFull]  a browser session's address already has its
+ *        unfinished jobs (system.addressFull): true = go on (report mode); without it 429
  */
 function mountJobRoutes(app, o) {
     const { system, contracts } = o;
@@ -158,7 +117,16 @@ function mountJobRoutes(app, o) {
         receive(req, res, (err) => { res.json = json; next(err); });
     };
 
-    app.post('/api/v1/jobs', ...(o.limiters || []), multipartOnly, async (req, res) => {
+    // Over the store's bounds (queued jobs, disk): answer before an upload is accepted.
+    const notBusy = (req, res, next) => {
+        const busy = system.busy ? system.busy() : null;
+        if (!busy) return next();
+        if (o.onBusy) return o.onBusy(req, res, busy) ? next() : undefined;
+        res.set('Retry-After', String(busy.retryAfter || 30));
+        return send(res, 503, 'tools.busy', busy.detail);
+    };
+
+    app.post('/api/v1/jobs', ...(o.limiters || []), notBusy, multipartOnly, async (req, res) => {
         noStore(res);
         const w = who(req, res, { create: true, action: 'create' });
         if (!w) return;
@@ -173,8 +141,22 @@ function mountJobRoutes(app, o) {
         const list = Array.isArray(req.files) ? req.files : req.files && typeof req.files === 'object' ? Object.values(req.files).flat() : req.file ? [req.file] : [];
         const files = list.map(f => ({ path: f.path, buffer: f.path ? undefined : f.buffer, name: f.originalname, mime: f.mimetype, size: f.size }));
         const key = req.headers['idempotency-key'] != null ? String(req.headers['idempotency-key']) : (b.idempotency_key != null ? String(b.idempotency_key) : null);
+        // Sessions from one address share a bound on unfinished jobs: a new cookie is no new allowance.
+        const full = w.caller && system.addressFull ? system.addressFull(w.owner, w.caller.ipKey) : null;
+        if (full) {
+            const goOn = o.onAddressFull ? o.onAddressFull(req, res, full) : (send(res, 429, 'tools.job.too_many_active', `At most ${full.limit} unfinished jobs from one address at a time; wait for one to finish`), false);
+            if (!goOn) { for (const f of files) if (f.path) fs.unlink(f.path, () => {}); return; }
+        }
+        if (o.admit) {
+            let ok = false;
+            try { ok = await o.admit(req, res, { type: String(b.type || ''), input, files }); } catch (err) {
+                console.error('[Jobs] admission failed:', err.message);
+                if (!res.headersSent) send(res, 500, 'tools.job.submit_failed', 'The job could not be accepted');
+            }
+            if (!ok) { for (const f of files) if (f.path) fs.unlink(f.path, () => {}); return; }
+        }
         try {
-            const { job, replayed } = await system.submit({ owner: w.owner, type: String(b.type || ''), input, files, idempotencyKey: key, ttlMs: ttlMs(req, w), env: w.env || 'production' });
+            const { job, replayed } = await system.submit({ owner: w.owner, type: String(b.type || ''), input, files, idempotencyKey: key, ttlMs: ttlMs(req, w), env: w.env || 'production', ipKey: w.caller ? w.caller.ipKey : null });
             res.set('Location', `/api/v1/jobs/${job.id}`);
             if (replayed) res.set('Idempotent-Replayed', 'true');
             return res.status(replayed ? 200 : 202).json(system.view(job));
@@ -201,7 +183,7 @@ function mountJobRoutes(app, o) {
     });
 
     // Retry and references are writes: a principal needs tools.job.create, like a submit.
-    app.post('/api/v1/jobs/:id/retry', ...(o.limiters || []), (req, res) => {
+    app.post('/api/v1/jobs/:id/retry', ...(o.limiters || []), notBusy, (req, res) => {
         noStore(res);
         const row = load(req, res, 'create');
         if (!row) return;

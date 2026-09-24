@@ -378,10 +378,10 @@ P.curlconvert=(s,m)=>DevEngine.curlconvert(s,m);
 
 P.webhook=async()=>{
     const o=$('out');
-    const r=await fetch(API+'/webhook/bins',{method:'POST'});const d=await r.json();if(!d.ok)throw new Error(d.error||'Failed');
+    const r=await fetch(API+'/webhook/bins',{method:'POST',credentials:'include'});const d=await r.json();if(!d.ok)throw new Error(d.error||'Failed');
     const binUrl=API+'/webhook/bins/'+d.binId+'/in';
     o.innerHTML='<div style="margin-bottom:12px"><div class="jl">Your Webhook URL</div><div style="font-size:1rem;word-break:break-all;color:var(--ac);cursor:pointer" onclick="navigator.clipboard.writeText(\''+binUrl+"');toast('Copied!')\">"+binUrl+'</div><div style="color:var(--tx3);font-size:.78rem;margin-top:4px">Click to copy \u00b7 Polling for requests...</div></div><div id="whr">Waiting for requests...</div>';
-    const iv=setInterval(async()=>{try{const r2=await fetch(API+'/webhook/bins/'+d.binId);const d2=await r2.json();
+    const iv=setInterval(async()=>{try{const r2=await fetch(API+'/webhook/bins/'+d.binId,{credentials:'include'});const d2=await r2.json();
         if(d2.ok&&d2.requests.length){$('whr').innerHTML=d2.requests.map((rq,i)=>'<div class="js"><div class="jl">#'+(i+1)+' '+rq.method+' \u00b7 '+new Date(rq.timestamp).toLocaleTimeString()+'</div>Headers:\n'+Object.entries(rq.headers||{}).map(([k,v])=>k+': '+v).join('\n')+'\n\nBody:\n'+H(typeof rq.body==='object'?JSON.stringify(rq.body,null,2):String(rq.body||'(empty)'))+'</div>').join('')}}catch{}},2000);
     setTimeout(()=>clearInterval(iv),3600000);return null;
 };

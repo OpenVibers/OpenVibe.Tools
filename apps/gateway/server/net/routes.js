@@ -24,7 +24,40 @@ const IPAPI_FIELDS = 'status,message,country,countryCode,region,regionName,city,
  * Every tool here that connects to the target (ssl, headers, redirects, port, ping, lookup, and a
  * custom DNS server) goes through the shared SSRF guard: only public addresses, checked after DNS
  * and dialled as checked. `opts.egress` is for tests (a guard with a mock resolver and transports).
+ *
+ * `opts.guard` (apps/_shared/guard, the gateway's): each call is charged to its tool's descriptor
+ * (tools-fetch or tools-probe × the caller's tier, weighted by cost), a principal needs the tool's
+ * capability (tools.net.probe for port, ping, latency), every tool that reaches a target is throttled
+ * per target across all callers (limits.perTargetPerMinute), and the port checker is capped per
+ * request and per caller so it cannot sweep hosts or ranges. The throttle and the port caps apply in
+ * report mode too. The pages call these routes without a session: people are counted by address.
  */
+const { SPECS: NET_SPECS } = require('./descriptors');
+
+// endpoint ('/dns') → the descriptors served by it (dns, dig, nslookup, mx, txt, …)
+const BY_ENDPOINT = new Map();
+for (const spec of NET_SPECS) {
+    if (!spec.route) continue;
+    const ep = spec.route.path.replace(/^\/api\/net/, '');
+    if (!BY_ENDPOINT.has(ep)) BY_ENDPOINT.set(ep, []);
+    BY_ENDPOINT.get(ep).push(spec);
+}
+
+/** The tool a /api/net request runs: the host's own tool when it uses this endpoint, else the one named after it. */
+function netToolOf(req) {
+    const ep = `/${String(req.path || '').split('/')[1] || ''}`;
+    const list = BY_ENDPOINT.get(ep);
+    if (!list) return null;
+    const host = req.ovHost && req.ovHost.tool;
+    return (list.find(s => s.id === host) || list.find(s => s.id === ep.slice(1)) || list[0]).id;
+}
+
+/** The target a request names: /api/net/<endpoint>/<target> or ?target= (or ?url=). */
+function netTargetOf(req) {
+    const m = /^\/[a-z0-9]+\/(.+)$/i.exec(String(req.path || ''));
+    if (m) { try { return decodeURIComponent(m[1]); } catch { return m[1]; } }
+    return String(req.query.target || req.query.url || '');
+}
 // ── IPv4 / IPv6 arithmetic ─────────────────────────────────
 
 const ipv4ToInt = (ip) => ip.split('.').reduce((n, o) => n * 256 + Number(o), 0) >>> 0;
@@ -117,6 +150,7 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
     const cache = opts.cache || createCache({ max: 5000, ttlMs: HOUR });
     const checks = createChecks({ egress, cache, ...(opts.resolverFor && { resolverFor: opts.resolverFor }), ...(opts.tlsUpgrade && { tlsUpgrade: opts.tlsUpgrade }) });
     const reverseDns = opts.reverse || ((ip) => dns.reverse(ip));
+    const guard = opts.guard || null;
 
     // ── Helpers ──────────────────────────────────────────────
 
@@ -226,19 +260,24 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
     /** Get config (live — reads DB each time for admin changes) */
     function cfg() { return getNetConfig(db); }
 
-    /** Optional auth — attaches user if token present, but doesn't block.
-     *  Verifies the shared ov_token OFFLINE against the Network public key. */
-    function optionalAuth(req, res, next) {
-        const authHeader = req.headers.authorization;
-        const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : req.cookies?.ov_token;
-        const auth = req.app.locals.auth;
-        if (!token || !auth) return next();
-        Promise.resolve(auth.verify(token))
-            .then(claims => { if (claims) req.user = claims; next(); })
-            .catch(() => next());
+    // ── Guard: who may run it, its quota, the per-target throttle (sign-in was read by the app) ──
+    if (guard) {
+        router.use((req, res, next) => {
+            const id = netToolOf(req);
+            if (!id) return next();
+            req.netTool = id;
+            if (!guard.capabilityRule(req, res, guard.tool(id))) return undefined;
+            return next();
+        });
+        router.use(guard.toolQuota((req) => req.netTool));
+        router.use((req, res, next) => {
+            const d = req.netTool && guard.tool(req.netTool);
+            if (!d || !d.egress || !(d.limits && d.limits.perTargetPerMinute)) return next();
+            const t = netTargetOf(req);
+            if (t && !guard.target(req, res, { tool: d.id, target: t })) return undefined;
+            return next();
+        });
     }
-
-    router.use(optionalAuth);
 
     // ── Tool list endpoint ───────────────────────────────────
     router.get('/tools', (_req, res) => {
@@ -699,9 +738,12 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
             const target = parseTarget(req.params.target || req.query.target);
             if (!target) return fail(res, 'Please provide a host');
 
-            const portsStr = req.query.ports || '80,443,22,21,25,53,3306,5432,8080,8443';
-            const ports = portsStr.split(',').map(p => parseInt(p.trim())).filter(p => p > 0 && p <= 65535).slice(0, 20);
+            const portsStr = String(req.query.ports || '80,443,22,21,25,53,3306,5432,8080,8443');
+            const ports = [...new Set(portsStr.split(',').map(p => parseInt(p.trim(), 10)).filter(p => p > 0 && p <= 65535))];
             if (!ports.length) return fail(res, 'No valid ports specified');
+            if (ports.length > 20) return fail(res, 'At most 20 ports per check');
+            // Per caller: at most so many ports and so many different hosts in ten minutes (a hard limit).
+            if (guard && !guard.portScan(req, res, { tool: req.netTool || 'port', target, ports })) return undefined;
 
             // Resolve + check; every probe dials the checked address.
             const dest = await egress.resolve(target, { prefer: 4 });

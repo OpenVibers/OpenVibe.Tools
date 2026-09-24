@@ -65,6 +65,8 @@ const ADDED_COLUMNS = [
     ['env', "TEXT NOT NULL DEFAULT 'production' CHECK (env IN ('production','sandbox'))"],   // developer-app sandboxes
     ['retry_of', 'TEXT'],       // the failed job this one retries
     ['retried_by', 'TEXT'],     // set on a failed job once it has been retried: the retry's id
+    ['ip_key', 'TEXT'],         // a browser session's job: the guard's hashed address key (never the address), so
+                                // unfinished jobs are also bounded per address (a new cookie is no new allowance)
 ];
 
 const parse = (s, fallback) => { if (s == null) return fallback; try { return JSON.parse(s); } catch { return fallback; } };
@@ -75,10 +77,11 @@ function createStore(db) {
     db.exec(SCHEMA);
     const have = new Set(db.prepare('PRAGMA table_info(tool_jobs)').all().map((c) => c.name));
     for (const [name, decl] of ADDED_COLUMNS) if (!have.has(name)) db.exec(`ALTER TABLE tool_jobs ADD COLUMN ${name} ${decl}`);
+    db.exec("CREATE INDEX IF NOT EXISTS tool_jobs_ip ON tool_jobs(ip_key, state) WHERE ip_key IS NOT NULL");
 
     const q = {
-        insert: db.prepare(`INSERT INTO tool_jobs (id, type, type_version, owner, state, input_json, files_json, idempotency_key, request_hash, max_attempts, ttl_ms, created_at, updated_at, env, retry_of)
-            VALUES (@id, @type, @type_version, @owner, 'queued', @input_json, @files_json, @idempotency_key, @request_hash, @max_attempts, @ttl_ms, @now, @now, @env, @retry_of)`),
+        insert: db.prepare(`INSERT INTO tool_jobs (id, type, type_version, owner, state, input_json, files_json, idempotency_key, request_hash, max_attempts, ttl_ms, created_at, updated_at, env, retry_of, ip_key)
+            VALUES (@id, @type, @type_version, @owner, 'queued', @input_json, @files_json, @idempotency_key, @request_hash, @max_attempts, @ttl_ms, @now, @now, @env, @retry_of, @ip_key)`),
         markRetried: db.prepare("UPDATE tool_jobs SET retried_by = @next, updated_at = @now WHERE id = @id AND state = 'failed' AND retried_by IS NULL"),
         get: db.prepare('SELECT * FROM tool_jobs WHERE id = ?'),
         byIdem: db.prepare('SELECT * FROM tool_jobs WHERE owner = ? AND idempotency_key = ?'),
@@ -86,6 +89,7 @@ function createStore(db) {
         claim: db.prepare("UPDATE tool_jobs SET state = 'running', attempts = attempts + 1, started_at = @now, updated_at = @now, progress = NULL, progress_message = NULL WHERE id = @id AND state = 'queued'"),
         running: db.prepare("SELECT * FROM tool_jobs WHERE state = 'running'"),
         activeForOwner: db.prepare("SELECT COUNT(*) AS n FROM tool_jobs WHERE owner = ? AND state IN ('queued','running')"),
+        activeForIp: db.prepare("SELECT COUNT(*) AS n FROM tool_jobs WHERE ip_key = ? AND state IN ('queued','running')"),
         progress: db.prepare('UPDATE tool_jobs SET progress = @progress, progress_message = @message, updated_at = @now WHERE id = @id AND state = \'running\''),
         requestCancel: db.prepare("UPDATE tool_jobs SET cancel_requested = 1, updated_at = @now WHERE id = @id AND state IN ('queued','running')"),
         requeue: db.prepare("UPDATE tool_jobs SET state = 'queued', started_at = NULL, progress = NULL, progress_message = NULL, updated_at = @now WHERE id = @id AND state = 'running'"),
@@ -120,7 +124,7 @@ function createStore(db) {
     return {
         db,
         TERMINAL, STATES,
-        insert(row) { q.insert.run({ retry_of: null, ...row }); },
+        insert(row) { q.insert.run({ retry_of: null, ip_key: null, ...row }); },
         markRetried: (id, next, now = Date.now()) => q.markRetried.run({ id, next, now }).changes === 1,
         get: (id) => q.get.get(id) || null,
         byIdempotencyKey: (owner, key) => q.byIdem.get(owner, key) || null,
@@ -128,6 +132,7 @@ function createStore(db) {
         claim: (id, now = Date.now()) => q.claim.run({ id, now }).changes === 1,
         running: () => q.running.all(),
         activeForOwner: (owner) => q.activeForOwner.get(owner).n,
+        activeForIp: (ipKey) => (ipKey ? q.activeForIp.get(ipKey).n : 0),
         setProgress: (id, progress, message, now = Date.now()) => q.progress.run({ id, progress, message, now }).changes === 1,
         requestCancel: (id, now = Date.now()) => q.requestCancel.run({ id, now }).changes === 1,
         requeue: (id, now = Date.now()) => q.requeue.run({ id, now }).changes === 1,

@@ -14,12 +14,12 @@ const path = require('path');
 const fs = require('fs');
 
 const config = require('./config');
-const { optionalAuth } = require('./auth');
 const downloader = require('./downloader');
 const seo = require('./seo');
 const { hostGuard } = require('../../_shared/host-role');
 const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
 const { createLocalRegistry, requiresStatus } = require('../../_shared/tools/local');
+const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
 
 // ── Analytics ────────────────────────────────────────────────
 const Database = require('better-sqlite3');
@@ -31,13 +31,22 @@ const analyticsDb = new Database(analyticsDbPath);
 analyticsDb.pragma('journal_mode = WAL');
 const analytics = new AnalyticsTracker(analyticsDb, 'openvibe-yt', { retention: { days: 30 } });
 
+// ── Guard (apps/_shared/guard) ───────────────────────────────
+// Who is asking (Network sign-in with aud openvibe.tools, the browser session, else the address),
+// the tools-download quota (a download costs 50, descriptor yt) and the abuse log (data/guard.db).
+// TOOLS_GUARD=report (default) records what it would refuse; the older limiters below stay until enforce.
+const guard = createGuard({
+    app: 'yt', dataDir: path.resolve(__dirname, '..', config.dataDir || 'data'), Database, specs: require('./descriptors').SPECS,
+    issuer: config.networkUrl, networkUrl: config.networkUrl, networkInternalUrl: config.networkInternalUrl, publicKeyFiles: config.publicKeyPaths,
+});
+
 const app = express();
 // What this deploy runs (ADR-016); the shared navbar's release-watch polls it on every tool host.
 const release = require('openvibe-shared/release').createRelease({ service: 'tools', root: require('path').join(__dirname, '..', '..', '..') });
 // Metrics (GET /metrics, direct loopback callers only) and GET /api/ready from this server's real
 // dependencies (roadmap Track O). First, so the HTTP metrics see every request.
 const { observe, checks: ready, which } = require('../../_shared/observe');
-observe({
+const obs = observe({
     app, metrics: require('openvibe-shared/metrics'), ready: require('openvibe-shared/ready'),
     service: 'tools-yt', release: release.release,
     checks: [
@@ -46,19 +55,20 @@ observe({
         ready.binary('yt_dlp', config.ytdlpPath, { description: 'every download runs yt-dlp' }),
         ready.binary('ffmpeg', process.env.FFMPEG_PATH || 'ffmpeg', { description: 'merging video+audio and audio conversion' }),
         ...(process.env.YT_COOKIES_FILE ? [ready.readableFile('yt_cookies', process.env.YT_COOKIES_FILE, { description: 'YT_COOKIES_FILE is set; yt-dlp is given these cookies' })] : []),
-        ready.networkKey('network_key', require('./auth').getPublicKey, { description: 'recognises signed-in visitors (higher limits); anonymous use works without it' }),
+        ready.networkKey('network_key', guard.keys.get, { description: 'recognises signed-in visitors (higher limits); anonymous use works without it' }),
     ],
     // Download progress streams last as long as the download.
     skip: (req) => /^\/api\/status\/[^/]+\/stream$/.test(req.path),
     details: () => ({ yt_proxy_configured: !!String(process.env.YT_PROXY || '').trim() }),
 });
+guard.attachMetrics(obs.registry);
 app.get('/release.json', release.handler);
 
 // Legal documents live on the apex; every tool host points there instead of answering 404.
 app.get(['/terms', '/privacy', '/dmca', '/tos'], (req, res) => res.redirect(301, 'https://openvibe.tools' + (req.path === '/tos' ? '/terms' : req.path)));
 
 // ── Security ─────────────────────────────────────────────────
-app.set('trust proxy', 2);
+app.set('trust proxy', TRUST_PROXY); // one hop: the host's nginx (or the gateway) on loopback; req.ip is the only address
 // API answers are live state, never revalidated: a 304 on /api/status froze the progress poll.
 app.set('etag', false);
 app.use(helmet({
@@ -93,9 +103,12 @@ app.use(exceptRegistry(cors({
 // ── Rate Limiting ────────────────────────────────────────────
 // Progress is one SSE connection, or a poll every 1–3 s when SSE is unavailable; the poll must
 // not eat the general budget (60/min would cut a download off after a minute).
+// Sign-in is read first, so limits know who is asking; everyone else counts by address (IPv6 by /64).
 const isStatusRoute = (req) => req.method === 'GET' && /^\/status\/[a-f0-9]+(\/stream)?$/.test(req.path);
-app.use('/api/', rateLimit({ windowMs: 60_000, max: 60, skip: isStatusRoute }));
-app.use('/api/status/', rateLimit({ windowMs: 60_000, max: 240 }));
+app.use(guard.identify);
+const apiLimiter = guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: 60, signedIn: 120, message: 'Too many requests. Please try again later.' });
+app.use('/api/', (req, res, next) => (isStatusRoute(req) ? next() : apiLimiter(req, res, (err) => (err ? next(err) : guard.apiQuota(req, res, next)))));
+app.use('/api/status/', guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: 240, signedIn: 240, message: 'Too many requests. Please try again later.' }));
 app.use('/api/', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
 
 // ── Tool registry (ADR-027): GET /api/v1/tools[/:id[/schema]] for this app's YouTube downloader ──
@@ -107,15 +120,18 @@ app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
 // ── Analytics Middleware ─────────────────────────────────────
 app.use(analytics.middleware());
 
-const downloadLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: (req) => req.user ? config.rateLimit.authedPerHour : config.rateLimit.anonPerHour,
-    keyGenerator: (req) => req.user?.sub || req.user?.id || req.ip,
-    message: { error: 'Download limit reached. Sign in for more downloads or wait an hour.' },
-});
-
-// ── Auth ─────────────────────────────────────────────────────
-app.use(optionalAuth);
+// Downloads: the older hourly limit (5 anonymous, 20 signed in) until enforce mode, and the guard's
+// tools-download quota (descriptor yt: cost 50) in both. A download belongs to whoever started it (the
+// browser session cookie, minted on the start, or a sign-in): its status, progress stream, file and
+// cancel answer 404 to anyone else, the same as for an id that does not exist.
+const owners = new Map();   // download id → owner
+const ownsDownload = (req, res, id) => {
+    const owner = owners.get(String(id || ''));
+    const who = guard.resolveCaller(req, res);
+    return !!owner && !!who.owner && owner === who.owner;
+};
+setInterval(() => { for (const id of owners.keys()) if (!downloader.getStatus(id) && !downloader.getFile(id)) owners.delete(id); }, 10 * 60_000).unref();
+const downloadLimiter = guard.legacyLimiter(rateLimit, { windowMs: 60 * 60 * 1000, anonymous: config.rateLimit.anonPerHour, signedIn: config.rateLimit.authedPerHour, message: 'Download limit reached. Sign in for more downloads or wait an hour.' });
 
 // ── Hosts ────────────────────────────────────────────────────
 // Pages are only rendered for hosts this tool serves (or that the gateway vouches for with
@@ -150,7 +166,7 @@ app.post('/api/info', async (req, res) => {
 });
 
 // Start download
-app.post('/api/download', downloadLimiter, async (req, res) => {
+app.post('/api/download', downloadLimiter, guard.toolQuota('yt'), async (req, res) => {
     const { url, quality, title } = req.body;
     if (!url) return res.status(400).json({ error: 'URL is required' });
     if (!downloader.isValidUrl(url)) return res.status(400).json({ error: 'Only YouTube URLs are supported' });
@@ -159,7 +175,9 @@ app.post('/api/download', downloadLimiter, async (req, res) => {
     if (known && known.downloadable === false) return res.status(422).json({ error: known.reason });
 
     try {
+        const who = guard.resolveCaller(req, res, { create: true });
         const { id } = await downloader.startDownload(url, quality || 'best', { title: typeof title === 'string' ? title : '' });
+        owners.set(id, who.owner);
         res.json({ success: true, id, statusUrl: `/api/status/${id}`, streamUrl: `/api/status/${id}/stream` });
     } catch (err) {
         console.error('[Download] Error:', err.message);
@@ -169,7 +187,7 @@ app.post('/api/download', downloadLimiter, async (req, res) => {
 
 // Download status (poll for progress)
 app.get('/api/status/:id', (req, res) => {
-    const status = downloader.getStatus(req.params.id);
+    const status = ownsDownload(req, res, req.params.id) ? downloader.getStatus(req.params.id) : null;
     if (!status) return res.status(404).json({ error: 'Download not found' });
     res.json(status);
 });
@@ -186,6 +204,7 @@ const SSE_EVENT = { downloading: 'progress', done: 'complete', error: 'failed' }
 
 app.get('/api/status/:id/stream', (req, res) => {
     const id = req.params.id;
+    if (!ownsDownload(req, res, id)) return res.status(404).json({ error: 'Download not found' });
 
     res.writeHead(200, {
         'Content-Type': 'text/event-stream; charset=utf-8',
@@ -235,14 +254,14 @@ app.get('/api/status/:id/stream', (req, res) => {
 
 // Cancel a running download (kills yt-dlp) or discard a finished file
 app.delete('/api/download/:id', (req, res) => {
-    const result = downloader.cancelDownload(req.params.id);
+    const result = ownsDownload(req, res, req.params.id) ? downloader.cancelDownload(req.params.id) : null;
     if (!result) return res.status(404).json({ error: 'Download not found' });
     res.json({ success: true, ...result });
 });
 
 // Serve downloaded file
 app.get('/api/download/:id', (req, res) => {
-    const entry = downloader.getFile(req.params.id);
+    const entry = ownsDownload(req, res, req.params.id) ? downloader.getFile(req.params.id) : null;
     if (!entry) return res.status(404).json({ error: 'File not found or expired' });
 
     res.set({
@@ -306,6 +325,7 @@ function shutdown() {
     console.log('[YT.OpenVibe] Shutting down...');
     analytics.destroy();
     analyticsDb.close();
+    guard.close();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(1), 5000);
 }

@@ -13,13 +13,11 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
 
+const rateLimit = require('express-rate-limit');
 const config = require('./config');
-const auth = require('./auth');
-const { optionalAuth } = auth;
 const { resolveContext, DOMAIN_MAP } = require('./domain-map');
 const { getTool, listTools } = require('./tools');
 const { uploadSingle } = require('./middleware/upload');
-const { apiLimiter, processLimiter, burstLimiter } = require('./middleware/rate-limit');
 const retention = require('./retention/manager');
 const { buildOptions, describe, processBuffer, defineJobs } = require('./process');
 const codec = require('./tools/codec');
@@ -27,6 +25,7 @@ const { hostGuard, ownHost } = require('../../_shared/host-role');
 const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
 const { createLocalRegistry, requiresStatus } = require('../../_shared/tools/local');
 const jobsRuntime = require('../../_shared/jobs');
+const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
 const contracts = require('openvibe-contracts');
 const sdk = require('openvibe-sdk');
 
@@ -40,13 +39,28 @@ const analyticsDb = new Database(analyticsDbPath);
 analyticsDb.pragma('journal_mode = WAL');
 const analytics = new AnalyticsTracker(analyticsDb, 'openvibe-img', { retention: { days: 30 } });
 
+// ── Guard (apps/_shared/guard) ───────────────────────────────
+// Who is asking (Network sign-in with aud openvibe.tools, service tokens, the browser session, else
+// the address), tiered quotas by each tool's descriptor, upload sniffing, the sync semaphore and the
+// abuse log (data/guard.db). TOOLS_GUARD=report (default) records what it would refuse.
+const SPECS = require('./descriptors').SPECS;
+const guard = createGuard({
+    app: 'img', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts, specs: SPECS,
+    issuer: config.networkUrl, networkUrl: config.networkUrl, networkInternalUrl: config.networkInternalUrl, publicKeyFiles: config.publicKeyPaths,
+});
+const { apiLimiter, processLimiter, burstLimiter } = guard.legacyLimiters(rateLimit);
+/** The tool a request is for before its body is read: the host's own, else the operation it defaults to. */
+const hostTool = (req) => (guard.tool(req.ctx.toolId) ? req.ctx.toolId : (guard.toolForJob('img.process', req.ctx.defaultOp || 'convert', null) || { id: null }).id);
+/** The tool a parsed request runs: its `tool` (operation) on this host. */
+const toolOf = (req) => { const d = guard.toolForJob('img.process', String((req.body && req.body.tool) || req.ctx.defaultOp || 'convert'), req.ctx.toolId); return d ? d.id : hostTool(req); };
+
 const app = express();
 // What this deploy runs (ADR-016); the shared navbar's release-watch polls it on every tool host.
 const release = require('openvibe-shared/release').createRelease({ service: 'tools', root: require('path').join(__dirname, '..', '..', '..') });
 // Metrics (GET /metrics, direct loopback callers only) and GET /api/ready from this server's real
 // dependencies (roadmap Track O). First, so the HTTP metrics see every request.
 const { observe, checks: ready } = require('../../_shared/observe');
-observe({
+const obs = observe({
     app, metrics: require('openvibe-shared/metrics'), ready: require('openvibe-shared/ready'),
     service: 'tools-img', release: release.release,
     checks: [
@@ -56,19 +70,20 @@ observe({
         ready.writableDir('uploads_dir', path.resolve(config.uploadsDir), { description: 'synchronous uploads' }),
         ready.writableDir('output_dir', path.resolve(config.outputDir), { description: 'synchronous results' }),
         ready.sqlite('analytics_db', analyticsDb, { required: false, description: 'visit analytics only; tools work without it' }),
-        ready.networkKey('network_key', auth.getPublicKey, { description: 'verifies signed-in users and service tokens on the job API; anonymous use works without it' }),
+        ready.networkKey('network_key', guard.keys.get, { description: 'verifies signed-in users and service tokens on the job API; anonymous use works without it' }),
         ...jobsRuntime.readyChecks(() => jobs),
         codec.heif.readyCheck('HEIC (iPhone) photos: heif-dec or heif-convert with an HEVC decoder plugin (libheif-examples + libheif-plugin-libde265); other formats work without it'),
     ],
     jobs: () => jobs,
 });
+guard.attachMetrics(obs.registry);
 app.get('/release.json', release.handler);
 
 // Legal documents live on the apex; every tool host points there instead of answering 404.
 app.get(['/terms', '/privacy', '/dmca', '/tos'], (req, res) => res.redirect(301, 'https://openvibe.tools' + (req.path === '/tos' ? '/terms' : req.path)));
 
 // ── Security ─────────────────────────────────────────────────
-app.set('trust proxy', 2); // Cloudflare → Nginx → Node
+app.set('trust proxy', TRUST_PROXY); // one hop: the host's nginx (or the gateway) on loopback; req.ip is the only address
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
@@ -100,8 +115,9 @@ app.use(exceptRegistry(cors({
     credentials: true,
 })));
 
-// ── Rate Limiting ────────────────────────────────────────────
-app.use('/api/', apiLimiter);
+// ── Who is asking, then rate limits (sign-in first, so a signed-in tier applies) ──
+app.use(guard.identify);
+app.use('/api/', apiLimiter, guard.apiQuota);
 
 // ── Tool registry (ADR-027): GET /api/v1/tools[/:id[/schema]] for this app's image tools ──
 // Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the limiter above. The
@@ -111,9 +127,6 @@ app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
 
 // ── Analytics Middleware ─────────────────────────────────────
 app.use(analytics.middleware());
-
-// ── Auth (optional on all routes) ────────────────────────────
-app.use(optionalAuth);
 
 // ── Hosts ────────────────────────────────────────────────────
 // Through the gateway the X-OV-* headers name the tool and its canonical host (a custom domain
@@ -136,8 +149,11 @@ app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', service: 'openvibe-img', version: '1.0.0', files: stats, jobs: jobs.stats() });
 });
 
-// Domain context (frontend calls this on load to get branding)
+// Domain context (frontend calls this on load to get branding). It also starts this browser's session
+// (ov_tools_jobs), so the page's first job already counts as a session rather than an address.
 app.get('/api/context', (req, res) => {
+    guard.ensureSession(req, res);
+    res.set('Cache-Control', 'private, no-store');
     const ctx = req.ctx;
     const tools = listTools();
     res.json({
@@ -161,7 +177,7 @@ app.get('/api/tools', (_req, res) => {
 });
 
 // ── Main Processing Endpoint ─────────────────────────────────
-app.post('/api/process', burstLimiter, processLimiter, uploadSingle, async (req, res) => {
+app.post('/api/process', burstLimiter, processLimiter, guard.toolQuota(hostTool), uploadSingle, guard.admitUpload(toolOf), guard.heavy(toolOf), async (req, res) => {
     try {
         const toolId = req.body.tool || req.ctx.defaultOp || 'convert';
         const tool = getTool(toolId);
@@ -183,6 +199,7 @@ app.post('/api/process', burstLimiter, processLimiter, uploadSingle, async (req,
 
         res.json({ success: true, download: saved, ...describe(toolId, result) });
     } catch (err) {
+        if (guard.toolRefused(req, res, err, toolOf(req))) return;
         if (err.status === 503) return contracts.http.sendProblem(res, 503, err.code, { detail: err.message, ctx: req.ov });
         console.error('[Process] Error:', err.message);
         res.status(422).json({ error: err.message || 'Image processing failed' });
@@ -190,7 +207,7 @@ app.post('/api/process', burstLimiter, processLimiter, uploadSingle, async (req,
 });
 
 // ── Direct Download (inline preview) ─────────────────────────
-app.post('/api/process/direct', burstLimiter, processLimiter, uploadSingle, async (req, res) => {
+app.post('/api/process/direct', burstLimiter, processLimiter, guard.toolQuota(hostTool), uploadSingle, guard.admitUpload(toolOf), guard.heavy(toolOf), async (req, res) => {
     try {
         const toolId = req.body.tool || req.ctx.defaultOp || 'convert';
         const tool = getTool(toolId);
@@ -206,6 +223,7 @@ app.post('/api/process/direct', burstLimiter, processLimiter, uploadSingle, asyn
         });
         res.send(result.buffer);
     } catch (err) {
+        if (guard.toolRefused(req, res, err, toolOf(req))) return;
         if (err.status === 503) return contracts.http.sendProblem(res, 503, err.code, { detail: err.message, ctx: req.ov });
         console.error('[Process/Direct] Error:', err.message);
         res.status(422).json({ error: err.message || 'Image processing failed' });
@@ -217,10 +235,11 @@ app.post('/api/process/direct', burstLimiter, processLimiter, uploadSingle, asyn
 // followed over SSE, reattachable by id after a reload or a restart (apps/_shared/jobs).
 const jobs = jobsRuntime.setupJobs({
     app, service: 'img', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts, sdk,
-    getPublicKey: auth.getPublicKey, issuer: auth.ISSUER,
+    getPublicKey: guard.keys.get, issuer: config.networkUrl, guard,
     define: defineJobs,
     receive: uploadSingle,
-    limiters: [burstLimiter, processLimiter],
+    limiters: [burstLimiter, processLimiter, guard.toolQuota(hostTool)],
+    jobTool: (req, type, input) => { const d = guard.toolForJob('img.process', String((input && input.tool) || req.ctx.defaultOp || 'convert'), req.ctx.toolId); return d ? d.id : null; },
     defaults(req, input) {
         const out = { ...input };
         if (!out.tool) out.tool = req.ctx.defaultOp || 'convert';
@@ -301,6 +320,7 @@ function shutdown() {
     analytics.destroy();
     analyticsDb.close();
     jobs.close();   // running jobs stay 'running' in data/jobs.db; the next boot re-queues them
+    guard.close();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(1), 5000);
 }

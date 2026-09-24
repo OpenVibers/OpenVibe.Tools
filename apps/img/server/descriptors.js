@@ -11,6 +11,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 const { DOMAIN_MAP } = require('./domain-map');
+const guardLimits = require('../../_shared/guard/limits');
 
 // tools/convert.js FORMAT_CONFIG: what convert can write, and the media type each one is.
 const FORMAT_MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', avif: 'image/avif', tiff: 'image/tiff', bmp: 'image/bmp', gif: 'image/gif', ico: 'image/x-icon' };
@@ -18,8 +19,9 @@ const FORMAT_MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', w
 const ACCEPT = ['image/png', 'image/jpeg', 'image/webp', 'image/avif', 'image/tiff', 'image/bmp', 'image/gif', 'image/heic', 'image/heif', 'image/svg+xml', 'image/x-icon', 'image/vnd.microsoft.icon'];
 const MAX_BYTES = 50 * 1024 * 1024;           // config.js upload.maxFileSize
 const TIMEOUT_MS = 5 * 60 * 1000;             // process.js img.process timeoutMs
-const SHARP_PIXELS = 268402689;               // sharp's default limitInputPixels (0x3FFF²), not raised here
-const CODEC_PIXELS = 100 * 1024 * 1024;       // tools/codec.js MAX_PIXELS: BMP written or read by our codec
+// tools/codec.js inputPixels(): no upload larger than this is decoded (sharp's limitInputPixels, and the
+// BMP, ICO and HEIC readers), 40 megapixels unless TOOLS_MAX_INPUT_PIXELS says otherwise.
+const MAX_PIXELS = guardLimits.bounds().maxInputPixels;
 const SAME_AS_INPUT = ['image/png', 'image/jpeg', 'image/webp', 'image/avif', 'image/tiff', 'image/gif', 'image/bmp'];
 
 const RESULT = {
@@ -74,7 +76,7 @@ function tool(id, extra = {}) {
         input: INPUT[op](ctx.defaultFormat),
         files: { min: 1, max: 1, accept: ACCEPT, maxBytes: MAX_BYTES },
         output: { kind: 'file', mime: out, schema: RESULT },
-        limits: { timeoutMs: TIMEOUT_MS, maxPixels: ctx.defaultFormat === 'bmp' ? CODEC_PIXELS : SHARP_PIXELS },
+        limits: { timeoutMs: TIMEOUT_MS, maxPixels: MAX_PIXELS },
         auth: { anonymous: true, capability: 'tools.tool.run' },
         quotaClass: 'tools-job', cost: op === 'convert' && ['avif', 'ico'].includes(ctx.defaultFormat) ? 8 : 5, egress: false,
         example: { input: {} },

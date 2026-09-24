@@ -1,7 +1,7 @@
 'use strict';
 // Food proxies every API call to maps. It used to call maps without the visitor's address, so maps'
 // per-IP limit (30/min) was one bucket shared by every food visitor (127.0.0.1). Now food forwards
-// X-Forwarded-For / X-Real-IP from req.ip, and maps believes X-Forwarded-For only from loopback hops.
+// X-Forwarded-For / X-Real-IP from req.ip, and maps believes X-Forwarded-For from one loopback hop only.
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
@@ -21,7 +21,8 @@ const { startApp } = require('../../_shared/test/spawn');
         assert.strictEqual(other.status, 200, 'a second visitor has their own bucket');
 
         const src = (app) => fs.readFileSync(path.join(__dirname, '..', '..', app, 'server', 'index.js'), 'utf8');
-        assert.match(src('maps'), /app\.set\('trust proxy', 'loopback'\)/, 'maps trusts forwarded addresses from loopback only');
+        assert.match(src('maps'), /app\.set\('trust proxy', TRUST_PROXY\)/, 'maps trusts one forwarded hop, on loopback only');
+        assert.match(src('food'), /app\.set\('trust proxy', TRUST_PROXY\)/);
         assert.match(src('food'), /'X-Forwarded-For': req\.ip/);
     } finally {
         await food.kill();

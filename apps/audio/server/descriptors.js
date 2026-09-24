@@ -14,11 +14,17 @@ const { DOMAIN_MAP } = require('./domain-map');
 // tools/convert.js FORMAT_CONFIG and tools/ffmpeg-helper.js FORMAT_MIME.
 const FORMAT_MIME = { mp3: 'audio/mpeg', wav: 'audio/wav', flac: 'audio/flac', ogg: 'audio/ogg', m4a: 'audio/mp4', aac: 'audio/aac', opus: 'audio/opus', wma: 'audio/x-ms-wma', aiff: 'audio/aiff', ac3: 'audio/ac3', webm: 'audio/webm' };
 const FORMATS = Object.keys(FORMAT_MIME);
-// config.js upload.allowedMimes (video types are there for the extractor; octet-stream for mis-typed uploads).
-const ACCEPT = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/wave', 'audio/flac', 'audio/x-flac', 'audio/ogg', 'audio/vorbis', 'audio/mp4', 'audio/x-m4a', 'audio/aac', 'audio/opus', 'audio/x-ms-wma', 'audio/aiff', 'audio/x-aiff', 'audio/ac3', 'audio/webm', 'audio/amr', 'video/mp4', 'video/webm', 'video/x-matroska', 'video/avi', 'video/x-msvideo', 'video/quicktime', 'video/x-flv', 'video/ogg', 'application/ogg', 'application/octet-stream'];
+// What the bytes may be (checked against the bytes by the guard, apps/_shared/guard/sniff.js; the upload
+// itself also lets application/octet-stream through, since browsers send it for audio they do not know).
+// Every operation reads audio containers, including the video containers that carry audio (MP4, WebM,
+// Matroska, QuickTime, Ogg); only the extractor also reads AVI and FLV (guard/ffmpeg.js formatsFor).
+const AUDIO_ACCEPT = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/wave', 'audio/flac', 'audio/x-flac', 'audio/ogg', 'audio/vorbis', 'audio/mp4', 'audio/x-m4a', 'audio/aac', 'audio/opus', 'audio/x-ms-wma', 'audio/aiff', 'audio/x-aiff', 'audio/ac3', 'audio/webm', 'audio/amr', 'video/mp4', 'video/webm', 'video/x-matroska', 'video/quicktime', 'video/ogg', 'application/ogg'];
+const ACCEPT = [...AUDIO_ACCEPT, 'video/avi', 'video/x-msvideo', 'video/x-flv'];
 const MAX_BYTES = 100 * 1024 * 1024;          // config.js upload.maxFileSize
 const TIMEOUT_MS = 15 * 60 * 1000;            // process.js audio.process timeoutMs
 const MERGE_MAX_SECONDS = 3 * 60 * 60;        // tools/merge.js MAX_TOTAL_SECONDS
+// Longest input any operation reads (process.js probes it first; ffmpeg reads no more than this, -t).
+const MAX_SECONDS = Math.max(1, parseInt(process.env.AUDIO_MAX_DURATION, 10) || 3 * 60 * 60);
 // An effect keeps the input's own format unless `format` names one (ffmpeg-helper getMime: amr too, anything else octet-stream).
 const ALL_OUT = [...new Set([...Object.values(FORMAT_MIME), 'audio/amr', 'application/octet-stream'])];
 
@@ -85,9 +91,9 @@ function tool(id, extra = {}) {
         job: { type: 'audio.process', operation: op, ...(fixed && { preset: { format: ctx.defaultFormat } }) },
         legacy: [op === 'merge' ? 'POST /api/process/multi' : 'POST /api/process'],
         input: INPUT[op](),
-        files: op === 'merge' ? { min: 2, max: 5, accept: ACCEPT, maxBytes: MAX_BYTES } : { min: 1, max: 1, accept: ACCEPT, maxBytes: MAX_BYTES },
+        files: { min: op === 'merge' ? 2 : 1, max: op === 'merge' ? 5 : 1, accept: op === 'extract' ? ACCEPT : AUDIO_ACCEPT, maxBytes: MAX_BYTES },
         output: { kind: 'file', mime, schema: RESULT },
-        limits: { timeoutMs: TIMEOUT_MS, ...(op === 'merge' && { maxDurationSec: MERGE_MAX_SECONDS }) },
+        limits: { timeoutMs: TIMEOUT_MS, maxDurationSec: op === 'merge' ? Math.min(MERGE_MAX_SECONDS, MAX_SECONDS) : MAX_SECONDS },
         // ffmpeg over an upload is heavy work: a browser session (the page has one), a person or a token.
         auth: { anonymous: false, capability: 'tools.tool.run' },
         quotaClass: 'tools-job', cost: op === 'merge' ? 20 : op === 'metadata' || op === 'waveform' ? 5 : 10, egress: false,
@@ -100,4 +106,4 @@ function tool(id, extra = {}) {
 const IDS = ['mp3', 'wav', 'flac', 'ogg', 'm4a', 'opus', 'aac', 'wma', 'aiff', 'ac3', 'extract', 'trim', 'merge', 'ringtone', 'speed', 'pitch', 'reverse', 'normalize', 'noise', 'silence', 'vocal', 'fade', 'loop', 'bass', 'equalizer', 'compressor', 'podcast', 'voice', 'echo', 'reverb', 'chorus', 'distortion', 'bitcrusher', 'stereo', 'waveform', 'metadata'];
 const SPECS = IDS.map(id => tool(id));
 
-module.exports = { SPECS, FORMAT_MIME, ACCEPT, MAX_BYTES, TIMEOUT_MS };
+module.exports = { SPECS, FORMAT_MIME, ACCEPT, AUDIO_ACCEPT, MAX_BYTES, TIMEOUT_MS, MAX_SECONDS };

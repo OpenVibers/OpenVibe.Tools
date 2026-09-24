@@ -24,11 +24,24 @@ const { internalOk } = require('../../_shared/internal-auth');
 const { hostGuard, stampedPage } = require('../../_shared/host-role');
 const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
 const { createLocalRegistry, requiresStatus } = require('../../_shared/tools/local');
+const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
+const { createPacer, Busy } = require('../../_shared/guard/semaphore');
 const analyticsDbPath = path.join(__dirname, '..', 'data', 'analytics.db');
 fs.mkdirSync(path.dirname(analyticsDbPath), { recursive: true });
 const analyticsDb = new Database(analyticsDbPath);
 analyticsDb.pragma('journal_mode = WAL');
 const analytics = new AnalyticsTracker(analyticsDb, 'openvibe-maps', { retention: { days: 30 } });
+
+// ── Guard (apps/_shared/guard) ───────────────────────────────
+// Who is asking (Network sign-in with aud openvibe.tools, else the address — the food app forwards its
+// visitor's), the tools-map quota on the data routes (descriptor maps: cost 2 a call) and the abuse log
+// (data/guard.db). TOOLS_GUARD=report (default) records what it would refuse.
+const NETWORK_URL = process.env.OV_NETWORK_URL || 'https://openvibe.network';
+const guard = createGuard({
+    app: 'maps', dataDir: path.join(__dirname, '..', 'data'), Database, specs: require('./descriptors').SPECS,
+    issuer: NETWORK_URL, networkUrl: NETWORK_URL, networkInternalUrl: process.env.OV_NETWORK_INTERNAL_URL || 'http://127.0.0.1:4000',
+    publicKeyFiles: [process.env.OV_NETWORK_PUBLIC_KEY].filter(Boolean),
+});
 
 const app = express();
 // What this deploy runs (ADR-016); the shared navbar's release-watch polls it on every tool host.
@@ -36,7 +49,7 @@ const release = require('openvibe-shared/release').createRelease({ service: 'too
 // Metrics (GET /metrics, direct loopback callers only) and GET /api/ready from this server's real
 // dependencies (roadmap Track O). First, so the HTTP metrics see every request.
 const { observe, checks: ready } = require('../../_shared/observe');
-observe({
+const obs = observe({
     app, metrics: require('openvibe-shared/metrics'), ready: require('openvibe-shared/ready'),
     service: 'tools-maps', release: release.release,
     checks: [
@@ -44,6 +57,7 @@ observe({
     ],
     // The public data sources maps queries (OSM and others) are not probed here: each request says when one fails.
 });
+guard.attachMetrics(obs.registry);
 app.get('/release.json', release.handler);
 
 // Legal documents live on the apex; every tool host points there instead of answering 404.
@@ -51,10 +65,10 @@ app.get(['/terms', '/privacy', '/dmca', '/tos'], (req, res) => res.redirect(301,
 const cache = new NodeCache({ stdTTL: config.cache.search, checkperiod: 60 });
 
 // ── Middleware ──────────────────────────────────────────────
-// X-Forwarded-For is believed only from loopback hops: the host's nginx, the gateway and the food
-// app (which forwards its visitor's address). Maps listens on 0.0.0.0 by default, so a direct
+// X-Forwarded-For is believed from exactly one hop on loopback: the host's nginx, the gateway or the
+// food app (which forwards its visitor's address). Maps listens on 0.0.0.0 by default, so a direct
 // caller's own header must not count.
-app.set('trust proxy', 'loopback');
+app.set('trust proxy', TRUST_PROXY);
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -73,13 +87,12 @@ app.use(exceptRegistry(cors({ origin: ['https://maps.openvibe.tools', 'https://f
 app.use(cookieParser());
 app.use(express.json());
 
-// Rate limiter
-const apiLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 30,
-  message: { error: 'Too many requests — slow down, traveler.' },
-});
-app.use('/api/', apiLimiter);
+// Rate limits: sign-in first, so limits know who is asking; everyone else counts by address (IPv6 /64).
+app.use(guard.identify);
+const apiLimiter = guard.legacyLimiter(rateLimit, { windowMs: 60 * 1000, anonymous: 30, signedIn: 60, message: 'Too many requests — slow down, traveler.' });
+app.use('/api/', apiLimiter, guard.apiQuota);
+// The map's data lookups (OpenStreetMap, weather, food banks…): the tools-map quota, by descriptor.
+app.use(['/api/geocode', '/api/search', '/api/weather', '/api/terrain', '/api/food-banks', '/api/stores', '/api/foods', '/api/meal-plan'], guard.toolQuota('maps'));
 
 // ── Tool registry (ADR-027): GET /api/v1/tools[/:id[/schema]] for this app's survival map ──
 // Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the limiter above. The
@@ -129,6 +142,9 @@ const terrain = require('./sources/terrain');
 const grocery = require('./sources/grocery');
 
 // ── Geocode endpoint ───────────────────────────────────────
+// Nominatim's usage policy is one request a second from us in all: answers are cached, and the misses
+// are paced (at most 20 waiting, none longer than 15 s; beyond that 503 with Retry-After).
+const nominatim = createPacer({ minIntervalMs: 1100, queue: 20, maxWaitMs: 15_000 });
 app.get('/api/geocode', async (req, res) => {
   const { q } = req.query;
   if (!q) return res.status(400).json({ error: 'Missing query' });
@@ -139,11 +155,11 @@ app.get('/api/geocode', async (req, res) => {
 
   try {
     const axios = require('axios');
-    const resp = await axios.get('https://nominatim.openstreetmap.org/search', {
+    const resp = await nominatim.run(() => axios.get('https://nominatim.openstreetmap.org/search', {
       params: { q, format: 'json', limit: 5, countrycodes: 'us,ca,mx' },
       headers: { 'User-Agent': 'Maps.OpenVibe/1.0 (maps.openvibe.tools)' },
       timeout: 8000,
-    });
+    }));
     const results = (resp.data || []).map(r => ({
       lat: parseFloat(r.lat),
       lon: parseFloat(r.lon),
@@ -153,6 +169,7 @@ app.get('/api/geocode', async (req, res) => {
     cache.set(cacheKey, results, config.cache.geocode);
     res.json(results);
   } catch (err) {
+    if (err instanceof Busy) return res.status(503).set('Retry-After', '15').json({ error: 'Place search is busy; try again in a few seconds.' });
     res.status(502).json({ error: 'Geocode failed' });
   }
 });
@@ -475,6 +492,7 @@ function shutdown() {
     console.log('[Maps.OpenVibe] Shutting down...');
     analytics.destroy();
     analyticsDb.close();
+    guard.close();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(1), 5000);
 }

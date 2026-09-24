@@ -11,6 +11,7 @@ const { EventEmitter } = require('events');
 const { Readable } = require('stream');
 const { createEgress } = require('../../_shared/egress');
 const createNetRoutes = require('../server/net/routes');
+const { TRUST_PROXY } = require('../../_shared/guard');
 const { createCache } = require('../server/net/cache');
 const { parseRobots, testRobots, analyseSitemap } = require('../server/net/checks');
 const { NET_TOOLS } = require('../server/net/config');
@@ -182,7 +183,7 @@ async function fakeFetch(url) {
     // ── Through the routes ──
     const egress = createEgress({ lookup, tcpConnect, tlsConnect: () => { throw new Error('unused'); }, httpRequest: fakeHttp, httpsRequest: fakeHttp });
     const app = express();
-    app.set('trust proxy', 1);   // what the gateway sets: the host's nginx is the one hop
+    app.set('trust proxy', TRUST_PROXY);   // what the gateway sets: the host's nginx on loopback is the one hop
     app.use('/api/net', createNetRoutes(null, null, { egress, resolverFor, tlsUpgrade, fetch: fakeFetch, reverse: async (ip) => (ip === '2606:4700:4700::1111' ? ['one.one.one.one'] : []) }));
     const srv = await new Promise(r => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
     const base = `http://127.0.0.1:${srv.address().port}`;
@@ -197,7 +198,7 @@ async function fakeFetch(url) {
         r = await get('/api/net/myip');
         assert.strictEqual(r.body.ip, '127.0.0.1');
         const gatewaySrc = fs.readFileSync(path.join(__dirname, '..', 'server', 'index.js'), 'utf8');
-        assert.match(gatewaySrc, /app\.set\('trust proxy', 1\)/, 'the gateway trusts exactly one proxy hop');
+        assert.match(gatewaySrc, /app\.set\('trust proxy', TRUST_PROXY\)/, 'the gateway trusts exactly one proxy hop, on loopback');
 
         // Upstream cache: ip-api once per IP, RDAP and DoH once per question.
         fetched.length = 0;

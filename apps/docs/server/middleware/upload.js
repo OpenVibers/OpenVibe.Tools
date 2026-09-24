@@ -2,16 +2,30 @@
 
 // ═══════════════════════════════════════════════════════════════
 // Docs.OpenVibe — Multer Upload Middleware
-// Memory storage with file size + mime validation.
-// Supports multiple file uploads for merge operations.
+// Disk storage (up to 50 files of 100 MB for a merge must never sit in memory while they arrive) with
+// size + declared-type validation; the guard then checks the bytes (apps/_shared/guard/sniff.js).
+// Files land in config.uploadsDir with a random name; the routes read them and delete them, and the
+// retention sweep removes anything older than retention.tempMaxAge. Job submits move them into the job.
 // ═══════════════════════════════════════════════════════════════
 
 const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
 const config = require('../config');
 
 const ALLOWED_MIMES = new Set(config.upload.allowedMimes);
 
-const storage = multer.memoryStorage();
+const uploadsDir = path.resolve(config.uploadsDir);
+fs.mkdirSync(uploadsDir, { recursive: true });
+
+const storage = multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadsDir),
+    filename: (_req, file, cb) => {
+        const ext = (path.extname(file.originalname || '').toLowerCase().match(/^\.[a-z0-9]{1,8}$/) || ['.bin'])[0];
+        cb(null, `${crypto.randomBytes(16).toString('hex')}${ext}`);
+    },
+});
 
 const upload = multer({
     storage,
@@ -30,7 +44,7 @@ const upload = multer({
 
 /**
  * Single file upload on 'file' field.
- * Attaches req.file with { buffer, originalname, mimetype, size }.
+ * Attaches req.file with { path, originalname, mimetype, size }.
  */
 function uploadSingle(req, res, next) {
     upload.single('file')(req, res, (err) => {
@@ -49,7 +63,7 @@ function uploadSingle(req, res, next) {
 
 /**
  * Multiple file upload on 'files' field (for merge, img2pdf, etc.).
- * Attaches req.files as an array.
+ * Attaches req.files as an array of { path, originalname, mimetype, size }.
  */
 function uploadMultiple(req, res, next) {
     upload.array('files', 50)(req, res, (err) => {

@@ -13,19 +13,19 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
 
+const fsp = require('fs/promises');
+const rateLimit = require('express-rate-limit');
 const config = require('./config');
-const auth = require('./auth');
-const { optionalAuth } = auth;
 const { resolveContext, DOMAIN_MAP } = require('./domain-map');
 const { getTool, listTools, BINARIES } = require('./tools');
 const { uploadSingle, uploadMultiple, uploadAny } = require('./middleware/upload');
-const { apiLimiter, processLimiter, burstLimiter } = require('./middleware/rate-limit');
 const retention = require('./retention/manager');
 const { buildOptions, defineJobs } = require('./process');
 const { hostGuard, ownHost } = require('../../_shared/host-role');
 const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
 const { createLocalRegistry, requiresStatus } = require('../../_shared/tools/local');
 const jobsRuntime = require('../../_shared/jobs');
+const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
 const contracts = require('openvibe-contracts');
 const sdk = require('openvibe-sdk');
 
@@ -39,13 +39,33 @@ const analyticsDb = new Database(analyticsDbPath);
 analyticsDb.pragma('journal_mode = WAL');
 const analytics = new AnalyticsTracker(analyticsDb, 'openvibe-docs', { retention: { days: 30 } });
 
+// ── Guard (apps/_shared/guard) ───────────────────────────────
+// Who is asking (Network sign-in with aud openvibe.tools, service tokens, the browser session, else
+// the address), tiered quotas by each tool's descriptor, upload sniffing, the sync semaphore and the
+// abuse log (data/guard.db). TOOLS_GUARD=report (default) records what it would refuse. Every PDF
+// tool needs a browser session, a sign-in or a token (descriptor auth.anonymous false).
+const SPECS = require('./descriptors').SPECS;
+const guard = createGuard({
+    app: 'docs', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts, specs: SPECS,
+    issuer: config.networkUrl, networkUrl: config.networkUrl, networkInternalUrl: config.networkInternalUrl, publicKeyFiles: config.publicKeyPaths,
+});
+const { apiLimiter, processLimiter, burstLimiter } = guard.legacyLimiters(rateLimit);
+/** The tool a request is for before its body is read: the host's own (the hubs: merge, the first). */
+const hostTool = (req) => (guard.tool(req.ctx.toolId) ? req.ctx.toolId : (guard.toolForJob('docs.process', req.ctx.defaultOp || 'merge', null) || { id: null }).id);
+/** The tool a parsed request runs: its `tool` (operation) on this host. */
+const toolOf = (req) => { const op = String((req.body && req.body.tool) || req.ctx.defaultOp || ''); const d = op ? guard.toolForJob('docs.process', op, req.ctx.toolId) : null; return d ? d.id : hostTool(req); };
+/** Read the uploaded files (on disk) and delete them. */
+async function readUploads(files) {
+    try { return await Promise.all(files.map(f => fsp.readFile(f.path))); } finally { for (const f of files) fs.unlink(f.path, () => {}); }
+}
+
 const app = express();
 // What this deploy runs (ADR-016); the shared navbar's release-watch polls it on every tool host.
 const release = require('openvibe-shared/release').createRelease({ service: 'tools', root: require('path').join(__dirname, '..', '..', '..') });
 // Metrics (GET /metrics, direct loopback callers only) and GET /api/ready from this server's real
 // dependencies (roadmap Track O). First, so the HTTP metrics see every request.
 const { observe, checks: ready } = require('../../_shared/observe');
-observe({
+const obs = observe({
     app, metrics: require('openvibe-shared/metrics'), ready: require('openvibe-shared/ready'),
     service: 'tools-docs', release: release.release,
     checks: [
@@ -55,19 +75,20 @@ observe({
         ready.writableDir('uploads_dir', path.resolve(config.uploadsDir), { description: 'synchronous uploads' }),
         ready.writableDir('output_dir', path.resolve(config.outputDir), { description: 'synchronous results' }),
         ready.sqlite('analytics_db', analyticsDb, { required: false, description: 'visit analytics only; tools work without it' }),
-        ready.networkKey('network_key', auth.getPublicKey, { description: 'verifies signed-in users and service tokens on the job API; anonymous use works without it' }),
+        ready.networkKey('network_key', guard.keys.get, { description: 'verifies signed-in users and service tokens on the job API; anonymous use works without it' }),
         ...BINARIES.map(b => b.readyCheck(b.name === 'qpdf' ? 'Protect and Unlock PDF (package qpdf); the other tools work without it' : 'PDF to image (package poppler-utils); the other tools work without it')),
         ...jobsRuntime.readyChecks(() => jobs),
     ],
     jobs: () => jobs,
 });
+guard.attachMetrics(obs.registry);
 app.get('/release.json', release.handler);
 
 // Legal documents live on the apex; every tool host points there instead of answering 404.
 app.get(['/terms', '/privacy', '/dmca', '/tos'], (req, res) => res.redirect(301, 'https://openvibe.tools' + (req.path === '/tos' ? '/terms' : req.path)));
 
 // ── Security ─────────────────────────────────────────────────
-app.set('trust proxy', 2); // Cloudflare → Nginx → Node
+app.set('trust proxy', TRUST_PROXY); // one hop: the host's nginx (or the gateway) on loopback; req.ip is the only address
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
@@ -98,8 +119,9 @@ app.use(exceptRegistry(cors({
     credentials: true,
 })));
 
-// ── Rate Limiting ────────────────────────────────────────────
-app.use('/api/', apiLimiter);
+// ── Who is asking, then rate limits (sign-in first, so a signed-in tier applies) ──
+app.use(guard.identify);
+app.use('/api/', apiLimiter, guard.apiQuota);
 
 // ── Tool registry (ADR-027): GET /api/v1/tools[/:id[/schema]] for this app's PDF tools ──
 // Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the limiter above. The
@@ -110,9 +132,6 @@ app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
 
 // ── Analytics Middleware ─────────────────────────────────────
 app.use(analytics.middleware());
-
-// ── Auth (optional on all routes) ────────────────────────────
-app.use(optionalAuth);
 
 // ── Hosts ────────────────────────────────────────────────────
 // Through the gateway the X-OV-* headers name the tool and its canonical host (a custom domain
@@ -131,6 +150,7 @@ app.use((req, _res, next) => {
 
 /** A tool's error on the synchronous endpoints: 503 problem when a tool is not set up, else { error }. */
 function sendToolError(req, res, err, label) {
+    if (guard.toolRefused(req, res, err, toolOf(req))) return undefined;
     if (err.status === 503) return contracts.http.sendProblem(res, 503, err.code || 'tools.unavailable', { detail: err.message, ctx: req.ov });
     if (!err.expose) console.error(`[${label}] Error:`, err.message);
     const status = Number.isInteger(err.status) && err.status >= 400 && err.status < 500 ? err.status : 422;
@@ -143,8 +163,11 @@ app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', service: 'openvibe-docs', version: '1.0.0', files: stats, jobs: jobs.stats() });
 });
 
-// Domain context (frontend calls this on load to get branding)
+// Domain context (frontend calls this on load to get branding). It also starts this browser's session
+// (ov_tools_jobs): PDF tools need one (or a sign-in, or a token) before the first upload.
 app.get('/api/context', (req, res) => {
+    guard.ensureSession(req, res);
+    res.set('Cache-Control', 'private, no-store');
     const ctx = req.ctx;
     const tools = listTools();
     res.json({
@@ -166,10 +189,11 @@ app.get('/api/tools', (_req, res) => {
 });
 
 // ── PDF Info (no file mutation) ──────────────────────────────
-app.post('/api/info', burstLimiter, processLimiter, uploadSingle, async (req, res) => {
+app.post('/api/info', burstLimiter, processLimiter, guard.toolQuota(hostTool), uploadSingle, guard.admitUpload(hostTool), guard.heavy(hostTool), async (req, res) => {
     try {
         const tool = getTool('metadata');
-        const result = await tool.handler(req.file.buffer, { mode: 'view' });
+        const [buffer] = await readUploads([req.file]);
+        const result = await tool.handler(buffer, { mode: 'view' });
         res.json({ success: true, ...result });
     } catch (err) {
         sendToolError(req, res, err, 'Info');
@@ -177,16 +201,17 @@ app.post('/api/info', burstLimiter, processLimiter, uploadSingle, async (req, re
 });
 
 // ── Main Processing Endpoint (single file) ───────────────────
-app.post('/api/process', burstLimiter, processLimiter, uploadSingle, async (req, res) => {
+app.post('/api/process', burstLimiter, processLimiter, guard.toolQuota(hostTool), uploadSingle, guard.admitUpload(toolOf), guard.heavy(toolOf), async (req, res) => {
     try {
         const toolId = req.body.tool || req.ctx.defaultOp;
-        if (!toolId) return res.status(400).json({ error: 'No tool specified.' });
+        if (!toolId) { fs.unlink(req.file.path, () => {}); return res.status(400).json({ error: 'No tool specified.' }); }
 
         const tool = getTool(toolId);
-        if (!tool) return res.status(400).json({ error: `Unknown tool: ${toolId}` });
+        if (!tool) { fs.unlink(req.file.path, () => {}); return res.status(400).json({ error: `Unknown tool: ${toolId}` }); }
 
         // Same options and code path as the docs.process job
-        const result = await tool.handler(req.file.buffer, buildOptions(req.body, req.ctx, false));
+        const [buffer] = await readUploads([req.file]);
+        const result = await tool.handler(buffer, buildOptions(req.body, req.ctx, false));
 
         // Some tools return view-only results (like metadata view)
         if (result.viewOnly) {
@@ -223,16 +248,18 @@ app.post('/api/process', burstLimiter, processLimiter, uploadSingle, async (req,
 });
 
 // ── Multi-File Processing Endpoint (merge, img2pdf) ──────────
-app.post('/api/process/multi', burstLimiter, processLimiter, uploadMultiple, async (req, res) => {
+app.post('/api/process/multi', burstLimiter, processLimiter, guard.toolQuota(hostTool), uploadMultiple, guard.admitUpload(toolOf), guard.heavy(toolOf), async (req, res) => {
     try {
         const toolId = req.body.tool || req.ctx.defaultOp;
-        if (!toolId) return res.status(400).json({ error: 'No tool specified.' });
+        const tool = toolId ? getTool(toolId) : null;
+        if (!tool || !tool.multiFile) {
+            for (const f of req.files) fs.unlink(f.path, () => {});
+            if (!toolId) return res.status(400).json({ error: 'No tool specified.' });
+            if (!tool) return res.status(400).json({ error: `Unknown tool: ${toolId}` });
+            return res.status(400).json({ error: `Tool "${toolId}" does not support multiple files. Use /api/process instead.` });
+        }
 
-        const tool = getTool(toolId);
-        if (!tool) return res.status(400).json({ error: `Unknown tool: ${toolId}` });
-        if (!tool.multiFile) return res.status(400).json({ error: `Tool "${toolId}" does not support multiple files. Use /api/process instead.` });
-
-        const buffers = req.files.map(f => f.buffer);
+        const buffers = await readUploads(req.files);
         const result = await tool.handler(buffers, buildOptions(req.body, req.ctx, true));
 
         // Save output
@@ -268,10 +295,11 @@ app.post('/api/process/multi', burstLimiter, processLimiter, uploadMultiple, asy
 // into data/jobs.db, followed over SSE, reattachable by id after a reload or a restart.
 const jobs = jobsRuntime.setupJobs({
     app, service: 'docs', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts, sdk,
-    getPublicKey: auth.getPublicKey, issuer: auth.ISSUER,
+    getPublicKey: guard.keys.get, issuer: config.networkUrl, guard,
     define: defineJobs,
     receive: uploadAny,
-    limiters: [burstLimiter, processLimiter],
+    limiters: [burstLimiter, processLimiter, guard.toolQuota(hostTool)],
+    jobTool: (req, type, input) => { const op = String((input && input.tool) || req.ctx.defaultOp || ''); const d = op ? guard.toolForJob('docs.process', op, req.ctx.toolId) : null; return d ? d.id : null; },
     defaults(req, input) {
         const out = { ...input };
         if (!out.tool && req.ctx.defaultOp) out.tool = req.ctx.defaultOp;
@@ -354,6 +382,7 @@ function shutdown() {
     analytics.destroy();
     analyticsDb.close();
     jobs.close();   // running jobs stay 'running' in data/jobs.db; the next boot re-queues them
+    guard.close();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(1), 5000);
 }

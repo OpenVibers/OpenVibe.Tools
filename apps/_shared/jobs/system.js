@@ -10,7 +10,10 @@
 // (onRestart: 'fail'), per job type. Queued rows simply start again.
 //
 // Bounded: at most `concurrency` jobs run at once in this process, and each owner may have at
-// most `maxActivePerOwner` queued + running jobs. Finished jobs expire (ttl chosen at submit),
+// most `maxActivePerOwner` queued + running jobs. busy() says when the whole store is over its
+// bounds — `maxQueued` jobs waiting (all owners), or `diskBudgetBytes` under <dataDir>/jobs — so the
+// HTTP layer can answer 503 tools.busy with Retry-After before it accepts an upload (through the
+// guard: refused in enforce mode, recorded in report mode). Finished jobs expire (ttl chosen at submit),
 // and the pruner deletes the row, its events, its files and any Media objects it made — except
 // while something references the result (reference(), e.g. a paste or a project that points at the
 // Media object), and never while Media keeps an object (a retention hold, or Media unreachable):
@@ -75,6 +78,10 @@ const scrub = (msg) => String(msg || '').replace(/(?:\/[\w.-]+){2,}/g, '[file]')
  * @param {string} o.dataDir       where job files live (<dataDir>/jobs/<id>/…)
  * @param {number} [o.concurrency=2]
  * @param {number} [o.maxActivePerOwner=10]
+ * @param {number} [o.maxActivePerAddress]  unfinished browser-session jobs per address (ipKey), all
+ *                                        sessions together (default 3 × maxActivePerOwner); see addressFull()
+ * @param {number} [o.maxQueued=0]        queued jobs (all owners) before busy() says so; 0 = no bound
+ * @param {number} [o.diskBudgetBytes=0]  bytes under <dataDir>/jobs before busy() says so; 0 = no bound
  * @param {object} [o.media]       result store from ./media (null = keep results on local disk)
  * @param {object} [o.outbox]      openvibe-sdk outbox on `db` (./events outboxFromEnv); null = no platform events
  * @param {number} [o.pruneIntervalMs=300000]
@@ -91,6 +98,10 @@ function createJobSystem(o) {
     const throttleMs = o.progressThrottleMs == null ? 250 : o.progressThrottleMs;
     const root = path.resolve(o.dataDir, 'jobs');
     fs.mkdirSync(root, { recursive: true });
+    const maxQueued = o.maxQueued > 0 ? o.maxQueued : 0;
+    const maxActivePerAddress = o.maxActivePerAddress > 0 ? o.maxActivePerAddress : 3 * maxActivePerOwner;
+    const diskBudget = o.diskBudgetBytes > 0 ? o.diskBudgetBytes : 0;
+    const disk = { bytes: 0, at: 0, scanning: null };
     const announce = createJobEvents({ contracts, service: o.service, outbox: o.outbox || null, referenceCount: (id) => store.referenceCount(id), log });
 
     const types = new Map();
@@ -191,7 +202,7 @@ function createJobSystem(o) {
     // Developer-app sandbox jobs: fewer at a time, kept briefly, results never leave this server.
     const SANDBOX_MAX_ACTIVE = Math.max(1, o.sandboxMaxActivePerOwner || 2);
     const SANDBOX_TTL_MS = 30 * 60 * 1000;
-    async function submit({ owner, type, input = {}, files = [], idempotencyKey = null, ttlMs = HOUR, env = 'production' }) {
+    async function submit({ owner, type, input = {}, files = [], idempotencyKey = null, ttlMs = HOUR, env = 'production', ipKey = null }) {
         if (env !== 'sandbox') env = 'production';
         if (env === 'sandbox') ttlMs = Math.min(ttlMs, SANDBOX_TTL_MS);
         if (stopped) throw new JobError(503, 'tools.job.unavailable', 'The job system is shutting down');
@@ -240,6 +251,7 @@ function createJobSystem(o) {
                         id, type, type_version: def.version, owner, input_json: JSON.stringify(input), files_json: JSON.stringify(stored),
                         idempotency_key: idempotencyKey == null ? null : String(idempotencyKey), request_hash: requestHash,
                         max_attempts: def.maxAttempts, ttl_ms: ttlMs, now: Date.now(), env,
+                        ip_key: String(owner).startsWith('session:') && ipKey ? String(ipKey) : null,
                     });
                     announce.created(store.get(id));
                 })();
@@ -253,6 +265,7 @@ function createJobSystem(o) {
                 }
                 throw err;
             }
+            disk.bytes += stored.reduce((n, f) => n + (f.size || 0), 0);
             emit(id, 'job.queued');
             kick();
             return { job: store.get(id), replayed: false };
@@ -461,7 +474,7 @@ function createJobSystem(o) {
                 store.insert({
                     id: next, type: row.type, type_version: def.version, owner: row.owner, input_json: row.input_json, files_json: JSON.stringify(stored),
                     idempotency_key: null, request_hash: row.request_hash, max_attempts: def.maxAttempts, ttl_ms: row.ttl_ms, now: Date.now(),
-                    env: row.env, retry_of: row.id,
+                    env: row.env, retry_of: row.id, ip_key: row.ip_key || null,
                 });
                 announce.created(store.get(next));
             })();
@@ -573,9 +586,60 @@ function createJobSystem(o) {
         return n;
     }
 
+    // ── Host-wide bounds ───────────────────────────────────────
+    /** Bytes under <dataDir>/jobs (inputs and results), walked in the background at most every 30 s. */
+    async function scanDisk() {
+        let total = 0;
+        const walk = async (dir) => {
+            let entries = [];
+            try { entries = await fsp.readdir(dir, { withFileTypes: true }); } catch { return; }
+            for (const e of entries) {
+                const p = path.join(dir, e.name);
+                if (e.isDirectory()) await walk(p);
+                else if (e.isFile()) { try { total += (await fsp.stat(p)).size; } catch { /* gone meanwhile */ } }
+            }
+        };
+        await walk(root);
+        disk.bytes = total;
+        disk.at = Date.now();
+        return total;
+    }
+    function refreshDisk() {
+        if (!disk.scanning) disk.scanning = scanDisk().catch(() => disk.bytes).finally(() => { disk.scanning = null; });
+        return disk.scanning;
+    }
+
+    /**
+     * Is the store over its bounds? → null, or { reason: 'queue'|'disk', detail, retryAfter } for a
+     * 503 tools.busy. Cheap: one COUNT and the last disk walk (a stale walk is refreshed in the background).
+     */
+    function busy() {
+        if (maxQueued) {
+            const queued = store.counts().queued || 0;
+            if (queued >= maxQueued) return { reason: 'queue', detail: `${queued} jobs are already waiting on this server; try again in a minute.`, retryAfter: 60, queued, limit: maxQueued };
+        }
+        if (diskBudget) {
+            if (Date.now() - disk.at > 30_000) refreshDisk();
+            if (disk.bytes >= diskBudget) return { reason: 'disk', detail: 'This server is holding as many files as it can right now; try again in a few minutes.', retryAfter: 300, bytes: disk.bytes, limit: diskBudget };
+        }
+        return null;
+    }
+
+    /**
+     * Browser sessions from one address together have maxActivePerAddress unfinished jobs: → null, or
+     * { active, limit } when a new session job from `ipKey` would pass it (the HTTP layer answers 429
+     * tools.job.too_many_active through the guard). Principals and people are bounded per owner only.
+     */
+    function addressFull(owner, ipKey) {
+        if (!ipKey || !String(owner || '').startsWith('session:')) return null;
+        const active = store.activeForIp(ipKey);
+        return active >= maxActivePerAddress ? { active, limit: maxActivePerAddress } : null;
+    }
+
     function start() {
         if (started) return api;
         started = true;
+        if (diskBudget) refreshDisk();
         const r = recover();
         if (r.requeued || r.failed) log.log(`[Jobs] ${o.service}: ${r.requeued} job(s) re-queued, ${r.failed} failed after restart`);
         prune().catch(() => {});
@@ -610,6 +674,7 @@ function createJobSystem(o) {
 
     const api = {
         define, submit, cancel, retry, reference, unreference, subscribe, start, stop, onStop, prune, recover, view, resultFile,
+        busy, refreshDisk, addressFull, bounds: { maxQueued, diskBudgetBytes: diskBudget, maxActivePerAddress },
         get: (id) => store.get(id),
         eventsAfter: (id, seq) => store.eventsAfter(id, seq),
         lastSeq: (id) => store.lastSeq(id),

@@ -27,6 +27,7 @@ const createNetRoutes = require('./net/routes');
 const { NET_TOOL_MAP, NET_ALIASES } = require('./net/config');
 const createDevRoutes = require('./dev/routes');
 const { DEV_TOOL_MAP, DEV_ALIASES } = require('./dev/config');
+const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
 
 const app = express();
 // What this deploy runs (ADR-016); the shared navbar's release-watch polls it on every tool host.
@@ -51,6 +52,19 @@ const registry = require('./registry');
 const toolRegistry = require('./registry/descriptors');
 const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
 let auth = null;   // created below; the key check reads it at request time
+
+// ── Guard (apps/_shared/guard) ───────────────────────────────
+// Who is asking (Network sign-in with aud openvibe.tools, service tokens, the browser session, else
+// the address), the tools-api quota, the net and dev tools' quotas by descriptor, the per-target
+// throttle, the port-scan cap, webhook bin caps and the abuse log (data/guard.db). The Network key is
+// the OAuth client's (loaded and retried by it). TOOLS_GUARD=report (default) records what it would refuse.
+const guard = createGuard({
+    app: 'gateway', dataDir: require('path').resolve(__dirname, '..', process.env.DATA_DIR || 'data'),
+    Database: require('better-sqlite3'), contracts: require('openvibe-contracts'),
+    specs: [...require('./net/descriptors').SPECS, ...require('./dev/descriptors').SPECS],
+    issuer: config.networkUrl,
+    keys: { get: () => (auth && auth.client.publicKey) || null, ensure: () => (auth ? auth.ensureKey() : Promise.resolve(null)) },
+});
 const obs = observe({
     app, metrics: require('openvibe-shared/metrics'), ready: require('openvibe-shared/ready'),
     service: 'tools', release: release.release, mountReady: false,
@@ -76,6 +90,7 @@ const obs = observe({
         ...Object.entries(SATELLITES).map(([name, port]) => ready.upstream(`satellite_${name}`, `http://127.0.0.1:${port}/api/ready`, { description: `${name} satellite (port ${port}); its hosts fail without it` })),
     ],
 });
+guard.attachMetrics(obs.registry);
 app.get('/release.json', release.handler);
 
 function getRequestHost(req) {
@@ -84,9 +99,10 @@ function getRequestHost(req) {
 
 // ── Security ─────────────────────────────────────────────────
 // One hop: the host's nginx, which applies Cloudflare's real IP (real_ip_header CF-Connecting-IP) and
-// sets X-Forwarded-For to $remote_addr. req.ip is that address; anything a client put in its own
-// X-Forwarded-For stays to the left of it and is never believed (myip, rate limits, forwarded IPs).
-app.set('trust proxy', 1);
+// sets X-Forwarded-For to $remote_addr, on loopback (TRUST_PROXY). req.ip is that address; anything a
+// client put in its own X-Forwarded-For is never believed (myip, rate limits, forwarded IPs). The
+// satellites this gateway proxies to get req.ip as their one hop (registry/host-middleware.js).
+app.set('trust proxy', TRUST_PROXY);
 
 app.use(helmet({
     contentSecurityPolicy: {
@@ -155,9 +171,10 @@ app.use(exceptRegistry(cors({
     credentials: true,
 })));
 
-// ── Rate Limiting ────────────────────────────────────────────
-app.use('/api/', rateLimit({ windowMs: 60_000, max: 120 }));
-app.use('/auth/', rateLimit({ windowMs: 15 * 60_000, max: 60 }));
+// ── Who is asking, then rate limits (sign-in first, so a signed-in tier applies) ──
+app.use(guard.identify);
+app.use('/api/', guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: 120, signedIn: 240, message: 'Too many requests. Please try again later.' }), guard.apiQuota);
+app.use('/auth/', rateLimit({ windowMs: 15 * 60_000, max: 60, keyGenerator: (req) => guard.caller(req).ipKey }));
 
 // ── Tool registry (ADR-027, capability tools.tool.read) ──────
 // GET /api/v1/tools (tools.tool-list@1), /api/v1/tools/:id (tools.tool@1), /api/v1/tools/:id/schema.
@@ -195,7 +212,7 @@ app.get('/api/brand', (_req, res) => res.json(BRAND));
 // which owns pastes (roadmap Wave 5). The visitor's Network JWT goes along: Community verifies it and
 // files writes under the person's canonical subject, so no site has to translate ids any more. The
 // client address goes along too, for Community's anonymous-write limits.
-app.use('/api/pastes', rateLimit({ windowMs: 60_000, max: 120 }), async (req, res) => {
+app.use('/api/pastes', guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: 120, signedIn: 240, message: 'Too many requests. Please try again later.' }), async (req, res) => {
     try {
         const target = `${config.communityUrl}/api/pastes${req.url}`;
         const fetchOpts = { method: req.method, headers: {} };
@@ -222,10 +239,10 @@ app.use('/api/pastes', rateLimit({ windowMs: 60_000, max: 120 }), async (req, re
 });
 
 // ── Net.OpenVibe — Network Tools API ─────────────────────────
-app.use('/api/net', rateLimit({ windowMs: 60_000, max: 60 }), createNetRoutes(null, requireAuth));
+app.use('/api/net', guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: 60, signedIn: 120, message: 'Too many requests. Please try again later.' }), createNetRoutes(null, requireAuth, { guard }));
 
 // ── Dev.OpenVibe — Developer & SEO Tools API ─────────────────
-app.use('/api/dev', rateLimit({ windowMs: 60_000, max: 60 }), createDevRoutes(null, requireAuth));
+app.use('/api/dev', guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: 60, signedIn: 120, message: 'Too many requests. Please try again later.' }), createDevRoutes(null, requireAuth, { guard }));
 
 // ── Host-header subdomain routing ────────────────────────────
 function subdomainOf(req) {

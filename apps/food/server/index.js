@@ -19,11 +19,23 @@ const { internalOk } = require('../../_shared/internal-auth');
 const { hostGuard, stampedPage } = require('../../_shared/host-role');
 const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
 const { createLocalRegistry, requiresStatus } = require('../../_shared/tools/local');
+const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
 const analyticsDbPath = path.join(__dirname, '..', 'data', 'analytics.db');
 fs.mkdirSync(path.dirname(analyticsDbPath), { recursive: true });
 const analyticsDb = new Database(analyticsDbPath);
 analyticsDb.pragma('journal_mode = WAL');
 const analytics = new AnalyticsTracker(analyticsDb, 'openvibe-food', { retention: { days: 30 } });
+
+// ── Guard (apps/_shared/guard) ───────────────────────────────
+// Who is asking (Network sign-in with aud openvibe.tools, else the address), the tools-api quota and
+// the abuse log (data/guard.db). The data lookups are counted by maps (tools-map), which gets the
+// visitor's address from here. TOOLS_GUARD=report (default) records what it would refuse.
+const NETWORK_URL = process.env.OV_NETWORK_URL || 'https://openvibe.network';
+const guard = createGuard({
+    app: 'food', dataDir: path.join(__dirname, '..', 'data'), Database, specs: require('../../maps/server/descriptors').SPECS.filter(s => s.id === 'food'),
+    issuer: NETWORK_URL, networkUrl: NETWORK_URL, networkInternalUrl: process.env.OV_NETWORK_INTERNAL_URL || 'http://127.0.0.1:4000',
+    publicKeyFiles: [process.env.OV_NETWORK_PUBLIC_KEY].filter(Boolean),
+});
 
 const PORT = parseInt(process.env.PORT) || 4011;
 const MAPS_API = process.env.MAPS_API || 'http://127.0.0.1:4010';
@@ -34,7 +46,7 @@ const release = require('openvibe-shared/release').createRelease({ service: 'too
 // Metrics (GET /metrics, direct loopback callers only) and GET /api/ready from this server's real
 // dependencies (roadmap Track O). First, so the HTTP metrics see every request.
 const { observe, checks: ready } = require('../../_shared/observe');
-observe({
+const obs = observe({
     app, metrics: require('openvibe-shared/metrics'), ready: require('openvibe-shared/ready'),
     service: 'tools-food', release: release.release,
     checks: [
@@ -43,14 +55,15 @@ observe({
         ready.sqlite('analytics_db', analyticsDb, { required: false, description: 'visit analytics only' }),
     ],
 });
+guard.attachMetrics(obs.registry);
 app.get('/release.json', release.handler);
 
 // Legal documents live on the apex; every tool host points there instead of answering 404.
 app.get(['/terms', '/privacy', '/dmca', '/tos'], (req, res) => res.redirect(301, 'https://openvibe.tools' + (req.path === '/tos' ? '/terms' : req.path)));
 
-// Only loopback hops (the host's nginx, the gateway) are proxies: req.ip is the first address before
-// them, which is what maps is told below. A client's own X-Forwarded-For is never believed.
-app.set('trust proxy', 'loopback');
+// One hop on loopback (the host's nginx, or the gateway) is the proxy: req.ip is the address it gives,
+// which is what maps is told below. A client's own X-Forwarded-For is never believed.
+app.set('trust proxy', TRUST_PROXY);
 app.use(exceptRegistry(cors({
   origin(origin, callback) {
     if (!origin) return callback(null, true);
@@ -74,7 +87,11 @@ app.use(helmet({
     },
   },
 }));
-app.use(rateLimit({ windowMs: 60000, max: 60 }));
+// Sign-in first, so limits know who is asking; everyone else counts by address (IPv6 /64).
+app.use(cookieParser());
+app.use(guard.identify);
+app.use(guard.legacyLimiter(rateLimit, { windowMs: 60000, anonymous: 60, signedIn: 120, message: 'Too many requests. Please try again later.' }));
+app.use('/api/', guard.apiQuota);
 
 // ── Tool registry (ADR-027): GET /api/v1/tools[/:id[/schema]] for this app's food finder ──
 // Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the limiter above. The
@@ -82,7 +99,6 @@ app.use(rateLimit({ windowMs: 60000, max: 60 }));
 // The food finder is built on the maps backend; its descriptor lives with the maps app's.
 const toolRegistry = createLocalRegistry({ specs: require('../../maps/server/descriptors').SPECS.filter(s => s.id === 'food') });
 app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
-app.use(cookieParser());
 
 // ── Analytics Middleware ─────────────────────────────────────
 app.use(analytics.middleware());
@@ -145,6 +161,7 @@ function shutdown() {
     console.log('[Food.OpenVibe] Shutting down...');
     analytics.destroy();
     analyticsDb.close();
+    guard.close();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(1), 5000);
 }

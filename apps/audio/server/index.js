@@ -13,21 +13,20 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
 
+const rateLimit = require('express-rate-limit');
 const config = require('./config');
-const auth = require('./auth');
-const { optionalAuth } = auth;
 const { resolveContext, DOMAIN_MAP } = require('./domain-map');
 const { getTool, listTools } = require('./tools');
 const { readMetadata } = require('./tools/metadata');
 const { uploadSingle, uploadMultiple, uploadAny } = require('./middleware/upload');
-const { apiLimiter, processLimiter, burstLimiter } = require('./middleware/rate-limit');
 const retention = require('./retention/manager');
 const { probe, getDuration, cleanTmp } = require('./tools/ffmpeg-helper');
-const { buildOptions, describe, defineJobs } = require('./process');
+const { buildOptions, describe, defineJobs, runSync, jobContext, limitsFor } = require('./process');
 const { hostGuard, ownHost } = require('../../_shared/host-role');
 const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
 const { createLocalRegistry, requiresStatus } = require('../../_shared/tools/local');
 const jobsRuntime = require('../../_shared/jobs');
+const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
 const contracts = require('openvibe-contracts');
 const sdk = require('openvibe-sdk');
 
@@ -41,13 +40,29 @@ const analyticsDb = new Database(analyticsDbPath);
 analyticsDb.pragma('journal_mode = WAL');
 const analytics = new AnalyticsTracker(analyticsDb, 'openvibe-audio', { retention: { days: 30 } });
 
+// ── Guard (apps/_shared/guard) ───────────────────────────────
+// Who is asking (Network sign-in with aud openvibe.tools, service tokens, the browser session, else
+// the address), tiered quotas by each tool's descriptor, upload sniffing, the sync semaphore and the
+// abuse log (data/guard.db). TOOLS_GUARD=report (default) records what it would refuse. Every audio
+// tool needs a browser session, a sign-in or a token (descriptor auth.anonymous false).
+const SPECS = require('./descriptors').SPECS;
+const guard = createGuard({
+    app: 'audio', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts, specs: SPECS,
+    issuer: config.networkUrl, networkUrl: config.networkUrl, networkInternalUrl: config.networkInternalUrl, publicKeyFiles: config.publicKeyPaths,
+});
+const { apiLimiter, processLimiter, burstLimiter } = guard.legacyLimiters(rateLimit);
+/** The tool a request is for before its body is read: the host's own, else the operation it defaults to. */
+const hostTool = (req) => (guard.tool(req.ctx.toolId) ? req.ctx.toolId : (guard.toolForJob('audio.process', req.ctx.defaultOp || 'convert', null) || { id: null }).id);
+/** The tool a parsed request runs: its `tool` (operation) on this host. */
+const toolOf = (req) => { const d = guard.toolForJob('audio.process', String((req.body && req.body.tool) || req.ctx.defaultOp || 'convert'), req.ctx.toolId); return d ? d.id : hostTool(req); };
+
 const app = express();
 // What this deploy runs (ADR-016); the shared navbar's release-watch polls it on every tool host.
 const release = require('openvibe-shared/release').createRelease({ service: 'tools', root: require('path').join(__dirname, '..', '..', '..') });
 // Metrics (GET /metrics, direct loopback callers only) and GET /api/ready from this server's real
 // dependencies (roadmap Track O). First, so the HTTP metrics see every request.
 const { observe, checks: ready, which } = require('../../_shared/observe');
-observe({
+const obs = observe({
     app, metrics: require('openvibe-shared/metrics'), ready: require('openvibe-shared/ready'),
     service: 'tools-audio', release: release.release,
     checks: [
@@ -57,19 +72,20 @@ observe({
         ready.writableDir('uploads_dir', path.resolve(config.uploadsDir), { description: 'synchronous uploads' }),
         ready.writableDir('output_dir', path.resolve(config.outputDir), { description: 'synchronous results' }),
         ready.sqlite('analytics_db', analyticsDb, { required: false, description: 'visit analytics only; tools work without it' }),
-        ready.networkKey('network_key', auth.getPublicKey, { description: 'verifies signed-in users and service tokens on the job API; anonymous use works without it' }),
+        ready.networkKey('network_key', guard.keys.get, { description: 'verifies signed-in users and service tokens on the job API; anonymous use works without it' }),
         ...jobsRuntime.readyChecks(() => jobs),
         ready.binary('ffmpeg', process.env.FFMPEG_PATH || 'ffmpeg', { description: 'every audio tool runs ffmpeg; without it jobs and conversions fail' }),
     ],
     jobs: () => jobs,
 });
+guard.attachMetrics(obs.registry);
 app.get('/release.json', release.handler);
 
 // Legal documents live on the apex; every tool host points there instead of answering 404.
 app.get(['/terms', '/privacy', '/dmca', '/tos'], (req, res) => res.redirect(301, 'https://openvibe.tools' + (req.path === '/tos' ? '/terms' : req.path)));
 
 // ── Security ─────────────────────────────────────────────────
-app.set('trust proxy', 2); // Cloudflare → Nginx → Node
+app.set('trust proxy', TRUST_PROXY); // one hop: the host's nginx (or the gateway) on loopback; req.ip is the only address
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
@@ -101,8 +117,9 @@ app.use(exceptRegistry(cors({
     credentials: true,
 })));
 
-// ── Rate Limiting ────────────────────────────────────────────
-app.use('/api/', apiLimiter);
+// ── Who is asking, then rate limits (sign-in first, so a signed-in tier applies) ──
+app.use(guard.identify);
+app.use('/api/', apiLimiter, guard.apiQuota);
 
 // ── Tool registry (ADR-027): GET /api/v1/tools[/:id[/schema]] for this app's audio tools ──
 // Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the limiter above. The
@@ -112,9 +129,6 @@ app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
 
 // ── Analytics Middleware ─────────────────────────────────────
 app.use(analytics.middleware());
-
-// ── Auth (optional on all routes) ────────────────────────────
-app.use(optionalAuth);
 
 // ── Hosts ────────────────────────────────────────────────────
 // Through the gateway the X-OV-* headers name the tool and its canonical host (a custom domain
@@ -137,8 +151,11 @@ app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', service: 'openvibe-audio', version: '1.0.0', files: stats, jobs: jobs.stats() });
 });
 
-// Domain context (frontend calls this on load to get branding)
+// Domain context (frontend calls this on load to get branding). It also starts this browser's session
+// (ov_tools_jobs): audio tools need one (or a sign-in, or a token) before the first upload.
 app.get('/api/context', (req, res) => {
+    guard.ensureSession(req, res);
+    res.set('Cache-Control', 'private, no-store');
     const ctx = req.ctx;
     const tools = listTools();
     res.json({
@@ -160,10 +177,10 @@ app.get('/api/tools', (_req, res) => {
 });
 
 // ── Probe / Metadata Endpoint ────────────────────────────────
-app.post('/api/probe', burstLimiter, processLimiter, uploadSingle, async (req, res) => {
+app.post('/api/probe', burstLimiter, processLimiter, guard.toolQuota('metadata'), uploadSingle, guard.admitUpload(() => 'metadata'), async (req, res) => {
     try {
-        const info = await probe(req.file.path);
-        const meta = await readMetadata(req.file.path);
+        // Hardened like every run: local files only, audio demuxers only.
+        const { info, meta } = await jobContext.run(limitsFor('metadata'), async () => ({ info: await probe(req.file.path), meta: await readMetadata(req.file.path) }));
         cleanTmp(req.file.path);
         res.json({ success: true, ...meta, probe: info.format });
     } catch (err) {
@@ -173,7 +190,7 @@ app.post('/api/probe', burstLimiter, processLimiter, uploadSingle, async (req, r
 });
 
 // ── Main Processing Endpoint ─────────────────────────────────
-app.post('/api/process', burstLimiter, processLimiter, uploadSingle, async (req, res) => {
+app.post('/api/process', burstLimiter, processLimiter, guard.toolQuota(hostTool), uploadSingle, guard.admitUpload(toolOf), guard.heavy(toolOf), async (req, res) => {
     try {
         const toolId = req.body.tool || req.ctx.defaultOp || 'convert';
         const tool = getTool(toolId);
@@ -186,8 +203,8 @@ app.post('/api/process', burstLimiter, processLimiter, uploadSingle, async (req,
             return res.status(400).json({ error: `${tool.label} takes several files: send them in "files" to /api/process/multi` });
         }
 
-        // Execute the tool (same options and code path as the audio.process job)
-        const result = await tool.handler(req.file.path, buildOptions(req.body, toolId, req.ctx));
+        // Execute the tool (same options, hardening and code path as the audio.process job; killed at its timeout)
+        const result = await runSync(res, toolId, req.file.path, buildOptions(req.body, toolId, req.ctx));
 
         // Clean up the uploaded input file
         cleanTmp(req.file.path);
@@ -207,13 +224,14 @@ app.post('/api/process', burstLimiter, processLimiter, uploadSingle, async (req,
         res.json({ success: true, download: saved, ...describe(toolId, result, saved.size, inputSize) });
     } catch (err) {
         cleanTmp(req.file?.path);
+        if (guard.toolRefused(req, res, err, toolOf(req))) return;
         console.error('[Process] Error:', err.message);
         res.status(422).json({ error: err.message || 'Audio processing failed' });
     }
 });
 
 // ── Multi-File Processing Endpoint (merge) ───────────────────
-app.post('/api/process/multi', burstLimiter, processLimiter, uploadMultiple, async (req, res) => {
+app.post('/api/process/multi', burstLimiter, processLimiter, guard.toolQuota(hostTool), uploadMultiple, guard.admitUpload(toolOf), guard.heavy(toolOf), async (req, res) => {
     const paths = req.files.map(f => f.path);
     try {
         const toolId = req.body.tool || req.ctx.defaultOp;
@@ -222,7 +240,7 @@ app.post('/api/process/multi', burstLimiter, processLimiter, uploadMultiple, asy
             cleanTmp(...paths);
             return res.status(400).json({ error: tool ? `Tool "${toolId}" takes one file: use /api/process` : `Unknown tool: ${toolId}` });
         }
-        const result = await tool.handler(paths, buildOptions(req.body, toolId, req.ctx));
+        const result = await runSync(res, toolId, req.files.map(f => f.path), buildOptions(req.body, toolId, req.ctx));
         cleanTmp(...paths);
         const first = req.files[0].originalname || 'audio';
         const saved = retention.saveOutputFromFile(result.outputPath, result.ext, result.mime, !!req.user,
@@ -230,7 +248,8 @@ app.post('/api/process/multi', burstLimiter, processLimiter, uploadMultiple, asy
         const inputSize = req.files.reduce((n, f) => n + f.size, 0);
         res.json({ success: true, download: saved, ...describe(toolId, result, saved.size, inputSize), fileCount: req.files.length });
     } catch (err) {
-        cleanTmp(...paths);
+        cleanTmp(...req.files.map(f => f.path));
+        if (guard.toolRefused(req, res, err, toolOf(req))) return;
         console.error('[Process/Multi] Error:', err.message);
         res.status(422).json({ error: err.message || 'Audio processing failed' });
     }
@@ -242,10 +261,11 @@ app.post('/api/process/multi', burstLimiter, processLimiter, uploadMultiple, asy
 // after a reload or a restart (apps/_shared/jobs).
 const jobs = jobsRuntime.setupJobs({
     app, service: 'audio', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts, sdk,
-    getPublicKey: auth.getPublicKey, issuer: auth.ISSUER,
+    getPublicKey: guard.keys.get, issuer: config.networkUrl, guard,
     define: defineJobs,
     receive: uploadAny,
-    limiters: [burstLimiter, processLimiter],
+    limiters: [burstLimiter, processLimiter, guard.toolQuota(hostTool)],
+    jobTool: (req, type, input) => { const d = guard.toolForJob('audio.process', String((input && input.tool) || req.ctx.defaultOp || 'convert'), req.ctx.toolId); return d ? d.id : null; },
     defaults(req, input) {
         const out = { ...input };
         if (!out.tool) out.tool = req.ctx.defaultOp || 'convert';
@@ -355,6 +375,7 @@ function shutdown() {
     analytics.destroy();
     analyticsDb.close();
     jobs.close();   // running jobs stay 'running' in data/jobs.db; the next boot re-queues them
+    guard.close();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(1), 5000);
 }

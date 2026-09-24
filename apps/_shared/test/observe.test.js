@@ -71,7 +71,9 @@ function assertShape(body, service) {
         const fd = new FormData();
         fd.append('type', 'img.process');
         fd.append('input', JSON.stringify({ tool: 'convert', format: 'webp' }));
-        fd.append('file', new Blob([Buffer.from('not really a png')], { type: 'image/png' }), 'a.png');
+        // A real 1×1 PNG: uploads are sniffed (apps/_shared/guard), so bytes must be what they claim.
+        const onePx = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8ffff3f0005fe02fea7d6a4c50000000049454e44ae426082', 'hex');
+        fd.append('file', new Blob([onePx], { type: 'image/png' }), 'a.png');
         const sub = await fetch(`${img.base}/api/v1/jobs`, { method: 'POST', body: fd });
         assert.strictEqual(sub.status, 202, await sub.clone().text());
         const job = await sub.json();

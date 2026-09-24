@@ -17,11 +17,22 @@ const { internalOk } = require('../../_shared/internal-auth');
 const { hostGuard } = require('../../_shared/host-role');
 const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
 const { createLocalRegistry, requiresStatus } = require('../../_shared/tools/local');
+const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
 const analyticsDbPath = path.resolve(__dirname, '..', process.env.DATA_DIR || 'data', 'analytics.db');
 fs.mkdirSync(path.dirname(analyticsDbPath), { recursive: true });
 const analyticsDb = new Database(analyticsDbPath);
 analyticsDb.pragma('journal_mode = WAL');
 const analytics = new AnalyticsTracker(analyticsDb, 'openvibe-text', { retention: { days: 30 } });
+
+// ── Guard (apps/_shared/guard) ───────────────────────────────
+// Who is asking (Network sign-in with aud openvibe.tools, else the address), the tools-api quota on
+// /api/ and the abuse log (data/guard.db). TOOLS_GUARD=report (default) records what it would refuse.
+const NETWORK_URL = process.env.OV_NETWORK_URL || 'https://openvibe.network';
+const guard = createGuard({
+    app: 'text', dataDir: path.resolve(__dirname, '..', process.env.DATA_DIR || 'data'), Database, specs: require('./descriptors').SPECS,
+    issuer: NETWORK_URL, networkUrl: NETWORK_URL, networkInternalUrl: process.env.OV_NETWORK_INTERNAL_URL || 'http://127.0.0.1:4000',
+    publicKeyFiles: [process.env.OV_NETWORK_PUBLIC_KEY].filter(Boolean),
+});
 
 const app = express();
 // What this deploy runs (ADR-016); the shared navbar's release-watch polls it on every tool host.
@@ -29,20 +40,21 @@ const release = require('openvibe-shared/release').createRelease({ service: 'too
 // Metrics (GET /metrics, direct loopback callers only) and GET /api/ready from this server's real
 // dependencies (roadmap Track O). First, so the HTTP metrics see every request.
 const { observe, checks: ready } = require('../../_shared/observe');
-observe({
+const obs = observe({
     app, metrics: require('openvibe-shared/metrics'), ready: require('openvibe-shared/ready'),
     service: 'tools-text', release: release.release,
     checks: [
         ready.sqlite('analytics_db', analyticsDb, { required: false, description: 'visit analytics only; the text tools run in the browser and on this process' }),
     ],
 });
+guard.attachMetrics(obs.registry);
 app.get('/release.json', release.handler);
 
 // Legal documents live on the apex; every tool host points there instead of answering 404.
 app.get(['/terms', '/privacy', '/dmca', '/tos'], (req, res) => res.redirect(301, 'https://openvibe.tools' + (req.path === '/tos' ? '/terms' : req.path)));
 
 // ── Security ─────────────────────────────────────────────────
-app.set('trust proxy', 2);
+app.set('trust proxy', TRUST_PROXY); // one hop: the host's nginx (or the gateway) on loopback; req.ip is the only address
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
@@ -73,8 +85,10 @@ app.use(exceptRegistry(cors({
     credentials: true,
 })));
 
-// ── Rate Limiting ────────────────────────────────────────────
-app.use(rateLimit({ windowMs: 60_000, max: 200 }));
+// ── Who is asking, then rate limits ──────────────────────────
+app.use(guard.identify);
+app.use(guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: 200, signedIn: 400, message: 'Too many requests. Please try again later.' }));
+app.use('/api/', guard.apiQuota);
 
 // ── Tool registry (ADR-027): GET /api/v1/tools[/:id[/schema]] for this app's text and logo tools ──
 // Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the limiter above. The
@@ -161,6 +175,7 @@ function shutdown() {
     console.log('[Text.OpenVibe] Shutting down...');
     analytics.destroy();
     analyticsDb.close();
+    guard.close();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(1), 5000);
 }
