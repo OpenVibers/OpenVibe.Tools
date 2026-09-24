@@ -72,7 +72,7 @@ function createRecorder({ env = process.env, fetchImpl = globalThis.fetch, now =
         const had = cur.status === 200 && cur.body && cur.body.data && Array.isArray(cur.body.data.recent) ? cur.body.data.recent : [];
         const add = [...fresh].reverse().map(([tool, at]) => ({ tool, at }));
         const recent = [...add, ...had.filter((e) => e && !fresh.has(e.tool))].slice(0, MAX);
-        const w = await call('PUT', subject, { body: { data: { recent } }, revision: cur.status === 200 ? cur.body.revision : undefined });
+        const w = await call('PUT', subject, { body: { data: { recent } }, revision: cur.status === 200 ? cur.body.revision : 0 });
         if (w.status === 412 || w.status === 409) { stats.conflicts++; return false; }
         if (w.status >= 300) throw new Error(`write: ${w.status} ${(w.body && w.body.code) || ''}`);
         stats.written++;
