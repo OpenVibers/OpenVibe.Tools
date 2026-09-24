@@ -18,7 +18,9 @@ async function watermark(buffer, options = {}) {
     const text = options.text || 'WATERMARK';
     const fontSize = parseInt(options.fontSize) || 48;
     const opacity = Math.min(1, Math.max(0.01, parseFloat(options.opacity) || 0.15));
-    const rotation = parseInt(options.rotation) ?? -45;
+    // parseInt of a missing value is NaN (never null), so `?? -45` never applied the default.
+    const rotationIn = parseInt(options.rotation, 10);
+    const rotation = Number.isFinite(rotationIn) ? rotationIn : -45;
 
     // Parse color (hex to rgb)
     const color = parseColor(options.color || '#888888');

@@ -9,7 +9,7 @@
 
 const fsp = require('fs/promises');
 const path = require('path');
-const { qpdf, run, withTempDir, writeArgFile, qpdfPages, checkPages, refuse } = require('./pdf');
+const { qpdf, run, withTempDir, stdinArgs, qpdfPages, checkPages, refuse } = require('./pdf');
 
 /**
  * @param {Buffer} buffer - PDF buffer
@@ -36,13 +36,12 @@ async function unlock(buffer, options = {}) {
 
         const count = await qpdfPages(bin, dir, input, password);
         if (count.error) {
-            if (/invalid password/i.test(count.error)) throw refuse(password ? 'The password is incorrect.' : 'This PDF needs its password to be unlocked.', 400, 'tools.pdf.wrong_password');
+            if (/invalid password/i.test(count.error)) throw refuse(password ? 'The password is incorrect.' : 'This PDF needs its password to be unlocked.', 422, 'tools.pdf.wrong_password');
             throw refuse('This file could not be read as a PDF.');
         }
         checkPages(count.pages);
 
-        const args = await writeArgFile(dir, [`--password=${password}`, '--decrypt']);
-        const r = await run(bin, [`@${args}`, input, output]);
+        const r = await run(bin, ['@-', input, output], { stdin: stdinArgs([`--password=${password}`, '--decrypt']) });
         if (r.code !== 0 && r.code !== 3) throw refuse('The PDF could not be unlocked.');
         return { buffer: await fsp.readFile(output), ext: 'pdf', mime: 'application/pdf', pageCount: count.pages };
     });

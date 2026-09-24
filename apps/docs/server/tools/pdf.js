@@ -53,9 +53,10 @@ const pdfinfo = createBinary({ name: 'pdfinfo', candidates: ['pdfinfo'], envVar:
  * @file) readable only by this user, so passwords are not visible in the process list.
  * → { code, stdout, stderr }
  */
-function run(bin, args, { timeoutMs = 120_000, cwd, maxOutput = 64 * 1024 } = {}) {
+function run(bin, args, { timeoutMs = 120_000, cwd, maxOutput = 64 * 1024, stdin = null } = {}) {
     return new Promise((resolve, reject) => {
-        const child = spawn(bin, args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+        const child = spawn(bin, args, { cwd, stdio: [stdin == null ? 'ignore' : 'pipe', 'pipe', 'pipe'] });
+        if (stdin != null) { child.stdin.on('error', () => {}); child.stdin.end(stdin); }
         let stdout = '', stderr = '', timedOut = false;
         const timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL'); }, timeoutMs);
         child.stdout.on('data', d => { if (stdout.length < maxOutput) stdout += d; });
@@ -75,18 +76,21 @@ async function withTempDir(fn) {
     try { return await fn(dir); } finally { fs.rm(dir, { recursive: true, force: true }, () => {}); }
 }
 
-/** One argument per line for qpdf's @file (a line break inside an argument cannot be represented). */
-async function writeArgFile(dir, args) {
+/**
+ * Arguments that carry a password go to qpdf on stdin (`@-`, one per line), never on the command line
+ * where any local user could read them in the process list. (qpdf 12.3's `@file` argument files did
+ * not expand reliably on the host; `@-` does, in any position.) A line break inside an argument
+ * cannot be represented, so it is refused.
+ */
+function stdinArgs(args) {
     for (const a of args) if (/[\r\n\0]/.test(a)) throw refuse('Passwords cannot contain line breaks');
-    const file = path.join(dir, 'args');
-    await fsp.writeFile(file, args.join('\n') + '\n', { mode: 0o600 });
-    return file;
+    return args.join('\n') + '\n';
 }
 
 /** qpdf's page count (with a password for encrypted files). */
 async function qpdfPages(bin, dir, input, password) {
-    const args = password != null ? [`@${await writeArgFile(dir, [`--password=${password}`])}`] : [];
-    const r = await run(bin, [...args, '--show-npages', input], { timeoutMs: 60_000 });
+    const stdin = password != null ? stdinArgs([`--password=${password}`]) : null;
+    const r = await run(bin, [...(stdin != null ? ['@-'] : []), '--show-npages', input], { timeoutMs: 60_000, stdin });
     if (r.code !== 0 && r.code !== 3) return { error: r.stderr || r.stdout };
     return { pages: parseInt(r.stdout.trim(), 10) };
 }
@@ -134,4 +138,4 @@ function zip(entries) {
     return Buffer.concat([...locals, cd, end]);
 }
 
-module.exports = { MAX_PAGES, checkPages, loadPdf, refuse, qpdf, pdftoppm, pdfinfo, run, withTempDir, writeArgFile, qpdfPages, zip, crc32 };
+module.exports = { MAX_PAGES, checkPages, loadPdf, refuse, qpdf, pdftoppm, pdfinfo, run, withTempDir, stdinArgs, qpdfPages, zip, crc32 };

@@ -10,7 +10,7 @@
 const crypto = require('crypto');
 const fsp = require('fs/promises');
 const path = require('path');
-const { qpdf, run, withTempDir, writeArgFile, qpdfPages, checkPages, refuse } = require('./pdf');
+const { qpdf, run, withTempDir, stdinArgs, qpdfPages, checkPages, refuse } = require('./pdf');
 
 const MAX_PASSWORD_BYTES = 127;   // AES-256 (R6) passwords are UTF-8, at most 127 bytes
 
@@ -45,11 +45,11 @@ async function protect(buffer, options = {}) {
         }
         checkPages(count.pages);
 
-        const args = await writeArgFile(dir, [
+        const stdin = stdinArgs([
             '--encrypt', `--user-password=${userPassword}`, `--owner-password=${ownerPassword}`, '--bits=256',
             `--print=${allowPrint ? 'full' : 'none'}`, `--extract=${allowCopy ? 'y' : 'n'}`, '--',
         ]);
-        const r = await run(bin, [`@${args}`, input, output]);
+        const r = await run(bin, ['@-', input, output], { stdin });
         // 0 = done, 3 = done with warnings (qpdf repaired something on the way).
         if (r.code !== 0 && r.code !== 3) throw refuse(`The PDF could not be encrypted (${(r.stderr || '').split('\n')[0].replace(/^qpdf:\s*/, '').replace(dir, '').slice(0, 160)})`);
 

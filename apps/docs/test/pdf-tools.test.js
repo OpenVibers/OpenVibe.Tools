@@ -110,7 +110,7 @@ const is503 = (e) => e.status === 503 && e.code === 'tools.unavailable' && /bein
 
         await assert.rejects(run('protect', locked.buffer, { password: 'again' }), /already password-protected/);
         await assert.rejects(run('protect', three, {}), (e) => e.status === 400);
-        await assert.rejects(run('unlock', locked.buffer, { password: 'wrong' }), (e) => e.status === 400 && e.code === 'tools.pdf.wrong_password');
+        await assert.rejects(run('unlock', locked.buffer, { password: 'wrong' }), (e) => e.status === 422 && e.code === 'tools.pdf.wrong_password');
         const open = await run('unlock', locked.buffer, { password: 's3cret pass' });
         const doc = await PDFDocument.load(open.buffer);   // no ignoreEncryption: really decrypted
         assert.strictEqual(doc.getPageCount(), 3);
