@@ -12,6 +12,7 @@
 // ═══════════════════════════════════════════════════════════════
 const crypto = require('crypto');
 const frame = require('openvibe-shared/frame');
+const ovServe = require('openvibe-shared/serve');
 const express = require('express');
 const seo = require('openvibe-shared/seo');
 const icons = require('openvibe-shared/icons');
@@ -119,14 +120,14 @@ ${head}
 ${appIcon.headTags({ site: 'tools', iconBase: '/assets' })}
 <link rel="alternate" type="application/json" href="${SITE}/api/catalog.json" title="Tool catalog">
 <link rel="preconnect" href="https://openvibe.network">
-<script src="https://openvibe.network/shared/theme-loader.js" defer></script>
+<script src="${ovServe.url('theme-loader.js')}" defer></script>
 <style>${CSS}</style></head><body>${spriteSvg}
 <noscript><header class="topbar"><a href="${SITE}/">${NAME}</a><nav>${families.filter(f => f.path).map(f => `<a href="${esc(f.path)}">${esc(f.name)}</a>`).join('')}<a href="/all-tools">All tools</a></nav></header></noscript>
 <main class="wrap">${body}
 <section aria-labelledby="net-h"><div class="sec-h"><h2 id="net-h">The rest of OpenVibe</h2></div><p class="sec-p">One account works on every site. Open source and community-run.</p>
 <div class="net">${NETWORK.map(([ic, n, d, u]) => `<a class="tool" href="${u}">${icon(ic, 36)}<span class="tool-t"><b>${n}</b><small>${d}</small></span></a>`).join('')}</div></section>
 </main>${frame.footer({ service: 'tools', variant: 'full', updates: '/updates' })}
-<script src="https://openvibe.network/shared/navbar.js" defer></script><script src="https://openvibe.network/shared/footer.js" defer></script><script src="/js/site.js" defer></script>
+<script src="${ovServe.url('navbar.js')}" defer></script><script src="${ovServe.url('footer.js')}" defer></script><script src="/js/site.js" defer></script>
 </body></html>`;
 }
 
@@ -236,7 +237,7 @@ function cached(key, render) {
 /** /developers: how to call any tool from code (run API, jobs, SDK, auth tiers, limits). */
 function pageUpdates() {
     const { families } = registry.get();
-    const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> › Updates</nav>${frame.updatesBody({ service: 'tools', siteName: NAME })}${frame.shippedScript()}`;
+    const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> › Updates</nav>${frame.updatesBody({ service: 'tools', siteName: NAME })}${`<script src="${ovServe.url('shipped.js')}" defer></script>`}`;
     return shell({ families, body, head: head({ title: 'What shipped on OpenVibe.Tools', description: 'Every change deployed to OpenVibe.Tools, newest first, with the Patch notes that gather them.', canonical: SITE + '/updates' }) });
 }
 
