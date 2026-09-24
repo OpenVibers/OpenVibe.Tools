@@ -241,6 +241,7 @@ function showTool(){
     $('io').innerHTML=ioh;
     let ah='<button class="ab ab-go" onclick="run()"><i class="fa-solid fa-play"></i> Run</button>';
     ah+='<button class="ab ab-s" onclick="copyOut()"><i class="fa-solid fa-copy"></i> Copy</button>';
+    ah+='<button class="ab ab-s" onclick="saveAsPaste(this)" title="Save the output as an unlisted paste on OpenVibe.Community"><i class="fa-solid fa-note-sticky"></i> Save as paste</button>';
     ah+='<button class="ab ab-s" onclick="clr()"><i class="fa-solid fa-trash"></i> Clear</button>';
     ah+='<button class="ab ab-s" onclick="sample()"><i class="fa-solid fa-flask"></i> Sample</button>';
     $('acts').innerHTML=ah;
@@ -401,7 +402,25 @@ P.opengraph=async(s)=>{
 
 // ═══════════════ UTILITY ═══════════════
 function copyOut(){navigator.clipboard.writeText(($('out').innerText||'')).then(()=>toast('Copied!')).catch(()=>{})}
-function clr(){const a=$('in1');if(a)a.value='';const b=$('in2');if(b)b.value='';$('out').innerHTML=''}
+// The output becomes an unlisted OpenVibe.Community paste (through this gateway's /api/pastes proxy, as
+// the signed-in person when there is one); the link appears under the buttons.
+async function saveAsPaste(btn){
+    const text=($('out').innerText||'').trim();
+    if(!text)return toast('Run the tool first');
+    btn.disabled=true;
+    try{
+        const t=T[ACT];
+        const r=await fetch('/api/pastes',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:((t&&t.n)||'Tool')+' output',content:text.slice(0,500000),visibility:'unlisted'})});
+        const d=await r.json().catch(()=>({}));
+        if(!r.ok||!d.slug)throw new Error(d.error||d.detail||'Could not save the paste');
+        const url='https://openvibe.community/p/'+encodeURIComponent(d.slug);
+        let n=$('pasted');if(!n){n=document.createElement('div');n.id='pasted';n.style.cssText='margin:8px 0;font-size:.85rem';$('acts').after(n)}
+        n.textContent='Saved as an unlisted paste: ';
+        const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';a.textContent=url.replace('https://','');n.appendChild(a);
+        toast('Saved as a paste');
+    }catch(e){toast(e.message)}finally{btn.disabled=false}
+}
+function clr(){const p=$('pasted');if(p)p.remove();const a=$('in1');if(a)a.value='';const b=$('in2');if(b)b.value='';$('out').innerHTML=''}
 function sample(){const t=T[ACT];if(t?.p){$('in1').value=t.p;if(t.p2&&$('in2'))$('in2').value=t.p2}run()}
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000)}
 </script>
