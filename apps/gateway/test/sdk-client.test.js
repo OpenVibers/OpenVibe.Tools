@@ -29,7 +29,8 @@ const sharp = require(require.resolve('sharp', { paths: [path.join(APPS, 'img')]
 const rejects = (p) => p.then((v) => { throw new Error(`expected a rejection, got ${JSON.stringify(v).slice(0, 200)}`); }, (err) => err);
 
 (async () => {
-    assert.ok(/^0\.(6|[7-9])\.|^[1-9]/.test(sdkVersion), `the SDK is v0.6.0 or later (${sdkVersion})`);
+    const [maj, min] = String(sdkVersion).split('.').map(Number);
+    assert.ok(maj > 0 || min >= 6, `the SDK is v0.6.0 or later (${sdkVersion})`);
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ov-sdk-client-'));
     const net = await startNetwork();
     const procs = [];
