@@ -110,6 +110,32 @@ const fetchImpl = async (url, opts) => {
     assert.deepStrictEqual(mergeGuestTools({ headers: {} }, resOf(), USR, [], [], fake), [], 'nothing to merge');
     assert.deepStrictEqual(mergeGuestTools({ headers: {} }, resOf(), USR, [], ['png'], { enabled: false }), [], 'recorder off');
 
+    // Anonymous favourites (WS-L task 1): a browser's stars live in ov_tool_favs on the tools zone; at
+    // sign-in they join the account's after its own, once, and the cookie is cleared.
+    {
+        const { favoritesFromCookie, setCookieFavorite, mergeGuestFavorites, FAV_COOKIE } = require('../usage');
+        assert.deepStrictEqual(favoritesFromCookie({ headers: { cookie: `${FAV_COOKIE}=png.x..<b>.png.yaml` } }), ['png', 'x', 'yaml'], 'only tool ids, deduplicated');
+        const out = [];
+        const res2 = { append: (k, v) => out.push(v) };
+        assert.deepStrictEqual(setCookieFavorite({ headers: { cookie: `${FAV_COOKIE}=yaml` } }, res2, 'png', true, 'openvibe.tools'), ['png', 'yaml'], 'newest first');
+        assert.match(out[0], /^ov_tool_favs=png\.yaml; Domain=\.openvibe\.tools; Path=\/; Max-Age=31536000; SameSite=Lax; Secure$/);
+        assert.deepStrictEqual(setCookieFavorite({ headers: { cookie: `${FAV_COOKIE}=png.yaml` } }, res2, 'png', false, '127.0.0.1'), ['yaml']);
+        assert.doesNotMatch(out[1], /Domain=/, 'a host-only cookie off the tools zone');
+        assert.match(setCookieFavorite({ headers: { cookie: `${FAV_COOKIE}=png` } }, res2, 'png', false, 'png.openvibe.tools') && out[2], /^ov_tool_favs=; Domain=\.openvibe\.tools; Path=\/; Max-Age=0/, 'the last unstar clears it');
+        const many = Array.from({ length: 30 }, (_, i) => `t${i}`);
+        assert.strictEqual(setCookieFavorite({ headers: { cookie: `${FAV_COOKIE}=${many.join('.')}` } }, res2, 'new', true, 'openvibe.tools').length, 24, 'at most 24');
+
+        await r.setFavorite(USR, 'uuid', true);
+        out.length = 0;
+        const merged = await mergeGuestFavorites({ headers: { cookie: `${FAV_COOKIE}=png.uuid.yaml` } }, res2, USR, 'openvibe.tools', r);
+        assert.deepStrictEqual(merged, ['uuid', 'png', 'yaml'], "the guest's stars join after the account's own, without duplicates");
+        assert.deepStrictEqual(modules.get(USR).data.favorites, ['uuid', 'png', 'yaml']);
+        assert.match(out[0], /^ov_tool_favs=; .*Max-Age=0/, 'and the cookie is cleared');
+        assert.strictEqual(await mergeGuestFavorites({ headers: {} }, res2, USR, 'openvibe.tools', r), null, 'nothing to merge');
+        assert.strictEqual(await mergeGuestFavorites({ headers: { cookie: `${FAV_COOKIE}=png` } }, res2, USR, 'openvibe.tools', { enabled: false }), null, 'recorder off: the cookie stays');
+        for (const id of ['uuid', 'png', 'yaml']) await r.setFavorite(USR, id, false);
+    }
+
     const off = createRecorder({ env: {}, fetchImpl });
     assert.strictEqual(off.enabled, false);
     assert.strictEqual(off.record(USR, 'yaml'), false, 'off without a service secret');

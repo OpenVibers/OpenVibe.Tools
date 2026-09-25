@@ -46,16 +46,58 @@
         var b = document.createElement('b'); b.textContent = t.name; var s = document.createElement('small'); s.textContent = t.tagline; var i = document.createElement('i'); i.textContent = t.hosts.short || t.hosts.canonical;
         box.appendChild(b); box.appendChild(s); box.appendChild(i); a.appendChild(ic); a.appendChild(box); return a;
     }
+    // Favourites (signed in: the account's, on every device and my.openvibe.network; otherwise this
+    // browser's). Each card can be starred wherever it is shown; every star for a tool stays in step.
+    var favs = [], favReady = null, heading = results.querySelector('h2');
+    function isFav(id) { return favs.indexOf(id) >= 0; }
+    function starred(t) {
+        var w = document.createElement('div'); w.className = 'tool-wrap';
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'fav'; b.setAttribute('data-tool', t.id);
+        paint(b, t.name, isFav(t.id));
+        b.addEventListener('click', function () {
+            var on = b.getAttribute('aria-pressed') !== 'true'; b.disabled = true;
+            fetch('/api/v1/me/favorites/' + encodeURIComponent(t.id), { method: on ? 'PUT' : 'DELETE', credentials: 'same-origin' })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (res) { if (res && res.favorites) { favs = res.favorites; syncStars(); } })
+                .catch(function () { /* unchanged */ })
+                .then(function () { b.disabled = false; });
+        });
+        w.appendChild(card(t)); w.appendChild(b); return w;
+    }
+    function paint(b, name, on) { b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.textContent = on ? '\u2605' : '\u2606'; b.setAttribute('aria-label', (on ? 'Remove ' : 'Add ') + name + (on ? ' from' : ' to') + ' favourites'); }
+    function syncStars() {
+        [].forEach.call(document.querySelectorAll('button.fav[data-tool]'), function (b) {
+            var id = b.getAttribute('data-tool'), c = catalog && catalog.filter(function (x) { return x.t.id === id; })[0];
+            paint(b, c ? c.t.name : id, isFav(id));
+        });
+    }
+    // Ctrl+K (or /) on an empty search: your favourites, ready to open with the keyboard.
+    function showFavorites() {
+        if (input.value.trim()) return;
+        (favReady || Promise.resolve()).then(load).then(function () {
+            if (input.value.trim() || !favs.length) return;
+            var byId = {}; catalog.forEach(function (c) { byId[c.t.id] = c.t; });
+            var list = favs.map(function (id) { return byId[id]; }).filter(Boolean);
+            if (!list.length) return;
+            heading.textContent = 'Your favourites'; empty.hidden = true;
+            grid.replaceChildren.apply(grid, list.map(starred));
+            results.hidden = false; others.forEach(function (x) { x.hidden = true; }); if (recentSec) recentSec.hidden = true;
+            mountIcons(grid);
+        });
+    }
     function show(q, push) {
         q = q.trim();
+        heading.textContent = 'Results';
         var url = new URL(location.href); if (q) url.searchParams.set('q', q); else url.searchParams.delete('q');
         if (url.href !== location.href) history[push ? 'pushState' : 'replaceState']({ q: q }, '', url);
         if (!q) { results.hidden = true; others.forEach(function (s) { s.hidden = false; }); if (recentSec) recentSec.hidden = !recentReady; return; }
         load().then(function () {
             if (input.value.trim() !== q) return;
-            var hits = find(q); grid.replaceChildren.apply(grid, hits.map(card)); empty.hidden = hits.length > 0;
+            var hits = find(q);
+            hits = hits.filter(function (t) { return isFav(t.id); }).concat(hits.filter(function (t) { return !isFav(t.id); }));
+            grid.replaceChildren.apply(grid, hits.map(starred)); empty.hidden = hits.length > 0;
             results.hidden = false; others.forEach(function (s) { s.hidden = true; }); if (recentSec) recentSec.hidden = true;
-            if (window.OpenVibeIcons) OpenVibeIcons.mount(grid); else if (!document.getElementById('ov-icons-loader')) { var sc = document.createElement('script'); sc.id = 'ov-icons-loader'; sc.src = 'https://openvibe.network/shared/ov-icons.js'; document.head.appendChild(sc); }
+            mountIcons(grid);
         });
     }
     var timer = null;
@@ -65,14 +107,16 @@
     window.addEventListener('popstate', function () { var q = new URL(location.href).searchParams.get('q') || ''; input.value = q; show(q, false); });
     document.addEventListener('keydown', function (e) {
         var k = (e.key || '').toLowerCase();
-        if ((k === 'k' && (e.ctrlKey || e.metaKey) && !e.altKey) || (e.key === '/' && document.activeElement !== input && !/input|textarea|select/i.test(document.activeElement.tagName))) { e.preventDefault(); input.focus(); input.select(); }
+        if ((k === 'k' && (e.ctrlKey || e.metaKey) && !e.altKey) || (e.key === '/' && document.activeElement !== input && !/input|textarea|select/i.test(document.activeElement.tagName))) { e.preventDefault(); input.focus(); input.select(); showFavorites(); }
+        else if (e.key === 'Escape' && !input.value.trim() && !results.hidden) show('', false);
     });
 
     // Your tools: favourites first (signed in: starred here or on my.openvibe.network), then recent tools,
     // this person's (every device they sign in to) or this browser's. Filled in after load.
     function mountIcons(el) { if (window.OpenVibeIcons) OpenVibeIcons.mount(el); else if (!document.getElementById('ov-icons-loader')) { var sc = document.createElement('script'); sc.id = 'ov-icons-loader'; sc.src = 'https://openvibe.network/shared/ov-icons.js'; document.head.appendChild(sc); } }
-    if (recentSec) fetch('/api/v1/me/recent-tools', { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
-        var favs = (d && d.favorites) || [];
+    favReady = fetch('/api/v1/me/recent-tools', { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) { favs = (d && d.favorites) || []; if (catalog) syncStars(); return d; }).catch(function () { return null; });
+    if (recentSec) favReady.then(function (d) {
         if (!d || ((!d.recent || !d.recent.length) && !favs.length)) return null;
         return load().then(function () {
             var byId = {}; catalog.forEach(function (c) { byId[c.t.id] = c.t; });
@@ -80,23 +124,6 @@
             var list = ids.map(function (id) { return byId[id]; }).filter(Boolean).slice(0, Math.max(8, favs.length));
             if (!list.length) return;
             var g = document.getElementById('recent-grid');
-            // Signed in: a star on each card (favourites live in the account's tools.usage module).
-            var starred = function (t) {
-                if (d.mode !== 'account') return card(t);
-                var w = document.createElement('div'); w.className = 'tool-wrap';
-                var b = document.createElement('button'); b.type = 'button'; b.className = 'fav';
-                var set = function (on) { b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.textContent = on ? '\u2605' : '\u2606'; b.setAttribute('aria-label', (on ? 'Remove ' : 'Add ') + t.name + (on ? ' from' : ' to') + ' favourites'); };
-                set(favs.indexOf(t.id) >= 0);
-                b.addEventListener('click', function () {
-                    var on = b.getAttribute('aria-pressed') !== 'true'; b.disabled = true;
-                    fetch('/api/v1/me/favorites/' + encodeURIComponent(t.id), { method: on ? 'PUT' : 'DELETE', credentials: 'same-origin' })
-                        .then(function (r) { return r.ok ? r.json() : null; })
-                        .then(function (res) { if (res) { favs = res.favorites; set(favs.indexOf(t.id) >= 0); } })
-                        .catch(function () { /* unchanged */ })
-                        .then(function () { b.disabled = false; });
-                });
-                w.appendChild(card(t)); w.appendChild(b); return w;
-            };
             g.replaceChildren.apply(g, list.map(starred));
             document.getElementById('recent-note').textContent = d.mode === 'account' ? 'On every device you sign in to' : 'On this browser';
             recentReady = true; if (!input.value.trim()) recentSec.hidden = false;

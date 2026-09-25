@@ -125,14 +125,25 @@ function createRecorder({ env = process.env, fetchImpl = globalThis.fetch, now =
 
     /** Star (on) or unstar a tool: a read-modify-write naming the revision read; a 412 reads again. → favorites */
     async function setFavorite(subject, tool, on) {
+        if (!TOOL_RE.test(String(tool || ''))) throw Object.assign(new Error('bad subject or tool'), { status: 400 });
+        return changeFavorites(subject, (had) => (on ? [tool, ...had.filter((id) => id !== tool)] : had.filter((id) => id !== tool)));
+    }
+
+    /** Add tools a browser starred as a guest after the account's own favourites (sign-in). → favorites */
+    async function addFavorites(subject, tools) {
+        const add = (tools || []).filter((id) => TOOL_RE.test(String(id)));
+        return changeFavorites(subject, (had) => [...had, ...add.filter((id) => !had.includes(id))]);
+    }
+
+    async function changeFavorites(subject, change) {
         if (!enabled) throw Object.assign(new Error('favourites are off on this server'), { status: 503 });
-        if (!USR_RE.test(String(subject || '')) || !TOOL_RE.test(String(tool || ''))) throw Object.assign(new Error('bad subject or tool'), { status: 400 });
+        if (!USR_RE.test(String(subject || ''))) throw Object.assign(new Error('bad subject or tool'), { status: 400 });
         for (let attempt = 0; attempt < 3; attempt++) {
             const cur = await call('GET', subject);
             if (cur.status !== 200 && cur.status !== 404) throw Object.assign(new Error(`read: ${cur.status}`), { status: 503 });
             const data = cur.status === 200 && cur.body && cur.body.data && typeof cur.body.data === 'object' ? cur.body.data : {};
             const had = Array.isArray(data.favorites) ? data.favorites : [];
-            const next = on ? [tool, ...had.filter((id) => id !== tool)].slice(0, FAV_MAX) : had.filter((id) => id !== tool);
+            const next = change(had).slice(0, FAV_MAX);
             if (JSON.stringify(next) === JSON.stringify(had)) return had;
             const w = await call('PUT', subject, { body: { data: { ...data, favorites: next } }, revision: cur.status === 200 ? cur.body.revision : 0 });
             if (w.status === 412) { stats.conflicts++; continue; }
@@ -142,7 +153,7 @@ function createRecorder({ env = process.env, fetchImpl = globalThis.fetch, now =
         throw Object.assign(new Error('your favourites kept changing; try again'), { status: 409 });
     }
 
-    return { enabled, record, recent, favorites, setFavorite, flush, stop, stats: () => ({ enabled, pending: pending.size, ...stats }) };
+    return { enabled, record, recent, favorites, setFavorite, addFavorites, flush, stop, stats: () => ({ enabled, pending: pending.size, ...stats }) };
 }
 
 // Anonymous history: the same list, per browser, in a first-party cookie on the tools zone, so every
@@ -159,6 +170,38 @@ function rememberInCookie(req, res, tool, host) {
     if (!res || typeof res.append !== 'function' || !/(^|\.)openvibe\.tools$/.test(host)) return;
     const list = [tool, ...recentFromCookie(req).filter((id) => id !== tool)].slice(0, COOKIE_MAX);
     res.append('Set-Cookie', `${COOKIE}=${list.join('.')}; Domain=.openvibe.tools; Path=/; Max-Age=${180 * 24 * 3600}; SameSite=Lax; Secure`);
+}
+
+// Anonymous favourites (roadmap WS-L task 1): the tools a browser starred without an account, in a
+// first-party cookie on the tools zone like its history (24 at most, newest first). When the person
+// signs in they join the account's favourites once, and the cookie is cleared.
+const FAV_COOKIE = 'ov_tool_favs';
+function favoritesFromCookie(req) {
+    const m = new RegExp(`(?:^|;\\s*)${FAV_COOKIE}=([^;]*)`).exec(String((req.headers && req.headers.cookie) || ''));
+    if (!m) return [];
+    let v = ''; try { v = decodeURIComponent(m[1]); } catch { return []; }
+    return [...new Set(v.split('.').filter((id) => TOOL_RE.test(id)))].slice(0, FAV_MAX);
+}
+function writeFavoritesCookie(res, list, host) {
+    const domain = /(^|\.)openvibe\.tools$/.test(String(host || '')) ? '; Domain=.openvibe.tools' : '';
+    res.append('Set-Cookie', list.length
+        ? `${FAV_COOKIE}=${list.slice(0, FAV_MAX).join('.')}${domain}; Path=/; Max-Age=${365 * 24 * 3600}; SameSite=Lax; Secure`
+        : `${FAV_COOKIE}=${domain}; Path=/; Max-Age=0; SameSite=Lax; Secure`);
+}
+/** Star or unstar a tool for this browser. → favorites (newest first) */
+function setCookieFavorite(req, res, tool, on, host) {
+    const had = favoritesFromCookie(req);
+    const next = on ? [tool, ...had.filter((id) => id !== tool)].slice(0, FAV_MAX) : had.filter((id) => id !== tool);
+    writeFavoritesCookie(res, next, host);
+    return next;
+}
+/** Signed in with guest favourites in the cookie: add them to the account's, then clear the cookie. → favorites | null */
+async function mergeGuestFavorites(req, res, subject, host, rec = recorder()) {
+    const guest = favoritesFromCookie(req);
+    if (!guest.length || !subject || !rec.enabled) return null;
+    const merged = await rec.addFavorites(subject, guest);
+    writeFavoritesCookie(res, [], host);
+    return merged;
 }
 
 let _recorder = null;
@@ -219,4 +262,4 @@ function usagePages({ snapshot, rec = null }) {
     };
 }
 
-module.exports = { createRecorder, recorder, usagePages, recentFromCookie, mergeGuestTools, NS, COOKIE, MERGED_COOKIE };
+module.exports = { createRecorder, recorder, usagePages, recentFromCookie, mergeGuestTools, favoritesFromCookie, setCookieFavorite, mergeGuestFavorites, NS, COOKIE, MERGED_COOKIE, FAV_COOKIE };

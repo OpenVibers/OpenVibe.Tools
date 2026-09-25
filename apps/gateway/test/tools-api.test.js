@@ -197,6 +197,25 @@ const get = async (url, headers = {}, method = 'GET') => {
         assert.strictEqual(ready.checks.tool_registry.status, 'ok', JSON.stringify(ready.checks.tool_registry));
         assert.strictEqual(ready.checks.tool_registry.required, false);
 
+        // ── Favourites without an account (WS-L task 1): this browser's ov_tool_favs cookie ──
+        {
+            const fav = (method, tool, cookie = '') => fetch(`${G}/api/v1/me/favorites/${tool}`, { method, headers: cookie ? { Cookie: cookie } : {} });
+            let r = await fav('PUT', 'png');
+            assert.strictEqual(r.status, 200);
+            assert.deepStrictEqual(await r.json(), { mode: 'device', favorites: ['png'] });
+            const cookie = (r.headers.get('set-cookie') || '').split(';')[0];
+            assert.strictEqual(cookie, 'ov_tool_favs=png');
+            r = await fav('PUT', 'yaml', cookie);
+            const both = (r.headers.get('set-cookie') || '').split(';')[0];
+            assert.deepStrictEqual((await r.json()).favorites, ['yaml', 'png'], 'newest first');
+            const me = await (await fetch(`${G}/api/v1/me/recent-tools`, { headers: { Cookie: `${both}; ov_recent_tools=uuid` } })).json();
+            assert.deepStrictEqual(me, { mode: 'device', recent: [{ tool: 'uuid' }], favorites: ['yaml', 'png'] }, 'the launcher reads them back');
+            assert.strictEqual((await fav('PUT', 'no-such-tool', cookie)).status, 404);
+            r = await fav('DELETE', 'png', cookie);
+            assert.deepStrictEqual((await r.json()).favorites, []);
+            assert.match(r.headers.get('set-cookie') || '', /^ov_tool_favs=; Path=\/; Max-Age=0/, 'the last unstar clears the cookie');
+        }
+
         // ── The gateway's /api/ limiter counts registry reads (120 a minute per address) ──
         let limited = null;
         for (let i = 0; i < 130 && !limited; i++) { const x = await fetch(`${G}/api/v1/tools/png`); if (x.status === 429) limited = x; }

@@ -197,7 +197,8 @@ app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
 // The launcher's recent tools: a signed-in person's tools.usage module (every device), otherwise this
 // browser's ov_recent_tools cookie. Only tools the registry still lists; never cached. Guest conversion
 // (WS-B task 8): the first time an account asks from a browser, the tools this browser used as a guest
-// join the account's list (once per account and browser: ov_recent_merged).
+// join the account's list (once per account and browser: ov_recent_merged). Favourites likewise: the
+// account's, or this browser's ov_tool_favs cookie; a guest's starred tools join the account at sign-in.
 app.get('/api/v1/me/recent-tools', async (req, res) => {
     const usage = require('../../_shared/usage');
     res.set('Cache-Control', 'private, no-store');
@@ -212,22 +213,26 @@ app.get('/api/v1/me/recent-tools', async (req, res) => {
             if (merged.length) recent = [...merged.map((tool) => ({ tool })), ...recent];
         } catch { /* the cookie list stands in */ }
     }
-    let favorites = [];
-    if (mode === 'account') { try { favorites = (await usage.recorder().favorites(sid)).filter((id) => known.has(id)); } catch { /* optional */ } }
-    res.json({ mode, recent: recent.filter((e) => e && known.has(e.tool)).slice(0, 12), favorites });
+    let favorites = mode === 'account' ? [] : usage.favoritesFromCookie(req);
+    if (mode === 'account') {
+        try { favorites = (await usage.mergeGuestFavorites(req, res, sid, req.hostname)) || await usage.recorder().favorites(sid); } catch { /* optional */ }
+    }
+    res.json({ mode, recent: recent.filter((e) => e && known.has(e.tool)).slice(0, 12), favorites: favorites.filter((id) => known.has(id)) });
 });
 
-// Favourite tools (tools.usage v2 `favorites`): PUT stars a tool, DELETE unstars it, for the signed-in
-// person. Cross-site pages cannot send these (PUT/DELETE need a CORS preflight the gateway refuses).
+// Favourite tools: PUT stars a tool, DELETE unstars it. Signed in: the account's tools.usage v2
+// `favorites` (every device, my.openvibe.network too); otherwise this browser's ov_tool_favs cookie.
+// Cross-site pages cannot send these (PUT/DELETE need a CORS preflight the gateway refuses).
 for (const method of ['put', 'delete']) {
     app[method]('/api/v1/me/favorites/:tool', async (req, res) => {
         res.set('Cache-Control', 'private, no-store');
+        const usage = require('../../_shared/usage');
         const sid = req.user && req.user.subject_id;
-        if (!sid) return res.status(401).json({ error: 'Sign in to keep favourite tools', code: 'auth.required' });
         const tool = String(req.params.tool || '');
         if (!(toolRegistry.snapshot().tools || []).some((t) => t.id === tool)) return res.status(404).json({ error: 'No such tool', code: 'tools.not_found' });
+        if (!sid || !usage.recorder().enabled) return res.json({ mode: 'device', favorites: usage.setCookieFavorite(req, res, tool, method === 'put', req.hostname) });
         try {
-            res.json({ favorites: await require('../../_shared/usage').recorder().setFavorite(sid, tool, method === 'put') });
+            res.json({ mode: 'account', favorites: await usage.recorder().setFavorite(sid, tool, method === 'put') });
         } catch (err) {
             res.status(err.status || 500).json({ error: err.status ? err.message : 'Could not save your favourites', code: 'tools.favorites.unavailable' });
         }
