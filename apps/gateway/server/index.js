@@ -30,6 +30,8 @@ const { DEV_TOOL_MAP, DEV_ALIASES } = require('./dev/config');
 const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
 
 const app = express();
+// Network's sign-out-everywhere cutoffs for every Tools app (./revocation-events.js): before any body parser.
+app.post('/internal/events', ...require('./revocation-events').handler());
 // What this deploy runs (ADR-016); the shared navbar's release-watch polls it on every tool host.
 const release = require('../../_shared/release').toolsRelease('gateway', require);   // its components: apps/_shared/release.js
 
@@ -463,6 +465,12 @@ const searchIndex = require('./search-index').searchIndexerFromEnv({ snapshot: t
 if (searchIndex.indexer) searchIndex.indexer.start(); else console.log(`[SearchIndex] off: ${searchIndex.reason}`);
 
 app.listen(config.port, config.host, () => {
+    // Subscribe to Network's token cutoffs (retried a few times; off without EVENTS_URL / TOOLS_EVENTS_SECRET).
+    const subscribe = (n) => require('./revocation-events').ensureSubscription({ port: config.port }).catch((e) => {
+        console.warn('[Events] token cutoff subscription not ready:', e.message);
+        if (n < 5) setTimeout(() => subscribe(n + 1), 60_000 * n).unref();
+    });
+    subscribe(1);
     console.log(`\n╔════════════════════════════════════════════╗`);
     console.log(`║   🔧 openvibe.tools — Tools Gateway         ║`);
     console.log(`╠════════════════════════════════════════════╣`);

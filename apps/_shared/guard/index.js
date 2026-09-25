@@ -109,6 +109,8 @@ function createGuard(o = {}) {
         return saltValue;
     };
 
+    // Network's sign-out-everywhere cutoffs, written by the gateway (./revocations.js).
+    const cutoffs = o.cutoffs || require('./revocations').createCutoffReader({ Database: o.Database, file: o.revocationsFile, now });
     const keys = o.keys || tokens.createKeySource({ networkUrl: o.networkUrl, networkInternalUrl: o.networkInternalUrl, files: o.publicKeyFiles || [], log });
     const issuer = o.issuer;
     const audience = env.OV_TOOLS_AUDIENCE || tokens.AUDIENCE;
@@ -175,7 +177,8 @@ function createGuard(o = {}) {
         if (!token || tokens.looksLikePrincipal(tokens.peek(token))) return next();
         const verify = () => {
             const claims = tokens.verifyUserToken(token, { publicKey: keys.get(), issuer, audience, now: now() });
-            if (claims) { req.user = claims; req.token = token; }
+            // Signed out everywhere, password changed or banned since this token was issued: nobody.
+            if (claims && !cutoffs.isRevoked(claims)) { req.user = claims; req.token = token; }
         };
         if (keys.get() || typeof keys.ensure !== 'function') { verify(); return next(); }
         Promise.resolve(keys.ensure()).then(verify, () => {}).finally(() => next());
