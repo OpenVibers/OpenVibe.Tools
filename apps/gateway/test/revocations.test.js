@@ -15,7 +15,10 @@ const express = require('express');
 const Database = require('better-sqlite3');
 const { signDeliveryHeaders } = require('openvibe-sdk/events');
 const events = require('../server/revocation-events');
-const { createCutoffReader } = require('../../_shared/guard/revocations');
+const { createCutoffReader, DEFAULT_FILE } = require('../../_shared/guard/revocations');
+
+// The default lives where the gateway's unit may write (ReadWritePaths=apps/gateway/data).
+assert.strictEqual(DEFAULT_FILE, path.resolve(__dirname, '..', 'data', 'token-revocations.db'));
 
 const SUBJECT = 'usr_01J8Z3Q4R5S6T7V8W9X0Y1Z2A3';
 const at = Date.parse('2026-09-25T12:00:00Z');

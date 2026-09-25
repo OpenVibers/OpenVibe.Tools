@@ -8,7 +8,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const DEFAULT_FILE = path.resolve(__dirname, '..', '..', '..', 'data', 'token-revocations.db');
+// In the gateway's data directory: the one place its unit may write (ReadWritePaths); the other apps only read it.
+const DEFAULT_FILE = path.resolve(__dirname, '..', '..', 'gateway', 'data', 'token-revocations.db');
 
 function revocationsFile(env = process.env) { return env.TOOLS_REVOCATIONS_DB || DEFAULT_FILE; }
 

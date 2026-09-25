@@ -20,7 +20,9 @@ function cutoffs() {
     const file = revocationsFile();
     fs.mkdirSync(path.dirname(file), { recursive: true });
     const db = new Database(file);
-    db.pragma('journal_mode = WAL');
+    // A rollback journal, not WAL: the other apps open the file read-only under ProtectSystem=strict and could not
+    // create a WAL's -shm file. Writes are one row per sign-out-everywhere.
+    db.pragma('journal_mode = DELETE');
     db.pragma('busy_timeout = 2000');
     store = require('openvibe-sdk/auth').createRevocationStore(db, { table: 'token_revocations' });
     return store;
