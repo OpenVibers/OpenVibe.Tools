@@ -65,6 +65,7 @@ section{padding:clamp(24px,4vw,44px) 0 0}
 .tool-t{min-width:0;display:block}.tool b{display:block;font-size:15px}.tool small{display:block;color:var(--text-secondary,#a8b3c4);font-size:13px;line-height:1.35;margin-top:2px}
 .tool i{display:block;font-style:normal;font-size:11.5px;color:var(--text-muted,#7d8aa0);margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tool[hidden]{display:none}
+.tool-wrap{position:relative;display:grid}.tool-wrap .tool{padding-right:40px}.fav{position:absolute;top:8px;right:8px;width:32px;height:32px;border:0;border-radius:999px;background:none;color:var(--text-muted,#7d8aa0);font-size:18px;line-height:1;cursor:pointer}.fav[aria-pressed="true"]{color:var(--accent,#3b82f6)}.fav:hover,.fav:focus-visible{color:var(--accent,#3b82f6);outline:2px solid var(--accent,#3b82f6);outline-offset:-2px}
 .crumbs{font-size:13.5px;color:var(--text-muted,#7d8aa0);padding-top:18px}.crumbs a{color:inherit}
 .page-h{display:flex;gap:16px;align-items:center;padding:14px 0 4px}.page-h h1{font-size:clamp(26px,4vw,40px);letter-spacing:-.03em;margin:0;line-height:1.1}
 .lead{font-size:clamp(15px,1.5vw,18px);color:var(--text-secondary,#a8b3c4);max-width:820px}
@@ -162,7 +163,7 @@ ${searchForm('')}
 <ul class="stats"><li><b>${tools.length}</b> tools</li><li><b>${fams.length}</b> families</li><li><b>0</b> installs</li><li><b>1</b> account for all of OpenVibe</li></ul></div>
 <nav class="jump" aria-label="Tool families">${fams.map(f => `<a href="#f-${f.id}">${icon(f.icon, 22)}${esc(f.name)}<i>${tools.filter(t => t.family === f.id).length}</i></a>`).join('')}</nav>
 <section id="results" hidden aria-live="polite"><div class="sec-h"><h2>Results</h2></div><div class="grid" id="results-grid"></div><p class="empty" id="results-empty" hidden>No tool matches that yet. <a href="/all-tools">Browse every tool</a>.</p></section>
-<section id="recent" hidden aria-labelledby="recent-h"><div class="sec-h"><h2 id="recent-h">Your recent tools</h2><span class="more" id="recent-note"></span></div><div class="grid" id="recent-grid"></div></section>
+<section id="recent" hidden aria-labelledby="recent-h"><div class="sec-h"><h2 id="recent-h">Your tools</h2><span class="more" id="recent-note"></span></div><div class="grid" id="recent-grid"></div></section>
 <section aria-labelledby="pop-h"><div class="sec-h"><h2 id="pop-h">What people reach for</h2><a class="more" href="/all-tools">A to Z list</a></div><div class="grid">${popular.slice(0, 8).map(toolCard).join('')}</div></section>
 ${fams.map(f => { const list = tools.filter(t => t.family === f.id); const next = planned.filter(t => t.family === f.id); return `<section class="fam" aria-labelledby="f-${f.id}"><div class="sec-h">${icon(f.icon, 40)}<div><h2 id="f-${f.id}"><a href="${esc(f.path)}">${esc(f.name)}</a></h2><p class="fam-tag">${esc(f.tagline)}</p></div><a class="more" href="${esc(f.path)}">About these ${list.length}</a></div><div class="tiles">${list.map(tile).join('')}${next.map(soon).join('')}</div></section>`; }).join('')}
 ${frame.shipped({ service: 'tools', title: 'Recently shipped on OpenVibe.Tools' })}

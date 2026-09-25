@@ -212,8 +212,27 @@ app.get('/api/v1/me/recent-tools', async (req, res) => {
             if (merged.length) recent = [...merged.map((tool) => ({ tool })), ...recent];
         } catch { /* the cookie list stands in */ }
     }
-    res.json({ mode, recent: recent.filter((e) => e && known.has(e.tool)).slice(0, 12) });
+    let favorites = [];
+    if (mode === 'account') { try { favorites = (await usage.recorder().favorites(sid)).filter((id) => known.has(id)); } catch { /* optional */ } }
+    res.json({ mode, recent: recent.filter((e) => e && known.has(e.tool)).slice(0, 12), favorites });
 });
+
+// Favourite tools (tools.usage v2 `favorites`): PUT stars a tool, DELETE unstars it, for the signed-in
+// person. Cross-site pages cannot send these (PUT/DELETE need a CORS preflight the gateway refuses).
+for (const method of ['put', 'delete']) {
+    app[method]('/api/v1/me/favorites/:tool', async (req, res) => {
+        res.set('Cache-Control', 'private, no-store');
+        const sid = req.user && req.user.subject_id;
+        if (!sid) return res.status(401).json({ error: 'Sign in to keep favourite tools', code: 'auth.required' });
+        const tool = String(req.params.tool || '');
+        if (!(toolRegistry.snapshot().tools || []).some((t) => t.id === tool)) return res.status(404).json({ error: 'No such tool', code: 'tools.not_found' });
+        try {
+            res.json({ favorites: await require('../../_shared/usage').recorder().setFavorite(sid, tool, method === 'put') });
+        } catch (err) {
+            res.status(err.status || 500).json({ error: err.status ? err.message : 'Could not save your favourites', code: 'tools.favorites.unavailable' });
+        }
+    });
+}
 
 // ── Net.OpenVibe and Dev.OpenVibe routes (the pages' API; the run API calls the same handlers) ──
 const netRouter = createNetRoutes(null, requireAuth, { guard });

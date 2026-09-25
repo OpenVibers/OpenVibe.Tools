@@ -50,6 +50,23 @@ const fetchImpl = async (url, opts) => {
     assert.strictEqual(modules.get(USR).data.recent.length, 30, 'capped at the namespace limit');
     assert.strictEqual(modules.get(USR).data.recent[0].tool, 'tool39');
 
+    // Favourites (tools.usage v2): starred newest first, kept by every recent-tools write, unstarred.
+    assert.deepStrictEqual(await r.setFavorite(USR, 'yaml', true), ['yaml']);
+    assert.deepStrictEqual(await r.setFavorite(USR, 'uuid', true), ['uuid', 'yaml']);
+    assert.deepStrictEqual(await r.setFavorite(USR, 'uuid', true), ['uuid', 'yaml'], 'starring twice changes nothing');
+    const revBefore = modules.get(USR).revision;
+    await r.setFavorite(USR, 'png', false);
+    assert.strictEqual(modules.get(USR).revision, revBefore, 'unstarring a tool that is not starred writes nothing');
+    t += 11 * 60 * 1000; r.record(USR, 'base64');
+    await r.flush();
+    assert.strictEqual(modules.get(USR).data.recent[0].tool, 'base64');
+    assert.deepStrictEqual(modules.get(USR).data.favorites, ['uuid', 'yaml'], 'a recent-tools write keeps the favourites');
+    conflictOnce = true;
+    await assert.doesNotReject(r.setFavorite(USR, 'md5', true), 'a moved revision is read again');
+    assert.deepStrictEqual(await r.favorites(USR), ['md5'], 'after the conflict: starred on top of what the other writer left');
+    assert.deepStrictEqual(await r.setFavorite(USR, 'md5', false), []);
+    await assert.rejects(r.setFavorite(USR, '../x', true), /bad subject or tool/);
+
     // The page middleware: a signed-in document request for a tool host counts; assets, APIs and unknown hosts do not.
     const got = [];
     const mw = usagePages({ snapshot: () => ({ tools: [{ id: 'jsonminify', hosts: ['json-minifier.openvibe.tools', 'jsonminify.openvibe.tools'] }] }), rec: { enabled: true, record: (s, id) => got.push(id) } });

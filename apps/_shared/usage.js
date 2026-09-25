@@ -2,7 +2,9 @@
 // ═══════════════════════════════════════════════════════════════
 // tools.usage (platform S9): a signed-in person's recently used tools, kept in their Network user
 // module `tools.usage` ({ recent: [{ tool, at }] }, newest first, 30 at most; openvibe-contracts
-// manifests/namespaces/tools.usage.json) for the launchers across the network.
+// manifests/namespaces/tools.usage.json) for the launchers across the network. Since v2 (contracts
+// 0.41.0) it also holds `favorites` (tool ids, 24 at most), which the person stars here or on
+// my.openvibe.network; every write keeps the fields it did not change.
 //
 //   app.use(usagePages({ snapshot: toolRegistry.snapshot }))   after guard.identify: a page view of
 //                                                                a tool by a signed-in person counts
@@ -22,6 +24,7 @@
 
 const NS = 'tools.usage';
 const MAX = 30;
+const FAV_MAX = 24;
 const SAME_TOOL_MS = 10 * 60 * 1000;
 const FLUSH_MS = 60 * 1000;
 const MAX_PENDING = 2000;
@@ -76,7 +79,9 @@ function createRecorder({ env = process.env, fetchImpl = globalThis.fetch, now =
         const had = cur.status === 200 && cur.body && cur.body.data && Array.isArray(cur.body.data.recent) ? cur.body.data.recent : [];
         const add = [...fresh].reverse().map(([tool, at]) => ({ tool, at }));
         const recent = [...add, ...had.filter((e) => e && !fresh.has(e.tool))].slice(0, MAX);
-        const w = await call('PUT', subject, { body: { data: { recent } }, revision: cur.status === 200 ? cur.body.revision : 0 });
+        // Keep the record's other fields (favorites, which the person writes too: tools.usage v2).
+        const rest = cur.status === 200 && cur.body && cur.body.data && typeof cur.body.data === 'object' ? cur.body.data : {};
+        const w = await call('PUT', subject, { body: { data: { ...rest, recent } }, revision: cur.status === 200 ? cur.body.revision : 0 });
         if (w.status === 412 || w.status === 409) { stats.conflicts++; return false; }
         if (w.status >= 300) throw new Error(`write: ${w.status} ${(w.body && w.body.code) || ''}`);
         stats.written++;
@@ -110,7 +115,34 @@ function createRecorder({ env = process.env, fetchImpl = globalThis.fetch, now =
         return [...top, ...had.filter((e) => e && (!fresh || !fresh.has(e.tool)))].slice(0, MAX);
     }
 
-    return { enabled, record, recent, flush, stop, stats: () => ({ enabled, pending: pending.size, ...stats }) };
+    /** The person's favourite tools (tools.usage v2 `favorites`, newest first): [toolId]. */
+    async function favorites(subject) {
+        if (!enabled || !USR_RE.test(String(subject || ''))) return [];
+        const cur = await call('GET', subject);
+        const fav = cur.status === 200 && cur.body && cur.body.data && Array.isArray(cur.body.data.favorites) ? cur.body.data.favorites : [];
+        return fav.filter((id) => TOOL_RE.test(String(id)));
+    }
+
+    /** Star (on) or unstar a tool: a read-modify-write naming the revision read; a 412 reads again. → favorites */
+    async function setFavorite(subject, tool, on) {
+        if (!enabled) throw Object.assign(new Error('favourites are off on this server'), { status: 503 });
+        if (!USR_RE.test(String(subject || '')) || !TOOL_RE.test(String(tool || ''))) throw Object.assign(new Error('bad subject or tool'), { status: 400 });
+        for (let attempt = 0; attempt < 3; attempt++) {
+            const cur = await call('GET', subject);
+            if (cur.status !== 200 && cur.status !== 404) throw Object.assign(new Error(`read: ${cur.status}`), { status: 503 });
+            const data = cur.status === 200 && cur.body && cur.body.data && typeof cur.body.data === 'object' ? cur.body.data : {};
+            const had = Array.isArray(data.favorites) ? data.favorites : [];
+            const next = on ? [tool, ...had.filter((id) => id !== tool)].slice(0, FAV_MAX) : had.filter((id) => id !== tool);
+            if (JSON.stringify(next) === JSON.stringify(had)) return had;
+            const w = await call('PUT', subject, { body: { data: { ...data, favorites: next } }, revision: cur.status === 200 ? cur.body.revision : 0 });
+            if (w.status === 412) { stats.conflicts++; continue; }
+            if (w.status >= 300) throw Object.assign(new Error(`write: ${w.status} ${(w.body && w.body.code) || ''}`), { status: 503 });
+            return next;
+        }
+        throw Object.assign(new Error('your favourites kept changing; try again'), { status: 409 });
+    }
+
+    return { enabled, record, recent, favorites, setFavorite, flush, stop, stats: () => ({ enabled, pending: pending.size, ...stats }) };
 }
 
 // Anonymous history: the same list, per browser, in a first-party cookie on the tools zone, so every

@@ -68,15 +68,36 @@
         if ((k === 'k' && (e.ctrlKey || e.metaKey) && !e.altKey) || (e.key === '/' && document.activeElement !== input && !/input|textarea|select/i.test(document.activeElement.tagName))) { e.preventDefault(); input.focus(); input.select(); }
     });
 
-    // Recent tools: this person's (every device they sign in to) or this browser's. Filled in after load.
+    // Your tools: favourites first (signed in: starred here or on my.openvibe.network), then recent tools,
+    // this person's (every device they sign in to) or this browser's. Filled in after load.
     function mountIcons(el) { if (window.OpenVibeIcons) OpenVibeIcons.mount(el); else if (!document.getElementById('ov-icons-loader')) { var sc = document.createElement('script'); sc.id = 'ov-icons-loader'; sc.src = 'https://openvibe.network/shared/ov-icons.js'; document.head.appendChild(sc); } }
     if (recentSec) fetch('/api/v1/me/recent-tools', { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
-        if (!d || !d.recent || !d.recent.length) return null;
+        var favs = (d && d.favorites) || [];
+        if (!d || ((!d.recent || !d.recent.length) && !favs.length)) return null;
         return load().then(function () {
             var byId = {}; catalog.forEach(function (c) { byId[c.t.id] = c.t; });
-            var list = d.recent.map(function (e) { return byId[e.tool]; }).filter(Boolean).slice(0, 8);
+            var ids = favs.concat(d.recent.map(function (e) { return e.tool; }).filter(function (id) { return favs.indexOf(id) < 0; }));
+            var list = ids.map(function (id) { return byId[id]; }).filter(Boolean).slice(0, Math.max(8, favs.length));
             if (!list.length) return;
-            var g = document.getElementById('recent-grid'); g.replaceChildren.apply(g, list.map(card));
+            var g = document.getElementById('recent-grid');
+            // Signed in: a star on each card (favourites live in the account's tools.usage module).
+            var starred = function (t) {
+                if (d.mode !== 'account') return card(t);
+                var w = document.createElement('div'); w.className = 'tool-wrap';
+                var b = document.createElement('button'); b.type = 'button'; b.className = 'fav';
+                var set = function (on) { b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.textContent = on ? '\u2605' : '\u2606'; b.setAttribute('aria-label', (on ? 'Remove ' : 'Add ') + t.name + (on ? ' from' : ' to') + ' favourites'); };
+                set(favs.indexOf(t.id) >= 0);
+                b.addEventListener('click', function () {
+                    var on = b.getAttribute('aria-pressed') !== 'true'; b.disabled = true;
+                    fetch('/api/v1/me/favorites/' + encodeURIComponent(t.id), { method: on ? 'PUT' : 'DELETE', credentials: 'same-origin' })
+                        .then(function (r) { return r.ok ? r.json() : null; })
+                        .then(function (res) { if (res) { favs = res.favorites; set(favs.indexOf(t.id) >= 0); } })
+                        .catch(function () { /* unchanged */ })
+                        .then(function () { b.disabled = false; });
+                });
+                w.appendChild(card(t)); w.appendChild(b); return w;
+            };
+            g.replaceChildren.apply(g, list.map(starred));
             document.getElementById('recent-note').textContent = d.mode === 'account' ? 'On every device you sign in to' : 'On this browser';
             recentReady = true; if (!input.value.trim()) recentSec.hidden = false;
             mountIcons(g);
