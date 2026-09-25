@@ -9,6 +9,7 @@ jobs:
     uses: OpenVibers/OpenVibe.Shared/.github/workflows/test.yml@66b76f868ea8228aad7811309eafef3726b036f3
     with:
       apt-packages: ffmpeg            # audio tests
+      cache: false                    # no root lockfile: each app installs its own (install:all)
       install: npm run install:all
       syntax-dirs: scripts apps/audio/server apps/docs/server apps/food/server apps/gateway/server apps/img/server apps/maps/server apps/text/server apps/yt/server
       # The satellites that use openvibe-contracts, each against the tools manifest.
