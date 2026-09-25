@@ -4,26 +4,20 @@ on:
     branches: [main]
   pull_request:
 jobs:
+  # install, node --check, tests, contract and pin-drift checks: the shared test job (WS-Q task 1).
   test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.22.1   # production runs Node 22
-      - name: ffmpeg (audio tests)
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
-      - run: npm run install:all
-      - run: npm test
-      - name: contracts check (satellites that use openvibe-contracts)
-        run: |
-          for app in img audio docs; do
-            (cd apps/$app && npx openvibe-contracts-check --service tools --src server --src ../_shared)
-          done
-      - name: pin drift (openvibe-* library pins)
-        run: curl -fsSL https://raw.githubusercontent.com/OpenVibers/OpenVibe.Shared/main/scripts/pin-drift.js | node - "$GITHUB_WORKSPACE"
-  # Secret scan (gitleaks) and dependency audit, shared by every OpenVibers repo (Track Q).
+    uses: OpenVibers/OpenVibe.Shared/.github/workflows/test.yml@66b76f868ea8228aad7811309eafef3726b036f3
+    with:
+      apt-packages: ffmpeg            # audio tests
+      install: npm run install:all
+      syntax-dirs: scripts apps/audio/server apps/docs/server apps/food/server apps/gateway/server apps/img/server apps/maps/server apps/text/server apps/yt/server
+      # The satellites that use openvibe-contracts, each against the tools manifest.
+      extra: |
+        for app in img audio docs; do
+          (cd apps/$app && npx openvibe-contracts-check --service tools --src server --src ../_shared)
+        done
+  # Secret scan (gitleaks) and dependency audit, shared by every OpenVibers repo.
   security:
-    uses: OpenVibers/OpenVibe.Shared/.github/workflows/security.yml@83c998b65424fb97e6f6de55ad9cc5981767e89c
+    uses: OpenVibers/OpenVibe.Shared/.github/workflows/security.yml@66b76f868ea8228aad7811309eafef3726b036f3
     with:
       audit-fail-level: none   # report only until fixed: apps/img has 5 critical advisories (to-ico -> jimp/request chain) that need a semver-major to-ico/sharp bump
