@@ -64,13 +64,14 @@ function createMediaResults(o) {
         return m ? { 'X-OV-Subject': m[1] } : {};
     };
 
-    /** Store one file → MediaRef { media_id, role, namespace, size_bytes, content_hash, mime_type }. */
-    async function upload({ path: file, name, mime, size, sha256, owner, jobId, service, type }) {
+    /** Store one file → MediaRef { media_id, role, namespace, size_bytes, content_hash, mime_type }; `namespace` names a child of this one. */
+    async function upload({ path: file, name, mime, size, sha256, owner, jobId, service, type, namespace = null }) {
+        const child = namespace && String(namespace).startsWith(`${o.namespace || 'tools'}.`) ? String(namespace) : null;
         const init = await json(await call(api, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...subjectHeader(owner) },
             body: JSON.stringify({
-                kind: 'file', visibility: 'private', size_bytes: size, mime_type: mime, filename: name, content_hash: sha256,
+                kind: 'file', visibility: 'private', size_bytes: size, mime_type: mime, filename: name, content_hash: sha256, ...(child ? { namespace: child } : {}),
                 metadata: { source: 'openvibe.tools', service, job_id: jobId, job_type: type },
             }),
         }), 'init');
@@ -88,7 +89,7 @@ function createMediaResults(o) {
             const done = await json(await call(`${api}/${encodeURIComponent(id)}/complete`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content_hash: sha256 }),
             }), 'complete');
-            return { media_id: id, role: 'output', namespace: o.namespace || 'tools', size_bytes: size, content_hash: sha256, mime_type: mime, status: done.lifecycle_status || 'ready' };
+            return { media_id: id, role: 'output', namespace: child || o.namespace || 'tools', size_bytes: size, content_hash: sha256, mime_type: mime, status: done.lifecycle_status || 'ready' };
         } catch (err) {
             await remove(id).catch(() => {});
             throw err;

@@ -410,6 +410,7 @@ function createRunApi(o) {
                     files: files.map(f => ({ path: f.path, buffer: f.buffer, name: f.originalname || f.name, mime: f.mimetype || f.mime, size: f.size })),
                     idempotencyKey: key, ttlMs: who.kind === 'session' ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000,
                     env: who.env || 'production', ipKey: who.ipKey, tool: d.id,
+                    project: who.kind === 'principal' && who.claims && who.claims.actor_type === 'app' ? who.claims.project_id : null,
                 });
                 row = out.job; replayed = out.replayed;
             } catch (err) {

@@ -38,6 +38,15 @@ const { createStore, TERMINAL } = require('./store');
 const { createJobEvents } = require('./events');
 
 const HOUR = 60 * 60 * 1000;
+
+// A developer project's jobs (WS-L task 5): results go to Media under <tools namespace>.app.<project_id>
+// (production) or .app.<project_id>.sandbox, so Media's namespace usage meters each project.
+const PROJECT_RE = /^prj_[0-9A-HJKMNP-TV-Z]{26}$/;
+const projectOf = (p) => (PROJECT_RE.test(String(p || '')) ? String(p) : null);
+function projectNamespace(media, row) {
+    if (!row.project_id || !PROJECT_RE.test(row.project_id)) return null;
+    return `${media.namespace || 'tools'}.app.${row.project_id}${row.env === 'sandbox' ? '.sandbox' : ''}`;
+}
 const PRUNE_RECHECK_MS = 24 * HOUR;   // an expired job the pruner could not finish is looked at again after this
 const REF_RE = /^[a-z][a-z0-9_-]*(?::[A-Za-z0-9_.-]+){1,4}$/;   // <service>:<kind>:<id>, e.g. community:paste:p_123
 const MAX_REFS = 50;
@@ -203,7 +212,7 @@ function createJobSystem(o) {
     // Developer-app sandbox jobs: fewer at a time, kept briefly, results never leave this server.
     const SANDBOX_MAX_ACTIVE = Math.max(1, o.sandboxMaxActivePerOwner || 2);
     const SANDBOX_TTL_MS = 30 * 60 * 1000;
-    async function submit({ owner, type, input = {}, files = [], idempotencyKey = null, ttlMs = HOUR, env = 'production', ipKey = null, tool = null }) {
+    async function submit({ owner, type, input = {}, files = [], idempotencyKey = null, ttlMs = HOUR, env = 'production', ipKey = null, tool = null, project = null }) {
         if (env !== 'sandbox') env = 'production';
         if (env === 'sandbox') ttlMs = Math.min(ttlMs, SANDBOX_TTL_MS);
         if (stopped) throw new JobError(503, 'tools.job.unavailable', 'The job system is shutting down');
@@ -254,6 +263,7 @@ function createJobSystem(o) {
                         max_attempts: def.maxAttempts, ttl_ms: ttlMs, now: Date.now(), env,
                         ip_key: String(owner).startsWith('session:') && ipKey ? String(ipKey) : null,
                         tool: tool && /^[a-z][a-z0-9-]{0,39}$/.test(String(tool)) ? String(tool) : null,
+                        project_id: projectOf(project),
                     });
                     announce.created(store.get(id));
                 })();
@@ -389,11 +399,13 @@ function createJobSystem(o) {
             const size = fs.statSync(local).size;
             const sha256 = await sha256File(local);
             const rec = { name: String(f.name || `result-${i}`).slice(0, 200), mime: f.mime || 'application/octet-stream', size, sha256, storage: 'local', media: null, _path: local };
-            if (media && !entry.reason && row.env !== 'sandbox') {
+            // A developer app's results (sandbox too) go under its project's namespace (WS-L task 5); other
+            // sandbox results stay on this server until the job expires.
+            if (media && !entry.reason && (row.env !== 'sandbox' || row.project_id)) {
                 try {
                     const progress = progressFn(row.id, entry);
                     progress(99, 'Storing the result');
-                    rec.media = await media.upload({ path: local, name: rec.name, mime: rec.mime, size, sha256, owner: row.owner, jobId: row.id, service: o.service, type: row.type });
+                    rec.media = await media.upload({ path: local, name: rec.name, mime: rec.mime, size, sha256, owner: row.owner, jobId: row.id, service: o.service, type: row.type, namespace: projectNamespace(media, row) });
                     rec.storage = 'media';
                     delete rec._path;
                     await fsp.unlink(local).catch(() => {});
@@ -476,7 +488,7 @@ function createJobSystem(o) {
                 store.insert({
                     id: next, type: row.type, type_version: def.version, owner: row.owner, input_json: row.input_json, files_json: JSON.stringify(stored),
                     idempotency_key: null, request_hash: row.request_hash, max_attempts: def.maxAttempts, ttl_ms: row.ttl_ms, now: Date.now(),
-                    env: row.env, retry_of: row.id, ip_key: row.ip_key || null, tool: row.tool || null,
+                    env: row.env, retry_of: row.id, ip_key: row.ip_key || null, tool: row.tool || null, project_id: row.project_id || null,
                 });
                 announce.created(store.get(next));
             })();

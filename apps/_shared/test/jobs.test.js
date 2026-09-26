@@ -515,6 +515,31 @@ async function readSse(url, { headers = {}, stop = () => false, ms = 5000 } = {}
         assert.strictEqual(r.status, 401, 'a sandbox token that is not an app is refused'); assert.strictEqual(r.body.code, 'token.sandbox_refused');
         await s.close();
 
+        // ── A developer app's results go to Media under its project's namespace (WS-L task 5) ───
+        {
+            const fm2 = fakeMedia();
+            const ms2 = await new Promise(res => { const srv = fm2.app.listen(0, '127.0.0.1', () => res(srv)); });
+            s = await satellite(path.join(root, 'g'), { media: jobs.createMediaResults({ internalUrl: `http://127.0.0.1:${ms2.address().port}`, tokens: fakeTokens }) });
+            const PRJ = 'prj_01JCCCCCCCCCCCCCCCCCCCCCCC';
+            const done = async (c, id) => until(async () => { const g = await c(`/api/v1/jobs/${id}`); return g.body.state === 'succeeded' && g.body; }, 'project job');
+            const prod = client(s.base, { bearer: token({}) });
+            let j = await done(prod, (await prod('/api/v1/jobs', json({ type: 'test.upper', input: { text: 'prod' } }))).body.id);
+            assert.strictEqual(s.system.get(j.id).project_id, PRJ, 'the job remembers its project');
+            assert.strictEqual(j.result.files[0].storage, 'media');
+            assert.strictEqual(fm2.objects.get(j.result.files[0].media.media_id).meta.namespace, `tools.app.${PRJ}`, 'production: tools.app.<project>');
+            assert.strictEqual(j.result.files[0].media.namespace, `tools.app.${PRJ}`);
+            const sand = client(s.base, { bearer: token({ env: 'sandbox', cap: ['tools.job.create', 'tools.job.read'] }) });
+            j = await done(sand, (await sand('/api/v1/jobs', json({ type: 'test.upper', input: { text: 'sandbox' } }))).body.id);
+            assert.strictEqual(j.result.files[0].storage, 'media', 'sandbox results reach Media too, metered per project');
+            assert.strictEqual(fm2.objects.get(j.result.files[0].media.media_id).meta.namespace, `tools.app.${PRJ}.sandbox`);
+            const person = client(s.base, { user: USER_B });
+            j = await done(person, (await person('/api/v1/jobs', json({ type: 'test.upper', input: { text: 'person' } }))).body.id);
+            assert.strictEqual(fm2.objects.get(j.result.files[0].media.media_id).meta.namespace, undefined, "a person's job stays in the tools root");
+            assert.strictEqual(s.system.get(j.id).project_id, null);
+            await s.close();
+            ms2.close();
+        }
+
         console.log('jobs (shared runtime): all checks passed');
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
