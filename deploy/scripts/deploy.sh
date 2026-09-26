@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Deploy OpenVibe.Tools on the host: pull, install dependencies in each app whose package.json
-# changed (that includes a new openvibe-shared release tag), restart the units, check health.
+# changed (that includes a new openvibe-shared release tag), restart the units, check health, then
+# announce the release to open tabs (`ovhost announce tools`; best effort, never fails the deploy).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 BEFORE=$(git rev-parse HEAD)
@@ -47,4 +48,19 @@ UNITS=$(systemctl list-unit-files 'openvibe-tools*' --no-legend | awk '{print $1
 sudo systemctl restart $UNITS
 sleep 5
 for u in $UNITS; do printf '%-34s %s\n' "$u" "$(systemctl is-active "$u")"; done
-curl -fsS -o /dev/null -H 'Host: openvibe.tools' http://127.0.0.1:4001/api/health && echo "gateway healthy ($BEFORE → $AFTER)"
+curl -fsS -o /dev/null -H 'Host: openvibe.tools' http://127.0.0.1:4001/api/health && echo "gateway healthy ($BEFORE → $AFTER)" || exit $?
+# Release notification (roadmap WS-P task 9): OpenVibe.Host publishes host.deploy.activated for the release
+# the apps' /release.json reports, once per release, so open tabs check it now instead of at their next
+# poll. Best effort: skipped without an ovhost whose --help has `announce <service>`, 20 s at most, and it
+# never changes the exit code. ovhost reads Host's credentials as root (OpenVibe.Host
+# docs/release-notifications.md).
+OVHOST_BIN=$(command -v "${OVHOST:-ovhost}" 2>/dev/null || true)
+if [ -n "$OVHOST_BIN" ]; then
+  case "$("$OVHOST_BIN" --help 2>/dev/null || true)" in
+    *"announce <service>"*)
+      SUDO=""; [ "$(id -u)" -eq 0 ] || SUDO="sudo -n"
+      timeout 20 $SUDO "$OVHOST_BIN" announce tools 2>&1 || echo "release notification not sent (the deploy stands)" ;;
+    *) echo "release notification skipped: this ovhost has no announce" ;;
+  esac
+fi
+exit 0
