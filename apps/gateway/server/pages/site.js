@@ -42,6 +42,7 @@ const CSS = `
 body{margin:0;background:var(--bg-primary,#0a0f18);color:var(--text-primary,#e6edf7);font:400 16px/1.55 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 a{color:var(--accent-light,var(--accent,#60a5fa))}
 .wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+pre{max-width:100%;overflow-x:auto}pre:focus-visible{outline:2px solid var(--accent,#3b82f6);outline-offset:2px}
 .topbar{display:flex;align-items:center;gap:14px;padding:12px 20px;border-bottom:1px solid var(--border,rgba(255,255,255,.08))}
 .topbar a{color:inherit;text-decoration:none;font-weight:700}.topbar nav{display:flex;gap:14px;margin-left:auto;font-size:14px;flex-wrap:wrap}.topbar nav a{font-weight:500;color:var(--text-secondary,#a8b3c4)}
 .hero{padding:clamp(28px,6vw,64px) 0 8px;text-align:center}
@@ -246,7 +247,8 @@ function pageDevelopers() {
     const { families } = registry.get();
     const snap = require('../registry/descriptors').snapshot();
     const withApi = snap.tools.filter((t) => t.api && t.status !== 'unavailable');
-    const code = (s) => `<pre><code>${esc(s)}</code></pre>`;
+    // A long command scrolls inside its block, not the page (it overflowed at 768 px); tabindex lets a keyboard scroll it.
+    const code = (s) => `<pre tabindex="0"><code>${esc(s)}</code></pre>`;
     const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> › Developers</nav><div class="page-h">${icon('code', 56)}<h1>Tools API</h1></div>
 <p class="lead">${withApi.length} of ${snap.tools.length} tools can be called from code, with the same engines the pages use. One request shape for all of them; long work runs as a job you can follow.</p>
 <section><div class="sec-h"><h2>Discover</h2></div><p class="sec-p">Every tool is described by a machine-readable descriptor (inputs as JSON Schema, file limits, how it runs, who may call it).</p>
