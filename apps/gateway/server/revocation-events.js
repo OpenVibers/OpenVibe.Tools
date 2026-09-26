@@ -14,18 +14,27 @@ const { revocationsFile } = require('../../_shared/guard/revocations');
 
 const TOPIC = 'network.user.token_valid_after';
 let store = null;
+let storeDb = null;
 function cutoffs() {
     if (store) return store;
     const Database = require('better-sqlite3');
     const file = revocationsFile();
     fs.mkdirSync(path.dirname(file), { recursive: true });
     const db = new Database(file);
+    storeDb = db;
     // A rollback journal, not WAL: the other apps open the file read-only under ProtectSystem=strict and could not
     // create a WAL's -shm file. Writes are one row per sign-out-everywhere.
     db.pragma('journal_mode = DELETE');
     db.pragma('busy_timeout = 2000');
     store = require('openvibe-sdk/auth').createRevocationStore(db, { table: 'token_revocations' });
     return store;
+}
+/** Close the cutoff store (graceful stop); the next request opens it again. */
+function close() {
+    const db = storeDb;
+    store = null;
+    storeDb = null;
+    if (db) try { db.close(); } catch { /* already closed */ }
 }
 const secrets = () => String(process.env.TOOLS_EVENTS_SECRET || '').split(',').map((s) => s.trim()).filter((s) => s.length >= 32);
 const stats = { received: 0, revoked: 0, refused: 0 };
@@ -71,4 +80,4 @@ async function ensureSubscription({ port, fetchImpl = globalThis.fetch, log = co
     return 'created';
 }
 
-module.exports = { handler, ensureSubscription, stats, TOPIC, _cutoffs: cutoffs };
+module.exports = { handler, ensureSubscription, close, stats, TOPIC, _cutoffs: cutoffs };

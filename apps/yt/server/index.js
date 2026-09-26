@@ -324,14 +324,20 @@ const server = app.listen(config.port, config.host, () => {
     console.log(`╚═══════════════════════════════════════╝\n`);
 });
 
-// ── Graceful Shutdown ────────────────────────────────────────
-function shutdown() {
-    console.log('[YT.OpenVibe] Shutting down...');
-    analytics.destroy();
-    analyticsDb.close();
-    guard.close();
-    server.close(() => process.exit(0));
-    setTimeout(() => process.exit(1), 5000);
-}
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+// ── Graceful stop (roadmap WS-P lifecycle; apps/_shared/graceful.js) ──
+// SIGTERM: the download cleanup timer stops; the server stops taking connections and lets requests
+// in flight finish (4 s at most; progress streams are closed and reconnect); then recent-tool writes
+// are flushed (1 s at most), the analytics and the guard close, and the process exits 0, within the
+// manifest's 5 s.
+require('../../_shared/graceful').gracefulStop({
+    name: 'YT.OpenVibe', server,
+    stop: [
+        () => downloader.stopCleanup(),
+    ],
+    close: [
+        () => require('../../_shared/usage').stopRecorder(800),
+        () => analytics.destroy(),
+        () => analyticsDb.close(),
+        () => guard.close(),
+    ],
+});

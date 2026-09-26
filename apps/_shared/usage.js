@@ -206,6 +206,14 @@ async function mergeGuestFavorites(req, res, subject, host, rec = recorder()) {
 
 let _recorder = null;
 function recorder() { if (!_recorder) _recorder = createRecorder(); return _recorder; }
+/** Graceful stop (apps/_shared/graceful.js): stop the flush timer and send what this process gathered, at most `ms`. */
+async function stopRecorder(ms = 1000) {
+    if (!_recorder) return;
+    _recorder.stop();
+    if (!_recorder.enabled || !_recorder.stats().pending) return;
+    await require('./graceful').within(ms, _recorder.flush());
+    _recorder.stop();
+}
 
 const MERGED_COOKIE = 'ov_recent_merged';
 /**
@@ -262,4 +270,4 @@ function usagePages({ snapshot, rec = null }) {
     };
 }
 
-module.exports = { createRecorder, recorder, usagePages, recentFromCookie, mergeGuestTools, favoritesFromCookie, setCookieFavorite, mergeGuestFavorites, NS, COOKIE, MERGED_COOKIE, FAV_COOKIE };
+module.exports = { createRecorder, recorder, stopRecorder, usagePages, recentFromCookie, mergeGuestTools, favoritesFromCookie, setCookieFavorite, mergeGuestFavorites, NS, COOKIE, MERGED_COOKIE, FAV_COOKIE };

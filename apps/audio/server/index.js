@@ -387,15 +387,22 @@ const server = app.listen(config.port, config.host, () => {
     console.log(`╚═══════════════════════════════════════╝\n`);
 });
 
-// ── Graceful Shutdown ────────────────────────────────────────
-function shutdown() {
-    console.log('[Audio.OpenVibe] Shutting down...');
-    analytics.destroy();
-    analyticsDb.close();
-    jobs.close();   // running jobs stay 'running' in data/jobs.db; the next boot re-queues them
-    guard.close();
-    server.close(() => process.exit(0));
-    setTimeout(() => process.exit(1), 5000);
-}
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+// ── Graceful stop (roadmap WS-P lifecycle; apps/_shared/graceful.js) ──
+// SIGTERM: the retention timer and the job worker stop (nothing new starts; open job event streams
+// end); the server stops taking connections and lets requests in flight finish (4 s at most); then
+// recent-tool writes are flushed (1 s at most), the analytics, the jobs store and the guard close,
+// and the process exits 0, within the manifest's 5 s.
+require('../../_shared/graceful').gracefulStop({
+    name: 'Audio.OpenVibe', server,
+    stop: [
+        () => retention.stopCleanup(),
+        () => jobs.stop(),
+    ],
+    close: [
+        () => require('../../_shared/usage').stopRecorder(800),
+        () => analytics.destroy(),
+        () => analyticsDb.close(),
+        () => jobs.close(),   // running jobs stay 'running' in data/jobs.db; the next boot re-queues them
+        () => guard.close(),
+    ],
+});

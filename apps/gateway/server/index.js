@@ -121,7 +121,7 @@ app.use(helmet({
 }));
 // ── Host roles: aliases redirect, unknown hosts leave, satellite hosts are proxied ──
 const { hostRoles } = require('./registry/host-middleware');
-registry.start();
+const registryTimer = registry.start();
 app.use(hostRoles({
     hostOf: getRequestHost,
     enforce: config.isProduction || process.env.OV_ENFORCE_HOSTS === '1',
@@ -482,13 +482,13 @@ app.get('*', (req, res) => {
 
 // ── Start ────────────────────────────────────────────────────
 // What each satellite says about its own tools (a program missing on the host → unavailable here too).
-toolRegistry.startSatellitePolling(SATELLITES);
+const satellitePolling = toolRegistry.startSatellitePolling(SATELLITES);
 
 // Every tool as an OpenVibe.Search document (owner tools), kept in step with the registry (S9).
 const searchIndex = require('./search-index').searchIndexerFromEnv({ snapshot: toolRegistry.snapshot, dataDir: require('path').resolve(__dirname, '..', process.env.DATA_DIR || 'data') });
 if (searchIndex.indexer) searchIndex.indexer.start(); else console.log(`[SearchIndex] off: ${searchIndex.reason}`);
 
-app.listen(config.port, config.host, () => {
+const server = app.listen(config.port, config.host, () => {
     // Subscribe to Network's token cutoffs (retried a few times; off without EVENTS_URL / TOOLS_EVENTS_SECRET).
     const subscribe = (n) => require('./revocation-events').ensureSubscription({ port: config.port }).catch((e) => {
         console.warn('[Events] token cutoff subscription not ready:', e.message);
@@ -503,4 +503,25 @@ app.listen(config.port, config.host, () => {
     console.log(`║  SSO:     ${config.networkUrl.padEnd(32)}║`);
     console.log(`║  Live:    ${config.liveUrl.padEnd(32)}║`);
     console.log(`╚════════════════════════════════════════════╝\n`);
+});
+
+// ── Stop (roadmap WS-P lifecycle; apps/_shared/graceful.js) ──
+// SIGTERM: the catalog, services and satellite pollers and the search indexer stop; the server stops
+// taking connections and lets requests in flight finish (4 s at most; event streams are closed and
+// reconnect); then recent-tool writes are flushed (1 s at most), the engine pool, the guard and the
+// cutoff store close, and the process exits 0 — within the manifest's 5 s.
+require('../../_shared/graceful').gracefulStop({
+    name: 'Tools gateway', server,
+    stop: [
+        () => clearInterval(registryTimer),
+        () => registry.services.stop(),
+        () => satellitePolling.stop(),
+        () => { if (searchIndex.indexer) searchIndex.indexer.stop(); },
+    ],
+    close: [
+        () => require('../../_shared/usage').stopRecorder(800),
+        () => runApi.pool.close(),
+        () => guard.close(),
+        () => require('./revocation-events').close(),
+    ],
 });

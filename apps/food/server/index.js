@@ -158,14 +158,14 @@ const server = app.listen(PORT, '127.0.0.1', () => {
   console.log(`[Food.OpenVibe] 🍽️  food.openvibe.tools listening on 127.0.0.1:${PORT}`);
 });
 
-// ── Graceful Shutdown ────────────────────────────────────────
-function shutdown() {
-    console.log('[Food.OpenVibe] Shutting down...');
-    analytics.destroy();
-    analyticsDb.close();
-    guard.close();
-    server.close(() => process.exit(0));
-    setTimeout(() => process.exit(1), 5000);
-}
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
+// ── Graceful stop (roadmap WS-P lifecycle; apps/_shared/graceful.js) ──
+// SIGTERM: the server stops taking connections and lets requests in flight finish (4 s at most);
+// then the analytics and the guard close, and the process exits 0, within the manifest's 5 s.
+require('../../_shared/graceful').gracefulStop({
+    name: 'Food.OpenVibe', server,
+    close: [
+        () => analytics.destroy(),
+        () => analyticsDb.close(),
+        () => guard.close(),
+    ],
+});
