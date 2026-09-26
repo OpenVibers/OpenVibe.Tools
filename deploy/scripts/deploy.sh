@@ -13,6 +13,7 @@ for f in $(git diff --name-only HEAD "origin/$(git rev-parse --abbrev-ref HEAD)"
 done
 git pull -q --ff-only; AFTER=$(git rev-parse HEAD)
 for app in apps/*/; do
+  case "$app" in apps/_*) continue ;; esac   # apps/_shared is a package the apps require, not an app
   [ -f "$app/package.json" ] || continue
   if git diff --name-only "$BEFORE" "$AFTER" -- "$app/package.json" | grep -q . || [ ! -d "$app/node_modules" ]; then (cd "$app" && npm install --omit=dev --no-audit --no-fund --loglevel=error); fi
 done
@@ -20,6 +21,7 @@ done
 # file: link can leave an empty directory npm treats as installed (2026-09-23: vendor/openvibe-shared
 # kept an untracked lockfile, every unit crash-looped on 'openvibe-shared/brand'); reinstall those.
 for app in apps/*/; do
+  case "$app" in apps/_*) continue ;; esac   # apps/_shared is a package the apps require, not an app
   [ -f "$app/package.json" ] || continue
   for dep in $(node -e 'console.log(Object.keys(require("./"+process.argv[1]+"package.json").dependencies||{}).join(" "))' "$app"); do
     if [ ! -f "$app/node_modules/$dep/package.json" ]; then
@@ -39,6 +41,7 @@ done
 # Every app keeps its guard (apps/_shared/guard) state in data/guard.db through its own better-sqlite3;
 # the units' ReadWritePaths name each data directory, which must exist before systemd starts them.
 for app in apps/*/; do
+  case "$app" in apps/_*) continue ;; esac   # apps/_shared is a package the apps require, not an app
   [ -f "$app/package.json" ] || continue
   mkdir -p "$app/data"
   (cd "$app" && node -e "const D=require('better-sqlite3'); new D(':memory:').close(); require('../_shared/guard')") \

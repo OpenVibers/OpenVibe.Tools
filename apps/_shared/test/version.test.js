@@ -50,4 +50,11 @@ assert.throws(() => requireShared('next', { appsDir: dir, version: '1.0.0' }), /
 assert.throws(() => require('../release').toolsRelease('no-such-app', require), /declares no "openvibeToolsShared" range/, 'toolsRelease refuses an undeclared app before anything else');
 fs.rmSync(dir, { recursive: true, force: true });
 
+// deploy.sh walks apps/*/ to install, resolve and preflight each app; _shared has a package.json now
+// but is not an app (2026-09-26: the guard preflight tried to load better-sqlite3 from it and aborted).
+const deploy = fs.readFileSync(path.join(APPS, '..', 'deploy', 'scripts', 'deploy.sh'), 'utf8');
+const loops = deploy.split('\n').map((l, i, all) => [l, all[i + 1] || '']).filter(([l]) => /^for app in apps\/\*\/; do/.test(l));
+assert.ok(loops.length >= 3, 'deploy.sh has its app loops');
+for (const [, next] of loops) assert.match(next, /case "\$app" in apps\/_\*\) continue ;; esac/, 'each app loop in deploy.sh skips apps/_*');
+
 console.log('_shared version: all checks passed');
