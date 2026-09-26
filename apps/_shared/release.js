@@ -14,6 +14,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 const path = require('path');
+const { requireShared } = require('./version');
 
 const ROOT = path.join(__dirname, '..', '..');
 
@@ -33,6 +34,7 @@ const JOB_APPS = new Set(['img', 'audio', 'docs']);
  * @param {object} [opts]         passed on to createRelease (tests: env, now, logger)
  */
 function toolsRelease(app, appRequire, opts = {}) {
+    requireShared(app);   // the app's declared openvibeToolsShared range, or it does not boot (version.js)
     const { createRelease } = appRequire('openvibe-shared/release');
     const dir = `apps/${app}`;
     let schema = null;

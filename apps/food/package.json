@@ -8,6 +8,7 @@
     "start": "node server/index.js",
     "dev": "node --watch server/index.js"
   },
+  "openvibeToolsShared": "^1.0.0",
   "dependencies": {
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",

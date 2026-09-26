@@ -9,6 +9,7 @@
     "dev": "NODE_ENV=development node server/index.js"
   },
   "license": "MIT",
+  "openvibeToolsShared": "^1.0.0",
   "dependencies": {
     "better-sqlite3": "^11.10.0",
     "cookie-parser": "^1.4.7",

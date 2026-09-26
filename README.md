@@ -22,7 +22,9 @@ apps/
 ├── audio     # Audio.OpenVibe — audio converter & effects
 ├── text      # Text.OpenVibe + Logo.OpenVibe — text generators & logo makers
 └── docs      # Docs.OpenVibe  — PDF & document tools
-apps/_shared   # code the apps require by relative path: host roles, internal auth, the job runtime (jobs/),
+apps/_shared   # openvibe-tools-shared, a versioned package (package.json, CHANGELOG.md): each app declares the
+               # range it needs ("openvibeToolsShared": "^1.0.0") and refuses to boot when this checkout does not
+               # satisfy it (version.js). The apps require it by relative path: host roles, internal auth, the job runtime (jobs/),
                # the guard (guard/: callers, quotas, sniffing, ffmpeg hardening, egress throttles, abuse log),
                # the SSRF guard (egress.js) that every tool reaching a visitor-chosen host or URL goes
                # through (public addresses only, checked after DNS and dialled as checked, redirect hops
