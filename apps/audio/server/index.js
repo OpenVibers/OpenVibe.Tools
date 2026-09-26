@@ -18,7 +18,8 @@ const config = require('./config');
 const { resolveContext, DOMAIN_MAP } = require('./domain-map');
 const { getTool, listTools } = require('./tools');
 const { readMetadata } = require('./tools/metadata');
-const { uploadSingle, uploadMultiple, uploadAny } = require('./middleware/upload');
+// Uploads from the shared runtime (apps/_shared/upload.js, WS-L task 3).
+const { uploadSingle, uploadMultiple, uploadAny } = require('../../_shared/upload').createUploads({ multer: require('multer'), config, storage: 'disk', maxFiles: 5, rejectHint: 'Upload an audio or video file.' });
 const retention = require('./retention/manager');
 const { probe, getDuration, cleanTmp } = require('./tools/ffmpeg-helper');
 const { buildOptions, describe, defineJobs, runSync, jobContext, limitsFor } = require('./process');

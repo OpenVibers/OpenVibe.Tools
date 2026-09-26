@@ -17,7 +17,8 @@ const rateLimit = require('express-rate-limit');
 const config = require('./config');
 const { resolveContext, DOMAIN_MAP } = require('./domain-map');
 const { getTool, listTools } = require('./tools');
-const { uploadSingle } = require('./middleware/upload');
+// Uploads from the shared runtime (apps/_shared/upload.js, WS-L task 3).
+const { uploadSingle } = require('../../_shared/upload').createUploads({ multer: require('multer'), config, storage: 'memory', maxFiles: 1 });
 const retention = require('./retention/manager');
 const { buildOptions, describe, runProcess, defineJobs } = require('./process');
 const { poolFromEnv } = require('../../_shared/jobs/pool');

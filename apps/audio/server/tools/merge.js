@@ -12,7 +12,7 @@ const { tmpFile, probe, getAudioStream, getDuration, getMime } = require('./ffmp
 const { FORMAT_CONFIG } = require('./convert');
 
 const MIN_FILES = 2;
-const MAX_FILES = 5;                          // the upload limit (middleware/upload.js)
+const MAX_FILES = 5;                          // the upload limit (createUploads maxFiles in server/index.js)
 const MAX_TOTAL_SECONDS = 3 * 60 * 60;        // three hours of joined audio
 const LOSSY = new Set(['mp3', 'ogg', 'm4a', 'aac', 'opus', 'wma', 'ac3', 'webm']);
 
