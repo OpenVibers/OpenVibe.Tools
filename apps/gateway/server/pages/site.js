@@ -70,7 +70,7 @@ section{padding:clamp(24px,4vw,44px) 0 0}
 .crumbs{font-size:13.5px;color:var(--text-muted,#7d8aa0);padding-top:18px}.crumbs a{color:inherit}
 .page-h{display:flex;gap:16px;align-items:center;padding:14px 0 4px}.page-h h1{font-size:clamp(26px,4vw,40px);letter-spacing:-.03em;margin:0;line-height:1.1}
 .lead{font-size:clamp(15px,1.5vw,18px);color:var(--text-secondary,#a8b3c4);max-width:820px}
-.cta{display:inline-flex;align-items:center;gap:8px;background:var(--accent,#3b82f6);color:var(--on-accent,#fff);font-weight:700;text-decoration:none;padding:12px 20px;border-radius:12px;margin:6px 0}
+.cta{display:inline-flex;align-items:center;gap:8px;background:var(--accent-strong,#1d4ed8);color:var(--on-accent-strong,#fff);font-weight:700;text-decoration:none;padding:12px 20px;border-radius:12px;margin:6px 0}
 .hosts{list-style:none;padding:0;margin:8px 0;display:flex;flex-direction:column;gap:6px;max-width:640px}
 .hosts li{display:flex;gap:10px;align-items:center;padding:9px 12px;border:1px solid var(--border,rgba(255,255,255,.08));border-radius:10px;flex-wrap:wrap}
 .hosts li.primary{border-color:var(--accent,#3b82f6);background:var(--accent-glow,rgba(59,130,246,.1))}
