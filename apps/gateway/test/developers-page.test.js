@@ -23,6 +23,8 @@ const site = require('../server/pages/site');
         // The family pages' "Open …" button: --on-accent-strong on --accent-strong (4.5:1 in every theme), not
         // white on --accent (3.67:1, axe color-contrast on /network-tools, /developer-tools, /image-tools).
         assert.ok(html.includes('.cta{display:inline-flex;align-items:center;gap:8px;background:var(--accent-strong,#1d4ed8);color:var(--on-accent-strong,#fff);'));
+        // A tool page's "Primary" address tag sits on the accent glow: muted text there read 3.16:1 (axe, /tool/yaml).
+        assert.ok(html.includes('.hosts li.primary .tag{color:var(--text-primary,#e6e9ef)}'));
         console.log('developers page: all checks passed');
     } finally { srv.close(); }
 })().catch((e) => { console.error(e); process.exit(1); });
