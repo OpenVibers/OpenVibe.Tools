@@ -62,7 +62,7 @@ Public, cacheable outputs on the apex: `/` (every tool by family, planned tools 
 `/llms.txt`, `/api/catalog.json`, `/terms`, `/privacy`, `/dmca`. All of it renders without JavaScript.
 
 Deploy with `deploy/scripts/deploy.sh` (it refreshes the copied shared package inside each app). Once the
-gateway is healthy, it runs `ovhost announce tools`. OpenVibe.Host then publishes `host.deploy.activated`
+gateway is healthy, it runs `ovhost announce tools`. OpenVibe.Host then publishes `host.release.published`
 to OpenVibe.Events, and open tabs check `/release.json` within seconds instead of at their next poll. This
 is best effort: it is skipped without an `ovhost` that has `announce`, and it never fails the deploy.
 

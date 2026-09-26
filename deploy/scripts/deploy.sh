@@ -49,7 +49,7 @@ sudo systemctl restart $UNITS
 sleep 5
 for u in $UNITS; do printf '%-34s %s\n' "$u" "$(systemctl is-active "$u")"; done
 curl -fsS -o /dev/null -H 'Host: openvibe.tools' http://127.0.0.1:4001/api/health && echo "gateway healthy ($BEFORE → $AFTER)" || exit $?
-# Release notification (roadmap WS-P task 9): OpenVibe.Host publishes host.deploy.activated for the release
+# Release notification (roadmap WS-P task 9): OpenVibe.Host publishes host.release.published for the release
 # the apps' /release.json reports, once per release, so open tabs check it now instead of at their next
 # poll. Best effort: skipped without an ovhost whose --help has `announce <service>`, 20 s at most, and it
 # never changes the exit code. ovhost reads Host's credentials as root (OpenVibe.Host
