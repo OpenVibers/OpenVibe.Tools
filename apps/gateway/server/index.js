@@ -112,7 +112,8 @@ app.use(helmet({
             styleSrc: ["'self'", "'unsafe-inline'", "cdnjs.cloudflare.com", "fonts.googleapis.com", "fonts.gstatic.com"],
             fontSrc: ["'self'", "fonts.gstatic.com", "cdnjs.cloudflare.com"],
             imgSrc: ["'self'", "data:", "blob:", "https://openvibe.network", "https://openvibe.media"],
-            connectSrc: ["'self'", "https://cloudflareinsights.com", "https://openvibe.network", "https://openvibe.tools", "https://*.openvibe.tools", "https://openvibe.media", "https://openvibe.live", "https://openvibe.games"],
+            // events.openvibe.network: release notifications (release-watch's EventSource, openvibe-shared 1.17).
+            connectSrc: ["'self'", "https://cloudflareinsights.com", "https://openvibe.network", "https://openvibe.tools", "https://*.openvibe.tools", "https://openvibe.media", "https://openvibe.live", "https://openvibe.games", "https://events.openvibe.network"],
             frameSrc: ["https://openvibe.network"], // the hidden /sso/check sign-in probe
             scriptSrcAttr: ["'unsafe-inline'"],
         },

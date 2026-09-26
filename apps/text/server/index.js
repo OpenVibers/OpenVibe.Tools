@@ -65,7 +65,8 @@ app.use(helmet({
             styleSrc: ["'self'", "'unsafe-inline'", "cdnjs.cloudflare.com", "fonts.googleapis.com", "fonts.gstatic.com"],
             fontSrc: ["'self'", "fonts.gstatic.com", "cdnjs.cloudflare.com"],
             imgSrc: ["'self'", "data:", "blob:"],
-            connectSrc: ["'self'", "https://openvibe.network", "https://api.exchangerate-api.com"],
+            // events.openvibe.network: release notifications (release-watch's EventSource, openvibe-shared 1.17).
+            connectSrc: ["'self'", "https://openvibe.network", "https://api.exchangerate-api.com", "https://events.openvibe.network"],
             frameSrc: ["'none'"],
             scriptSrcAttr: ["'unsafe-inline'"],
         },
