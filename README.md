@@ -245,6 +245,17 @@ reload reattaches.
   creates no job and no event. The relay uses the `tools` client (`OV_OAUTH_CLIENT_ID`, `OV_OAUTH_CLIENT_SECRET`)
   with `events.event.publish` on audience `openvibe.events`. Without `EVENTS_URL` (or with `EVENTS_PUBLISH=off`, or
   no client secret) nothing is written or sent. `GET /api/health` shows `jobs.events` (pending, rejected).
+- **Project usage to OpenVibe.Events** on the same outbox (`apps/_shared/jobs/usage.js`, roadmap WS-N task 4): a
+  developer app's job (it carries a project) that ends is counted in the transaction that records its end, per
+  project, environment, capability (`tools.tool.run` for a tool run, `tools.job.create` for `POST /api/v1/jobs`),
+  job type or tool and UTC hour: the jobs that ended (succeeded or failed; cancelled ones are not counted) and the
+  failed ones by problem code, with the last ten failures' job id, status and the trace id of the request that
+  submitted the job (`tool_jobs.trace_id`). A minute after an hour closes, the pruner's timer writes each rollup
+  once as `tools.usage.recorded` (`common.usage-recorded@1`, openvibe-contracts 0.63.0; subject the project,
+  visibility `internal`, priority `low`) in the transaction that marks it sent. Sandbox jobs count under
+  `env: sandbox`. No owner, session, address, input, file name or output leaves. OpenVibe.Network adds the rollups
+  up for the project's usage page on openvibe.codes. Off without `EVENTS_URL`, like the job events;
+  `GET /api/health` shows `jobs.usage` (pending, invalid).
 
 Environment (all in `/etc/openvibe/tools.env`): `TOOLS_WORKERS`, `TOOLS_WORKERS_<APP>`, `TOOLS_WORKER_MEMORY_MB`,
 `TOOLS_WORKER_MEMORY_MB_<APP>`, `TOOLS_WORKER_QUEUE`, `TOOLS_WORKER_IDLE_MS`, `TOOLS_JOBS_CONCURRENCY`, `TOOLS_JOBS_CONCURRENCY_<APP>`,

@@ -3,7 +3,8 @@
 // Tools job runtime (roadmap Wave 11). Shared by the satellites the way apps/_shared always is:
 // required by relative path, no dependencies of its own — each app passes its better-sqlite3,
 // openvibe-contracts and openvibe-sdk. See system.js (lifecycle), http.js (routes), media.js (results
-// in Media), events.js (tools.job.* to OpenVibe.Events), client.js (browser helper).
+// in Media), events.js (tools.job.* to OpenVibe.Events), usage.js (tools.usage.recorded, a developer
+// project's jobs per hour), client.js (browser helper).
 //
 // Environment (one /etc/openvibe/tools.env for every unit):
 //   TOOLS_JOBS_CONCURRENCY           jobs running at once per satellite (default 2)

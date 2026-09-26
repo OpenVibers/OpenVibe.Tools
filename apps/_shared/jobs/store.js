@@ -70,6 +70,8 @@ const ADDED_COLUMNS = [
     ['tool', 'TEXT'],           // the tool (tools.tool@1 id) whose run created the job (POST /api/v1/tools/:id/run)
     ['project_id', 'TEXT'],     // a developer app's job: its project (prj_…), so its results go to Media under the
                                 // project's namespace, metered per project (WS-L task 5)
+    ['trace_id', 'TEXT'],       // the trace id of the request that submitted the job, sampled with a developer
+                                // project's failures in its usage rollups (./usage.js, WS-N task 4)
 ];
 
 const parse = (s, fallback) => { if (s == null) return fallback; try { return JSON.parse(s); } catch { return fallback; } };
@@ -83,8 +85,8 @@ function createStore(db) {
     db.exec("CREATE INDEX IF NOT EXISTS tool_jobs_ip ON tool_jobs(ip_key, state) WHERE ip_key IS NOT NULL");
 
     const q = {
-        insert: db.prepare(`INSERT INTO tool_jobs (id, type, type_version, owner, state, input_json, files_json, idempotency_key, request_hash, max_attempts, ttl_ms, created_at, updated_at, env, retry_of, ip_key, tool, project_id)
-            VALUES (@id, @type, @type_version, @owner, 'queued', @input_json, @files_json, @idempotency_key, @request_hash, @max_attempts, @ttl_ms, @now, @now, @env, @retry_of, @ip_key, @tool, @project_id)`),
+        insert: db.prepare(`INSERT INTO tool_jobs (id, type, type_version, owner, state, input_json, files_json, idempotency_key, request_hash, max_attempts, ttl_ms, created_at, updated_at, env, retry_of, ip_key, tool, project_id, trace_id)
+            VALUES (@id, @type, @type_version, @owner, 'queued', @input_json, @files_json, @idempotency_key, @request_hash, @max_attempts, @ttl_ms, @now, @now, @env, @retry_of, @ip_key, @tool, @project_id, @trace_id)`),
         markRetried: db.prepare("UPDATE tool_jobs SET retried_by = @next, updated_at = @now WHERE id = @id AND state = 'failed' AND retried_by IS NULL"),
         get: db.prepare('SELECT * FROM tool_jobs WHERE id = ?'),
         byIdem: db.prepare('SELECT * FROM tool_jobs WHERE owner = ? AND idempotency_key = ?'),
@@ -129,7 +131,7 @@ function createStore(db) {
     return {
         db,
         TERMINAL, STATES,
-        insert(row) { q.insert.run({ retry_of: null, ip_key: null, tool: null, project_id: null, ...row }); },
+        insert(row) { q.insert.run({ retry_of: null, ip_key: null, tool: null, project_id: null, trace_id: null, ...row }); },
         byResultMedia: (owner, mediaId) => q.byResultMedia.all(owner, `%"media_id":"${String(mediaId).replace(/[%"\\]/g, '')}"%`),
         markRetried: (id, next, now = Date.now()) => q.markRetried.run({ id, next, now }).changes === 1,
         get: (id) => q.get.get(id) || null,

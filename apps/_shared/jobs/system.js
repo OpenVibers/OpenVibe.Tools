@@ -27,6 +27,10 @@
 // started, succeeded and failed are also announced to OpenVibe.Events as tools.job.*, each written
 // in the transaction that records the transition. Without one, nothing is announced.
 //
+// Usage (WS-N task 4): with an outbox, a developer project's job that ends is also counted in the
+// transaction that records its end (./usage.js), and each closed hour goes out as tools.usage.recorded
+// from the pruner's timer.
+//
 // No dependencies of its own: the app passes its better-sqlite3 handle and openvibe-contracts.
 // ═══════════════════════════════════════════════════════════════
 
@@ -36,6 +40,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { createStore, TERMINAL } = require('./store');
 const { createJobEvents } = require('./events');
+const { createJobUsage } = require('./usage');
 
 const HOUR = 60 * 60 * 1000;
 
@@ -112,6 +117,13 @@ function createJobSystem(o) {
     const diskBudget = o.diskBudgetBytes > 0 ? o.diskBudgetBytes : 0;
     const disk = { bytes: 0, at: 0, scanning: null };
     const announce = createJobEvents({ contracts, service: o.service, outbox: o.outbox || null, referenceCount: (id) => store.referenceCount(id), log });
+    const usage = createJobUsage({ db: o.db, contracts, outbox: o.outbox || null, log });
+    /** Inside the transaction that recorded the end: tools.job.succeeded|failed and the project's usage. */
+    function ended(id) {
+        const row = store.get(id);
+        announce.finished(row);
+        usage.finished(row);
+    }
 
     const types = new Map();
     const active = new Map();      // id → { ctrl, reason, last: { pct, msg, at } }
@@ -212,7 +224,7 @@ function createJobSystem(o) {
     // Developer-app sandbox jobs: fewer at a time, kept briefly, results never leave this server.
     const SANDBOX_MAX_ACTIVE = Math.max(1, o.sandboxMaxActivePerOwner || 2);
     const SANDBOX_TTL_MS = 30 * 60 * 1000;
-    async function submit({ owner, type, input = {}, files = [], idempotencyKey = null, ttlMs = HOUR, env = 'production', ipKey = null, tool = null, project = null }) {
+    async function submit({ owner, type, input = {}, files = [], idempotencyKey = null, ttlMs = HOUR, env = 'production', ipKey = null, tool = null, project = null, traceId = null }) {
         if (env !== 'sandbox') env = 'production';
         if (env === 'sandbox') ttlMs = Math.min(ttlMs, SANDBOX_TTL_MS);
         if (stopped) throw new JobError(503, 'tools.job.unavailable', 'The job system is shutting down');
@@ -264,6 +276,7 @@ function createJobSystem(o) {
                         ip_key: String(owner).startsWith('session:') && ipKey ? String(ipKey) : null,
                         tool: tool && /^[a-z][a-z0-9-]{0,39}$/.test(String(tool)) ? String(tool) : null,
                         project_id: projectOf(project),
+                        trace_id: /^[0-9a-f]{32}$/.test(String(traceId || '')) ? String(traceId) : null,
                     });
                     announce.created(store.get(id));
                 })();
@@ -368,7 +381,7 @@ function createJobSystem(o) {
         let recorded = false;
         try {
             // The end state and its tools.job.succeeded|failed event commit together (or neither does).
-            store.transaction(() => { if (store.finish(row.id, outcome)) announce.finished(store.get(row.id)); })();
+            store.transaction(() => { if (store.finish(row.id, outcome)) ended(row.id); })();
             recorded = true;
             emit(row.id, EVENT_FOR[outcome.state]);
         } catch (err) {
@@ -534,7 +547,7 @@ function createJobSystem(o) {
     // ── Boot recovery, pruning ─────────────────────────────────
     /** A job the restart ended as failed: the row and its tools.job.failed event in one transaction. */
     function failRecovered(id, outcome) {
-        store.transaction(() => { if (store.finish(id, outcome)) announce.finished(store.get(id)); })();
+        store.transaction(() => { if (store.finish(id, outcome)) ended(id); })();
     }
 
     function recover() {
@@ -657,7 +670,11 @@ function createJobSystem(o) {
         const r = recover();
         if (r.requeued || r.failed) log.log(`[Jobs] ${o.service}: ${r.requeued} job(s) re-queued, ${r.failed} failed after restart`);
         prune().catch(() => {});
-        pruneTimer = setInterval(() => prune().catch(err => log.error('[Jobs] prune:', err.message)), o.pruneIntervalMs || 5 * 60 * 1000);
+        flushUsage();
+        pruneTimer = setInterval(() => {
+            prune().catch(err => log.error('[Jobs] prune:', err.message));
+            flushUsage();
+        }, o.pruneIntervalMs || 5 * 60 * 1000);
         if (pruneTimer.unref) pruneTimer.unref();
         kick();
         return api;
@@ -667,6 +684,11 @@ function createJobSystem(o) {
      * Stop. Running jobs are left as they are in the database ('running'), which is exactly what a
      * crash or a restart leaves behind; the next start() recovers them per type.
      */
+    /** Closed hours of project usage → the outbox (./usage.js); a failure is logged and retried next tick. */
+    function flushUsage(at) {
+        try { return usage.flush(at); } catch (err) { log.error('[Jobs] usage flush:', err.message); return { queued: 0, invalid: 0 }; }
+    }
+
     function stop() {
         stopped = true;
         if (pruneTimer) clearInterval(pruneTimer);
@@ -706,7 +728,8 @@ function createJobSystem(o) {
         types: () => [...types.keys()],
         media,
         // running (after the spread) is the store's count of rows in 'running'; executing is this process's.
-        stats: () => ({ running: active.size, concurrency, ...store.counts(), executing: active.size, results: media ? 'media' : 'local', events: announce.status() }),
+        stats: () => ({ running: active.size, concurrency, ...store.counts(), executing: active.size, results: media ? 'media' : 'local', events: announce.status(), usage: usage.enabled ? usage.status() : { enabled: false } }),
+        usage, flushUsage,
         outbox: o.outbox || null,
         /** True between start() and stop(): the worker picks up queued jobs. */
         isRunning: () => started && !stopped,

@@ -174,7 +174,7 @@ function mountJobRoutes(app, o) {
             if (!ok) { for (const f of files) if (f.path) fs.unlink(f.path, () => {}); return; }
         }
         try {
-            const { job, replayed } = await system.submit({ owner: w.owner, type: String(b.type || ''), input, files, idempotencyKey: key, ttlMs: ttlMs(req, w), env: w.env || 'production', ipKey: w.caller ? w.caller.ipKey : null, project: w.kind === 'principal' && w.claims && w.claims.actor_type === 'app' ? w.claims.project_id : null });
+            const { job, replayed } = await system.submit({ owner: w.owner, type: String(b.type || ''), input, files, idempotencyKey: key, ttlMs: ttlMs(req, w), env: w.env || 'production', ipKey: w.caller ? w.caller.ipKey : null, project: w.kind === 'principal' && w.claims && w.claims.actor_type === 'app' ? w.claims.project_id : null, traceId: req.ov && req.ov.traceId });
             res.set('Location', `/api/v1/jobs/${job.id}`);
             if (replayed) res.set('Idempotent-Replayed', 'true');
             return res.status(replayed ? 200 : 202).json(system.view(job));

@@ -411,6 +411,7 @@ function createRunApi(o) {
                     idempotencyKey: key, ttlMs: who.kind === 'session' ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000,
                     env: who.env || 'production', ipKey: who.ipKey, tool: d.id,
                     project: who.kind === 'principal' && who.claims && who.claims.actor_type === 'app' ? who.claims.project_id : null,
+                    traceId: req.ov && req.ov.traceId,
                 });
                 row = out.job; replayed = out.replayed;
             } catch (err) {
