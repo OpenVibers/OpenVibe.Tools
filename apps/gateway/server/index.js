@@ -316,6 +316,14 @@ app.get('/api/brand', (_req, res) => res.json(BRAND));
 app.use('/api/pastes', guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: 120, signedIn: 240, message: 'Too many requests. Please try again later.' }), async (req, res) => {
     try {
         const target = `${config.communityUrl}/api/pastes${req.url}`;
+        // The path is the visitor's: "/api/pastes/../../internal/x" (or %2e%2e) resolves to another of
+        // Community's routes, carrying the visitor's token; an encoded slash or backslash becomes one
+        // once Community decodes it. Only Community's paste API is proxied.
+        let resolved = null;
+        try { resolved = new URL(target).pathname; } catch { /* not a URL: refused below */ }
+        if (!resolved || (resolved !== '/api/pastes' && !resolved.startsWith('/api/pastes/')) || /%(2f|5c)/i.test(resolved) || resolved.includes('\\')) {
+            return res.status(404).json({ error: 'Not found' });
+        }
         const fetchOpts = { method: req.method, headers: {} };
         // Forward the visitor's JWT — Community verifies it and maps it to their subject.
         const userToken = extractToken(req);

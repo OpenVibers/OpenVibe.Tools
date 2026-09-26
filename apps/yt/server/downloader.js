@@ -48,6 +48,10 @@ const ALLOWED_DOMAINS = [
 function isValidUrl(url) {
     try {
         const parsed = new URL(url);
+        // A YouTube host is not enough: file:, ftp: or a non-default port would send yt-dlp somewhere
+        // else, and a user:password part has no business in a video link.
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false;
+        if (parsed.username || parsed.password || (parsed.port && parsed.port !== '443' && parsed.port !== '80')) return false;
         return ALLOWED_DOMAINS.some(re => re.test(parsed.hostname));
     } catch {
         return false;
