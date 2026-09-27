@@ -63,10 +63,15 @@ Public, cacheable outputs on the apex: `/` (every tool by family, planned tools 
 `/<family>-tools`, `/tool/<id>`, `/all-tools`, `/search?q=`, `/sitemap.xml`, `/robots.txt`,
 `/llms.txt`, `/api/catalog.json`, `/terms`, `/privacy`, `/dmca`. All of it renders without JavaScript.
 
-Deploy with `deploy/scripts/deploy.sh` (it refreshes the copied shared package inside each app). Once the
-gateway is healthy, it runs `ovhost announce tools`. OpenVibe.Host then publishes `host.release.published`
-to OpenVibe.Events, and open tabs check `/release.json` within seconds instead of at their next poll. This
-is best effort: it is skipped without an `ovhost` that has `announce`, and it never fails the deploy.
+Deploy with `deploy/scripts/deploy.sh`: it runs `ovhost deploy tools` (OpenVibe.Host, strategy
+`multi-app`; `--wait-idle`, `--restart`, `--rollback`, `DRY_RUN=1` for `ovhost plan tools`). ovhost pulls
+as the checkout owner, installs in each app whose dependencies changed (apps/_* are packages, not apps),
+checks every dependency resolves and that the jobs runtime and the guard load, restarts every
+`openvibe-tools*` unit, waits for the gateway's `/api/ready` and its `/release.json` to name the new sha
+with every unit active, rolls back if they do not, and announces the release (`host.release.published`
+to OpenVibe.Events, so open tabs check `/release.json` within seconds). When ovhost is missing, too old or
+does not deploy Tools with that strategy, the wrapper runs `deploy/scripts/deploy-legacy.sh`, the previous
+script, unchanged (`OVHOST_LEGACY=1` forces it).
 
 ## Tool registry API (ADR-027)
 
@@ -533,8 +538,8 @@ The full OAuth round-trip needs OpenVibe.Network running on port 4000
   (`apps/<name>/deploy/systemd/`). Resource bounds: `MemoryMax=2G` (img, audio,
   docs), `1G` (yt), `768M` (gateway, text, maps, food); `TasksMax=256`; `Nice=5`
   for img, audio, docs and yt. Every app writes `data/guard.db` (the gateway
-  too: `ReadWritePaths=/opt/openvibe.tools/apps/gateway/data`; `deploy.sh`
-  creates each `data/` before restarting).
+  too: `ReadWritePaths=/opt/openvibe.tools/apps/gateway/data`; the deploy
+  (`ovhost deploy tools`, or `deploy-legacy.sh`) creates each `data/` before restarting).
 - Nginx: satellites have specific `server_name` blocks; the gateway's
   wildcard `*.openvibe.tools` block catches everything else. TLS via
   `/etc/letsencrypt/live/openvibe.tools/`.

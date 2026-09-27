@@ -1,69 +1,71 @@
 #!/usr/bin/env bash
-# Deploy OpenVibe.Tools on the host: pull, install dependencies in each app whose package.json
-# changed (that includes a new openvibe-shared release tag), restart the units, check health, then
-# announce the release to open tabs (`ovhost announce tools`; best effort, never fails the deploy).
+# OpenVibe.Tools — deploy: a thin wrapper around `ovhost deploy tools` (OpenVibe.Host, strategy multi-app;
+# roadmap WS-N task 11; OpenVibe.Host docs/deploy-strategies.md).
+#
+# ovhost now does what this script did, as the checkout owner: untracked apps/*/package-lock.json files the
+# release tracks are removed before the merge; npm install in each app whose lockfile or dependencies changed
+# (apps/_* are packages, not apps); every dependency resolves (reinstalled once, else ABORT with nothing
+# restarted); each app's data/ exists; the jobs runtime loads in img/audio/docs and the guard in every app;
+# every openvibe-tools* unit restarts; the gateway answers /api/ready with Host: openvibe.tools and its
+# /release.json names the new sha, every unit is active; the release is announced. New: a release that does
+# not come up is rolled back (the checkout, its dependencies, a second restart; exit 3), and every attempt
+# is in `ovhost releases tools`.
+#
+#   deploy/scripts/deploy.sh               ovhost deploy tools
+#   deploy/scripts/deploy.sh --wait-idle   ovhost deploy tools --wait-idle   (hold until no tool job runs)
+#   deploy/scripts/deploy.sh --restart     ovhost deploy tools --restart
+#   deploy/scripts/deploy.sh --rollback    ovhost rollback tools
+#   DRY_RUN=1 deploy/scripts/deploy.sh     ovhost plan tools
+#
+# ovhost runs as root (sudo is used when this runs as another user). Fallback: deploy-legacy.sh, the
+# previous script unchanged, when ovhost is missing or too old (no `capabilities`, deploy-api < 1), or the
+# host inventory does not deploy tools with strategy multi-app; OVHOST_LEGACY=1 forces it. The legacy
+# script takes no flags: --rollback, --wait-idle and DRY_RUN=1 are refused rather than ignored there.
 set -euo pipefail
-cd "$(dirname "$0")/../.."
-BEFORE=$(git rev-parse HEAD)
-# npm leaves untracked lockfiles in apps that did not track one; once the repo starts tracking it,
-# `git pull` refuses to overwrite it. Those files are generated, so remove exactly those before pulling.
-git fetch -q origin
-for f in $(git diff --name-only HEAD "origin/$(git rev-parse --abbrev-ref HEAD)" -- 'apps/*/package-lock.json'); do
-  if [ -f "$f" ] && ! git ls-files --error-unmatch "$f" >/dev/null 2>&1; then echo "removing untracked $f (the release tracks it)"; rm -f "$f"; fi
+
+SERVICE=tools
+STRATEGY=multi-app
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+LEGACY="${DEPLOY_LEGACY:-$HERE/deploy-legacy.sh}"
+OVHOST="${OVHOST:-/usr/local/bin/ovhost}"
+if [ "${OVHOST_SUDO-auto}" = auto ]; then if [ "$(id -u)" -eq 0 ]; then SUDO=(); else SUDO=(sudo); fi; elif [ -n "${OVHOST_SUDO}" ]; then SUDO=("$OVHOST_SUDO"); else SUDO=(); fi
+
+CMD=deploy
+FLAGS=()
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --wait-idle|--restart|--force) FLAGS+=("$1"); shift ;;
+        --rollback) CMD=rollback; shift ;;
+        --) shift; break ;;
+        *) echo "Usage: $0 [--wait-idle] [--restart] [--force] [--rollback]   (DRY_RUN=1 for the plan)"; exit 1 ;;
+    esac
 done
-git pull -q --ff-only; AFTER=$(git rev-parse HEAD)
-for app in apps/*/; do
-  case "$app" in apps/_*) continue ;; esac   # apps/_shared is a package the apps require, not an app
-  [ -f "$app/package.json" ] || continue
-  if git diff --name-only "$BEFORE" "$AFTER" -- "$app/package.json" | grep -q . || [ ! -d "$app/node_modules" ]; then (cd "$app" && npm install --omit=dev --no-audit --no-fund --loglevel=error); fi
-done
-# Every app must resolve its dependencies before anything restarts. A dependency that used to be a
-# file: link can leave an empty directory npm treats as installed (2026-09-23: vendor/openvibe-shared
-# kept an untracked lockfile, every unit crash-looped on 'openvibe-shared/brand'); reinstall those.
-for app in apps/*/; do
-  case "$app" in apps/_*) continue ;; esac   # apps/_shared is a package the apps require, not an app
-  [ -f "$app/package.json" ] || continue
-  for dep in $(node -e 'console.log(Object.keys(require("./"+process.argv[1]+"package.json").dependencies||{}).join(" "))' "$app"); do
-    if [ ! -f "$app/node_modules/$dep/package.json" ]; then
-      echo "reinstalling $dep in $app (missing package.json)"; rm -rf "$app/node_modules/$dep"
-      (cd "$app" && npm install --omit=dev --no-audit --no-fund --loglevel=error)
-      [ -f "$app/node_modules/$dep/package.json" ] || { echo "ABORT: $app cannot resolve $dep; nothing restarted" >&2; exit 1; }
+
+legacy() {
+    echo "[tools-deploy] $1 — running deploy-legacy.sh (the previous deploy script) instead"
+    if [ "$CMD" = rollback ] || [ "${DRY_RUN:-0}" = 1 ] || [[ " ${FLAGS[*]:-} " == *" --wait-idle "* ]]; then
+        echo "[tools-deploy] ✗ deploy-legacy.sh has no --rollback, --wait-idle or DRY_RUN; nothing was done" >&2
+        exit 1
     fi
-  done
-done
-# Apps that run jobs (apps/_shared/jobs, required by relative path) hand it their own better-sqlite3,
-# openvibe-contracts and openvibe-sdk (the tools.job.* outbox relay): check they load under this Node (a
-# native-module ABI mismatch shows up here, not in a crash loop) and that the shared runtime itself loads.
-for app in img audio docs; do
-  (cd "apps/$app" && node -e "const D=require('better-sqlite3'); new D(':memory:').close(); require('openvibe-contracts'); require('openvibe-sdk'); require('../_shared/jobs')") \
-    || { echo "ABORT: apps/$app cannot load the jobs runtime; nothing restarted" >&2; exit 1; }
-done
-# Every app keeps its guard (apps/_shared/guard) state in data/guard.db through its own better-sqlite3;
-# the units' ReadWritePaths name each data directory, which must exist before systemd starts them.
-for app in apps/*/; do
-  case "$app" in apps/_*) continue ;; esac   # apps/_shared is a package the apps require, not an app
-  [ -f "$app/package.json" ] || continue
-  mkdir -p "$app/data"
-  (cd "$app" && node -e "const D=require('better-sqlite3'); new D(':memory:').close(); require('../_shared/guard')") \
-    || { echo "ABORT: $app cannot load the guard; nothing restarted" >&2; exit 1; }
-done
-UNITS=$(systemctl list-unit-files 'openvibe-tools*' --no-legend | awk '{print $1}')
-sudo systemctl restart $UNITS
-sleep 5
-for u in $UNITS; do printf '%-34s %s\n' "$u" "$(systemctl is-active "$u")"; done
-curl -fsS -o /dev/null -H 'Host: openvibe.tools' http://127.0.0.1:4001/api/health && echo "gateway healthy ($BEFORE → $AFTER)" || exit $?
-# Release notification (roadmap WS-P task 9): OpenVibe.Host publishes host.release.published for the release
-# the apps' /release.json reports, once per release, so open tabs check it now instead of at their next
-# poll. Best effort: skipped without an ovhost whose --help has `announce <service>`, 20 s at most, and it
-# never changes the exit code. ovhost reads Host's credentials as root (OpenVibe.Host
-# docs/release-notifications.md).
-OVHOST_BIN=$(command -v "${OVHOST:-ovhost}" 2>/dev/null || true)
-if [ -n "$OVHOST_BIN" ]; then
-  case "$("$OVHOST_BIN" --help 2>/dev/null || true)" in
-    *"announce <service>"*)
-      SUDO=""; [ "$(id -u)" -eq 0 ] || SUDO="sudo -n"
-      timeout 20 $SUDO "$OVHOST_BIN" announce tools 2>&1 || echo "release notification not sent (the deploy stands)" ;;
-    *) echo "release notification skipped: this ovhost has no announce" ;;
-  esac
-fi
-exit 0
+    exec bash "$LEGACY"
+}
+
+REASON=""
+probe() {
+    if [ "${OVHOST_LEGACY:-0}" = 1 ]; then REASON="OVHOST_LEGACY=1"; return 1; fi
+    if ! command -v "$OVHOST" >/dev/null 2>&1; then REASON="ovhost not found ($OVHOST)"; return 1; fi
+    local caps api
+    if ! caps=$("${SUDO[@]}" "$OVHOST" capabilities "$SERVICE" 2>/dev/null); then REASON="this ovhost has no 'capabilities' (too old) or no inventory entry for $SERVICE"; return 1; fi
+    api=$(printf '%s\n' "$caps" | sed -n 's/^deploy-api=//p')
+    case "$api" in ''|*[!0-9]*) REASON="this ovhost reports no deploy-api (too old)"; return 1 ;; esac
+    if [ "$api" -lt 1 ]; then REASON="this ovhost's deploy-api is $api, 1 is needed"; return 1; fi
+    if ! printf '%s\n' "$caps" | grep -qx "strategy=$STRATEGY"; then REASON="the host inventory does not deploy $SERVICE with strategy $STRATEGY ($(printf '%s\n' "$caps" | sed -n 's/^strategy=//p'))"; return 1; fi
+    if ! printf '%s\n' "$caps" | grep -qx "managed=yes"; then REASON="ovhost does not manage $SERVICE"; return 1; fi
+    return 0
+}
+
+probe || legacy "$REASON"
+
+if [ "${DRY_RUN:-0}" = 1 ]; then exec "${SUDO[@]}" "$OVHOST" plan "$SERVICE"; fi
+echo "[tools-deploy] ovhost $CMD $SERVICE ${FLAGS[*]:-}"
+exec "${SUDO[@]}" "$OVHOST" "$CMD" "$SERVICE" "${FLAGS[@]}"
