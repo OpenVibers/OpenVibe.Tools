@@ -9,8 +9,9 @@
 const axios = require('axios');
 const { haversine } = require('./utils');
 
-// Use env var RIDB_API_KEY if set, otherwise fall back to default key
-const API_KEY = process.env.RIDB_API_KEY || '10157187-d1f3-4c78-a3c2-5a4d8c23d715';
+// RIDB_API_KEY from the environment (/etc/openvibe/tools.env in production); never a key in the code.
+// Without one, RIDB is skipped (search answers the other sources).
+const API_KEY = process.env.RIDB_API_KEY || '';
 const BASE_URL = 'https://ridb.recreation.gov/api/v1';
 let _ridbDisabled = false; // Disable after first 401 to avoid duplicate errors
 
@@ -26,7 +27,10 @@ const CAMPING_ACTIVITY_IDS = [
 /**
  * Search RIDB for facilities near lat/lon within radiusMiles
  */
+let _warnedNoKey = false;
+
 async function search(lat, lon, radiusMiles) {
+  if (!API_KEY) { if (!_warnedNoKey) { _warnedNoKey = true; console.warn('[RIDB] RIDB_API_KEY is not set: RIDB results are skipped'); } return []; }
   if (_ridbDisabled) return []; // Skip after auth failure
   const results = [];
 
