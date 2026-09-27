@@ -46,11 +46,20 @@ function toolsRelease(app, appRequire, opts = {}) {
         },
         server: { kind: 'server', files: [`${dir}/server`, 'apps/_shared', `${dir}/package-lock.json`] },
     };
-    return createRelease({
+    const release = createRelease({
         service: 'tools', root: ROOT, publicDir: `${dir}/public`, components,
         ...(schema && { schema }),
         ...opts,
     });
+    // D42 (roadmap WS-P task 4): every app serves its OWN pinned copy of the shared browser files at /shared
+    // (navbar, footer, theme loader, bell…), content-addressed, so its pages run what its pin says and keep
+    // their frame while openvibe.network is down. Mounted with the release routes, before any page fallback.
+    const mountRelease = release.mount;
+    release.mount = function mount(app, o) {
+        app.use('/shared', appRequire('openvibe-shared/serve').handler());
+        return mountRelease.call(this, app, o);
+    };
+    return release;
 }
 
 module.exports = { toolsRelease, PAGE_FILES, ROOT };

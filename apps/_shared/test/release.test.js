@@ -51,6 +51,13 @@ const quiet = { warn() {}, log() {}, error() {} };
         assert.strictEqual(r.status, 204);
         const text = await (await fetch(`${base}/metrics`)).text();
         assert.match(text, /release_client_updates_total\{outcome="applied",reason="style"\} 2/);
+        // D42: the app's own pinned shared browser files, content-addressed; nothing else under /shared.
+        const nav = req('openvibe-shared/serve').url('navbar.js');
+        r = await fetch(base + nav);
+        assert.strictEqual(r.status, 200);
+        assert.match(r.headers.get('content-type'), /javascript/);
+        assert.match(r.headers.get('cache-control'), /immutable/, 'the hashed URL is cached for good');
+        assert.strictEqual((await fetch(`${base}/shared/server.js`)).status, 404, 'only the browser files files.js lists');
     } finally { await new Promise(res => srv.close(res)); inst.stop && inst.stop(); }
-    console.log('release: gateway/img/audio/docs serve components (shell, server) valid against their contracts; the others 1.0.0; mount serves /release.json and /release-metrics');
+    console.log('release: gateway/img/audio/docs serve components (shell, server) valid against their contracts; the others 1.0.0; mount serves /release.json, /release-metrics and the pinned /shared files');
 })().catch((err) => { console.error(err); process.exit(1); });

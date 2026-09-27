@@ -113,7 +113,7 @@
 
     // Your tools: favourites first (signed in: starred here or on my.openvibe.network), then recent tools,
     // this person's (every device they sign in to) or this browser's. Filled in after load.
-    function mountIcons(el) { if (window.OpenVibeIcons) OpenVibeIcons.mount(el); else if (!document.getElementById('ov-icons-loader')) { var sc = document.createElement('script'); sc.id = 'ov-icons-loader'; sc.src = 'https://openvibe.network/shared/ov-icons.js'; document.head.appendChild(sc); } }
+    function mountIcons(el) { if (window.OpenVibeIcons) OpenVibeIcons.mount(el); else if (!document.getElementById('ov-icons-loader')) { var sc = document.createElement('script'); sc.id = 'ov-icons-loader'; sc.src = '/shared/ov-icons.js'; document.head.appendChild(sc); } }
     favReady = fetch('/api/v1/me/recent-tools', { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) { favs = (d && d.favorites) || []; if (catalog) syncStars(); return d; }).catch(function () { return null; });
     if (recentSec) favReady.then(function (d) {

@@ -426,8 +426,8 @@ function sendTool(req, res, file) {
 
 // The apex is server-rendered from the registry: index, families, tool pages, search,
 // sitemap.xml, robots.txt, llms.txt and /api/catalog.json (server/pages/site.js).
-// This site's own pinned copy of the OpenVibe Frame's browser files (openvibe-shared/serve).
-app.use('/shared', require('openvibe-shared/serve').handler());
+// This site's own pinned copy of the OpenVibe Frame's browser files (/shared, openvibe-shared/serve) is
+// mounted with the release routes: apps/_shared/release.js.
 app.use(require('./pages/site').createSiteRouter());
 
 // Net tool subdomains → net.html SPA

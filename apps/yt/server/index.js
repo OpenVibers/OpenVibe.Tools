@@ -291,7 +291,7 @@ app.get('/api/internal/analytics/bots', (req, res) => {
 });
 
 // ── Static Files ─────────────────────────────────────────────
-// (shared client-side libs are loaded absolutely from https://openvibe.network/shared/)
+// (the shared browser files come from this app's own pin at /shared: apps/_shared/release.js)
 app.use(express.static(path.join(__dirname, '..', 'public'), {
     index: false, // '/' is rendered below with the head for this host (server/seo.js)
     setHeaders(res, filePath) {
