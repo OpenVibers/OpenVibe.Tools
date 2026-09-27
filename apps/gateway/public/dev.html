@@ -147,6 +147,7 @@ a{color:inherit;text-decoration:none}
 <script src="https://openvibe.network/shared/navbar.js"></script>
 <script src="https://openvibe.network/shared/footer.js"></script>
 <script src="https://openvibe.network/shared/theme-loader.js" defer></script>
+<script src="/shared/web-runtime.js"></script>
 <script src="/js/dev-engine.js"></script>
 <script>
 'use strict';
@@ -262,10 +263,14 @@ function buildRel(){
 }
 
 // ═══════════════ PROCESSORS ═══════════════
+// Each run is a generation of the network's web runtime (openvibe-shared/web-runtime): a new run (or Clear) ends
+// the previous one's pollers and requests, and a slow earlier result never overwrites a newer one.
+const RT=OVWebRuntime.create({});
 async function run(){
+    const g=RT.nextRoute(),sc=RT.scope();
     const i1=$('in1')?.value||'',i2=$('in2')?.value||'',o=$('out');
-    try{const r=await P[ACT](i1,MODE,i2);if(r==null)return;o.innerHTML=typeof r==='object'?r.html:H(String(r))}
-    catch(e){o.innerHTML='<span class="err">\u2717 '+H(e.message)+'</span>'}
+    try{const r=await P[ACT](i1,MODE,i2,sc);if(r==null||!RT.isCurrent(g))return;o.innerHTML=typeof r==='object'?r.html:H(String(r))}
+    catch(e){if(RT.isCurrent(g)&&e.name!=='AbortError')o.innerHTML='<span class="err">\u2717 '+H(e.message)+'</span>'}
 }
 const P={};
 
@@ -312,7 +317,7 @@ P.cron=(s)=>DevEngine.cron(s);
 P.beautify=(s,m)=>DevEngine.beautify(s,m);
 
 // ── Single-purpose tools ─────────────────────────────────────
-const loadScript=(src)=>new Promise((ok,no)=>{const e=document.createElement('script');e.src=src;e.onload=ok;e.onerror=()=>no(new Error('Could not load the minifier. Check your connection and try again.'));document.head.appendChild(e)});
+const loadScript=(src)=>RT.loadScript(src).catch(()=>{throw new Error('Could not load the minifier. Check your connection and try again.')});
 const terser=async()=>{if(!window.Terser)await loadScript('https://cdn.jsdelivr.net/npm/terser@5/dist/bundle.min.js');return window.Terser};
 const saved=(a,b)=>{const x=new Blob([a]).size,y=new Blob([b]).size;return x?`${x.toLocaleString()} → ${y.toLocaleString()} bytes (${Math.max(0,Math.round((1-y/x)*100))}% smaller)`:''};
 const withNote=(code,note)=>({html:(note?'<div style="color:var(--tx2);font-size:.8rem;margin-bottom:8px">'+H(note)+'</div>':'')+'<pre style="margin:0;white-space:pre-wrap;word-break:break-word">'+H(code)+'</pre>'});
@@ -377,14 +382,15 @@ P.lorem=(s,m)=>DevEngine.lorem(m.includes('Words')?'words':m.includes('Sent')?'s
 
 P.curlconvert=(s,m)=>DevEngine.curlconvert(s,m);
 
-P.webhook=async()=>{
+P.webhook=async(s,m,s2,sc)=>{
     const o=$('out');
-    const r=await fetch(API+'/webhook/bins',{method:'POST',credentials:'include'});const d=await r.json();if(!d.ok)throw new Error(d.error||'Failed');
+    const r=await sc.fetch(API+'/webhook/bins',{method:'POST',credentials:'include'});const d=await r.json();if(!d.ok)throw new Error(d.error||'Failed');
     const binUrl=API+'/webhook/bins/'+d.binId+'/in';
     o.innerHTML='<div style="margin-bottom:12px"><div class="jl">Your Webhook URL</div><div style="font-size:1rem;word-break:break-all;color:var(--ac);cursor:pointer" onclick="navigator.clipboard.writeText(\''+binUrl+"');toast('Copied!')\">"+binUrl+'</div><div style="color:var(--tx3);font-size:.78rem;margin-top:4px">Click to copy \u00b7 Polling for requests...</div></div><div id="whr">Waiting for requests...</div>';
-    const iv=setInterval(async()=>{try{const r2=await fetch(API+'/webhook/bins/'+d.binId,{credentials:'include'});const d2=await r2.json();
-        if(d2.ok&&d2.requests.length){$('whr').innerHTML=d2.requests.map((rq,i)=>'<div class="js"><div class="jl">#'+(i+1)+' '+rq.method+' \u00b7 '+new Date(rq.timestamp).toLocaleTimeString()+'</div>Headers:\n'+Object.entries(rq.headers||{}).map(([k,v])=>k+': '+v).join('\n')+'\n\nBody:\n'+H(typeof rq.body==='object'?JSON.stringify(rq.body,null,2):String(rq.body||'(empty)'))+'</div>').join('')}}catch{}},2000);
-    setTimeout(()=>clearInterval(iv),3600000);return null;
+    const poll=sc.child();   // polls until the next run or Clear, for an hour at most
+    poll.interval(async()=>{try{const r2=await poll.fetch(API+'/webhook/bins/'+d.binId,{credentials:'include'});const d2=await r2.json();
+        if(d2.ok&&d2.requests.length){$('whr').innerHTML=d2.requests.map((rq,i)=>'<div class="js"><div class="jl">#'+(i+1)+' '+H(String(rq.method||''))+' \u00b7 '+H(new Date(rq.timestamp).toLocaleTimeString())+'</div>Headers:\n'+Object.entries(rq.headers||{}).map(([k,v])=>H(k)+': '+H(String(v))).join('\n')+'\n\nBody:\n'+H(typeof rq.body==='object'?JSON.stringify(rq.body,null,2):String(rq.body||'(empty)'))+'</div>').join('')}}catch{}},2000);
+    poll.timeout(()=>poll.dispose(),3600000);return null;
 };
 
 P.color=(s)=>{
@@ -420,7 +426,7 @@ async function saveAsPaste(btn){
         toast('Saved as a paste');
     }catch(e){toast(e.message)}finally{btn.disabled=false}
 }
-function clr(){const p=$('pasted');if(p)p.remove();const a=$('in1');if(a)a.value='';const b=$('in2');if(b)b.value='';$('out').innerHTML=''}
+function clr(){RT.nextRoute();const p=$('pasted');if(p)p.remove();const a=$('in1');if(a)a.value='';const b=$('in2');if(b)b.value='';$('out').innerHTML=''}
 function sample(){const t=T[ACT];if(t?.p){$('in1').value=t.p;if(t.p2&&$('in2'))$('in2').value=t.p2}run()}
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000)}
 </script>
