@@ -1,0 +1,36 @@
+{
+  "repository": "OpenVibers/OpenVibe.Tools",
+  "stage": "stable",
+  "code": true,
+  "plan": "OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026)",
+  "runtime": "node 22, express, better-sqlite3; eight apps (gateway, maps, food, img, yt, audio, text, docs)",
+  "port": 4001,
+  "ports": {
+    "gateway": 4001,
+    "maps": 4010,
+    "food": 4011,
+    "img": 4012,
+    "yt": 4013,
+    "audio": 4014,
+    "text": 4015,
+    "docs": 4016
+  },
+  "domain": "openvibe.tools and *.openvibe.tools",
+  "contracts": "openvibe-contracts v0.63.0 (each app's package.json; the root package.json pins none)",
+  "capabilities": ["tools.job.create", "tools.job.read", "tools.job.cancel", "tools.tool.read", "tools.tool.run", "tools.net.probe"],
+  "capabilitiesRegistered": true,
+  "deployed": true,
+  "deployment": "Public at https://openvibe.tools: deployed with `sudo ovhost deploy tools` (OpenVibe.Host strategy multi-app since the 2026-09-27 cutover; deploy/scripts/deploy.sh is the wrapper), /opt/openvibe.tools, units openvibe-tools (gateway, 127.0.0.1:4001) and openvibe-tools-<app> per satellite, env /etc/openvibe/tools.env.",
+  "features": [
+    "tool registry with descriptors, canonical hosts, aliases and owner-attached custom domains",
+    "server-rendered catalog and tool pages with full SEO",
+    "public registry API (tools.tool.read) and run API (tools.tool.run)",
+    "jobs runtime for img, audio and docs with SSE progress and Media results",
+    "net and dev tools on the gateway; maps, food, img, yt, audio, text and docs satellites",
+    "guard: callers, tiered quotas, upload sniffing, SSRF-safe egress, abuse log",
+    "tools.* events and Search documents",
+    "analytics within ADR-021",
+    "per-actor limits (openvibe-sdk/limits)"
+  ],
+  "updated": "2026-09-28"
+}

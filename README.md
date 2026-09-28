@@ -1,5 +1,7 @@
 # OpenVibe.Tools
 
+## Purpose
+
 The tools suite of the OpenVibe network — `openvibe.tools` plus dozens of
 tool subdomains under `*.openvibe.tools`.
 
@@ -8,6 +10,42 @@ This repo contains no identity provider: the gateway is an OAuth2 **client**
 (`client_id: tools`) that sets the shared `ov_token` cookie on
 `.openvibe.tools`; every satellite reads that cookie and verifies the JWT
 offline against the Network's public key (JWKS).
+
+## Owns
+
+- the tool registry (families, tools, descriptors `tools.tool@1`, canonical, short and alias hosts),
+  the catalog and every tool page on `openvibe.tools` and `*.openvibe.tools`
+- the run API and the jobs runtime (img, audio, docs jobs with their files and SSE progress), the
+  guard (callers, quotas, sniffing, egress throttles, abuse log) and each app's `data/guard.db`
+- the `tools.*` events, Tools' Search documents and the `tools.usage` user module
+
+## Does not own
+
+- identity and sign-in (OpenVibe.Network), pastes (OpenVibe.Community: `pastes.openvibe.tools` hands over),
+  result storage (OpenVibe.Media keeps job results), custom-domain records (Network's domains admin)
+
+## Depends on
+
+- OpenVibe.Network (SSO as OAuth client `tools`, JWKS, client-credentials tokens, the domains registry),
+  OpenVibe.Media (job results), OpenVibe.Events (job and usage events, revocation cutoffs),
+  OpenVibe.Search (tool documents), OpenVibe.Community (the paste hand-over)
+- host programs some tools need (ffmpeg, yt-dlp, qpdf, poppler, libheif; [Host packages](#host-packages-some-tools-need))
+- in each app: `openvibe-contracts` v0.63.0, `openvibe-sdk` v0.12.0 and `openvibe-shared` v1.23.0, pinned
+  by release tarball, and `apps/_shared` (openvibe-tools-shared) by relative path
+
+## Capabilities
+
+Implemented here (the service manifest's `capabilities`, audience `openvibe.tools`): `tools.tool.read`
+(the public registry API), `tools.tool.run` (the run API), `tools.job.create`, `tools.job.read` and
+`tools.job.cancel` (jobs), and `tools.net.probe` (network probes).
+
+Called elsewhere, as the service principal `tools` (the OAuth client `tools`):
+
+| Service | Grant | Why |
+|---|---|---|
+| OpenVibe.Media | `media.object.upload`, `media.object.read` | job results |
+| OpenVibe.Events | `events.event.publish`, `events.subscription.manage` | job and usage events; the `network.user.token_valid_after` subscription |
+| OpenVibe.Search | `search.document.write` | tool documents for the network index |
 
 ## Layout
 
@@ -434,7 +472,7 @@ the run API on the gateway, img and docs (with a stand-in Network for tokens, `a
 every answer against `tools.run@1`, the refusal codes, probes, quotas, idempotency, job tools and references
 across satellites, the Origin check and the deprecation headers; `jobs-facade.test.js` routes jobs through the
 gateway (by type, by id after a restart, events, files, retry, cancel); `sdk-client.test.js` drives
-openvibe-sdk v0.6.0's `createToolsClient` against the real gateway (it requires a checkout of OpenVibe.SDK next to
+the pinned openvibe-sdk's `createToolsClient` against the real gateway (it requires a checkout of OpenVibe.SDK next to
 this repo, or `OV_SDK_DIR`, and says it skipped without one); `pool.test.js` (shared and docs) hold the worker
 pool to its limits. The audio tests need
 `ffmpeg` and skip without it. The docs and img tests always check the 503 path with qpdf, poppler and libheif
@@ -550,10 +588,28 @@ The full OAuth round-trip needs OpenVibe.Network running on port 4000
 - `GET /auth/me`, `POST /auth/refresh`, `GET /auth/logout`.
 - Satellites never talk OAuth — they read `ov_token` and verify offline
   via the Network JWKS (`GET /api/.well-known/jwks`).
-- Browser pages load shared JS absolutely from
-  `https://openvibe.network/shared/` (theme-loader, navbar, …).
+- Browser pages load the shared files (theme-loader, navbar, …) from their
+  own app's pinned copy at `/shared/` (`apps/_shared/release.js`,
+  `openvibe-shared/serve`), not from openvibe.network.
+
+## Security
+
+Reporting a vulnerability: [SECURITY.md](SECURITY.md). The rules are in [Guard](#guard-anti-abuse-apps_sharedguard)
+and [Auth model](#auth-model); in short: every caller is identified (principal, user with audience
+`openvibe.tools`, session or address) and held to per-tier quotas and per-actor limits; uploads are
+sniffed against the descriptor; every tool that reaches a visitor-chosen host goes through the SSRF guard
+(`apps/_shared/egress.js`: public addresses only, checked after DNS, redirect hops re-checked); `trust proxy`
+is one loopback hop; sign-in `next` accepts only relative paths, `*.openvibe.tools` and `openvibe.network`.
+Secrets (`OV_OAUTH_CLIENT_SECRET`, `TOOLS_EVENTS_SECRET`, `NET_IPINFO_TOKEN`, `RIDB_API_KEY`, `NPS_API_KEY`,
+`OPEN_CHARGE_MAP_KEY`, `YT_COOKIES_FILE`, the fallback `INTERNAL_API_KEY`) live in `/etc/openvibe/tools.env`
+(0600), by name only.
 
 ## Deploy
+
+Production deploys with `sudo ovhost deploy tools` (`deploy/scripts/deploy.sh` is the wrapper; strategy
+`multi-app`, described under [Registry, hosts and domains](#registry-hosts-and-domains)). Rollback: automatic
+when the gateway's `/api/ready` or `/release.json` does not come up with every unit active; afterwards
+`sudo ovhost rollback tools --to <sha>`. Nothing blocks a rollback: the schema code only adds.
 
 - Production path: `/opt/openvibe.tools` (apps under `apps/<name>`)
 - Env file: `/etc/openvibe/tools.env` (0600) — shared by all units; per-app
