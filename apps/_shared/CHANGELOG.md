@@ -4,6 +4,19 @@ The Tools apps' shared runtime. Each app declares the range it needs as `"openvi
 its `package.json`, and refuses to boot when this checkout does not satisfy it (`version.js`). A
 breaking change bumps the major and every app's range in the same commit.
 
+## 1.2.0 — 2026-09-27
+
+Additive (roadmap WS-R task 4):
+
+- `actor-limits.js`: `createToolsLimits({ app, createActorLimiter, guard, registry })`, per-actor
+  limits (openvibe-sdk/limits, which the app passes in) only where the guard has no per-caller limit:
+  `registryReads` (GET/HEAD `/api/v1/tools[/:id[/schema]]` by a signed-in person or a third-party
+  principal, `TOOLS_LIMITS_MINUTE` / `TOOLS_LIMITS_HOUR`, 120 and 3000; signed-out reads and first-party
+  services are not counted), `backstop(name)` (a ceiling above the guard's quotas on job submits,
+  retries and runs: a person or address 600 a minute and 20 000 an hour, a principal 3000 and 100 000)
+  and `admin` (30 a minute, 300 an hour). Callers come from `guard.caller`; the guard is unchanged.
+  Refusals: 429 problem+json `rate_limited`, a `[Limits]` log line and `tools_rate_limited_total`.
+
 ## 1.1.0 — 2026-09-26
 
 Additive (roadmap WS-N task 4):

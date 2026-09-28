@@ -193,6 +193,10 @@ app.use('/auth/', rateLimit({ windowMs: 15 * 60_000, max: 60, keyGenerator: (req
 // GET /api/v1/tools (tools.tool-list@1), /api/v1/tools/:id (tools.tool@1), /api/v1/tools/:id/schema.
 // Every tool, every family; satellite hosts answer the same routes for their own tools. Counted by
 // the /api/ limiter above. /api/catalog.json stays as it is (Network reads it).
+// Per-actor limits (apps/_shared/actor-limits.js, roadmap WS-R task 4): signed-in registry reads, a backstop above the
+// guard's quotas on runs and on the jobs facade's submits, and the admin analytics route.
+const actorLimits = require('../../_shared/actor-limits').createToolsLimits({ app: 'gateway', createActorLimiter: require('openvibe-sdk/limits').createActorLimiter, guard, registry: obs.registry });
+app.use(actorLimits.registryReads);
 app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
 
 // The launcher's recent tools: a signed-in person's tools.usage module (every device), otherwise this
@@ -257,6 +261,10 @@ const runApi = createGatewayRun({
     ports: () => SATELLITES, parseJson: jsonBody, jobIndex, ...ajvFrom(require),
 });
 const jobsFacade = createJobsFacade({ ports: () => SATELLITES, index: jobIndex, contracts: require('openvibe-contracts') });
+// The backstop above the guard's quotas (actorLimits, above), before a run or a submit does any work:
+// a satellite counts the same run or submit again when the gateway streams it there.
+app.post('/api/v1/tools/:id/run', actorLimits.backstop('tools.tool.run'));
+app.post(['/api/v1/jobs', '/api/v1/jobs/:id/retry'], actorLimits.backstop('tools.job.create'));
 app.use(runApi.handle);
 app.use((req, res, next) => { jobsFacade.handle(req, res, next); });
 
@@ -397,7 +405,8 @@ function sendTool(req, res, file) {
 // The gateway keeps no analytics of its own; it adds up the satellites'. Internal key + loopback only.
 {
     const { requireInternal } = require('../../_shared/internal-auth');
-    app.get('/api/internal/analytics', requireInternal, async (req, res) => {
+    // After the internal key, before the fan-out: per-actor limit (actorLimits.admin, 30 a minute).
+    app.get('/api/internal/analytics', requireInternal, actorLimits.admin, async (req, res) => {
         const days = Math.min(parseInt(req.query.days, 10) || 30, 365);
         const hours = req.query.hours ? Math.min(parseInt(req.query.hours, 10), 8760) : null;
         const key = String(req.headers['x-internal-key']);

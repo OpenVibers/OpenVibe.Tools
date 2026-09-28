@@ -103,6 +103,10 @@ app.use(['/api/geocode', '/api/search', '/api/weather', '/api/terrain', '/api/fo
 const toolRegistry = createLocalRegistry({ specs: require('./descriptors').SPECS.filter(s => s.id === 'maps') });
 // A signed-in person's page view of a tool goes into their tools.usage module (the launchers' recent tools).
 app.use(require('../../_shared/usage').usagePages({ snapshot: toolRegistry.snapshot }));
+// Per-actor limits (apps/_shared/actor-limits.js, roadmap WS-R task 4): signed-in registry reads (signed-out reads keep
+// the per-address limit only).
+const actorLimits = require('../../_shared/actor-limits').createToolsLimits({ app: 'maps', createActorLimiter: require('openvibe-sdk/limits').createActorLimiter, guard, registry: obs.registry });
+app.use(actorLimits.registryReads);
 app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
 
 // ── Analytics Middleware ─────────────────────────────────────

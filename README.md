@@ -347,6 +347,31 @@ Environment: `TOOLS_GUARD`, `TOOLS_GUARD_LIMITS` (JSON merged into the table, e.
 `TOOLS_JOBS_MAX_QUEUED`, `TOOLS_JOBS_MAX_ACTIVE_PER_ADDRESS`, `TOOLS_DISK_BUDGET_MB`, `TOOLS_MAX_INPUT_PIXELS`, `TOOLS_PORTS_PER_CALLER`,
 `TOOLS_PORT_TARGETS_PER_CALLER`, `AUDIO_MAX_DURATION`, `OV_TOOLS_AUDIENCE` (white-label installs).
 
+## Per-actor limits (`apps/_shared/actor-limits.js`)
+
+Roadmap WS-R task 4, openvibe-sdk/limits, one limiter per app, only where the guard has no per-caller
+limit of its own. The guard, its quotas, the older limiters and `TOOLS_GUARD` are unchanged; these limits
+read the guard's resolved caller (`guard.caller`): a person as `user:usr_…`, a service or app by its
+principal, a browser session or nobody by the guard's hashed address key (`ip:<HMAC>`, never a raw
+address). Past a limit: `429` problem+json `rate_limited` with `Retry-After`, one `[Limits]` log line and
+`tools_rate_limited_total{limit,window}`.
+
+| Where | Routes | Per caller, a minute / an hour |
+|---|---|---|
+| every app | Registry reads `GET`/`HEAD /api/v1/tools[/:id[/schema]]` by a signed-in person or a third-party principal (`app:…`, `mod:…`) | `TOOLS_LIMITS_MINUTE` / `TOOLS_LIMITS_HOUR` (120 / 3000) |
+| gateway, img, audio, docs | Backstop on job submits and retries (`POST /api/v1/jobs`, `…/:id/retry`) and runs (`POST /api/v1/tools/:id/run`) | a person or an address 600 / 20 000; a principal 3000 / 100 000 |
+| gateway | `GET /api/internal/analytics` (the Network admin's analytics page, after the internal key) | 30 / 300 |
+
+Signed-out registry reads keep only the per-address `/api/` limit (many visitors share a carrier or campus
+address); a first-party service (`svc:…`) reading for itself is not counted. The backstop sits above the
+guard's highest allowances (tools-run: a person 480 a minute, a service 2400, one address's sessions
+together 540; the day allowances average at most about 2100 and 21 000 an hour), so the guard still
+decides every normal caller's allowance, and a runaway caller is stopped even while the guard only
+reports. A run the gateway streams to a satellite is counted there again. Never limited: `/api/health`,
+`/api/ready`, `/release.json`, `/metrics`, the pages, `/api/internal/jobs/:id` and the signed
+`/internal/events` deliveries. Tests: `apps/_shared/test/actor-limits.test.js` (fixed clock) and
+`apps/gateway/test/actor-limits.test.js` (the real gateway).
+
 ## Canonical hosts and the service registry
 
 Every satellite honours the gateway's `X-OV-Tool` / `X-OV-Host-Role` / `X-OV-Canonical-Host` / `X-OV-Short-Host`

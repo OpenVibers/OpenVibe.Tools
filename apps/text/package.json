@@ -8,7 +8,7 @@
     "start": "node server/index.js",
     "dev": "NODE_ENV=development node server/index.js"
   },
-  "openvibeToolsShared": "^1.0.0",
+  "openvibeToolsShared": "^1.2.0",
   "dependencies": {
     "express": "^4.18.2",
     "helmet": "^7.1.0",
@@ -17,6 +17,7 @@
     "better-sqlite3": "^11.0.0",
     "express-rate-limit": "^7.1.5",
     "dotenv": "^16.3.1",
+    "openvibe-sdk": "https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.12.0",
     "openvibe-shared": "https://codeload.github.com/OpenVibers/OpenVibe.Shared/tar.gz/refs/tags/v1.23.0"
   },
   "license": "MIT"

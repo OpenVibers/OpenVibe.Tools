@@ -1,7 +1,7 @@
 {
   "name": "openvibe-tools-shared",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
-  "description": "The Tools apps' shared runtime (apps/_shared): guard, egress, jobs, uploads, usage, internal auth, release, graceful stop. No dependencies: its modules take packages from the app that requires them.",
+  "description": "The Tools apps' shared runtime (apps/_shared): guard, per-actor limits, egress, jobs, uploads, usage, internal auth, release, graceful stop. No dependencies: its modules take packages from the app that requires them.",
   "license": "MIT"
 }

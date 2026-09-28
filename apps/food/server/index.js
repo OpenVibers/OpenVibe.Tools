@@ -101,6 +101,10 @@ app.use('/api/', guard.apiQuota);
 // gateway (openvibe.tools) answers the same routes for every tool and reads this list for status.
 // The food finder is built on the maps backend; its descriptor lives with the maps app's.
 const toolRegistry = createLocalRegistry({ specs: require('../../maps/server/descriptors').SPECS.filter(s => s.id === 'food') });
+// Per-actor limits (apps/_shared/actor-limits.js, roadmap WS-R task 4): signed-in registry reads (signed-out reads keep
+// the per-address limit only).
+const actorLimits = require('../../_shared/actor-limits').createToolsLimits({ app: 'food', createActorLimiter: require('openvibe-sdk/limits').createActorLimiter, guard, registry: obs.registry });
+app.use(actorLimits.registryReads);
 app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
 
 // ── Analytics Middleware ─────────────────────────────────────

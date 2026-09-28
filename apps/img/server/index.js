@@ -157,6 +157,10 @@ app.use('/api/', apiLimiter, guard.apiQuota);
 const toolRegistry = createLocalRegistry({ specs: require('./descriptors').SPECS, statusOf: requiresStatus((p) => (p === 'heif-dec' ? codec.heif.available() : true)) });
 // A signed-in person's page view of a tool goes into their tools.usage module (the launchers' recent tools).
 app.use(require('../../_shared/usage').usagePages({ snapshot: toolRegistry.snapshot }));
+// Per-actor limits (apps/_shared/actor-limits.js, roadmap WS-R task 4): signed-in registry reads, and a backstop above the
+// guard's quotas on job submits, retries and runs.
+const actorLimits = require('../../_shared/actor-limits').createToolsLimits({ app: 'img', createActorLimiter: require('openvibe-sdk/limits').createActorLimiter, guard, registry: obs.registry });
+app.use(actorLimits.registryReads);
 app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
 
 // ── Analytics Middleware ─────────────────────────────────────
@@ -266,7 +270,7 @@ const jobs = jobsRuntime.setupJobs({
     getPublicKey: guard.keys.get, issuer: config.networkUrl, guard,
     define: (system) => defineJobs(system, pool),
     receive: uploadSingle,
-    limiters: [burstLimiter, processLimiter, guard.toolQuota(hostTool)],
+    limiters: [actorLimits.backstop('tools.job.create'), burstLimiter, processLimiter, guard.toolQuota(hostTool)],
     jobTool: (req, type, input) => { const d = guard.toolForJob('img.process', String((input && input.tool) || req.ctx.defaultOp || 'convert'), req.ctx.toolId); return d ? d.id : null; },
     defaults(req, input) {
         const out = { ...input };
@@ -283,7 +287,7 @@ const jobs = jobsRuntime.setupJobs({
 const runApi = satelliteRunApi({
     app: 'img', guard, contracts, snapshot: toolRegistry.snapshot, system: () => jobs,
     multer: require('multer'), uploadsDir: path.resolve(config.uploadsDir), ...ajvFrom(require), ports: () => satellitePorts(),
-    limiters: [burstLimiter, processLimiter],
+    limiters: [actorLimits.backstop('tools.tool.run'), burstLimiter, processLimiter],
 });
 app.use(runApi.handle);
 
