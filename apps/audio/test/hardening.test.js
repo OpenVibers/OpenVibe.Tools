@@ -13,7 +13,7 @@ const { execFileSync } = require('child_process');
 const { startApp } = require('../../_shared/test/spawn');
 
 try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' }); } catch {
-    console.log('audio hardening: SKIPPED (no ffmpeg on this machine)');
+    console.log('audio hardening: skipped (no ffmpeg on this machine)');
     process.exit(0);
 }
 

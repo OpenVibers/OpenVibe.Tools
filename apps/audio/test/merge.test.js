@@ -12,7 +12,7 @@ const { startApp } = require('../../_shared/test/spawn');
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' }); } catch {
-    console.log('audio merge: SKIPPED (no ffmpeg on this machine)');
+    console.log('audio merge: skipped (no ffmpeg on this machine)');
     process.exit(0);
 }
 
