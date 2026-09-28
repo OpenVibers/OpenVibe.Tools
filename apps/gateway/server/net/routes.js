@@ -218,10 +218,34 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
         }, (d) => (d && d.status === 'success' ? HOUR : 0));
     }
 
-    /** RDAP for a domain or an IP. → { ok, status, data }. 200s are kept an hour, 404s ten minutes. */
+    /** IANA's RDAP bootstrap for domains: TLD → the registry's RDAP base URL. Kept a day; an empty map if it fails. */
+    function rdapBootstrap() {
+        return cache.wrap('rdap:bootstrap:dns', async () => {
+            const r = await timedFetch(cfg().rdap.bootstrapUrl, { headers: { Accept: 'application/json', 'User-Agent': cfg().rdap.userAgent } });
+            if (!r.ok) return {};
+            const map = {};
+            for (const [tlds, urls] of (await r.json()).services || []) {
+                const base = (urls || []).find((u) => /^https:/i.test(u)) || (urls || [])[0];
+                if (base) for (const t of tlds) map[String(t).toLowerCase()] = base.replace(/\/?$/, '/');
+            }
+            return map;
+        }, (m) => (Object.keys(m).length ? 24 * HOUR : 0));
+    }
+
+    /**
+     * RDAP for a domain or an IP. → { ok, status, data }. A domain is asked of its TLD's registry directly (IANA
+     * bootstrap), else rdap.org; an IP through rdap.org. 200s are kept an hour, 404s ten minutes.
+     */
     function rdapLookup(type, target) {
         return cache.wrap(`rdap:${type}:${target}`, async () => {
-            const r = await timedFetch(`${cfg().rdap.baseUrl}/${type}/${encodeURIComponent(target)}`, { headers: { Accept: 'application/rdap+json, application/json' } });
+            const headers = { Accept: 'application/rdap+json, application/json', 'User-Agent': cfg().rdap.userAgent };
+            let url = `${cfg().rdap.baseUrl}/${type}/${encodeURIComponent(target)}`;
+            if (type === 'domain') {
+                const tld = target.toLowerCase().split('.').pop();
+                const base = (await rdapBootstrap())[tld];
+                if (base) url = `${base}domain/${encodeURIComponent(target)}`;
+            }
+            const r = await timedFetch(url, { headers });
             return { ok: r.ok, status: r.status, data: r.ok ? await r.json() : null };
         }, (v) => (v.ok ? HOUR : v.status === 404 ? 10 * 60_000 : 0));
     }
@@ -518,9 +542,10 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
             if (!target) return fail(res, 'Please provide a domain or IP');
             // RDAP queries: domain → /domain/, IP → /ip/ (cached)
             const rdapType = isIP(target) ? 'ip' : 'domain';
+            if (rdapType === 'domain' && !/^[^\s./]+(\.[^\s./]+)+$/u.test(target)) return fail(res, 'Enter a full domain name (like example.com) or an IP address');
             const r = await rdapLookup(rdapType, target);
 
-            if (!r.ok) return fail(res, `RDAP lookup failed (${r.status})`, r.status >= 500 ? 502 : 404);
+            if (!r.ok) return fail(res, r.status === 404 ? `No registration record for ${target}` : `RDAP lookup failed (${r.status})`, r.status >= 500 ? 502 : 404);
             const data = r.data;
 
             // Extract key fields from RDAP response

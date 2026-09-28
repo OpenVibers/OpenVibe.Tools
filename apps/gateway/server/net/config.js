@@ -37,9 +37,13 @@ function getNetConfig(db) {
         ipapi: {
             baseUrl: 'http://ip-api.com',                     // ip-api.com — free (non-commercial), HTTP only
         },
-        // RDAP is keyless (IANA standard, public registries)
+        // RDAP is keyless (IANA standard, public registries). Domains go straight to the TLD's own RDAP server from
+        // IANA's bootstrap file; rdap.org (a redirector) is the fallback and serves IPs. Registries and rdap.org
+        // refuse requests without a real User-Agent (rdap.org answered Node's default with 403).
         rdap: {
             baseUrl: 'https://rdap.org',
+            bootstrapUrl: 'https://data.iana.org/rdap/dns.json',
+            userAgent: 'OpenVibe.Tools/1.0 (+https://openvibe.tools; whois and RDAP lookups)',
         },
         // Google DNS-over-HTTPS (public, no key)
         doh: {
