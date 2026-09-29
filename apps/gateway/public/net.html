@@ -924,6 +924,41 @@
         return (e && (e.detail || e.title || e.message)) || (body && (body.detail || body.title)) || 'Lookup failed';
     }
 
+    // ── The run input, from the tool's descriptor ────────────
+    // Every net tool's input schema has additionalProperties: false, so a field it does not declare
+    // (types on mx., count on latency.) would refuse the run: send only what the schema lists.
+    const schemas = new Map();
+    function inputSchema(id) {
+        if (!schemas.has(id)) {
+            schemas.set(id, fetch(`${API_BASE}/${encodeURIComponent(id)}/schema`, { credentials: 'same-origin' })
+                .then(r => (r.ok ? r.json() : null))
+                .then(s => (s && s.$defs && s.$defs.input) || null)
+                .catch(() => null)
+                .then(s => { if (!s) schemas.delete(id); return s; }));
+        }
+        return schemas.get(id);
+    }
+    /** What the page collected for `tool`, as run input fields (before the schema filter). */
+    function runFields(tool, ui) {
+        const f = {};
+        if (ui.target) f.target = ui.target;
+        if (ui.types && ui.types.length) f.types = ui.types;
+        if (ui.selector) f.selector = ui.selector;
+        if (tool.count) f.count = tool.count;
+        if (ui.propType) f.type = ui.propType;
+        if (ui.smtpPort) f.port = parseInt(ui.smtpPort, 10);
+        const path = String(ui.robotsPath || '').trim();
+        if (path) { f.path = path; f.ua = ui.robotsUa; }
+        return f;
+    }
+    /** The fields `schema` declares (no schema, say the descriptor could not be fetched: the target only). */
+    function runInput(schema, fields) {
+        const props = (schema && schema.properties) || { target: {} };
+        const input = {};
+        for (const [k, v] of Object.entries(fields)) if (v !== undefined && Object.prototype.hasOwnProperty.call(props, k)) input[k] = v;
+        return input;
+    }
+
     // ── Run the active tool ──────────────────────────────────
     async function runTool() {
         const input = document.getElementById('search-input');
@@ -943,36 +978,22 @@
         resultsEl.innerHTML = `<div class="loading"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Running ${tool.name}…</p></div>`;
 
         try {
-            // The tool's run API (plan T8, Phase 1): the same handlers the old /api/net routes called,
-            // in the run response shape. The request is the route's query as an `input` object.
-            const input = {};
-            if (target) input.target = target;
-
-            // DNS type overrides
-            if (tool.defaultTypes) input.types = tool.defaultTypes.split(',');
-            if (tool.dnsTypes) {
-                const sel = document.getElementById('dns-types');
-                if (sel) {
-                    const selected = [...sel.selectedOptions].map(o => o.value);
-                    if (selected.length) input.types = selected;
-                }
-            }
-            // DKIM special: query selector._domainkey.domain
-            if (activeTool === 'dkim' && target) {
-                const selector = prompt('DKIM selector (e.g., "default", "google", "s1"):', 'default') || 'default';
-                input.target = `${selector}._domainkey.${target}`;
-            }
-            // DMARC: prepend _dmarc.
-            if (activeTool === 'dmarc' && target) input.target = `_dmarc.${target}`;
-            // SPF: just TXT
-            if (activeTool === 'spf') input.types = ['TXT'];
-            if (tool.count) input.count = tool.count;
-            if (tool.propTypes) input.type = document.getElementById('prop-type').value;
-            if (tool.smtpPorts) input.port = parseInt(document.getElementById('smtp-port').value, 10);
-            if (tool.robotsTest) {
-                const p = document.getElementById('robots-path').value.trim();
-                if (p) { input.path = p; input.ua = document.getElementById('robots-ua').value; }
-            }
+            // The tool's run API (plan T8, Phase 1): the fields the page collected, kept only where the
+            // tool's own input schema (its descriptor, GET /api/v1/tools/<id>/schema) declares them. The
+            // descriptor adds the rest itself: MX/TXT/NS types, the _dmarc. and <selector>._domainkey.
+            // targets, the latency count.
+            let selector;
+            if (activeTool === 'dkim' && target) selector = prompt('DKIM selector (e.g., "default", "google", "s1"):', 'default') || 'default';
+            const fields = runFields(tool, {
+                target,
+                types: tool.dnsTypes && document.getElementById('dns-types') ? [...document.getElementById('dns-types').selectedOptions].map(o => o.value) : undefined,
+                selector,
+                propType: tool.propTypes ? document.getElementById('prop-type').value : undefined,
+                smtpPort: tool.smtpPorts ? document.getElementById('smtp-port').value : undefined,
+                robotsPath: tool.robotsTest ? document.getElementById('robots-path').value : undefined,
+                robotsUa: tool.robotsTest ? document.getElementById('robots-ua').value : undefined,
+            });
+            const input = runInput(await inputSchema(activeTool), fields);
 
             const token = localStorage.getItem('ov_token') || getCookie('ov_token');
             const headers = { 'Content-Type': 'application/json' };
