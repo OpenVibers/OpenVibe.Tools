@@ -679,11 +679,20 @@ function createJobSystem(o) {
         return active >= maxActivePerAddress ? { active, limit: maxActivePerAddress } : null;
     }
 
-    async function start() {
-        if (started) return api;
-        started = true;
+    /**
+     * Recover, prune, start the timer and the worker. A failed recovery (the database not reachable yet)
+     * rejects and leaves the system unstarted, so start() can simply be called again (index.js retries
+     * it with a backoff): queued jobs are never stranded behind a `started` flag nothing will reset.
+     */
+    let starting = null;
+    function start() {
+        if (!starting) starting = boot().catch((err) => { starting = null; throw err; });
+        return starting;
+    }
+    async function boot() {
         if (diskBudget) refreshDisk();
         const r = await recover();
+        started = true;   // only now: the worker never claims a job while recovery is still reading 'running' rows
         if (r.requeued || r.failed) log.log(`[Jobs] ${o.service}: ${r.requeued} job(s) re-queued, ${r.failed} failed after restart`);
         await prune().catch(() => {});
         await flushUsage();

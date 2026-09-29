@@ -86,6 +86,7 @@ function mediaOrigin(env = process.env) {
  * @param {object} [o.guard]        apps/_shared/guard: its caller resolver, admission (session rule,
  *                                  sniffing, quota) and busy handling; without it the job routes
  *                                  resolve owners themselves and a busy store is always refused
+ * @param {number} [o.bootRetryMs]  first retry delay after a failed boot recovery (default 1000, doubling to 60 s)
  * @param {(req, type, input) => string|null} [o.jobTool]  the descriptor id a submit runs (the host's
  *                                  tool, or the one its input.tool names)
  */
@@ -122,7 +123,17 @@ function setupJobs(o) {
             onAddressFull: (req, res, full) => !g.refuse(req, res, { status: 429, code: 'tools.job.too_many_active', reason: 'jobs.address', tool: o.jobTool ? o.jobTool(req, null, {}) : null, retryAfter: 30, detail: `At most ${full.limit} unfinished jobs from one address at a time; wait for one to finish.`, extra: { scope: 'address' } }),
         }),
     });
-    system.start().catch((err) => log.error(`[Jobs] ${o.service}: boot recovery failed:`, err.message));
+    // A failed boot recovery (the database not reachable yet) leaves the system unstarted; try again with
+    // a backoff (1 s doubling to 60 s) until it starts or the app closes, so queued jobs always resume.
+    let bootTimer = null, closed = false;
+    const boot = (attempt = 0) => system.start().catch((err) => {
+        if (closed) return;
+        const wait = Math.min(60_000, (o.bootRetryMs || 1000) * 2 ** attempt);
+        log.error(`[Jobs] ${o.service}: boot recovery failed (retrying in ${Math.round(wait / 1000)} s):`, err.message);
+        bootTimer = setTimeout(() => boot(attempt + 1), wait);
+        if (bootTimer.unref) bootTimer.unref();
+    });
+    boot();
     let pruneOutbox = null;
     if (events.outbox) {
         events.outbox.start();
@@ -133,6 +144,8 @@ function setupJobs(o) {
     system.db = db;
     // The `tools` database is shared with the rest of the app and closed there; this only stops the worker.
     system.close = () => {
+        closed = true;
+        clearTimeout(bootTimer);
         system.stop();
         if (events.outbox) { events.outbox.stop().catch(() => {}); clearInterval(pruneOutbox); }
     };
