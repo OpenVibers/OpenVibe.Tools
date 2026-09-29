@@ -27,7 +27,6 @@ const { hostGuard, ownHost } = require('../../_shared/host-role');
 const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
 const { satelliteRunApi, ajvFrom } = require('../../_shared/tools/run');
 const { satellitePorts } = require('../../_shared/tools/satellites');
-const { deprecated, runPath } = require('../../_shared/tools/deprecation');
 const { createLocalRegistry, requiresStatus } = require('../../_shared/tools/local');
 const jobsRuntime = require('../../_shared/jobs');
 const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
@@ -232,99 +231,9 @@ app.post('/api/info', guard.originCheck(), burstLimiter, processLimiter, guard.t
     }
 });
 
-// ── Main Processing Endpoint (single file) ───────────────────
-app.post('/api/process', deprecated((req) => runPath(hostTool(req))), guard.originCheck(), burstLimiter, processLimiter, guard.toolQuota(hostTool), uploadSingle, guard.admitUpload(toolOf), guard.heavy(toolOf), async (req, res) => {
-    try {
-        const toolId = req.body.tool || req.ctx.defaultOp;
-        if (!toolId) { fs.unlink(req.file.path, () => {}); return res.status(400).json({ error: 'No tool specified.' }); }
-
-        const tool = getTool(toolId);
-        if (!tool) { fs.unlink(req.file.path, () => {}); return res.status(400).json({ error: `Unknown tool: ${toolId}` }); }
-
-        // Same options and code path as the docs.process job (the worker pool, its cap and its limits)
-        const [buffer] = await readUploads([req.file]);
-        const result = await runTool(pool, tool, buffer, buildOptions(req.body, req.ctx, false), syncRun(req, res));
-
-        // Some tools return view-only results (like metadata view)
-        if (result.viewOnly) {
-            return res.json({ success: true, tool: toolId, ...result });
-        }
-
-        // Save output file
-        const saved = retention.saveOutput(
-            result.buffer,
-            result.ext,
-            result.mime,
-            !!req.user,
-            req.file.originalname,
-        );
-
-        res.json({
-            success: true,
-            tool: toolId,
-            download: saved,
-            output: {
-                mime: result.mime,
-                ext: result.ext,
-                size: result.buffer.length,
-                sizeKB: Math.round(result.buffer.length / 1024 * 10) / 10,
-            },
-            ...(result.pageCount !== undefined && { pageCount: result.pageCount }),
-            ...(result.savings && { savings: result.savings }),
-            ...(result.metadata && { metadata: result.metadata }),
-            ...(result.note && { note: result.note }),
-        });
-    } catch (err) {
-        sendToolError(req, res, err, 'Process');
-    }
-});
-
-// ── Multi-File Processing Endpoint (merge, img2pdf) ──────────
-app.post('/api/process/multi', deprecated((req) => runPath(hostTool(req))), guard.originCheck(), burstLimiter, processLimiter, guard.toolQuota(hostTool), uploadMultiple, guard.admitUpload(toolOf), guard.heavy(toolOf), async (req, res) => {
-    try {
-        const toolId = req.body.tool || req.ctx.defaultOp;
-        const tool = toolId ? getTool(toolId) : null;
-        if (!tool || !tool.multiFile) {
-            for (const f of req.files) fs.unlink(f.path, () => {});
-            if (!toolId) return res.status(400).json({ error: 'No tool specified.' });
-            if (!tool) return res.status(400).json({ error: `Unknown tool: ${toolId}` });
-            return res.status(400).json({ error: `Tool "${toolId}" does not support multiple files. Use /api/process instead.` });
-        }
-
-        const buffers = await readUploads(req.files);
-        const result = await runTool(pool, tool, buffers, buildOptions(req.body, req.ctx, true), syncRun(req, res));
-
-        // Save output
-        const firstName = req.files[0]?.originalname || 'output';
-        const saved = retention.saveOutput(
-            result.buffer,
-            result.ext,
-            result.mime,
-            !!req.user,
-            firstName,
-        );
-
-        res.json({
-            success: true,
-            tool: toolId,
-            download: saved,
-            output: {
-                mime: result.mime,
-                ext: result.ext,
-                size: result.buffer.length,
-                sizeKB: Math.round(result.buffer.length / 1024 * 10) / 10,
-            },
-            fileCount: req.files.length,
-            ...(result.pageCount !== undefined && { pageCount: result.pageCount }),
-        });
-    } catch (err) {
-        sendToolError(req, res, err, 'Process/Multi');
-    }
-});
-
 // ── Jobs (/api/v1/jobs) ──────────────────────────────────────
-// The same operations as /api/process and /api/process/multi, asynchronous and durable: accepted
-// into data/jobs.db, followed over SSE, reattachable by id after a reload or a restart.
+// The document operations, asynchronous and durable: accepted into data/jobs.db, followed over SSE,
+// reattachable by id after a reload or a restart.
 const jobs = jobsRuntime.setupJobs({
     app, service: 'docs', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts, sdk,
     getPublicKey: guard.keys.get, issuer: config.networkUrl, guard,

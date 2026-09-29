@@ -26,40 +26,40 @@ async function makePdf(pages) {
         const app = await startApp('docs', { DATA_DIR: data, UPLOADS_DIR: uploads, OUTPUT_DIR: path.join(data, 'output'), TOOLS_GUARD: mode });
         // Each call from its own address, so the older burst limiter (4 in 5 s per address) stays out of it.
         let n = 0;
-        const post = (files, fields, cookie, p = '/api/process') => {
+        const post = (id, files, input, cookie) => {
             const f = new FormData();
-            for (const [k, v] of Object.entries(fields)) f.append(k, v);
+            f.append('input', JSON.stringify(input || {}));
             for (const [buf, name, type, field = 'file'] of files) f.append(field, new Blob([buf], { type }), name);
-            return fetch(`${app.base}${p}`, { method: 'POST', body: f, headers: { 'X-Forwarded-For': `198.51.100.${++n}`, ...(cookie ? { cookie } : {}) } });
+            return fetch(`${app.base}/api/v1/tools/${id}/run?wait_ms=30000`, { method: 'POST', body: f, headers: { 'X-Forwarded-For': `198.51.100.${++n}`, ...(cookie ? { cookie } : {}) } });
         };
         try {
             const ctx = await fetch(`${app.base}/api/context`, { headers: { Host: 'compresspdf.openvibe.tools' } });
             const cookie = String(ctx.headers.get('set-cookie') || '').split(';')[0];
             assert.match(cookie, /^ov_tools_jobs=/);
 
-            let r = await post([[pdf, 'doc.pdf', 'application/pdf']], { tool: 'compress' }, cookie);
+            let r = await post('compresspdf', [[pdf, 'doc.pdf', 'application/pdf']], {}, cookie);
             let body = await r.json();
             assert.strictEqual(r.status, 200, JSON.stringify(body));
-            assert.strictEqual(body.output.ext, 'pdf');
+            assert.strictEqual(body.state, 'succeeded', JSON.stringify(body.error));
+            assert.strictEqual(body.result.data.output.ext, 'pdf');
             assert.deepStrictEqual(fs.readdirSync(uploads), [], 'the upload was on disk and is gone after the call');
 
-            r = await post([[png, 'doc.pdf', 'application/pdf']], { tool: 'compress' }, cookie);
+            r = await post('compresspdf', [[png, 'doc.pdf', 'application/pdf']], {}, cookie);
             assert.strictEqual(r.status, 415, 'a PNG called doc.pdf is refused (in both modes)');
             assert.strictEqual((await r.json()).code, 'tools.file.unsupported_type');
-            r = await post([[png, 'a.png', 'image/png', 'files'], [pdf, 'b.png', 'image/png', 'files']], { tool: 'img2pdf' }, cookie, '/api/process/multi');
+            r = await post('image2pdf', [[png, 'a.png', 'image/png', 'files'], [pdf, 'b.png', 'image/png', 'files']], {}, cookie);
             assert.strictEqual(r.status, 415, 'Image to PDF takes pictures only: file 2 is a PDF');
             assert.match((await r.json()).detail, /File 2 is a PDF file/);
-            r = await post([[png, 'a.png', 'image/png', 'files'], [png, 'b.png', 'image/png', 'files']], { tool: 'img2pdf' }, cookie, '/api/process/multi');
+            r = await post('image2pdf', [[png, 'a.png', 'image/png', 'files'], [png, 'b.png', 'image/png', 'files']], {}, cookie);
             assert.strictEqual(r.status, 200);
+            assert.strictEqual((await r.json()).state, 'succeeded');
             assert.deepStrictEqual(fs.readdirSync(uploads), []);
 
-            // No session, no sign-in, no token: PDF tools (auth.anonymous false) record or refuse it.
-            r = await post([[pdf, 'doc.pdf', 'application/pdf']], { tool: 'compress' }, null);
-            if (mode === 'report') assert.strictEqual(r.status, 200, 'report mode lets it through');
-            else {
-                assert.strictEqual(r.status, 401);
-                assert.strictEqual((await r.json()).code, 'tools.session_required');
-            }
+            // No session, no sign-in, no token: PDF tools (auth.anonymous false) are refused by the run
+            // API in both modes (authorization is always enforced, not a quota).
+            r = await post('compresspdf', [[pdf, 'doc.pdf', 'application/pdf']], {}, null);
+            assert.strictEqual(r.status, 401);
+            assert.strictEqual((await r.json()).code, 'tools.session_required');
             const m = await (await fetch(`${app.base}/metrics`)).text();
             assert.match(m, /tools_guard_refused_total\{reason="session",tool="compresspdf"\} 1/);
             assert.match(m, /tools_guard_refused_total\{reason="sniff",tool="compresspdf"\} 1/);

@@ -82,20 +82,20 @@ try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' }); } catch {
         const ctx = await fetch(`${app.base}/api/context`);
         const cookie = String(ctx.headers.get('set-cookie') || '').split(';')[0];
         assert.match(cookie, /^ov_tools_jobs=/, 'the page\'s context call starts the session audio tools need');
-        const post = (buf, name, type, tool = 'convert') => {
+        const run = (buf, name, type) => {
             const f = new FormData();
+            f.append('input', JSON.stringify({}));
             f.append('file', new Blob([buf], { type }), name);
-            f.append('tool', tool);
-            f.append('format', 'mp3');
-            return fetch(`${app.base}/api/process`, { method: 'POST', body: f, headers: { cookie } });
+            return fetch(`${app.base}/api/v1/tools/mp3/run?wait_ms=30000`, { method: 'POST', body: f, headers: { cookie } });
         };
-        let r = await post(fs.readFileSync(hls), 'song.mp3', 'audio/mpeg');
-        assert.strictEqual(r.status, 415);
+        let r = await run(fs.readFileSync(hls), 'song.mp3', 'audio/mpeg');
+        assert.strictEqual(r.status, 415, 'the run API refuses the playlist at the door');
         assert.strictEqual((await r.json()).code, 'tools.file.unsupported_type');
-        r = await post(fs.readFileSync(secret), 'take.wav', 'application/octet-stream');
+        r = await run(fs.readFileSync(secret), 'take.wav', 'application/octet-stream');
         const body = await r.json();
         assert.strictEqual(r.status, 200, JSON.stringify(body));
-        assert.strictEqual(body.output.ext, 'mp3');
+        assert.strictEqual(body.state, 'succeeded', JSON.stringify(body.error));
+        assert.strictEqual(body.result.data.output.ext, 'mp3');
         // A job with the playlist is refused the same way.
         const f = new FormData();
         f.append('type', 'audio.process');

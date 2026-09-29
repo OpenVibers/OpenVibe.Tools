@@ -136,7 +136,6 @@ function spec(id) {
         auth: { anonymous, capability: probe ? 'tools.net.probe' : 'tools.tool.run' },
         quotaClass: probe ? 'tools-probe' : egress ? 'tools-fetch' : 'tools-run', cost: t.cost || 1, egress,
         ...(endpoint && {
-            legacy: [`GET /api/net${endpoint}${endpoint === '/myip' ? '' : '/:target'}`],
             route: { method: 'GET', path: `/api/net${endpoint}`, ...(t.query && { query: t.query }), ...(t.targetTemplate && { target: t.targetTemplate }) },
         }),
         example: { input: endpoint === '/myip' ? {} : { target: 'example.com' } },

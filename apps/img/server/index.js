@@ -27,7 +27,6 @@ const { hostGuard, ownHost } = require('../../_shared/host-role');
 const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
 const { satelliteRunApi, ajvFrom } = require('../../_shared/tools/run');
 const { satellitePorts } = require('../../_shared/tools/satellites');
-const { deprecated, runPath } = require('../../_shared/tools/deprecation');
 const { createLocalRegistry, requiresStatus } = require('../../_shared/tools/local');
 const jobsRuntime = require('../../_shared/jobs');
 const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
@@ -64,24 +63,6 @@ const toolOf = (req) => { const d = guard.toolForJob('img.process', String((req.
 // once for the synchronous endpoints and the jobs together, each with a heap limit
 // (TOOLS_WORKER_MEMORY_MB, 512) and terminated at its timeout, on cancel, or when the client goes away.
 const pool = poolFromEnv('img', path.join(__dirname, 'worker.js'));
-/** The sync endpoints' bounds for a run: the tool's descriptor timeout, and the client leaving. */
-function syncRun(req, res) {
-    const ac = new AbortController();
-    res.on('close', () => { if (!res.writableFinished) ac.abort(); });
-    const d = guard.tool(toolOf(req));
-    return { signal: ac.signal, timeoutMs: (d && d.limits && d.limits.timeoutMs) || 5 * 60 * 1000, transfer: true };
-}
-/** A tool's failure on the synchronous endpoints: its own 503 (with Retry-After when busy), else { error }. */
-function syncError(req, res, err, label) {
-    if (guard.toolRefused(req, res, err, toolOf(req))) return;
-    if (err.status === 503) {
-        if (err.retryAfter) res.set('Retry-After', String(err.retryAfter));
-        return contracts.http.sendProblem(res, 503, err.code, { detail: err.message, ctx: req.ov });
-    }
-    if (err.code === 'tools.job.cancelled') return;   // the client went away
-    console.error(`[${label}] Error:`, err.message);
-    res.status(422).json({ error: err.message || 'Image processing failed' });
-}
 
 const app = express();
 // What this deploy runs (ADR-016); the shared navbar's release-watch polls it on every tool host.
@@ -217,57 +198,9 @@ app.get('/api/tools', (_req, res) => {
     res.json({ tools: listTools() });
 });
 
-// ── Main Processing Endpoint ─────────────────────────────────
-app.post('/api/process', deprecated((req) => runPath(hostTool(req))), guard.originCheck(), burstLimiter, processLimiter, guard.toolQuota(hostTool), uploadSingle, guard.admitUpload(toolOf), guard.heavy(toolOf), async (req, res) => {
-    try {
-        const toolId = req.body.tool || req.ctx.defaultOp || 'convert';
-        const tool = getTool(toolId);
-        if (!tool) {
-            return res.status(400).json({ error: `Unknown tool: ${toolId}` });
-        }
-
-        // Execute the tool (the same code, pool and limits the img.process job uses)
-        const result = await runProcess(pool, req.file.buffer, toolId, buildOptions(req.body, req.ctx, req.file.mimetype), syncRun(req, res));
-
-        // Save to retention
-        const saved = retention.saveOutput(
-            result.buffer,
-            result.ext,
-            result.mime,
-            !!req.user,
-            req.file.originalname,
-        );
-
-        res.json({ success: true, download: saved, ...describe(toolId, result) });
-    } catch (err) {
-        syncError(req, res, err, 'Process');
-    }
-});
-
-// ── Direct Download (inline preview) ─────────────────────────
-app.post('/api/process/direct', deprecated((req) => runPath(hostTool(req))), guard.originCheck(), burstLimiter, processLimiter, guard.toolQuota(hostTool), uploadSingle, guard.admitUpload(toolOf), guard.heavy(toolOf), async (req, res) => {
-    try {
-        const toolId = req.body.tool || req.ctx.defaultOp || 'convert';
-        const tool = getTool(toolId);
-        if (!tool) return res.status(400).json({ error: `Unknown tool: ${toolId}` });
-
-        const result = await runProcess(pool, req.file.buffer, toolId, buildOptions(req.body, req.ctx, req.file.mimetype), syncRun(req, res));
-        const baseName = path.basename(req.file.originalname, path.extname(req.file.originalname));
-
-        res.set({
-            'Content-Type': result.mime,
-            'Content-Disposition': `attachment; filename="${baseName}.${result.ext}"`,
-            'Content-Length': result.buffer.length,
-        });
-        res.send(result.buffer);
-    } catch (err) {
-        syncError(req, res, err, 'Process/Direct');
-    }
-});
-
 // ── Jobs (/api/v1/jobs) ──────────────────────────────────────
-// The same operation as /api/process, asynchronous and durable: accepted into data/jobs.db,
-// followed over SSE, reattachable by id after a reload or a restart (apps/_shared/jobs).
+// The image operations, asynchronous and durable: accepted into data/jobs.db, followed over SSE,
+// reattachable by id after a reload or a restart (apps/_shared/jobs).
 const jobs = jobsRuntime.setupJobs({
     app, service: 'img', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts, sdk,
     getPublicKey: guard.keys.get, issuer: config.networkUrl, guard,

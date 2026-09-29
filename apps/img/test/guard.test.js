@@ -37,26 +37,26 @@ const { startApp } = require('../../_shared/test/spawn');
     // ── Through the app ──
     const data = fs.mkdtempSync(path.join(os.tmpdir(), 'ov-img-guard-'));
     const app = await startApp('img', { DATA_DIR: data, UPLOADS_DIR: path.join(data, 'uploads'), OUTPUT_DIR: path.join(data, 'output'), TOOLS_MAX_INPUT_PIXELS: '10000' });
-    const post = (buf, name, type, p = '/api/process') => {
+    const run = (buf, name, type) => {
         const f = new FormData();
+        f.append('input', JSON.stringify({ format: 'png' }));
         f.append('file', new Blob([buf], { type }), name);
-        f.append('tool', 'convert');
-        f.append('format', 'png');
-        return fetch(`${app.base}${p}`, { method: 'POST', body: f });
+        return fetch(`${app.base}/api/v1/tools/convert/run?wait_ms=30000`, { method: 'POST', body: f });
     };
     try {
-        let r = await post(big, 'big.png', 'image/png');
-        assert.strictEqual(r.status, 413, 'the pixel limit applies in report mode too');
+        let r = await run(big, 'big.png', 'image/png');
+        assert.strictEqual(r.status, 200);
         let body = await r.json();
-        assert.strictEqual(r.headers.get('content-type'), 'application/problem+json');
-        assert.strictEqual(body.code, 'tools.file.too_large');
-        r = await post(Buffer.from('%PDF-1.4\n%%EOF\n'), 'photo.png', 'image/png', '/api/process/direct');
+        assert.strictEqual(body.state, 'failed', 'the pixel limit applies in report mode too');
+        assert.strictEqual(body.error.status, 413);
+        assert.strictEqual(body.error.code, 'tools.file.too_large');
+        r = await run(Buffer.from('%PDF-1.4\n%%EOF\n'), 'photo.png', 'image/png');
         assert.strictEqual(r.status, 415, 'a PDF called photo.png is refused');
         assert.strictEqual((await r.json()).code, 'tools.file.unsupported_type');
-        r = await post(small, 'photo.gif', 'image/gif');
+        r = await run(small, 'photo.gif', 'image/gif');
         body = await r.json();
-        assert.strictEqual(r.status, 200, JSON.stringify(body));
-        assert.strictEqual(body.output.ext, 'png');
+        assert.strictEqual(body.state, 'succeeded', JSON.stringify(body.error));
+        assert.strictEqual(body.result.data.output.ext, 'png');
         // The job API refuses the same picture the same way (hard limit): the job fails with the code.
         const f = new FormData();
         f.append('type', 'img.process');
@@ -67,7 +67,6 @@ const { startApp } = require('../../_shared/test/spawn');
         // Answers carry RateLimit headers and the sync endpoint is behind the semaphore.
         assert.ok(r.headers.get('ratelimit-limit'), 'RateLimit-Limit');
         const metrics = await (await fetch(`${app.base}/metrics`)).text();
-        assert.match(metrics, /tools_guard_refused_total\{reason="pixels",tool="convert"\} 1/);
         assert.match(metrics, /tools_guard_refused_total\{reason="sniff",tool="convert"\} [12]/);
         assert.match(metrics, /tools_guard_sync\{kind="limit"\} 2/);
         assert.match(metrics, /tools_guard_enforcing 0/);

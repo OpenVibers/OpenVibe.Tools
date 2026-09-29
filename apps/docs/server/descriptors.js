@@ -79,7 +79,6 @@ function tool(id, extra = {}) {
     return {
         id, execution: 'job', api: true,
         job: { type: 'docs.process', operation: op, ...(ctx.defaultFormat && { preset: { defaultFormat: ctx.defaultFormat } }) },
-        legacy: [o.files.max > 1 ? 'POST /api/process/multi' : 'POST /api/process'],
         input: o.input,
         files: { ...o.files, maxBytes: MAX_BYTES },
         output: { kind: 'file', mime: o.mime, schema: RESULT },

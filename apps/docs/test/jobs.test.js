@@ -75,15 +75,15 @@ async function finished(app, id, cookie) {
         r = await fetch(`${app.base}/api/v1/jobs`, { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ type: 'docs.process', input: { tool: 'merge' } }) });
         assert.strictEqual(r.status, 400, 'a job without files is refused');
 
-        // The synchronous endpoint is unchanged (after the burst limiter's 5 s window: jobs count too).
+        // The run API merges too (after the burst limiter's 5 s window: jobs count too).
         await sleep(5100);
         const sync = new FormData();
+        sync.append('input', JSON.stringify({}));
         sync.append('files', new Blob([a], { type: 'application/pdf' }), 'a.pdf');
         sync.append('files', new Blob([b], { type: 'application/pdf' }), 'b.pdf');
-        sync.append('tool', 'merge');
-        r = await fetch(`${app.base}/api/process/multi`, { method: 'POST', body: sync });
+        r = await fetch(`${app.base}/api/v1/tools/mergepdf/run?wait_ms=30000`, { method: 'POST', body: sync, headers: { cookie } });
         const body = await r.json();
-        assert.strictEqual(body.success, true, JSON.stringify(body)); assert.strictEqual(body.pageCount, 5);
+        assert.strictEqual(body.state, 'succeeded', JSON.stringify(body.error)); assert.strictEqual(body.result.data.pageCount, 5);
 
         // Canonical host through the gateway.
         const html = await new Promise((resolve, reject) => http.get({ host: '127.0.0.1', port: app.port, path: '/', headers: { Host: 'mergepdf.openvibe.tools', 'X-OV-Tool': 'mergepdf', 'X-OV-Host-Role': 'short', 'X-OV-Canonical-Host': 'merge-pdf.openvibe.tools' } }, (res) => {
