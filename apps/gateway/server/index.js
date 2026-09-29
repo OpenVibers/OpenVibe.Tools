@@ -56,13 +56,19 @@ let auth = null;   // created below; the key check reads it at request time
 // the address), the tools-api quota, the net and dev tools' quotas by descriptor, the per-target
 // throttle, the port-scan cap, webhook bin caps and the abuse log (data/guard.db). The Network key is
 // the OAuth client's (loaded and retried by it). TOOLS_GUARD=report (default) records what it would refuse.
+// The one `tools` database and the shared Valkey (plan T8, decisions 3 and 4).
+const toolsDb = require('../../_shared/db').openToolsDb({ createDb: require('openvibe-sdk/db').createDb, service: 'tools-gateway' });
+const toolsValkey = require('../../_shared/db').openToolsValkey({ createValkey: require('openvibe-sdk/valkey').createValkey });
+require('./revocation-events').configure({ db: toolsDb.db, valkey: toolsValkey });
 const guard = createGuard({
-    app: 'gateway', dataDir: require('path').resolve(__dirname, '..', process.env.DATA_DIR || 'data'),
-    Database: require('better-sqlite3'), contracts: require('openvibe-contracts'),
+    app: 'gateway', db: toolsDb.db, valkey: toolsValkey, contracts: require('openvibe-contracts'),
     specs: [...require('./net/descriptors').SPECS, ...require('./dev/descriptors').SPECS],
     issuer: config.networkUrl,
     keys: { get: () => (auth && auth.client.publicKey) || null, ensure: () => (auth ? auth.ensureKey() : Promise.resolve(null)) },
 });
+// Serve only once the schema is in: the first PGlite migration must not run inside a request (it
+// would block the event loop and time out a satellite's readiness check).
+app.use((req, res, next) => toolsDb.ready.then(() => next(), next));
 const obs = observe({
     app, metrics: require('openvibe-shared/metrics'), ready: require('openvibe-shared/ready'),
     service: 'tools', release: release.release, mountReady: false,
@@ -78,6 +84,7 @@ const obs = observe({
             name: 'catalog', required: true, description: 'the tool catalog every apex page, host route and proxy decision is built from',
             check: () => { const n = registry.get().tools.length; return n > 0 ? { ok: true, detail: { tools: n } } : 'catalog is empty'; },
         },
+        ready.postgres('tools_db', () => toolsDb.db, { description: 'the one tools database (guard_abuse, revocations)' }),
         ready.networkKey('network_key', () => auth && auth.client.publicKey, { description: 'verifies signed-in visitors offline; signed-out use works without it' }),
         {
             name: 'service_directory', required: false, description: 'other services\' origins from the Network registry (a built-in fallback list is used without it)',
@@ -542,6 +549,8 @@ require('../../_shared/graceful').gracefulStop({
         () => require('../../_shared/usage').stopRecorder(800),
         () => runApi.pool.close(),
         () => guard.close(),
+        () => toolsDb.db.close(),
+        () => toolsValkey && toolsValkey.close(),
         () => require('./revocation-events').close(),
     ],
 });

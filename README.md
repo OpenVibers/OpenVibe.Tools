@@ -638,5 +638,12 @@ with `DATABASE_DIRECT_URL` set for the cutover; it prints a per-table count and 
 After the move the apps read `DATABASE_URL` / `DATABASE_DIRECT_URL` (PostgreSQL, via PgBouncer) and
 `VALKEY_URL` (Valkey); `guard_salt`, `guard_day` and the minute/burst buckets live in Valkey (a throttle,
 never authoritative), while `guard_abuse`, the job store and the analytics tables stay in PostgreSQL.
-`TOOLS_GUARD` (default `report`) and its meaning are unchanged. Until the cutover lands the apps still run
-on `better-sqlite3` exactly as described above.
+`TOOLS_GUARD` (default `report`) and its meaning are unchanged.
+
+State (plan T8 phases 1–4 done, 5–6 pending): every app already opens the one `tools` database
+(`apps/_shared/db.js`, `DATABASE_URL` else an embedded PGlite database in development; `DATABASE_DIRECT_URL`
+runs the migrations as owner) and the shared Valkey (`VALKEY_URL`, else the guard's counters and salt stay
+in this process); `guard_abuse`, `token_revocations` and the request analytics are on PostgreSQL, and the
+net and dev pages call the run API (the `/api/net/*` and `/api/dev/*` routes still answer until phase 6
+removes them; a signed-in person may now run a probe under their per-person quota). The job store still
+runs on `better-sqlite3` (`apps/_shared/jobs/`, plan T8 phases 2–3) — only that dependency remains.

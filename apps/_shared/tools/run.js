@@ -239,10 +239,11 @@ function createRunApi(o) {
             }
             return c;
         }
-        if (probe) {
+        // A signed-in person may run probes through the run API under their per-person quota (plan T8, Phase
+        // 1: the net pages and dev.html call the run API with the session token); anonymous stays 401.
+        if (probe && c.kind !== 'user') {
             guard.record(req, c, { reason: 'capability', tool: d.id, enforced: true });
-            if (c.kind === 'user') throw new Refusal(403, 'capability.denied', `Network probes run through the API only for apps and services holding ${cap}; people use the tool's page.`);
-            throw new Refusal(401, 'token.missing', `${d.id} runs through the API only with a token holding ${cap}; people use the tool's page.`);
+            throw new Refusal(401, 'token.missing', `${d.id} runs through the API only with a token holding ${cap}, or a signed-in person on its page.`);
         }
         if (d.auth && d.auth.anonymous === false && c.kind === 'anonymous') {
             guard.record(req, c, { reason: 'session', tool: d.id, enforced: true });

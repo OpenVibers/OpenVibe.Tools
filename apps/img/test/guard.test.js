@@ -71,7 +71,10 @@ const { startApp } = require('../../_shared/test/spawn');
         assert.match(metrics, /tools_guard_refused_total\{reason="sniff",tool="convert"\} [12]/);
         assert.match(metrics, /tools_guard_sync\{kind="limit"\} 2/);
         assert.match(metrics, /tools_guard_enforcing 0/);
-        assert.ok(fs.existsSync(path.join(data, 'guard.db')), 'guard.db in the data directory');
+        // The guard no longer keeps a per-app guard.db: guard_abuse is in the one tools database and
+        // guard_salt/guard_day in Valkey (plan T8 decision 4), reported by the tools_db readiness check.
+        const ready = await (await fetch(`${app.base}/api/ready`)).json();
+        assert.strictEqual(ready.checks.tools_db.status, 'ok', 'the guard serves from the one tools database');
     } finally {
         await app.kill();
         fs.rmSync(data, { recursive: true, force: true });

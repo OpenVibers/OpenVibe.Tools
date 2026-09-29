@@ -129,9 +129,13 @@ function checkProblem(r, status, code, where) {
         checkRun(r.body, 'headers refused');
         assert.deepStrictEqual([r.body.state, r.body.error.status, r.body.error.code], ['failed', 403, 'tools.net.target_not_public']);
 
-        // ── Probes: a token with tools.net.probe, nobody else ──
+        // ── Probes: a token with tools.net.probe, a signed-in person under their quota, nobody else ──
         checkProblem(await run('ping', { input: { target: '127.0.0.1' } }), 401, 'token.missing', 'probe, anonymous');
-        checkProblem(await run('ping', { input: { target: '127.0.0.1' } }, { headers: { Authorization: `Bearer ${net.user()}` } }), 403, 'capability.denied', 'probe, a person');
+        // Plan T8, Phase 1: the net pages call the run API with the session token, so a signed-in person
+        // may run a probe (under their per-person quota); the SSRF guard still keeps it off loopback.
+        r = await run('ping', { input: { target: '127.0.0.1' } }, { headers: { Authorization: `Bearer ${net.user()}` } });
+        checkRun(r.body, 'probe, a person');
+        assert.deepStrictEqual([r.body.state, r.body.error.code], ['failed', 'tools.net.target_not_public'], 'a person runs a probe: it ran and the SSRF guard refused loopback');
         checkProblem(await run('ping', { input: { target: '127.0.0.1' } }, { headers: { Authorization: `Bearer ${net.service(['tools.tool.run'])}` } }), 403, 'capability.denied', 'probe, runner token');
         r = await run('ping', { input: { target: '127.0.0.1', count: 1 } }, { headers: { Authorization: `Bearer ${net.service(['tools.net.probe'], { name: 'prober' })}` } });
         checkRun(r.body, 'ping with tools.net.probe');

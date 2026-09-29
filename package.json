@@ -5,6 +5,7 @@
   "description": "OpenVibe.Tools \u2014 the tools suite on openvibe.tools and *.openvibe.tools",
   "scripts": {
     "test": "node test/run.js",
+    "test:pg": "DATABASE_URL=\"$OV_TEST_PG_URL\" DATABASE_DIRECT_URL=\"$OV_TEST_PG_DIRECT_URL\" VALKEY_URL=\"$OV_TEST_VALKEY_URL\" node test/run.js",
     "install:all": "npm --prefix apps/gateway install && npm --prefix apps/maps install && npm --prefix apps/food install && npm --prefix apps/img install && npm --prefix apps/yt install && npm --prefix apps/audio install && npm --prefix apps/text install && npm --prefix apps/docs install",
     "start:gateway": "npm --prefix apps/gateway start",
     "start:maps": "npm --prefix apps/maps start",

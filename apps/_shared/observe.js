@@ -90,8 +90,21 @@ const checks = {
         };
     },
 
+    /** A real round trip on the one `tools` database (an openvibe-sdk/db handle, or a function
+     *  returning one); the detail names the store it answered from (postgresql / pglite). */
+    postgres(name, db, { required = true, description } = {}) {
+        return {
+            name, required, description,
+            check: async () => {
+                const h = typeof db === 'function' ? db() : db;
+                if (!h) return 'database not open';
+                return h.ready();
+            },
+        };
+    },
+
     /** This process can write to the directory (a real create + remove). A missing directory is
-     *  created first, as the app itself does on first use (mkdir -p). */
+     *  created first, as the app itself does on first boot (mkdir -p). */
     writableDir(name, dir, { required = true, description } = {}) {
         return {
             name, required, description,

@@ -16,7 +16,7 @@ const { dep } = require('./deps');
 const express = dep('express');
 const cookieParser = dep('cookie-parser');
 const multer = dep('multer');
-const Database = dep('better-sqlite3');
+const Database = dep('better-sqlite3');   // the job store is still SQLite (Phases 2–3 not done)
 const contracts = dep('openvibe-contracts');
 const metrics = dep('openvibe-shared/metrics');
 const guardLib = require('../guard');
@@ -43,6 +43,41 @@ const svcToken = (name, extra = {}) => contracts.serviceAuth.signServiceToken({ 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'ov-guard-'));
 const quiet = { log() {}, warn() {}, error() {} };
 
+// A stand-in for openvibe-sdk/valkey: the same key()/client shape over one Map, so two guards can
+// share "one Valkey" in-process. The bucket's two Lua commands are emulated in JS (the real ones are
+// atomic; a single-threaded test has no race to lose).
+function fakeValkey({ down = false } = {}) {
+    const store = new Map();
+    const guard = () => { if (down) throw new Error('valkey down'); };
+    const client = {
+        async get(k) { guard(); return store.has(k) ? store.get(k) : null; },
+        async set(k, v) { guard(); if (store.has(k)) return null; store.set(k, String(v)); return 'OK'; },
+        async hget(k, f) { guard(); const h = store.get(k); return h && h[f] != null ? h[f] : null; },
+        async hincrbyfloat(k, f, n) { guard(); const h = store.get(k) || {}; h[f] = String(Number(h[f] || 0) + Number(n)); store.set(k, h); return h[f]; },
+        async expire() { guard(); return 1; },
+        async incr(k) { guard(); const v = Number(store.get(k) || 0) + 1; store.set(k, String(v)); return v; },
+        defineCommand(name) {
+            client[name] = async (_numKeys, key, burst, rate, need, now) => {
+                guard();
+                const h = store.get(key) || {};
+                let tokens = h.tokens != null ? Number(h.tokens) : Number(burst);
+                const at = h.at != null ? Number(h.at) : Number(now);
+                tokens = Math.min(Number(burst), tokens + (Number(now) - at) * Number(rate));
+                if (name === 'ovBucketRefund') {   // give back, capped at burst
+                    const left = Math.min(Number(burst), tokens + Number(need));
+                    store.set(key, { tokens: String(left), at: String(now) });
+                    return String(left);
+                }
+                if (tokens < Number(need)) return `${tokens}:0`;   // short: take nothing
+                const left = tokens - Number(need);
+                store.set(key, { tokens: String(left), at: String(now) });
+                return `${left}:1`;
+            };
+        },
+    };
+    return { client, key: (...p) => p.join(':'), ready: async () => (down ? { ok: false, error: 'down' } : { ok: true }), close: async () => {} };
+}
+
 // Pure-data descriptors of the real apps (nothing loads sharp or ffmpeg).
 const IMG = require('../../img/server/descriptors').SPECS;
 const AUDIO = require('../../audio/server/descriptors').SPECS;
@@ -50,7 +85,7 @@ const NET = require('../../gateway/server/net/descriptors').SPECS;
 
 function makeGuard(o = {}) {
     return createGuard({
-        app: o.app || 'test', dataDir: o.dataDir, Database: o.dataDir ? Database : undefined, contracts,
+        app: o.app || 'test', db: o.db, valkey: o.valkey, contracts,
         specs: o.specs || [...IMG, ...AUDIO, ...NET], issuer: ISSUER,
         keys: { get: () => publicKey, ensure: async () => publicKey },
         env: { TOOLS_GUARD: o.mode || 'report', ...(o.env || {}) }, log: quiet, now: o.now, pruneIntervalMs: 0,
@@ -140,28 +175,30 @@ async function serve(app) {
         assert.strictEqual(cost('png'), 5);
         assert.strictEqual(cost('avif'), 8, 'AVIF encoding weighs more');
         assert.strictEqual(cost('merge'), 20);
-        // tools-job anonymous: a bucket of 30 refilled at 60 a minute.
-        for (let i = 0; i < 3; i++) assert.ok(q.check(anon, { quotaClass: 'tools-job', cost: cost('avif') }).ok, `avif ${i + 1}`);
-        let r = q.check(anon, { quotaClass: 'tools-job', cost: cost('png') });
+        // tools-job anonymous: a bucket of 30 refilled at 60 a minute. check() is async since the day
+        // allowance and the minute/burst buckets became shared (Valkey, plan T8 decision 4).
+        for (let i = 0; i < 3; i++) assert.ok((await q.check(anon, { quotaClass: 'tools-job', cost: cost('avif') })).ok, `avif ${i + 1}`);
+        let r = await q.check(anon, { quotaClass: 'tools-job', cost: cost('png') });
         assert.ok(r.ok, 'png: 24 + 5 = 29 of 30');
         assert.strictEqual(r.limit, 30);
         assert.strictEqual(r.remaining, 1);
-        r = q.check(anon, { quotaClass: 'tools-job', cost: cost('png') });
+        r = await q.check(anon, { quotaClass: 'tools-job', cost: cost('png') });
         assert.strictEqual(r.ok, false, 'the next png does not fit');
         assert.strictEqual(r.binding, 'minute');
         assert.strictEqual(r.retryAfter, 4, 'four more units at one a second');
         clock += 4000;
-        assert.ok(q.check(anon, { quotaClass: 'tools-job', cost: cost('png') }).ok, 'refilled');
+        assert.ok((await q.check(anon, { quotaClass: 'tools-job', cost: cost('png') })).ok, 'refilled');
         // Tiers: a signed-in person has four times the bucket, a service forty.
         const user = { tier: 'user', key: 'user:x', ipKey: 'ip:a' };
-        let n = 0; while (q.check(user, { quotaClass: 'tools-job', cost: 5 }).ok) n++;
+        let n = 0; while ((await q.check(user, { quotaClass: 'tools-job', cost: 5 })).ok) n++;
         assert.strictEqual(n, 24, 'user burst 120 / 5');
         // Sessions from one address share SESSION_IP_SHARE × one session's allowance: dropping the cookie is no reset.
         const sessions = [1, 2, 3, 4].map(i => ({ tier: 'session', key: `session:${i}`, ipKey: 'ip:nat' }));
-        const spent = sessions.map(sess => { let k = 0; while (q.check(sess, { quotaClass: 'tools-job', cost: 5 }).ok) k++; return k; });
+        const spent = [];
+        for (const sess of sessions) { let k = 0; while ((await q.check(sess, { quotaClass: 'tools-job', cost: 5 })).ok) k++; spent.push(k); }
         assert.deepStrictEqual(spent, [9, 9, 9, 0], 'three sessions use the address allowance, a fourth cookie gets nothing more');
         // A run costing more than the whole bucket still runs when the bucket is full.
-        assert.ok(q.check({ tier: 'anonymous', key: 'ip:big', ipKey: 'ip:big' }, { quotaClass: 'tools-download', cost: 500 }).ok);
+        assert.ok((await q.check({ tier: 'anonymous', key: 'ip:big', ipKey: 'ip:big' }, { quotaClass: 'tools-download', cost: 500 })).ok);
     }
 
     // ── Report vs enforce; headers and problem+json; the metric; the challenge hook ──
@@ -237,32 +274,52 @@ async function serve(app) {
         } finally { await s.close(); g.close(); }
     }
 
-    // ── Day allowances survive a restart (guard.db) ──
+    // ── One Valkey, two processes: one shared day allowance and bucket (plan T8 decision 4) ──
+    // (Replaces the old "day allowances survive a restart" test: the allowance no longer lives in a
+    // per-app guard.db, it lives in Valkey, so the invariant to test is two processes against one store.)
     {
-        const dataDir = tmp();
-        const env = { TOOLS_GUARD: 'enforce', TOOLS_GUARD_LIMITS: JSON.stringify({ 'tools-fetch': { anonymous: { perMinute: 600, burst: 600, perDay: 10 } } }) };
+        const valkey = fakeValkey();
+        const env = { TOOLS_GUARD: 'enforce', TOOLS_GUARD_LIMITS: JSON.stringify({
+            'tools-fetch': { anonymous: { perMinute: 600, burst: 600, perDay: 10 } },
+            'tools-tiny': { anonymous: { perMinute: 60, burst: 4, perDay: 1000 } },
+        }) };
         const req = { ip: '198.51.100.20', headers: {}, cookies: {} };
-        let g = makeGuard({ dataDir, env });
-        const caller1 = g.resolveCaller(req);
-        assert.ok(g.quotas.check(caller1, { quotaClass: 'tools-fetch', cost: 4 }).ok);
-        assert.ok(g.quotas.check(caller1, { quotaClass: 'tools-fetch', cost: 4 }).ok);
-        g.close();
-        g = makeGuard({ dataDir, env });
-        const caller2 = g.resolveCaller(req);
-        assert.strictEqual(caller2.ipKey, caller1.ipKey, "today's salt is kept, so the same address is the same key after a restart");
-        const r = g.quotas.check(caller2, { quotaClass: 'tools-fetch', cost: 4 });
-        assert.strictEqual(r.ok, false, '8 of 10 used before the restart: 4 more do not fit');
+        const a = makeGuard({ valkey, env });
+        const b = makeGuard({ valkey, env });
+        await a.store.warm(); await b.store.warm();
+        const ca = a.resolveCaller(req);
+        const cb = b.resolveCaller(req);
+        assert.strictEqual(cb.ipKey, ca.ipKey, "one salt in Valkey: the same address is the same key in both processes");
+        assert.ok((await a.quotas.check(ca, { quotaClass: 'tools-fetch', cost: 4 })).ok);
+        assert.ok((await a.quotas.check(ca, { quotaClass: 'tools-fetch', cost: 4 })).ok, 'process A has spent 8 of the day allowance');
+        const r = await b.quotas.check(cb, { quotaClass: 'tools-fetch', cost: 4 });
+        assert.strictEqual(r.ok, false, "process B sees A's spend: 4 more do not fit");
         assert.strictEqual(r.binding, 'day');
-        assert.ok(g.quotas.check(caller2, { quotaClass: 'tools-fetch', cost: 2 }).ok, 'the last 2 still do');
+        assert.ok((await b.quotas.check(cb, { quotaClass: 'tools-fetch', cost: 2 })).ok, 'the last 2 still do');
+        // The minute/burst bucket is shared too: A drains it, B is refused on the minute leg.
+        for (let i = 0; i < 4; i++) assert.ok((await a.quotas.check(ca, { quotaClass: 'tools-tiny', cost: 1 })).ok, `tiny ${i + 1}`);
+        const rm = await b.quotas.check(cb, { quotaClass: 'tools-tiny', cost: 1 });
+        assert.strictEqual(rm.ok, false, "process B sees A's bucket: the minute leg is shared");
+        assert.strictEqual(rm.binding, 'minute');
+        a.close(); b.close();
+    }
+
+    // ── A Valkey outage degrades to this process's own counters: a throttle, never a failure ──
+    {
+        const valkey = fakeValkey({ down: true });
+        const env = { TOOLS_GUARD: 'enforce', TOOLS_GUARD_LIMITS: JSON.stringify({ 'tools-fetch': { anonymous: { perMinute: 600, burst: 600, perDay: 2 } } }) };
+        const g = makeGuard({ valkey, env });
+        const c = g.resolveCaller({ ip: '198.51.100.30', headers: {}, cookies: {} });
+        let ok = 0;
+        for (let i = 0; i < 6; i++) if ((await g.quotas.check(c, { quotaClass: 'tools-fetch', cost: 1 })).ok) ok++;
+        assert.strictEqual(ok, 2, 'the day allowance still holds in this process: the guard never fails open and never fails every request');
         g.close();
-        fs.rmSync(dataDir, { recursive: true, force: true });
     }
 
     // ── The abuse log: no raw address anywhere, 30 days ──
     {
-        const dataDir = tmp();
         let clock = now0;
-        const g = makeGuard({ dataDir, now: () => clock, mode: 'enforce' });
+        const g = makeGuard({ now: () => clock, mode: 'enforce' });
         const RAW = '203.0.113.201';
         const req = { ip: RAW, headers: {}, cookies: {} };
         const res = { headersSent: false, statusCode: 200, setHeader() {}, end() {} };
@@ -274,15 +331,12 @@ async function serve(app) {
         assert.strictEqual(rows[0].count, 3, 'repeats within a minute are one row with a count');
         assert.match(rows[0].ip_hash, /^[0-9a-f]{32}$/);
         assert.notStrictEqual(rows[0].ip_hash, rows[1].ip_hash, 'the salt rotates daily: yesterday\'s hash no longer matches');
-        g.store.db.pragma('wal_checkpoint(TRUNCATE)');
-        for (const f of fs.readdirSync(dataDir)) assert.ok(!fs.readFileSync(path.join(dataDir, f)).includes(RAW), `${f} holds no raw address`);
-        assert.strictEqual(g.store.db.prepare('SELECT COUNT(*) AS n FROM guard_salt').get().n, 1, 'only today\'s salt is kept');
+        assert.ok(!JSON.stringify(rows).includes(RAW), 'the log keeps no raw address');
         clock += 6 * 24 * 3600 * 1000;   // the first row is now 31 days old, the second 6
-        g.prune();
+        await g.prune();
         rows = g.store.abuseRows();
         assert.deepStrictEqual(rows.map(r => r.reason), ['sniff'], 'rows older than 30 days are pruned');
         g.close();
-        fs.rmSync(dataDir, { recursive: true, force: true });
     }
 
     // ── Upload sniffing: the bytes, not the name or the declared type ──
@@ -514,5 +568,5 @@ async function serve(app) {
         system.stop(); db.close(); fs.rmSync(dataDir, { recursive: true, force: true });
     }
 
-    console.log('guard: callers (/64, one loopback hop, services by token, aud-checked users, sessions, sandbox), bucket math + cost, session sharing, report vs enforce, headers + problem+json, day counters across restarts, sniffing, target throttle, port cap, abuse log + prune + metric, semaphore, job bounds (queue, disk, per address), challenge hook, Origin check (CSRF): all checks passed');
+    console.log('guard: callers (/64, one loopback hop, services by token, aud-checked users, sessions, sandbox), bucket math + cost, session sharing, report vs enforce, headers + problem+json, two processes one Valkey quota + outage fallback, sniffing, target throttle, port cap, abuse log + prune + metric, semaphore, job bounds (queue, disk, per address), challenge hook, Origin check (CSRF): all checks passed');
 })().catch((err) => { console.error(err); process.exit(1); });
