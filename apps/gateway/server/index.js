@@ -402,17 +402,19 @@ function sendTool(req, res, file) {
 }
 
 // ── Internal analytics (Network admin + ranking) ─────────────
-// The gateway keeps no analytics of its own; it adds up the satellites'. Internal key + loopback only.
+// The gateway keeps no analytics of its own; it adds up the satellites'. Loopback only, with a Network
+// service token (capability tools.analytics.read) or the internal key (apps/_shared/internal-token.js).
 {
-    const { requireInternal } = require('../../_shared/internal-auth');
-    // After the internal key, before the fan-out: per-actor limit (actorLimits.admin, 30 a minute).
-    app.get('/api/internal/analytics', requireInternal, actorLimits.admin, async (req, res) => {
+    const { requireInternalAccess } = require('../../_shared/internal-token');
+    // After the token-or-key check, before the fan-out: per-actor limit (actorLimits.admin, 30 a minute).
+    app.get('/api/internal/analytics', requireInternalAccess({ keys: guard.keys, issuer: guard.issuer, audience: guard.audience, contracts: require('openvibe-contracts') }), actorLimits.admin, async (req, res) => {
         const days = Math.min(parseInt(req.query.days, 10) || 30, 365);
         const hours = req.query.hours ? Math.min(parseInt(req.query.hours, 10), 8760) : null;
-        const key = String(req.headers['x-internal-key']);
+        // The same proof the caller used goes to the satellites: the Bearer with a token, the key otherwise.
+        const forward = req.ovInternal.via === 'token' ? { Authorization: req.ovInternal.bearer } : { 'X-Internal-Key': String(req.headers['x-internal-key']) };
         const parts = await Promise.all(Object.entries(SATELLITES).map(async ([name, port]) => {
             try {
-                const r = await fetch(`http://127.0.0.1:${port}/api/internal/analytics?days=${days}${hours ? '&hours=' + hours : ''}`, { headers: { 'X-Internal-Key': key }, signal: AbortSignal.timeout(5000) });
+                const r = await fetch(`http://127.0.0.1:${port}/api/internal/analytics?days=${days}${hours ? '&hours=' + hours : ''}`, { headers: forward, signal: AbortSignal.timeout(5000) });
                 const j = r.ok ? await r.json() : null;
                 return j && j.analytics ? { name, analytics: j.analytics } : null;
             } catch { return null; }

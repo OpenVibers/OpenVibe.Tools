@@ -37,7 +37,7 @@ const sdk = require('openvibe-sdk');
 // ── Analytics ────────────────────────────────────────────────
 const Database = require('better-sqlite3');
 const { AnalyticsTracker } = require('openvibe-shared/analytics'); // ADR-021: no IP/user id, route templates, raw rows pruned after 30 days, Sec-GPC/DNT not recorded
-const { internalOk } = require('../../_shared/internal-auth');
+const { requireInternalAccess } = require('../../_shared/internal-token');
 const analyticsDbPath = path.resolve(__dirname, '..', config.dataDir, 'analytics.db');
 fs.mkdirSync(path.dirname(analyticsDbPath), { recursive: true });
 const analyticsDb = new Database(analyticsDbPath);
@@ -348,13 +348,12 @@ app.get('/api/preview/:id', (req, res) => {
 });
 
 // ── Internal Analytics API ────────────────────────────────────
-app.get('/api/internal/analytics', (req, res) => {
-    if (!internalOk(req)) return res.status(404).json({ error: 'Not found' });
+const internalAccess = requireInternalAccess({ keys: guard.keys, issuer: guard.issuer, audience: guard.audience, contracts });
+app.get('/api/internal/analytics', internalAccess, (req, res) => {
     try { const d = Math.min(parseInt(req.query.days) || 30, 365); const h = req.query.hours ? Math.min(parseInt(req.query.hours), 8760) : null; res.json({ ok: true, analytics: analytics.getStats({ days: d, hours: h }) }); }
     catch (err) { res.status(500).json({ ok: false, error: err.message }); }
 });
-app.get('/api/internal/analytics/bots', (req, res) => {
-    if (!internalOk(req)) return res.status(404).json({ error: 'Not found' });
+app.get('/api/internal/analytics/bots', internalAccess, (req, res) => {
     try { res.json({ ok: true, bots: analytics.getBotAnalysis(Math.min(parseInt(req.query.days) || 30, 365)) }); }
     catch (err) { res.status(500).json({ ok: false, error: err.message }); }
 });

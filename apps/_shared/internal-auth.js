@@ -7,16 +7,19 @@
 //      X-Real-IP, service-to-service calls on loopback never do.
 const crypto = require('crypto');
 
+/** The request came straight from loopback, not through the public proxy (nginx adds the headers). */
+function loopbackOnly(req) {
+    if (req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.headers['cf-connecting-ip']) return false;
+    const ip = String(req.socket && req.socket.remoteAddress || '');
+    return /^(::1|::ffff:127\.|127\.)/.test(ip);
+}
+
 function internalOk(req) {
     const want = String(process.env.INTERNAL_API_KEY || process.env.OV_INTERNAL_KEY || '');
     const got = String(req.headers['x-internal-key'] || '');
     if (want.length < 16 || got.length !== want.length) return false;
-    if (req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.headers['cf-connecting-ip']) return false;
-    const ip = String(req.socket && req.socket.remoteAddress || '');
-    if (!/^(::1|::ffff:127\.|127\.)/.test(ip)) return false;
+    if (!loopbackOnly(req)) return false;
     return crypto.timingSafeEqual(Buffer.from(got), Buffer.from(want));
 }
 
-function requireInternal(req, res, next) { return internalOk(req) ? next() : res.status(404).json({ error: 'Not found' }); }
-
-module.exports = { internalOk, requireInternal };
+module.exports = { internalOk, loopbackOnly };
