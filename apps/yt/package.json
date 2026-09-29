@@ -19,7 +19,7 @@
     "helmet": "^8.1.0",
     "better-sqlite3": "^11.0.0",
     "openvibe-sdk": "https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.12.0",
-    "openvibe-shared": "https://codeload.github.com/OpenVibers/OpenVibe.Shared/tar.gz/refs/tags/v1.29.1",
+    "openvibe-shared": "https://codeload.github.com/OpenVibers/OpenVibe.Shared/tar.gz/refs/tags/v1.29.2",
     "jsonwebtoken": "^9.0.2",
     "uuid": "^11.1.0"
   }
