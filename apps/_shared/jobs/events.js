@@ -18,7 +18,8 @@
 // output data or a browser session: a session-owned job has owner null.
 //
 // Inert unless EVENTS_URL is set (and OV_OAUTH_CLIENT_SECRET, for the tools service token with
-// events.event.publish on openvibe.events): no outbox table, nothing written, nothing relayed.
+// events.event.publish on openvibe.events): nothing written, nothing relayed. The event_outbox table is
+// migrations/0004_event_outbox.sql (run as the owner), never created at runtime.
 // EVENTS_PUBLISH=off turns it off with EVENTS_URL set.
 // ═══════════════════════════════════════════════════════════════
 
@@ -165,8 +166,10 @@ function createJobEvents({ contracts, service, outbox = null, referenceCount = a
  *   OV_NETWORK_INTERNAL_URL    token endpoint host (default http://127.0.0.1:4000)
  *   EVENTS_RELAY_INTERVAL_MS   relay poll (default 2000)
  *
- * The outbox table is created at boot (createPgOutbox.ensureSchema); outbox.ready is that promise, for a
- * test (or a caller) that must know the table exists.
+ * The event_outbox table is an owner migration (migrations/0004_event_outbox.sql, DATABASE_DIRECT_URL):
+ * the runtime role (DATABASE_URL) may have no DDL rights, so createPgOutbox.ensureSchema is never called
+ * here. outbox.ready checks the table is there (after the app's migrations) and rejects, naming the
+ * migration, when it is not; index.js logs that.
  *
  * @param {object} o
  * @param {object} o.db       openvibe-sdk/db handle — the outbox table lives beside tool_jobs
@@ -203,7 +206,9 @@ function outboxFromEnv({ db, sdk, env = process.env, fetch: fetchImpl, log = con
         },
     });
     outbox.url = url;
-    outbox.ready = outbox.ensureSchema();
+    outbox.ready = Promise.resolve(db.maybe("SELECT to_regclass('event_outbox') IS NOT NULL AS ok")).then((r) => {
+        if (!r || !r.ok) throw new Error('the event_outbox table is missing: run migrations/0004_event_outbox.sql as the owner (DATABASE_DIRECT_URL)');
+    });
     return { outbox, reason: null };
 }
 

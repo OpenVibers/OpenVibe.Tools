@@ -156,9 +156,25 @@ const settled = (s, id, state) => until(async () => { const r = await s.system.g
             await system.start();
             const { job } = await system.submit({ owner: `user:${USER}`, type: 'test.upper', input: { text: 'x' } });
             await until(async () => (await system.get(job.id)).state === 'succeeded', 'inert job');
-            assert.strictEqual((await db.prepare("SELECT COUNT(*) AS n FROM information_schema.tables WHERE table_name = 'event_outbox'").get()).n, 0, 'no outbox table without EVENTS_URL');
+            assert.strictEqual(Number((await db.prepare('SELECT COUNT(*) AS n FROM event_outbox').get()).n), 0, 'nothing in the outbox without EVENTS_URL (the table itself is a migration)');
             assert.deepStrictEqual((await system.stats()).events, { enabled: false });
             system.stop();
+        }
+
+        // ── The outbox table is an owner migration, never runtime DDL ──
+        {
+            const db = await testDb(path.join(root, 'schema-db'));
+            let ddl = 0;
+            const spy = { ...sdk, events: { ...sdk.events, createPgOutbox: (d, o) => { const ob = sdk.events.createPgOutbox(d, o); ob.ensureSchema = async () => { ddl++; }; return ob; } } };
+            const { outbox } = outboxFromEnv({ db, sdk: spy, env: ENV, fetch: fakeNetwork().fetch, log: silent });
+            await outbox.ready;
+            assert.strictEqual(ddl, 0, 'the runtime role never creates the outbox table');
+            assert.ok(await db.maybe("SELECT to_regclass('event_outbox') AS t"), 'migrations/0004_event_outbox.sql created it');
+            const missing = Object.create(db);
+            missing.maybe = async () => ({ ok: false });
+            const bare = outboxFromEnv({ db: missing, sdk: spy, env: ENV, fetch: fakeNetwork().fetch, log: silent }).outbox;
+            await assert.rejects(bare.ready, /0004_event_outbox\.sql/, 'a missing table is reported, naming the migration');
+            assert.strictEqual(ddl, 0);
         }
 
         const net = fakeNetwork();

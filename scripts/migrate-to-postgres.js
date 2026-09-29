@@ -10,8 +10,8 @@
 //
 // Every app's data/<guard|jobs|analytics>.db is imported into the shared tables, tagged with its app id
 // (`app` = the app name; the analytics tables already carry `service`). guard_salt and guard_day are not
-// copied (Valkey, decision 4); the event outbox and token_revocations are left behind (the SDK re-creates
-// its own tables at boot and a revocation cutoff is re-derivable). The SQLite files are opened read-only.
+// copied (Valkey, decision 4); the event outbox's rows and token_revocations are left behind (the tables are
+// migrations 0004 and 0003; an undelivered SQLite outbox row is not replayed, and a revocation cutoff is re-derivable). The SQLite files are opened read-only.
 //
 // It relies on the newer openvibe-sdk/db (0.25+) and better-sqlite3; OV_SDK_DIR points at an openvibe-sdk
 // checkout, else the gateway's node_modules is used. better-sqlite3 is scripts/' own dependency (no app

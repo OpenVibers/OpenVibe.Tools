@@ -99,7 +99,7 @@ function setupJobs(o) {
     // tools.job.* → OpenVibe.Events through the `event_outbox` table in this same database (inert without EVENTS_URL).
     const events = outboxFromEnv({ db, sdk: o.sdk, log });
     if (events.reason && process.env.EVENTS_URL) console.warn(`[Jobs] ${o.service}: job events are not published — ${events.reason}`);
-    if (events.outbox) events.outbox.ready.catch((err) => log.error(`[Jobs] ${o.service}: could not create the event outbox:`, err.message));
+    if (events.outbox) events.outbox.ready.catch((err) => log.error(`[Jobs] ${o.service}: job events cannot be written:`, err.message));
     const system = createJobSystem({
         db, contracts: o.contracts, service: o.service, dataDir: o.dataDir,
         concurrency: envInt(`TOOLS_JOBS_CONCURRENCY_${o.service.toUpperCase()}`, envInt('TOOLS_JOBS_CONCURRENCY', 2)),
