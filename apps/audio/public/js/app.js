@@ -432,31 +432,12 @@
         processing.style.display = '';
 
         // Jobs: the work is accepted, followed live (ffmpeg's progress) and survives a reload.
-        if (window.OVJobs) {
-            const input = {};
-            for (const [k, v] of formData.entries()) if (k !== 'file' && k !== 'files') input[k] = v;
-            try {
-                const job = await OVJobs.submit({ type: 'audio.process', input, files, fileField: isMerge() ? 'files' : 'file' });
-                OVJobs.remember(job.id);
-                followJob(job);
-            } catch (err) {
-                showToast(err.message, 'error');
-                resetUI();
-            }
-            return;
-        }
-
-        // Without the jobs helper: the synchronous endpoint, as before.
+        const input = {};
+        for (const [k, v] of formData.entries()) if (k !== 'file' && k !== 'files') input[k] = v;
         try {
-            const res = await fetch(isMerge() ? '/api/process/multi' : '/api/process', { method: 'POST', body: formData });
-            const data = await res.json();
-
-            if (!res.ok) {
-                throw new Error(data.error || `Server error (${res.status})`);
-            }
-
-            resultId = data.download.id;
-            showResult(data);
+            const job = await OVJobs.submit({ type: 'audio.process', input, files, fileField: isMerge() ? 'files' : 'file' });
+            OVJobs.remember(job.id);
+            followJob(job);
         } catch (err) {
             showToast(err.message, 'error');
             resetUI();

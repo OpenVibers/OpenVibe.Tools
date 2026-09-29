@@ -374,39 +374,14 @@
         }
 
         // Jobs: the work is accepted, followed live and survives a reload (?job=<id> in the address).
-        if (window.OVJobs) {
-            const input = {};
-            for (const [k, v] of formData.entries()) if (k !== 'file') input[k] = v;
-            try {
-                const job = await OVJobs.submit({ type: 'img.process', input, files: [selectedFile] });
-                OVJobs.remember(job.id);
-                followJob(job);
-            } catch (err) {
-                failProcessing(err.message);
-            }
-            return;
-        }
-
-        // Without the jobs helper: the synchronous endpoint, as before.
+        const input = {};
+        for (const [k, v] of formData.entries()) if (k !== 'file') input[k] = v;
         try {
-            const token = getCookie('ov_token') || localStorage.getItem('ov_token');
-            const headers = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            const res = await fetch('/api/process', { method: 'POST', body: formData, headers });
-
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({ error: 'Processing failed' }));
-                throw new Error(err.error || `Server error: ${res.status}`);
-            }
-
-            const data = await res.json();
-            showResult(data);
+            const job = await OVJobs.submit({ type: 'img.process', input, files: [selectedFile] });
+            OVJobs.remember(job.id);
+            followJob(job);
         } catch (err) {
-            processingEl.style.display = 'none';
-            optionsPanel.style.display = '';
-            processBtn.disabled = false;
-            alert(`Error: ${err.message}`);
+            failProcessing(err.message);
         }
     }
 

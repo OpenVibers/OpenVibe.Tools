@@ -460,46 +460,14 @@
         addToolOptions(formData);
 
         // Jobs: the work is accepted, followed live and survives a reload (?job=<id> in the address).
-        if (window.OVJobs) {
-            const input = {};
-            for (const [k, v] of formData.entries()) if (k !== 'file' && k !== 'files') input[k] = v;
-            try {
-                const job = await OVJobs.submit({ type: 'docs.process', input, files: isMulti ? selectedFiles : [selectedFiles[0]], fileField: isMulti ? 'files' : 'file' });
-                OVJobs.remember(job.id);
-                followJob(job);
-            } catch (err) {
-                failProcessing(err.message);
-            }
-            return;
-        }
-
-        // Without the jobs helper: the synchronous endpoints, as before.
+        const input = {};
+        for (const [k, v] of formData.entries()) if (k !== 'file' && k !== 'files') input[k] = v;
         try {
-            const token = getCookie('ov_token') || localStorage.getItem('ov_token');
-            const headers = {};
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-
-            const endpoint = isMulti ? '/api/process/multi' : '/api/process';
-            const res = await fetch(endpoint, { method: 'POST', body: formData, headers });
-
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({ error: 'Processing failed' }));
-                throw new Error(err.error || `Server error: ${res.status}`);
-            }
-
-            const data = await res.json();
-
-            // Handle view-only results (metadata)
-            if (data.viewOnly) {
-                showMetadataResult(data);
-            } else {
-                showResult(data);
-            }
+            const job = await OVJobs.submit({ type: 'docs.process', input, files: isMulti ? selectedFiles : [selectedFiles[0]], fileField: isMulti ? 'files' : 'file' });
+            OVJobs.remember(job.id);
+            followJob(job);
         } catch (err) {
-            processingEl.style.display = 'none';
-            optionsPanel.style.display = '';
-            processBtn.disabled = false;
-            alert(`Error: ${err.message}`);
+            failProcessing(err.message);
         }
     }
 

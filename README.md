@@ -624,3 +624,19 @@ when the gateway's `/api/ready` or `/release.json` does not come up with every u
 - Nginx: satellites have specific `server_name` blocks; the gateway's
   wildcard `*.openvibe.tools` block catches everything else. TLS via
   `/etc/letsencrypt/live/openvibe.tools/`.
+
+## Migration to PostgreSQL + Valkey (plan T8)
+
+All eight apps move from `better-sqlite3` to **one `tools` PostgreSQL database** and to **Valkey** for the
+guard's throttle state. The schema is in `migrations/0001_tools.sql` (job store, `guard_abuse`) and
+`migrations/0002_analytics.sql` (request analytics, the DDL of `openvibe-shared/analytics/pg.js`); the event
+outbox and the revocation store create their own tables at boot. `scripts/migrate-to-postgres.js` imports
+every `apps/*/data/{guard,jobs,analytics}.db` into that one database (each file's rows tagged with its app):
+run it with `--pglite` for an in-memory rehearsal, `--dry-run --url <scratch>` for a scratch database, or
+with `DATABASE_DIRECT_URL` set for the cutover; it prints a per-table count and checksum report.
+
+After the move the apps read `DATABASE_URL` / `DATABASE_DIRECT_URL` (PostgreSQL, via PgBouncer) and
+`VALKEY_URL` (Valkey); `guard_salt`, `guard_day` and the minute/burst buckets live in Valkey (a throttle,
+never authoritative), while `guard_abuse`, the job store and the analytics tables stay in PostgreSQL.
+`TOOLS_GUARD` (default `report`) and its meaning are unchanged. Until the cutover lands the apps still run
+on `better-sqlite3` exactly as described above.
