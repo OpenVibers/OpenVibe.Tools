@@ -327,14 +327,14 @@ function createRunApi(o) {
         const notFound = () => new Refusal(404, 'tools.run.file_not_found', `${ref.media_id || `${ref.job_id} file ${ref.index}`} is not a file you can read here: a result of one of your own Tools jobs that has not expired.`);
         let row = null, index = ref.index;
         if (ref.job_id) {
-            row = system.get(ref.job_id);
+            row = await system.get(ref.job_id);
             if (!row && o.jobs.fetchSibling) {
                 const got = await o.jobs.fetchSibling(ref, req, dir);
                 if (got) return got;
                 throw notFound();
             }
         } else {
-            const hit = system.findResultMedia(owner, ref.media_id);
+            const hit = await system.findResultMedia(owner, ref.media_id);
             if (hit) { row = hit.row; index = hit.index; }
         }
         if (!row || row.owner !== owner || row.state !== 'succeeded') throw notFound();
@@ -352,23 +352,22 @@ function createRunApi(o) {
         throw notFound();
     }
 
-    function waitFor(system, id, ms, res) {
-        return new Promise((resolve) => {
-            const row = system.get(id);
-            if (!row || TERMINAL.has(row.state) || ms <= 0) return resolve();
+    async function waitFor(system, id, ms, res) {
+        const row = await system.get(id);
+        if (!row || TERMINAL.has(row.state) || ms <= 0) return;
+        await new Promise((resolve) => {
             let done = false;
             const finish = () => { if (done) return; done = true; clearTimeout(timer); off(); res.removeListener('close', finish); resolve(); };
             const off = system.subscribe(id, (e) => { if (TERMINAL.has(e.data.state)) finish(); });
             const timer = setTimeout(finish, ms);
             res.on('close', finish);
             // It may have finished between the first read and the subscription.
-            const again = system.get(id);
-            if (!again || TERMINAL.has(again.state)) finish();
+            system.get(id).then((again) => { if (!again || TERMINAL.has(again.state)) finish(); }).catch(() => {});
         });
     }
 
-    function runView(system, d, row) {
-        const job = system.view(row);
+    async function runView(system, d, row) {
+        const job = await system.view(row);
         const took = row.finished_at ? Math.max(0, row.finished_at - row.created_at) : 0;
         if (row.state === 'succeeded') return { state: 'succeeded', tool: d.id, result: { data: (job.result && job.result.data) || {}, files: (job.result && job.result.files) || [] }, took_ms: took, job };
         if (row.state === 'failed' || row.state === 'cancelled') return { state: row.state, tool: d.id, error: job.error || contracts.http.problem(500, 'tools.job.failed', { detail: 'The job failed' }), took_ms: took, job };
@@ -400,9 +399,9 @@ function createRunApi(o) {
             // The bytes against files.accept (hard; a misleading name or type is corrected).
             if (spec && !guard.checkFiles(req, res, files, spec.accept, d.id)) return undefined;
             // Sessions from one address share a bound on unfinished jobs; the store's queue and disk bounds.
-            const full = system.addressFull ? system.addressFull(owner, who.ipKey) : null;
+            const full = system.addressFull ? await system.addressFull(owner, who.ipKey) : null;
             if (full && guard.refuse(req, res, { status: 429, code: 'tools.job.too_many_active', reason: 'jobs.address', tool: d.id, retryAfter: 30, detail: `At most ${full.limit} unfinished jobs from one address at a time; wait for one to finish.`, extra: { scope: 'address' } })) return undefined;
-            const busy = system.busy ? system.busy() : null;
+            const busy = system.busy ? await system.busy() : null;
             if (busy && !guard.jobsBusy(req, res, busy, d.id)) return undefined;
             let row, replayed;
             try {
@@ -421,8 +420,8 @@ function createRunApi(o) {
             }
             files.length = 0;   // the job owns them now
             if (wait > 0) await waitFor(system, row.id, wait, res);
-            const fresh = system.get(row.id) || row;
-            const body = runView(system, d, fresh);
+            const fresh = (await system.get(row.id)) || row;
+            const body = await runView(system, d, fresh);
             const headers = replayed ? { 'Idempotent-Replayed': 'true' } : {};
             if (body.location) headers.Location = body.location;
             return send(res, replayed || !body.location ? 200 : 202, body, headers);

@@ -3,9 +3,9 @@
 // The Tools guard (apps/_shared/guard): anti-abuse for the gateway and every satellite, driven by
 // the tools' descriptors (tools.tool@1: quotaClass, cost, auth, files.accept, limits) and the host-wide
 // numbers in ./limits.js. Like the rest of apps/_shared it has no dependencies: the app passes its
-// better-sqlite3 class, openvibe-contracts (when it has it) and its descriptor specs.
+// openvibe-sdk/db handle, its Valkey and openvibe-contracts (when it has it) and its descriptor specs.
 //
-//   const guard = createGuard({ app: 'img', dataDir, Database, contracts, specs, networkUrl, … });
+//   const guard = createGuard({ app: 'img', dataDir, db, valkey, contracts, specs, networkUrl, … });
 //   app.set('trust proxy', TRUST_PROXY);                 // ./ip.js: one loopback hop
 //   app.use(guard.identify);                             // req.user (Network sign-in, aud checked)
 //   app.use('/api/', legacyLimiter, guard.apiQuota);     // every /api/ request (tools-api)
@@ -82,8 +82,9 @@ function discardUploads(req) {
 /**
  * @param {object} o
  * @param {string} o.app                  'gateway' | 'img' | … (logs, metrics)
- * @param {string} [o.dataDir]            guard.db goes here (with o.Database)
- * @param {Function} [o.Database]         require('better-sqlite3'); without it everything stays in memory
+ * @param {string} [o.dataDir]            where the app keeps its files (job inputs/results)
+ * @param {object} [o.db]                 openvibe-sdk/db handle (guard_abuse); without it everything stays in memory
+ * @param {object} [o.valkey]             the shared Valkey (day counters, salt, buckets)
  * @param {object} [o.contracts]          openvibe-contracts, when the app has it
  * @param {object[]} [o.specs]            the app's descriptor specs (server/descriptors.js SPECS)
  * @param {object} [o.keys]               { get(), ensure() } — or networkUrl/networkInternalUrl/publicKeyFiles

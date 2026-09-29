@@ -34,7 +34,6 @@ const contracts = require('openvibe-contracts');
 const sdk = require('openvibe-sdk');
 
 // ── Analytics ────────────────────────────────────────────────
-const Database = require('better-sqlite3');
 const { AnalyticsTrackerPg } = require('openvibe-shared/analytics/pg'); // ADR-021: no IP/user id, route templates, raw rows pruned after 30 days, Sec-GPC/DNT not recorded
 const { requireInternalAccess } = require('../../_shared/internal-token');
 
@@ -72,9 +71,8 @@ const obs = observe({
     service: 'tools-audio', release: release.release,
     checks: [
         ready.postgres('tools_db', () => toolsDb.db, { description: 'the one tools database (guard_abuse, jobs, analytics, revocations)' }),
-        ready.sqlite('jobs_db', () => jobs.db, { sql: 'SELECT COUNT(*) AS n FROM tool_jobs', description: 'job store (jobs.db)' }),
         ready.jobRuntime('job_runtime', () => jobs),
-        ready.writableDir('data_dir', path.resolve(__dirname, '..', config.dataDir), { description: 'jobs.db and job inputs/results' }),
+        ready.writableDir('data_dir', path.resolve(__dirname, '..', config.dataDir), { description: 'job inputs/results' }),
         ready.writableDir('uploads_dir', path.resolve(config.uploadsDir), { description: 'synchronous uploads' }),
         ready.writableDir('output_dir', path.resolve(config.outputDir), { description: 'synchronous results' }),
         ready.networkKey('network_key', guard.keys.get, { description: 'verifies signed-in users and service tokens on the job API; anonymous use works without it' }),
@@ -160,9 +158,9 @@ app.use((req, _res, next) => {
 // ── API Routes ───────────────────────────────────────────────
 
 // Health check
-app.get('/api/health', (_req, res) => {
+app.get('/api/health', async (_req, res) => {
     const stats = retention.getStats();
-    res.json({ status: 'ok', service: 'openvibe-audio', version: '1.0.0', files: stats, jobs: jobs.stats() });
+    res.json({ status: 'ok', service: 'openvibe-audio', version: '1.0.0', files: stats, jobs: await jobs.stats() });
 });
 
 // Domain context (frontend calls this on load to get branding). It also starts this browser's session
@@ -204,11 +202,11 @@ app.post('/api/probe', guard.originCheck(), burstLimiter, processLimiter, guard.
 });
 
 // ── Jobs (/api/v1/jobs) ──────────────────────────────────────
-// The audio operations, asynchronous and durable: accepted into data/jobs.db, followed over SSE
+// The audio operations, asynchronous and durable: accepted into the shared `tools` database, followed over SSE
 // (ffmpeg's own progress), cancellable (ffmpeg is killed), reattachable by id after a reload or a
 // restart (apps/_shared/jobs).
 const jobs = jobsRuntime.setupJobs({
-    app, service: 'audio', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts, sdk,
+    app, service: 'audio', dataDir: path.resolve(__dirname, '..', config.dataDir), db: toolsDb.db, contracts, sdk,
     getPublicKey: guard.keys.get, issuer: config.networkUrl, guard,
     define: defineJobs,
     receive: uploadAny,
@@ -341,7 +339,7 @@ require('../../_shared/graceful').gracefulStop({
     close: [
         () => require('../../_shared/usage').stopRecorder(800),
         () => analytics.destroy(),
-        () => jobs.close(),   // running jobs stay 'running' in data/jobs.db; the next boot re-queues them
+        () => jobs.close(),   // running jobs stay 'running' in the tools database; the next boot re-queues them
         () => guard.close(),
         () => toolsDb.db.close(),
         () => toolsValkey && toolsValkey.close(),

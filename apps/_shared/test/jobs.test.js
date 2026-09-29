@@ -14,9 +14,9 @@ const { dep } = require('./deps');
 
 const express = dep('express');
 const cookieParser = dep('cookie-parser');
-const Database = dep('better-sqlite3');
 const contracts = dep('openvibe-contracts');
 const jobs = require('../jobs');
+const { testDb: dbFor, closeAllTestDbs: closeDbs, quiet } = require('./testdb');
 
 const ISSUER = 'https://openvibe.network';
 const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048, publicKeyEncoding: { type: 'spki', format: 'pem' }, privateKeyEncoding: { type: 'pkcs8', format: 'pem' } });
@@ -114,11 +114,11 @@ function fakeMedia() {
 }
 const fakeTokens = { authHeaders: async () => ({ Authorization: 'Bearer media-token' }), invalidate() {} };
 
-// ── A satellite: express + the job routes over one SQLite file ──
-function satellite(dir, { concurrency = 2, media = null, maxActivePerOwner = 10 } = {}) {
+// ── A satellite: express + the job routes over the shared `tools` database ──
+async function satellite(dir, { concurrency = 2, media = null, maxActivePerOwner = 10 } = {}) {
     fs.mkdirSync(dir, { recursive: true });
-    const db = new Database(path.join(dir, 'jobs.db'));
-    const system = jobs.createJobSystem({ db, contracts, service: 'test', dataDir: dir, concurrency, media, maxActivePerOwner, progressThrottleMs: 0, log: { log() {}, warn() {}, error() {} } });
+    const db = await dbFor(dir);
+    const system = jobs.createJobSystem({ db, contracts, service: 'test', dataDir: dir, concurrency, media, maxActivePerOwner, progressThrottleMs: 0, log: quiet });
     define(system);
     const app = express();
     app.use(cookieParser());
@@ -128,11 +128,11 @@ function satellite(dir, { concurrency = 2, media = null, maxActivePerOwner = 10 
     const upload = multer({ dest: path.join(dir, 'tmp') });
     const resolveOwner = jobs.createOwnerResolver({ contracts, getPublicKey: () => publicKey, issuer: ISSUER, secureCookie: false });
     jobs.mountJobRoutes(app, { system, contracts, resolveOwner, receive: upload.any() });
-    system.start();
+    await system.start();
     return new Promise(resolve => {
         const server = app.listen(0, '127.0.0.1', () => resolve({
             system, db, base: `http://127.0.0.1:${server.address().port}`,
-            close: () => new Promise(r => { system.stop(); server.closeAllConnections(); server.close(() => { db.close(); r(); }); }),
+            close: () => new Promise(r => { system.stop(); server.closeAllConnections(); server.close(() => r()); }),
         }));
     });
 }
@@ -246,7 +246,7 @@ async function readSse(url, { headers = {}, stop = () => false, ms = 5000 } = {}
         assert.strictEqual((await guest1(`/api/v1/jobs/${guestJob}`)).status, 200, 'the session that made it can reattach');
         assert.strictEqual((await guest2(`/api/v1/jobs/${guestJob}`)).status, 404, 'another browser cannot');
         assert.strictEqual((await alice(`/api/v1/jobs/${guestJob}`)).status, 404, 'nor can a signed-in stranger');
-        assert.ok(s.db.prepare('SELECT owner FROM tool_jobs').all().every(x => /^(user:usr_[0-9A-Z]{26}|session:[0-9a-f]{40})$/.test(x.owner)), 'owners are canonical subjects or hashed sessions, never raw cookies');
+        assert.ok((await s.db.prepare('SELECT owner FROM tool_jobs').all()).every(x => /^(user:usr_[0-9A-Z]{26}|session:[0-9a-f]{40})$/.test(x.owner)), 'owners are canonical subjects or hashed sessions, never raw cookies');
 
         // ── SSE: events carry ids; Last-Event-ID resumes after them ──
         const all = await readSse(`${s.base}/api/v1/jobs/${first}/events`, { headers: { 'x-test-user': USER_A } });
@@ -267,6 +267,19 @@ async function readSse(url, { headers = {}, stop = () => false, ms = 5000 } = {}
         const live = await streaming;
         assert.strictEqual(live.events[live.events.length - 1].event, 'job.succeeded');
         assert.strictEqual(live.events[live.events.length - 1].data.result.files.length, 1, 'the terminal event carries the result');
+        // A forced disconnect mid-stream: the reader drops after the first frame it sees, then reconnects
+        // with the last id it got. The two reads together are the exact log — no gap, no repeat.
+        r = await alice('/api/v1/jobs', json({ type: 'test.upper', input: { text: 'cut', gate: 'cut' } }));
+        const cutId = r.body.id;
+        await until(async () => (await alice(`/api/v1/jobs/${cutId}`)).body.state === 'running', 'disconnect job running');
+        const head = await readSse(`${s.base}/api/v1/jobs/${cutId}/events`, { headers: { 'x-test-user': USER_A }, stop: (ev) => ev.length >= 1 });
+        assert.ok(head.events.length >= 1, 'the stream was cut mid-job');
+        gate('cut').open();
+        const tail = await readSse(`${s.base}/api/v1/jobs/${cutId}/events`, { headers: { 'x-test-user': USER_A, 'last-event-id': String(head.events[head.events.length - 1].id) } });
+        const joined = [...head.events, ...tail.events];
+        const whole = await readSse(`${s.base}/api/v1/jobs/${cutId}/events`, { headers: { 'x-test-user': USER_A } });
+        assert.deepStrictEqual(joined.map(e => e.event), whole.events.map(e => e.event), 'the exact sequence across the disconnect');
+        assert.deepStrictEqual(joined.map(e => e.id), whole.events.map(e => e.id), 'the job\'s log, in order, once each');
 
         // ── Cancel ──────────────────────────────────────────────
         await s.close();
@@ -294,14 +307,14 @@ async function readSse(url, { headers = {}, stop = () => false, ms = 5000 } = {}
         const dave = client(s.base, { user: USER_B });
         const ids = [];
         for (let i = 0; i < 4; i++) ids.push((await dave('/api/v1/jobs', json({ type: 'test.upper', input: { gate: 'pool' } }))).body.id);
-        await until(async () => s.system.stats().running === 2, 'two running');
+        await until(async () => (await s.system.stats()).running === 2, 'two running');
         await sleep(50);
-        assert.strictEqual(s.system.stats().running, 2, 'never more than the concurrency limit');
-        assert.strictEqual(s.system.stats().queued, 2);
+        assert.strictEqual((await s.system.stats()).running, 2, 'never more than the concurrency limit');
+        assert.strictEqual((await s.system.stats()).queued, 2);
         r = await dave('/api/v1/jobs', json({ type: 'test.upper', input: { text: 'one too many' } }));
         assert.strictEqual(r.status, 429); assert.strictEqual(r.body.code, 'tools.job.too_many_active');
         gate('pool').open();
-        await until(async () => s.system.stats().succeeded === 4, 'pool drained');
+        await until(async () => (await s.system.stats()).succeeded === 4, 'pool drained');
 
         // ── Restart: an accepted job is not lost ────────────────
         await s.close();
@@ -339,7 +352,7 @@ async function readSse(url, { headers = {}, stop = () => false, ms = 5000 } = {}
         assert.ok(pruned >= 3);
         assert.strictEqual((await erin(`/api/v1/jobs/${accepted}`)).status, 404, 'expired jobs are gone');
         assert.ok(!fs.existsSync(path.join(dir, 'jobs', accepted)), 'with their files');
-        assert.strictEqual(s.db.prepare('SELECT COUNT(*) AS n FROM tool_job_events WHERE job_id = ?').get(accepted).n, 0, 'and their events');
+        assert.strictEqual((await s.db.prepare('SELECT COUNT(*) AS n FROM tool_job_events WHERE job_id = ?').get(accepted)).n, 0, 'and their events');
         await s.close();
 
         // ── Results as Media objects ────────────────────────────
@@ -488,7 +501,7 @@ async function readSse(url, { headers = {}, stop = () => false, ms = 5000 } = {}
         assert.strictEqual(r.headers.get('set-cookie'), null, 'principals get no session cookie');
         const devJob = r.body.id;
         await until(async () => (await dev(`/api/v1/jobs/${devJob}`)).body.state === 'succeeded', 'app job');
-        assert.strictEqual(s.system.get(devJob).owner, 'app:app_01JCCCCCCCCCCCCCCCCCCCCCCC');
+        assert.strictEqual((await s.system.get(devJob)).owner, 'app:app_01JCCCCCCCCCCCCCCCCCCCCCCC');
         r = await dev(`/api/v1/jobs/${devJob}`, { method: 'DELETE' });
         assert.strictEqual(r.status, 403, 'cancel needs tools.job.cancel');
         r = await client(s.base, { bearer: token({ cap: ['tools.job.read'] }) })('/api/v1/jobs', json({ type: 'test.upper', input: {} }));
@@ -504,8 +517,8 @@ async function readSse(url, { headers = {}, stop = () => false, ms = 5000 } = {}
         assert.strictEqual(r.status, 202, 'a sandbox app token can submit');
         const sbxJob = r.body.id;
         await until(async () => (await sbx(`/api/v1/jobs/${sbxJob}`)).body.state === 'succeeded', 'sandbox job');
-        assert.strictEqual(s.system.get(sbxJob).env, 'sandbox', 'the job remembers its environment');
-        assert.ok(s.system.get(sbxJob).ttl_ms <= 30 * 60 * 1000, 'sandbox jobs are kept briefly');
+        assert.strictEqual((await s.system.get(sbxJob)).env, 'sandbox', 'the job remembers its environment');
+        assert.ok((await s.system.get(sbxJob)).ttl_ms <= 30 * 60 * 1000, 'sandbox jobs are kept briefly');
         r = await client(s.base, { bearer: token({ sub: 'app:app_01JDDDDDDDDDDDDDDDDDDDDDDD', env: 'sandbox' }) })(`/api/v1/jobs/${sbxJob}`);
         assert.strictEqual(r.status, 404, 'another sandbox app cannot read it');
         r = await client(s.base, { bearer: contracts.serviceAuth.signServiceToken({
@@ -524,7 +537,7 @@ async function readSse(url, { headers = {}, stop = () => false, ms = 5000 } = {}
             const done = async (c, id) => until(async () => { const g = await c(`/api/v1/jobs/${id}`); return g.body.state === 'succeeded' && g.body; }, 'project job');
             const prod = client(s.base, { bearer: token({}) });
             let j = await done(prod, (await prod('/api/v1/jobs', json({ type: 'test.upper', input: { text: 'prod' } }))).body.id);
-            assert.strictEqual(s.system.get(j.id).project_id, PRJ, 'the job remembers its project');
+            assert.strictEqual((await s.system.get(j.id)).project_id, PRJ, 'the job remembers its project');
             assert.strictEqual(j.result.files[0].storage, 'media');
             assert.strictEqual(fm2.objects.get(j.result.files[0].media.media_id).meta.namespace, `tools.app.${PRJ}`, 'production: tools.app.<project>');
             assert.strictEqual(j.result.files[0].media.namespace, `tools.app.${PRJ}`);
@@ -535,13 +548,14 @@ async function readSse(url, { headers = {}, stop = () => false, ms = 5000 } = {}
             const person = client(s.base, { user: USER_B });
             j = await done(person, (await person('/api/v1/jobs', json({ type: 'test.upper', input: { text: 'person' } }))).body.id);
             assert.strictEqual(fm2.objects.get(j.result.files[0].media.media_id).meta.namespace, undefined, "a person's job stays in the tools root");
-            assert.strictEqual(s.system.get(j.id).project_id, null);
+            assert.strictEqual((await s.system.get(j.id)).project_id, null);
             await s.close();
             ms2.close();
         }
 
         console.log('jobs (shared runtime): all checks passed');
     } finally {
+        await closeDbs();
         fs.rmSync(root, { recursive: true, force: true });
     }
 })().catch((err) => { console.error(err); process.exit(1); });

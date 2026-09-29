@@ -1,10 +1,12 @@
 'use strict';
 // ═══════════════════════════════════════════════════════════════
 // Tools job runtime (roadmap Wave 11). Shared by the satellites the way apps/_shared always is:
-// required by relative path, no dependencies of its own — each app passes its better-sqlite3,
-// openvibe-contracts and openvibe-sdk. See system.js (lifecycle), http.js (routes), media.js (results
-// in Media), events.js (tools.job.* to OpenVibe.Events), usage.js (tools.usage.recorded, a developer
-// project's jobs per hour), client.js (browser helper).
+// required by relative path, no dependencies of its own — each app passes the one openvibe-sdk/db
+// handle (the shared `tools` database, plan T8), openvibe-contracts and openvibe-sdk. See system.js
+// (lifecycle), http.js (routes), media.js (results in Media), events.js (tools.job.* to OpenVibe.Events),
+// usage.js (tools.usage.recorded, a developer project's jobs per hour), client.js (browser helper).
+//
+// The job store is part of every app's one `tools` database: no per-satellite jobs.db.
 //
 // Environment (one /etc/openvibe/tools.env for every unit):
 //   TOOLS_JOBS_CONCURRENCY           jobs running at once per satellite (default 2)
@@ -65,14 +67,14 @@ function mediaOrigin(env = process.env) {
 }
 
 /**
- * One call per satellite: open <dataDir>/jobs.db, build the system, let the app define its job
- * types, mount the routes and start (boot recovery happens here).
+ * One call per satellite: build the system on the app's shared `tools` database, let the app define its
+ * job types, mount the routes and start (boot recovery happens here).
  *
  * @param {object} o
  * @param {object} o.app            Express app
  * @param {string} o.service        'img' | 'audio' | 'docs'
  * @param {string} o.dataDir
- * @param {Function} o.Database     require('better-sqlite3')
+ * @param {object} o.db             the app's shared openvibe-sdk/db handle (one `tools` database)
  * @param {object} o.contracts      require('openvibe-contracts')
  * @param {object} [o.sdk]          require('openvibe-sdk') — the outbox relay to OpenVibe.Events
  * @param {() => string|null} o.getPublicKey
@@ -89,12 +91,14 @@ function mediaOrigin(env = process.env) {
  */
 function setupJobs(o) {
     fs.mkdirSync(o.dataDir, { recursive: true });
-    const db = new o.Database(path.join(o.dataDir, 'jobs.db'));
+    const db = o.db;
+    const log = o.log || console;
     const results = mediaFromEnv(o.contracts);
     if (results.reason && String(process.env.TOOLS_JOB_RESULTS || '').toLowerCase() === 'media') console.warn(`[Jobs] ${o.service}: results stay local — ${results.reason}`);
-    // tools.job.* → OpenVibe.Events through an outbox table in this same jobs.db (inert without EVENTS_URL).
-    const events = outboxFromEnv({ db, sdk: o.sdk });
+    // tools.job.* → OpenVibe.Events through the `event_outbox` table in this same database (inert without EVENTS_URL).
+    const events = outboxFromEnv({ db, sdk: o.sdk, log });
     if (events.reason && process.env.EVENTS_URL) console.warn(`[Jobs] ${o.service}: job events are not published — ${events.reason}`);
+    if (events.outbox) events.outbox.ready.catch((err) => log.error(`[Jobs] ${o.service}: could not create the event outbox:`, err.message));
     const system = createJobSystem({
         db, contracts: o.contracts, service: o.service, dataDir: o.dataDir,
         concurrency: envInt(`TOOLS_JOBS_CONCURRENCY_${o.service.toUpperCase()}`, envInt('TOOLS_JOBS_CONCURRENCY', 2)),
@@ -104,6 +108,7 @@ function setupJobs(o) {
         diskBudgetBytes: envInt('TOOLS_DISK_BUDGET_MB', 8192) * 1024 * 1024,
         media: results.media,
         outbox: events.outbox,
+        log,
     });
     o.define(system);
     const g = o.guard || null;
@@ -117,19 +122,19 @@ function setupJobs(o) {
             onAddressFull: (req, res, full) => !g.refuse(req, res, { status: 429, code: 'tools.job.too_many_active', reason: 'jobs.address', tool: o.jobTool ? o.jobTool(req, null, {}) : null, retryAfter: 30, detail: `At most ${full.limit} unfinished jobs from one address at a time; wait for one to finish.`, extra: { scope: 'address' } }),
         }),
     });
-    system.start();
+    system.start().catch((err) => log.error(`[Jobs] ${o.service}: boot recovery failed:`, err.message));
     let pruneOutbox = null;
     if (events.outbox) {
         events.outbox.start();
-        pruneOutbox = setInterval(() => { try { events.outbox.prune(); } catch { /* next time */ } }, 6 * 60 * 60 * 1000);
+        pruneOutbox = setInterval(() => { events.outbox.prune().catch(() => { /* next time */ }); }, 6 * 60 * 60 * 1000);
         if (pruneOutbox.unref) pruneOutbox.unref();
-        console.log(`[Jobs] ${o.service}: job events → ${events.outbox.url} (${events.outbox.pending()} pending)`);
+        console.log(`[Jobs] ${o.service}: job events → ${events.outbox.url}`);
     }
     system.db = db;
+    // The `tools` database is shared with the rest of the app and closed there; this only stops the worker.
     system.close = () => {
         system.stop();
-        if (events.outbox) { events.outbox.stop(); clearInterval(pruneOutbox); }
-        try { db.close(); } catch { /* already closed */ }
+        if (events.outbox) { events.outbox.stop().catch(() => {}); clearInterval(pruneOutbox); }
     };
     return system;
 }

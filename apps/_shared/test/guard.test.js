@@ -16,7 +16,6 @@ const { dep } = require('./deps');
 const express = dep('express');
 const cookieParser = dep('cookie-parser');
 const multer = dep('multer');
-const Database = dep('better-sqlite3');   // the job store is still SQLite (Phases 2–3 not done)
 const contracts = dep('openvibe-contracts');
 const metrics = dep('openvibe-shared/metrics');
 const guardLib = require('../guard');
@@ -27,6 +26,7 @@ const { createGuardStore } = require('../guard/store');
 const { ipBucket } = require('../guard/ip');
 const sniff = require('../guard/sniff');
 const jobs = require('../jobs');
+const { testDb, closeAllTestDbs } = require('./testdb');
 
 const ISSUER = 'https://openvibe.network';
 const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048, publicKeyEncoding: { type: 'spki', format: 'pem' }, privateKeyEncoding: { type: 'pkcs8', format: 'pem' } });
@@ -494,10 +494,10 @@ async function serve(app) {
     // ── The job store's bounds: queued jobs and disk (system.busy) through the guard ──
     for (const mode of ['enforce', 'report']) {
         const dataDir = tmp();
-        const db = new Database(':memory:');
+        const db = await testDb(dataDir);
         const system = jobs.createJobSystem({ db, contracts, service: 'test', dataDir, concurrency: 0, maxQueued: 2, diskBudgetBytes: 1_000_000, log: quiet });
         system.define({ type: 'test.noop', maxFiles: 1, async run() { return { files: [], data: {} }; } });
-        system.start();
+        await system.start();
         const g = makeGuard({ mode });
         const app = express();
         app.set('trust proxy', TRUST_PROXY);
@@ -509,7 +509,7 @@ async function serve(app) {
         try {
             assert.strictEqual((await submit()).status, 202);
             assert.strictEqual((await submit()).status, 202);
-            assert.strictEqual(system.busy().reason, 'queue');
+            assert.strictEqual((await system.busy()).reason, 'queue');
             const r = await submit();
             if (mode === 'enforce') {
                 assert.strictEqual(r.status, 503, 'a third queued job is refused');
@@ -519,15 +519,15 @@ async function serve(app) {
                 assert.strictEqual(r.status, 202, 'report mode accepts it');
                 assert.ok(g.store.abuseRows().some(x => x.reason === 'busy.queue' && x.enforced === 0));
             }
-        } finally { await s.close(); g.close(); system.stop(); db.close(); fs.rmSync(dataDir, { recursive: true, force: true }); }
+        } finally { await s.close(); g.close(); system.stop(); fs.rmSync(dataDir, { recursive: true, force: true }); }
     }
     // Unfinished browser-session jobs are bounded per address too: a new cookie is no new allowance.
     for (const mode of ['enforce', 'report']) {
         const dataDir = tmp();
-        const db = new Database(':memory:');
+        const db = await testDb(dataDir);
         const system = jobs.createJobSystem({ db, contracts, service: 'test', dataDir, concurrency: 0, maxActivePerOwner: 1, log: quiet });
         system.define({ type: 'test.noop', maxFiles: 1, async run() { return { files: [], data: {} }; } });
-        system.start();
+        await system.start();
         assert.strictEqual(system.bounds.maxActivePerAddress, 3, '3 × the per-owner bound by default');
         const g = makeGuard({ mode });
         const app = express();
@@ -549,24 +549,25 @@ async function serve(app) {
             for (let i = 0; i < 3; i++) codes.push((await submit('198.51.100.60')).status);   // a fresh cookie each time
             assert.deepStrictEqual(codes, mode === 'enforce' ? [202, 202, 429] : [202, 202, 202], `${mode}: three per address`);
             assert.strictEqual((await submit('198.51.100.61')).status, 202, 'another address is fine');
-            const row = db.prepare('SELECT ip_key FROM tool_jobs LIMIT 1').get();
+            const row = await db.prepare('SELECT ip_key FROM tool_jobs LIMIT 1').get();
             assert.match(row.ip_key, /^ip:[0-9a-f]{32}$/, 'the job keeps the hashed key, never the address');
             if (mode === 'report') assert.ok(g.store.abuseRows().some(x => x.reason === 'jobs.address' && x.enforced === 0));
-        } finally { await s.close(); g.close(); system.stop(); db.close(); fs.rmSync(dataDir, { recursive: true, force: true }); }
+        } finally { await s.close(); g.close(); system.stop(); fs.rmSync(dataDir, { recursive: true, force: true }); }
     }
     {
         const dataDir = tmp();
-        const db = new Database(':memory:');
+        const db = await testDb(dataDir);
         const system = jobs.createJobSystem({ db, contracts, service: 'test', dataDir, concurrency: 0, diskBudgetBytes: 1000, log: quiet });
         system.define({ type: 'test.noop', maxFiles: 1, async run() { return { files: [], data: {} }; } });
-        system.start();
+        await system.start();
         await system.refreshDisk();
-        assert.strictEqual(system.busy(), null);
+        assert.strictEqual(await system.busy(), null);
         await system.submit({ owner: 'session:x', type: 'test.noop', input: {}, files: [{ buffer: Buffer.alloc(1500), name: 'a.bin', mime: 'application/octet-stream', size: 1500 }] });
-        assert.strictEqual(system.busy().reason, 'disk', 'accepted inputs count against the disk budget at once');
+        assert.strictEqual((await system.busy()).reason, 'disk', 'accepted inputs count against the disk budget at once');
         assert.strictEqual((await system.refreshDisk()) >= 1500, true, 'and the walk finds them');
-        system.stop(); db.close(); fs.rmSync(dataDir, { recursive: true, force: true });
+        system.stop(); fs.rmSync(dataDir, { recursive: true, force: true });
     }
+    await closeAllTestDbs();
 
     console.log('guard: callers (/64, one loopback hop, services by token, aud-checked users, sessions, sandbox), bucket math + cost, session sharing, report vs enforce, headers + problem+json, two processes one Valkey quota + outage fallback, sniffing, target throttle, port cap, abuse log + prune + metric, semaphore, job bounds (queue, disk, per address), challenge hook, Origin check (CSRF): all checks passed');
 })().catch((err) => { console.error(err); process.exit(1); });

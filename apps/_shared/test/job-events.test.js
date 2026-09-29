@@ -1,16 +1,16 @@
 'use strict';
 // tools.job.* → OpenVibe.Events (roadmap Wave 11): every transition writes exactly one event to the
-// jobs database's outbox in the transaction that records it; a rolled-back transition writes none;
-// sandbox jobs and cancellations write none; payloads carry no input, file name, output data or
-// browser session and validate against openvibe-contracts; the relay posts to EVENTS_URL with the
-// tools service token; and without EVENTS_URL nothing is set up at all.
+// tools database's outbox (openvibe-sdk createPgOutbox) in the transaction that records it; a rolled-back
+// transition writes none; sandbox jobs and cancellations write none; payloads carry no input, file name,
+// output data or browser session and validate against openvibe-contracts; the relay posts to EVENTS_URL
+// with the tools service token; and without EVENTS_URL nothing is set up at all.
 const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { dep } = require('./deps');
+const { testDb, closeAllTestDbs } = require('./testdb');
 
-const Database = dep('better-sqlite3');
 const contracts = dep('openvibe-contracts');
 const sdk = dep('openvibe-sdk');
 const jobs = require('../jobs');
@@ -100,17 +100,19 @@ function fakeNetwork() {
 
 const ENV = { EVENTS_URL: 'http://events.test/', OV_OAUTH_CLIENT_SECRET: 'tools-secret', OV_NETWORK_INTERNAL_URL: 'http://network.test' };
 
-function satellite(dir, { wrap, concurrency = 1, net } = {}) {
+async function satellite(dir, { wrap, concurrency = 1, net } = {}) {
     fs.mkdirSync(dir, { recursive: true });
-    const db = new Database(path.join(dir, 'jobs.db'));
+    const db = await testDb(dir);
     const { outbox, reason } = outboxFromEnv({ db, sdk, env: ENV, fetch: net.fetch, log: silent });
     assert.ok(outbox, `outbox configured (${reason})`);
+    await outbox.ready;
     const system = jobs.createJobSystem({ db, contracts, service: 'img', dataDir: dir, concurrency, outbox: wrap ? wrap(outbox) : outbox, progressThrottleMs: 0, log: silent });
     define(system);
-    system.start();
-    const envelopes = (jobId) => db.prepare('SELECT envelope FROM event_outbox ORDER BY id').all().map(r => JSON.parse(r.envelope))
+    await system.start();
+    const envelopes = async (jobId) => (await db.prepare('SELECT envelope FROM event_outbox ORDER BY id').all())
+        .map(r => (typeof r.envelope === 'string' ? JSON.parse(r.envelope) : r.envelope))
         .filter(e => !jobId || e.subject.id === jobId);
-    return { db, system, outbox, envelopes, close() { system.stop(); outbox.stop(); db.close(); } };
+    return { db, system, outbox, envelopes, close: async () => { system.stop(); await outbox.stop(); } };
 }
 
 const types = (list) => list.map(e => e.event_type);
@@ -135,28 +137,28 @@ function noLeaks(list, extra = []) {
         }
     }
 }
-const settled = (s, id, state) => until(() => { const r = s.system.get(id); return r && r.state === state && r; }, `${id} ${state}`);
+const settled = (s, id, state) => until(async () => { const r = await s.system.get(id); return r && r.state === state && r; }, `${id} ${state}`);
 
 (async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ov-job-events-'));
     try {
         // ── Inert without EVENTS_URL ─────────────────────────────
         {
-            const db = new Database(':memory:');
+            const db = await testDb(path.join(root, 'inert-db'));
             assert.deepStrictEqual(outboxFromEnv({ db, sdk, env: {} }), { outbox: null, reason: 'EVENTS_URL is not set' });
             assert.strictEqual(outboxFromEnv({ db, sdk, env: { EVENTS_URL: 'http://events.test' } }).outbox, null, 'no secret, no outbox');
             assert.strictEqual(outboxFromEnv({ db, sdk, env: { ...ENV, EVENTS_PUBLISH: 'off' } }).outbox, null, 'EVENTS_PUBLISH=off');
             assert.strictEqual(outboxFromEnv({ db, sdk: null, env: ENV }).outbox, null, 'no sdk, no outbox');
             const dir = path.join(root, 'inert');
-            fs.mkdirSync(dir);
+            fs.mkdirSync(dir, { recursive: true });
             const system = jobs.createJobSystem({ db, contracts, service: 'img', dataDir: dir, log: silent });
             define(system);
-            system.start();
+            await system.start();
             const { job } = await system.submit({ owner: `user:${USER}`, type: 'test.upper', input: { text: 'x' } });
-            await until(() => system.get(job.id).state === 'succeeded', 'inert job');
-            assert.strictEqual(db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name = 'event_outbox'").get().n, 0, 'no outbox table without EVENTS_URL');
-            assert.deepStrictEqual(system.stats().events, { enabled: false });
-            system.stop(); db.close();
+            await until(async () => (await system.get(job.id)).state === 'succeeded', 'inert job');
+            assert.strictEqual((await db.prepare("SELECT COUNT(*) AS n FROM information_schema.tables WHERE table_name = 'event_outbox'").get()).n, 0, 'no outbox table without EVENTS_URL');
+            assert.deepStrictEqual((await system.stats()).events, { enabled: false });
+            system.stop();
         }
 
         const net = fakeNetwork();
@@ -164,18 +166,18 @@ const settled = (s, id, state) => until(() => { const r = s.system.get(id); retu
         let failOn = null;
         const wrap = (outbox) => ({
             ...outbox,
-            enqueue(envelope, opts) {
-                const env = outbox.enqueue(envelope, opts);
+            async enqueue(t, envelope, opts) {
+                const env = await outbox.enqueue(t, envelope, opts);
                 if (failOn === envelope.event_type) throw new Error('disk I/O error (test)');
                 return env;
             },
         });
-        let s = satellite(path.join(root, 'a'), { net, wrap });
+        let s = await satellite(path.join(root, 'a'), { net, wrap });
 
         // ── A signed-in person's job: created, started, succeeded — once each ──
         let { job } = await s.system.submit({ owner: `user:${USER}`, type: 'test.upper', input: { text: SECRET_INPUT }, files: [{ buffer: Buffer.from('hello'), name: SECRET_FILE, mime: 'text/plain' }] });
         await settled(s, job.id, 'succeeded');
-        let list = s.envelopes(job.id);
+        let list = await s.envelopes(job.id);
         assert.deepStrictEqual(types(list), ['tools.job.created', 'tools.job.started', 'tools.job.succeeded']);
         list.forEach(checkContracts);
         noLeaks(list);
@@ -195,12 +197,20 @@ const settled = (s, id, state) => until(() => { const r = s.system.get(id); retu
         assert.strictEqual(done.result.files[0].storage, 'local');
         assert.strictEqual(done.result.files[0].media, null);
         assert.strictEqual(done.result.files[0].size, 5);
-        assert.deepStrictEqual(s.system.stats().events.enabled, true);
+        assert.deepStrictEqual((await s.system.stats()).events.enabled, true);
+
+        // ── A stream that dropped mid-job resumes with Last-Event-ID: the log from there is exactly the
+        //    tail of the whole sequence, seq for seq — no gap, no repeat (the SSE reconnect path) ──
+        const log = await s.system.eventsAfter(job.id, 0);
+        assert.deepStrictEqual(log.map(e => e.event), ['job.queued', 'job.running', 'job.succeeded']);
+        const resumed = await s.system.eventsAfter(job.id, log[0].seq);
+        assert.deepStrictEqual(resumed.map(e => e.event), ['job.running', 'job.succeeded'], 'exactly the events after the last id the client saw');
+        assert.deepStrictEqual(resumed.map(e => e.seq), log.slice(1).map(e => e.seq), 'the same per-job seq values, in order');
 
         // ── A failure whose message names the input file: failed once, name and path scrubbed ──
         ({ job } = await s.system.submit({ owner: `user:${USER}`, type: 'test.boom', input: { text: SECRET_INPUT }, files: [{ buffer: Buffer.from('x'), name: SECRET_FILE, mime: 'text/plain' }] }));
         await settled(s, job.id, 'failed');
-        list = s.envelopes(job.id);
+        list = await s.envelopes(job.id);
         assert.deepStrictEqual(types(list), ['tools.job.created', 'tools.job.started', 'tools.job.failed']);
         list.forEach(checkContracts);
         noLeaks(list);
@@ -214,7 +224,7 @@ const settled = (s, id, state) => until(() => { const r = s.system.get(id); retu
         // ── A browser session's job: owner null, the service acts, the session never appears ──
         ({ job } = await s.system.submit({ owner: SESSION, type: 'test.upper', input: { text: SECRET_INPUT } }));
         await settled(s, job.id, 'succeeded');
-        list = s.envelopes(job.id);
+        list = await s.envelopes(job.id);
         assert.deepStrictEqual(types(list), ['tools.job.created', 'tools.job.started', 'tools.job.succeeded']);
         list.forEach(checkContracts);
         noLeaks(list);
@@ -223,7 +233,7 @@ const settled = (s, id, state) => until(() => { const r = s.system.get(id); retu
         // ── Principals: a service and a production app are subjects ──
         ({ job } = await s.system.submit({ owner: 'svc:live', type: 'test.upper', input: {} }));
         await settled(s, job.id, 'succeeded');
-        list = s.envelopes(job.id);
+        list = await s.envelopes(job.id);
         list.forEach(checkContracts);
         assert.deepStrictEqual(list[0].actor, { type: 'service', id: 'live' });
         assert.deepStrictEqual(list[0].payload.owner, { type: 'service', id: 'live' });
@@ -231,90 +241,90 @@ const settled = (s, id, state) => until(() => { const r = s.system.get(id); retu
         assert.strictEqual(ownerRef(contracts, 'app:nope'), null);
 
         // ── Sandbox app jobs are never announced ─────────────────
-        const before = s.envelopes().length;
+        const before = (await s.envelopes()).length;
         ({ job } = await s.system.submit({ owner: `app:${APP}`, type: 'test.upper', input: { text: 'sandbox' }, env: 'sandbox' }));
         await settled(s, job.id, 'succeeded');
         const sandboxFail = (await s.system.submit({ owner: `app:${APP}`, type: 'test.boom', files: [{ buffer: Buffer.from('x'), name: 'a.txt' }], env: 'sandbox' })).job;
         await settled(s, sandboxFail.id, 'failed');
-        assert.strictEqual(s.envelopes(job.id).length + s.envelopes(sandboxFail.id).length, 0, 'sandbox jobs emit nothing');
-        assert.strictEqual(s.envelopes().length, before);
+        assert.strictEqual((await s.envelopes(job.id)).length + (await s.envelopes(sandboxFail.id)).length, 0, 'sandbox jobs emit nothing');
+        assert.strictEqual((await s.envelopes()).length, before);
 
         // ── Retry: a new created (retry_of) + its run; the failed job gets nothing new ──
         flaky.add('t1');
         const first = (await s.system.submit({ owner: `user:${USER}`, type: 'test.flaky', input: { tag: 't1' }, files: [{ buffer: Buffer.from('abc'), name: SECRET_FILE }] })).job;
         await settled(s, first.id, 'failed');
-        assert.strictEqual(s.envelopes(first.id).at(-1).payload.retryable, true);
+        assert.strictEqual((await s.envelopes(first.id)).at(-1).payload.retryable, true);
         flaky.delete('t1');
-        const retried = s.system.retry(first.id).job;
+        const retried = (await s.system.retry(first.id)).job;
         await settled(s, retried.id, 'succeeded');
-        assert.deepStrictEqual(types(s.envelopes(first.id)), ['tools.job.created', 'tools.job.started', 'tools.job.failed'], 'the retried job gets no new event');
-        list = s.envelopes(retried.id);
+        assert.deepStrictEqual(types(await s.envelopes(first.id)), ['tools.job.created', 'tools.job.started', 'tools.job.failed'], 'the retried job gets no new event');
+        list = await s.envelopes(retried.id);
         assert.deepStrictEqual(types(list), ['tools.job.created', 'tools.job.started', 'tools.job.succeeded']);
         list.forEach(checkContracts);
         noLeaks(list);
         assert.strictEqual(list[0].payload.retry_of, first.id);
-        assert.strictEqual(s.system.retry(first.id).replayed, true);
-        assert.strictEqual(s.envelopes(retried.id).length, 3, 'a replayed retry creates no event');
+        assert.strictEqual((await s.system.retry(first.id)).replayed, true);
+        assert.strictEqual((await s.envelopes(retried.id)).length, 3, 'a replayed retry creates no event');
 
         // ── An Idempotency-Key replay creates no job and no event ──
         const k1 = (await s.system.submit({ owner: `user:${USER}`, type: 'test.upper', input: { text: 'k' }, idempotencyKey: 'key-00000001' })).job;
         await settled(s, k1.id, 'succeeded');
         const k2 = await s.system.submit({ owner: `user:${USER}`, type: 'test.upper', input: { text: 'k' }, idempotencyKey: 'key-00000001' });
         assert.strictEqual(k2.replayed, true);
-        assert.strictEqual(s.envelopes(k1.id).length, 3);
+        assert.strictEqual((await s.envelopes(k1.id)).length, 3);
 
         // ── Cancelled jobs are not announced (neither queued nor running) ──
         const blocker = (await s.system.submit({ owner: `user:${USER}`, type: 'test.upper', input: { gate: 'g1' } })).job;
         await settled(s, blocker.id, 'running');
         const queued = (await s.system.submit({ owner: `user:${USER}`, type: 'test.upper', input: { text: 'q' } })).job;
-        assert.strictEqual(s.system.cancel(queued.id).changed, true);
-        assert.deepStrictEqual(types(s.envelopes(queued.id)), ['tools.job.created']);
-        s.system.cancel(blocker.id);
+        assert.strictEqual((await s.system.cancel(queued.id)).changed, true);
+        assert.deepStrictEqual(types(await s.envelopes(queued.id)), ['tools.job.created']);
+        await s.system.cancel(blocker.id);
         await settled(s, blocker.id, 'cancelled');
-        assert.deepStrictEqual(types(s.envelopes(blocker.id)), ['tools.job.created', 'tools.job.started']);
+        assert.deepStrictEqual(types(await s.envelopes(blocker.id)), ['tools.job.created', 'tools.job.started']);
 
         // ── Rollbacks: a failed outbox write undoes the transition, and no event is left ──
-        const count = () => s.envelopes().length;
-        let n = count();
+        const count = async () => (await s.envelopes()).length;
+        let n = await count();
         failOn = 'tools.job.created';
         await assert.rejects(s.system.submit({ owner: `user:${USER}`, type: 'test.upper', input: { text: 'rollback' } }), /disk I\/O error/);
         failOn = null;
-        assert.strictEqual(count(), n, 'rolled-back submit: no event');
-        assert.strictEqual(s.db.prepare("SELECT COUNT(*) AS n FROM tool_jobs WHERE input_json LIKE '%rollback%'").get().n, 0, 'rolled-back submit: no job');
+        assert.strictEqual(await count(), n, 'rolled-back submit: no event');
+        assert.strictEqual((await s.db.prepare("SELECT COUNT(*) AS n FROM tool_jobs WHERE input_json LIKE '%rollback%'").get()).n, 0, 'rolled-back submit: no job');
 
         // claim(): the job stays queued and nothing says it started.
         failOn = 'tools.job.started';
         const stuck = (await s.system.submit({ owner: `user:${USER}`, type: 'test.upper', input: { text: 'claim' } })).job;
         await sleep(50);
-        assert.strictEqual(s.system.get(stuck.id).state, 'queued', 'rolled-back claim: still queued');
-        assert.strictEqual(s.system.get(stuck.id).attempts, 0);
-        assert.deepStrictEqual(types(s.envelopes(stuck.id)), ['tools.job.created'], 'rolled-back claim: no started event');
+        assert.strictEqual((await s.system.get(stuck.id)).state, 'queued', 'rolled-back claim: still queued');
+        assert.strictEqual((await s.system.get(stuck.id)).attempts, 0);
+        assert.deepStrictEqual(types(await s.envelopes(stuck.id)), ['tools.job.created'], 'rolled-back claim: no started event');
         failOn = null;
         // The next kick (any submit) starts it: exactly one started.
         const kicker = (await s.system.submit({ owner: `user:${USER}`, type: 'test.upper', input: { text: 'kick' } })).job;
         await settled(s, stuck.id, 'succeeded');
         await settled(s, kicker.id, 'succeeded');
-        assert.deepStrictEqual(types(s.envelopes(stuck.id)), ['tools.job.created', 'tools.job.started', 'tools.job.succeeded']);
+        assert.deepStrictEqual(types(await s.envelopes(stuck.id)), ['tools.job.created', 'tools.job.started', 'tools.job.succeeded']);
 
         // finish(): the job stays running (recovered on the next start) and nothing says it ended.
         failOn = 'tools.job.succeeded';
         const unfinished = (await s.system.submit({ owner: `user:${USER}`, type: 'test.upper', input: { text: 'finish' } })).job;
-        await until(() => s.envelopes(unfinished.id).length === 2 && s.system.stats().executing === 0, 'finish attempt');
+        await until(async () => (await s.envelopes(unfinished.id)).length === 2 && (await s.system.stats()).executing === 0, 'finish attempt');
         await sleep(30);
-        assert.strictEqual(s.system.get(unfinished.id).state, 'running', 'rolled-back finish: still running');
-        assert.deepStrictEqual(types(s.envelopes(unfinished.id)), ['tools.job.created', 'tools.job.started']);
+        assert.strictEqual((await s.system.get(unfinished.id)).state, 'running', 'rolled-back finish: still running');
+        assert.deepStrictEqual(types(await s.envelopes(unfinished.id)), ['tools.job.created', 'tools.job.started']);
         failOn = null;
 
         // ── Restart: the stuck job is re-queued (not announced) and started again (announced again);
         //    a running onRestart:'fail' job fails once with tools.job.interrupted ──
         const fragile = (await s.system.submit({ owner: `user:${USER}`, type: 'test.fragile', input: { gate: 'never' } })).job;
         await settled(s, fragile.id, 'running');
-        s.close();
-        s = satellite(path.join(root, 'a'), { net });
+        await s.close();
+        s = await satellite(path.join(root, 'a'), { net });
         await settled(s, unfinished.id, 'succeeded');
-        assert.deepStrictEqual(types(s.envelopes(unfinished.id)), ['tools.job.created', 'tools.job.started', 'tools.job.started', 'tools.job.succeeded']);
-        assert.strictEqual(s.envelopes(unfinished.id)[2].payload.attempts, 2);
-        const fr = s.envelopes(fragile.id);
+        assert.deepStrictEqual(types(await s.envelopes(unfinished.id)), ['tools.job.created', 'tools.job.started', 'tools.job.started', 'tools.job.succeeded']);
+        assert.strictEqual((await s.envelopes(unfinished.id))[2].payload.attempts, 2);
+        const fr = await s.envelopes(fragile.id);
         assert.deepStrictEqual(types(fr), ['tools.job.created', 'tools.job.started', 'tools.job.failed']);
         fr.forEach(checkContracts);
         assert.strictEqual(fr[2].payload.error.code, 'tools.job.interrupted');
@@ -322,21 +332,21 @@ const settled = (s, id, state) => until(() => { const r = s.system.get(id); retu
         assert.ok(fr[2].payload.started_at);
 
         // ── Every event so far: valid, and never a secret ──
-        const all = s.envelopes();
+        const all = await s.envelopes();
         all.forEach(checkContracts);
         noLeaks(all);
         assert.strictEqual(new Set(all.map(e => e.event_id)).size, all.length, 'unique event ids');
 
         // ── The relay: POST EVENTS_URL/api/v1/events with the tools token for openvibe.events ──
-        assert.strictEqual(s.outbox.pending(), all.length);
+        assert.strictEqual(await s.outbox.pending(), all.length);
         const r = await s.outbox.flush();
         assert.strictEqual(r.sent, all.length);
-        assert.strictEqual(s.outbox.pending(), 0);
+        assert.strictEqual(await s.outbox.pending(), 0);
         const published = net.calls.publish.flatMap(c => c.events);
         assert.deepStrictEqual(published.map(e => e.event_id), all.map(e => e.event_id), 'published in order, once');
         assert.ok(net.calls.publish.every(c => c.authorization === 'Bearer events-token'));
         assert.deepStrictEqual(net.calls.token[0], { grant_type: 'client_credentials', client_id: 'tools', client_secret: 'tools-secret', audience: 'openvibe.events', scope: 'events.event.publish' });
-        s.close();
+        await s.close();
 
         // ── Payload builder: a result in Media is { media_id, role } only ──
         const row = {
@@ -353,6 +363,7 @@ const settled = (s, id, state) => until(() => { const r = s.system.get(id); retu
 
         console.log('job events (tools.job.* outbox): all checks passed');
     } finally {
+        await closeAllTestDbs();
         fs.rmSync(root, { recursive: true, force: true });
     }
 })().catch((err) => { console.error(err); process.exit(1); });

@@ -11,7 +11,6 @@
   "openvibeToolsShared": "^1.2.0",
   "dependencies": {
     "axios": "^1.7.0",
-    "better-sqlite3": "^11.0.0",
     "iovalkey": "^0.4.0",
     "pg": "^8.23.0",
     "@electric-sql/pglite": "^0.5.8",

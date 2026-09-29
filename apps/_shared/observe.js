@@ -52,18 +52,18 @@ function observe(o) {
     if (o.jobs) {
         inst.registry.gauge({
             name: 'tools_jobs', help: 'Jobs in this satellite\'s job store by state', labelNames: ['app', 'state'],
-            collect: () => {
+            collect: async () => {
                 const sys = o.jobs();
                 if (!sys) return null;
-                return Object.entries(sys.store.counts()).map(([state, n]) => ({ labels: { app: appName, state }, value: n }));
+                return Object.entries(await sys.store.counts()).map(([state, n]) => ({ labels: { app: appName, state }, value: n }));
             },
         });
         inst.registry.gauge({
             name: 'tools_jobs_executing', help: 'Jobs executing in this process now, and the concurrency limit', labelNames: ['app', 'kind'],
-            collect: () => {
+            collect: async () => {
                 const sys = o.jobs();
                 if (!sys) return null;
-                const s = sys.stats();
+                const s = await sys.stats();
                 return [{ labels: { app: appName, kind: 'executing' }, value: s.executing }, { labels: { app: appName, kind: 'limit' }, value: s.concurrency }];
             },
         });
@@ -119,14 +119,14 @@ const checks = {
     },
 
     /** The job runtime: started and not stopped, its store answering (counts are a real query). */
-    jobRuntime(name, getSystem, { required = true, description = 'job runtime: worker started, jobs.db answering' } = {}) {
+    jobRuntime(name, getSystem, { required = true, description = 'job runtime: worker started, store answering' } = {}) {
         return {
             name, required, description,
-            check: () => {
+            check: async () => {
                 const sys = getSystem();
                 if (!sys) return 'job runtime not set up yet';
                 if (!sys.isRunning()) return 'job runtime is not running';
-                const s = sys.stats();   // store.counts() inside: a real query on jobs.db
+                const s = await sys.stats();   // store.counts() inside: a real query
                 return { ok: true, detail: { queued: s.queued, running: s.running, executing: s.executing, concurrency: s.concurrency, results: s.results } };
             },
         };

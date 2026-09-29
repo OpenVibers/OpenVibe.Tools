@@ -4,14 +4,14 @@
 // failures by code with their job id and submit trace id; nobody else's jobs and no cancelled job
 // count; each closed hour is written to the outbox once as tools.usage.recorded (valid against
 // openvibe-contracts, no owner, input or file name); a job ending in an hour already sent re-sends it
-// as revision 2; without an outbox nothing is counted.
+// as revision 2; without an outbox nothing is counted. On PostgreSQL (plan T8): openvibe-sdk/db.
 const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { dep } = require('./deps');
+const { testDb, closeAllTestDbs } = require('./testdb');
 
-const Database = dep('better-sqlite3');
 const contracts = dep('openvibe-contracts');
 const sdk = dep('openvibe-sdk');
 const jobs = require('../jobs');
@@ -60,29 +60,30 @@ function define(system) {
     try {
         // ── Without an outbox: nothing counted, no table ──
         {
-            const db = new Database(':memory:');
+            const db = await testDb(path.join(root, 'inert-db'));
             const dir = path.join(root, 'inert');
-            fs.mkdirSync(dir);
+            fs.mkdirSync(dir, { recursive: true });
             const system = jobs.createJobSystem({ db, contracts, service: 'img', dataDir: dir, log: silent });
             define(system);
-            system.start();
+            await system.start();
             const { job } = await system.submit({ owner: `app:${APP}`, type: 'test.upper', input: { text: 'x' }, project: PRJ });
-            await until(() => system.get(job.id).state === 'succeeded', 'inert job');
-            assert.strictEqual(db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name = 'tool_job_usage'").get().n, 0);
-            assert.deepStrictEqual(system.stats().usage, { enabled: false });
-            system.stop(); db.close();
+            await until(async () => (await system.get(job.id)).state === 'succeeded', 'inert job');
+            assert.strictEqual(Number((await db.prepare('SELECT COUNT(*) AS n FROM tool_job_usage').get()).n), 0, 'inert: nothing counted');
+            assert.deepStrictEqual((await system.stats()).usage, { enabled: false });
+            system.stop();
         }
 
         const dir = path.join(root, 'a');
-        fs.mkdirSync(dir);
-        const db = new Database(path.join(dir, 'jobs.db'));
+        fs.mkdirSync(dir, { recursive: true });
+        const db = await testDb(dir);
         const { outbox } = outboxFromEnv({ db, sdk, env: ENV, fetch: fakeFetch, log: silent });
+        await outbox.ready;
         const system = jobs.createJobSystem({ db, contracts, service: 'img', dataDir: dir, concurrency: 1, outbox, progressThrottleMs: 0, log: silent });
         define(system);
-        system.start();
+        await system.start();
         const run = async (o, state) => {
             const { job } = await system.submit({ owner: `app:${APP}`, type: 'test.upper', input: { text: SECRET_INPUT }, ...o });
-            await until(() => { const r = system.get(job.id); return r && r.state === state; }, `${job.id} ${state}`);
+            await until(async () => { const r = await system.get(job.id); return r && r.state === state; }, `${job.id} ${state}`);
             return job.id;
         };
 
@@ -93,13 +94,13 @@ function define(system) {
         await run({ project: PRJ, env: 'sandbox' }, 'succeeded');
         await run({ project: PRJ, tool: 'image-resize' }, 'succeeded');
         await run({ project: null, owner: `user:${USER}` }, 'succeeded');   // a person's job: no project, not counted
-        assert.strictEqual(system.get(failedId).trace_id, TRACE, 'the submit request\'s trace id is kept with the job');
+        assert.strictEqual((await system.get(failedId)).trace_id, TRACE, 'the submit request\'s trace id is kept with the job');
         const { job: held } = await system.submit({ owner: `app:${APP}`, type: 'test.upper', input: { hold: true }, project: PRJ });
-        await until(() => system.get(held.id).state === 'running', 'held job running');
-        system.cancel(held.id);
-        await until(() => system.get(held.id).state === 'cancelled', 'held job cancelled');
+        await until(async () => (await system.get(held.id)).state === 'running', 'held job running');
+        await system.cancel(held.id);
+        await until(async () => (await system.get(held.id)).state === 'cancelled', 'held job cancelled');
 
-        const rows = db.prepare('SELECT * FROM tool_job_usage ORDER BY capability, dimension, env').all();
+        const rows = await db.prepare('SELECT * FROM tool_job_usage ORDER BY capability, dimension, env').all();
         const view = rows.map(r => [r.capability, r.dimension, r.env, r.quantity, r.errors]);
         assert.deepStrictEqual(view, [
             ['tools.job.create', 'test.boom', 'production', 1, 1],
@@ -111,18 +112,18 @@ function define(system) {
         assert.deepStrictEqual(JSON.parse(boom.error_codes), { 'tools.test.unreadable': 1 });
         const [sample] = JSON.parse(boom.samples);
         assert.deepStrictEqual([sample.code, sample.status, sample.trace_id, sample.ref], ['tools.test.unreadable', 422, TRACE, failedId]);
-        assert.strictEqual(keyOf({ ...system.get(failedId), state: 'cancelled' }), null);
+        assert.strictEqual(keyOf({ ...(await system.get(failedId)), state: 'cancelled' }), null);
 
         // ── Nothing leaves before the hour closes ──
-        const before = db.prepare("SELECT COUNT(*) AS n FROM event_outbox WHERE envelope LIKE '%tools.usage.recorded%'").get().n;
-        assert.strictEqual(before, 0);
-        assert.strictEqual(system.flushUsage().queued, 0);
+        const before = (await db.prepare("SELECT COUNT(*) AS n FROM event_outbox WHERE envelope->>'event_type' = 'tools.usage.recorded'").get()).n;
+        assert.strictEqual(Number(before), 0);
+        assert.strictEqual((await system.flushUsage()).queued, 0);
 
         // ── After the hour: one tools.usage.recorded per rollup, once ──
-        const later = rows[0].window_start + HOUR_MS + 2 * 60 * 1000;
-        assert.strictEqual(system.flushUsage(later).queued, 4);
-        assert.strictEqual(system.flushUsage(later).queued, 0, 'sent once');
-        const sent = db.prepare('SELECT envelope FROM event_outbox ORDER BY id').all().map(r => JSON.parse(r.envelope)).filter(e => e.event_type === 'tools.usage.recorded');
+        const later = Number(rows[0].window_start) + HOUR_MS + 2 * 60 * 1000;
+        assert.strictEqual((await system.flushUsage(later)).queued, 4);
+        assert.strictEqual((await system.flushUsage(later)).queued, 0, 'sent once');
+        const sent = (await db.prepare('SELECT envelope FROM event_outbox ORDER BY id').all()).map(r => (typeof r.envelope === 'string' ? JSON.parse(r.envelope) : r.envelope)).filter(e => e.event_type === 'tools.usage.recorded');
         assert.strictEqual(sent.length, 4);
         for (const env of sent) {
             const v = contracts.validate('tools.usage.recorded@1', env.payload);
@@ -138,16 +139,17 @@ function define(system) {
         assert.deepStrictEqual([failedRollup.quantity, failedRollup.errors, failedRollup.samples[0].ref], [1, 1, failedId]);
 
         // ── A job that ends in an hour already sent: re-sent as revision 2 with the new totals ──
-        db.transaction(() => system.usage.finished({ ...system.get(failedId), state: 'succeeded' }))();
-        assert.strictEqual(system.flushUsage(later).queued, 1);
-        const resent = db.prepare('SELECT envelope FROM event_outbox ORDER BY id DESC LIMIT 1').get();
-        const p = JSON.parse(resent.envelope).payload;
+        await db.tx(async () => system.usage.finished({ ...(await system.get(failedId)), state: 'succeeded' }));
+        assert.strictEqual((await system.flushUsage(later)).queued, 1);
+        const resent = await db.prepare('SELECT envelope FROM event_outbox ORDER BY id DESC LIMIT 1').get();
+        const p = (typeof resent.envelope === 'string' ? JSON.parse(resent.envelope) : resent.envelope).payload;
         assert.deepStrictEqual([p.dimension, p.quantity, p.errors, p.revision], ['test.boom', 2, 1, 2]);
-        assert.deepStrictEqual(system.stats().usage, { pending: 0, invalid: 0, last_invalid: null });
+        assert.deepStrictEqual((await system.stats()).usage, { pending: 0, invalid: 0, last_invalid: null });
 
-        system.stop(); outbox.stop(); db.close();
+        system.stop(); await outbox.stop();
         console.log('job usage: all checks passed');
     } finally {
+        await closeAllTestDbs();
         fs.rmSync(root, { recursive: true, force: true });
     }
 })().catch((e) => { console.error(e); process.exit(1); });
