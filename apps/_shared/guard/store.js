@@ -26,6 +26,36 @@ const MAX_ABUSE = 10000;
 
 /** Seconds until just after the next UTC midnight (a day counter's TTL). */
 function dayTtl(t) { return Math.ceil((Math.floor(t / DAY_MS) + 1) * DAY_MS / 1000) - Math.floor(t / 1000) + 3600; }
+/** The guard_day hash of one UTC day, and one allowance's field in it (quota.js charges the same ones). */
+const dayKey = (valkey, day) => valkey.key('guard_day', day);
+const dayField = (key, cls) => `${key}|${cls}`;
+
+// Check every allowance in one day hash and, when they all fit (or `force`, report mode), add to each:
+// all or nothing, atomically. KEYS[1] the day hash. ARGV: ttl (s), commit (1: charge when it fits,
+// 0: only look), force (1: charge even when it does not fit), then per allowance: field, n, limit
+// (0 = none). Returns "<1|0>:<used before, comma-separated>".
+const DAY_CHARGE = `
+local ttl = tonumber(ARGV[1])
+local commit = ARGV[2] == '1'
+local force = ARGV[3] == '1'
+local m = (#ARGV - 3) / 3
+local ok = true
+local used = {}
+for i = 1, m do
+  local b = 3 + (i - 1) * 3
+  local u = tonumber(redis.call('HGET', KEYS[1], ARGV[b + 1]) or '0')
+  used[i] = tostring(u)
+  local lim = tonumber(ARGV[b + 3])
+  if lim > 0 and u + tonumber(ARGV[b + 2]) > lim then ok = false end
+end
+if (ok and commit) or force then
+  for i = 1, m do
+    local b = 3 + (i - 1) * 3
+    if tonumber(ARGV[b + 2]) > 0 then redis.call('HINCRBYFLOAT', KEYS[1], ARGV[b + 1], ARGV[b + 2]) end
+  end
+  redis.call('EXPIRE', KEYS[1], ttl)
+end
+return (ok and '1' or '0') .. ':' .. table.concat(used, ',')`;
 
 /**
  * @param {object} o
@@ -66,7 +96,7 @@ function createGuardStore(o = {}) {
                 v = await valkey.client.get(key);
             }
             if (v) {
-                salts.set(day, v);
+                salts.set(day, v);   // replaces the process-local stand-in: salt() answers the shared one from now on
                 for (const k of salts.keys()) if (k !== day) salts.delete(k);
             }
         } catch (err) {
@@ -78,29 +108,37 @@ function createGuardStore(o = {}) {
     async function warm() { if (valkey) await loadSalt(dayOf(now())); }
 
     // ── guard_day (Valkey) ───────────────────────────────────
-    async function dayUsed(day, key, cls) {
+    // One run charges one or more day allowances (a session and its address) all or nothing, and the
+    // check and the increment are one Lua call: two requests can never both see room for the last unit.
+    function dayCharge(day, entries, opt = {}) {
         if (cacheDay !== day) { days.clear(); cacheDay = day; }
-        const k = `${day}|${key}|${cls}`;
         if (dayUp) {
-            try {
-                const v = await valkey.client.hget(valkey.key('guard_day', day), `${key}|${cls}`);
-                const n = v == null ? 0 : Number(v);
-                days.set(k, n);
-                return n;
-            } catch (err) { dayUp = false; log.warn(`[Guard] ${app}: Valkey day counters unavailable (${err.message}); counting in this process`); }
+            return valkeyDayCharge(day, entries, opt).catch((err) => {
+                dayUp = false;
+                log.warn(`[Guard] ${app}: Valkey day counters unavailable (${err.message}); counting in this process`);
+                return localDayCharge(day, entries, opt);
+            });
         }
-        return days.get(k) || 0;
+        return Promise.resolve(localDayCharge(day, entries, opt));
     }
-    async function dayAdd(day, key, cls, n) {
-        if (!(n > 0)) return;
-        const k = `${day}|${key}|${cls}`;
-        days.set(k, (days.get(k) || 0) + n);
-        if (!dayUp) return;
-        try {
-            const h = valkey.key('guard_day', day);
-            await valkey.client.hincrbyfloat(h, `${key}|${cls}`, n);
-            await valkey.client.expire(h, dayTtl(now()));
-        } catch (err) { dayUp = false; log.warn(`[Guard] ${app}: Valkey day counters unavailable (${err.message}); counting in this process`); }
+    /** In-process: synchronous, so nothing interleaves between the check and the increment. */
+    function localDayCharge(day, entries, { commit = true, force = false } = {}) {
+        const used = entries.map((e) => days.get(`${day}|${e.key}|${e.cls}`) || 0);
+        const ok = entries.every((e, i) => !(e.limit > 0) || used[i] + e.n <= e.limit);
+        if ((ok && commit) || force) {
+            entries.forEach((e, i) => { if (e.n > 0) days.set(`${day}|${e.key}|${e.cls}`, used[i] + e.n); });
+        }
+        return { ok, used };
+    }
+    async function valkeyDayCharge(day, entries, { commit = true, force = false } = {}) {
+        const c = valkey.client;
+        if (typeof c.ovGuardDayCharge !== 'function') c.defineCommand('ovGuardDayCharge', { lua: DAY_CHARGE });
+        const args = [String(dayTtl(now())), commit ? '1' : '0', force ? '1' : '0'];
+        for (const e of entries) args.push(dayField(e.key, e.cls), String(e.n), String(e.limit > 0 ? e.limit : 0));
+        const [ok, list] = String(await c.ovGuardDayCharge(1, dayKey(valkey, day), ...args)).split(':');
+        const used = list ? list.split(',').map(Number) : [];
+        entries.forEach((e, i) => days.set(`${day}|${e.key}|${e.cls}`, used[i] + ((ok === '1' && commit) || force ? e.n : 0)));
+        return { ok: ok === '1', used };
     }
 
     // ── guard_abuse (PostgreSQL) ─────────────────────────────
@@ -123,7 +161,7 @@ function createGuardStore(o = {}) {
     async function pruneAbuse(beforeMs) {
         for (let i = abuse.length - 1; i >= 0; i--) if (abuse[i].at < beforeMs) abuse.splice(i, 1);
         if (!db) return 0;
-        const n = await db.exec('DELETE FROM guard_abuse WHERE at < $1', [beforeMs]);
+        const n = await db.exec('DELETE FROM guard_abuse WHERE app = $1 AND at < $2', [app, beforeMs]);   // this app's rows only: the table is shared
         return n || 0;
     }
     // guard_day rows live in Valkey and expire on their own.
@@ -131,7 +169,7 @@ function createGuardStore(o = {}) {
 
     async function close() { /* the app owns db and valkey */ }
 
-    return { kind: db ? 'postgres' : 'memory', app, db, valkey, salt, warm, dayUsed, dayAdd, logAbuse, abuseRows, pruneAbuse, pruneDays, close };
+    return { kind: db ? 'postgres' : 'memory', app, db, valkey, salt, warm, dayCharge, logAbuse, abuseRows, pruneAbuse, pruneDays, close };
 }
 
-module.exports = { createGuardStore, dayOf, DAY_MS };
+module.exports = { createGuardStore, dayOf, dayTtl, dayKey, dayField, DAY_MS };

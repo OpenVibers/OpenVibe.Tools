@@ -106,12 +106,9 @@ function createGuard(o = {}) {
     const store = o.store || createGuardStore({ db: o.db || null, valkey: o.valkey || null, app: appName, now, log });
     if (!o.store) void store.warm();
 
-    let saltDay = null, saltValue = null;
-    const salt = () => {
-        const d = dayOf(now());
-        if (d !== saltDay) { saltValue = store.salt(d); saltDay = d; }
-        return saltValue;
-    };
+    // Asked of the store every time (a Map lookup), never cached here: a salt handed out before Valkey
+    // answered is a process-local stand-in, and the shared one must replace it as soon as it loads.
+    const salt = () => store.salt(dayOf(now()));
 
     // Network's sign-out-everywhere cutoffs (PostgreSQL, read through a short shared cache): the gateway
     // writes them (apps/gateway/server/revocation-events.js); every app reads them here.

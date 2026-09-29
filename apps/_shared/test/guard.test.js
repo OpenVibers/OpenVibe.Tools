@@ -44,8 +44,8 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'ov-guard-'));
 const quiet = { log() {}, warn() {}, error() {} };
 
 // A stand-in for openvibe-sdk/valkey: the same key()/client shape over one Map, so two guards can
-// share "one Valkey" in-process. The bucket's two Lua commands are emulated in JS (the real ones are
-// atomic; a single-threaded test has no race to lose).
+// share "one Valkey" in-process. The guard's Lua commands are emulated in JS (the real ones are atomic,
+// and guard-valkey.test.js runs them on a real Valkey under npm run test:pg).
 function fakeValkey({ down = false } = {}) {
     const store = new Map();
     const guard = () => { if (down) throw new Error('valkey down'); };
@@ -57,22 +57,56 @@ function fakeValkey({ down = false } = {}) {
         async expire() { guard(); return 1; },
         async incr(k) { guard(); const v = Number(store.get(k) || 0) + 1; store.set(k, String(v)); return v; },
         defineCommand(name) {
-            client[name] = async (_numKeys, key, burst, rate, need, now) => {
-                guard();
-                const h = store.get(key) || {};
-                let tokens = h.tokens != null ? Number(h.tokens) : Number(burst);
-                const at = h.at != null ? Number(h.at) : Number(now);
-                tokens = Math.min(Number(burst), tokens + (Number(now) - at) * Number(rate));
-                if (name === 'ovBucketRefund') {   // give back, capped at burst
-                    const left = Math.min(Number(burst), tokens + Number(need));
+            const num = (x) => Number(x);
+            const refill = (h, burst, rate, now) => {
+                const tokens = h.tokens != null ? num(h.tokens) : burst;
+                const at = h.at != null ? num(h.at) : now;
+                return Math.min(burst, tokens + Math.max(0, now - at) * rate);
+            };
+            if (name === 'ovBucketRefund') {   // give back, capped at burst
+                client[name] = async (_numKeys, key, burst, rate, need, now) => {
+                    guard();
+                    const left = Math.min(num(burst), refill(store.get(key) || {}, num(burst), num(rate), num(now)) + num(need));
                     store.set(key, { tokens: String(left), at: String(now) });
                     return String(left);
-                }
-                if (tokens < Number(need)) return `${tokens}:0`;   // short: take nothing
-                const left = tokens - Number(need);
-                store.set(key, { tokens: String(left), at: String(now) });
-                return `${left}:1`;
-            };
+                };
+            } else if (name === 'ovQuotaCharge') {   // quota.js CHARGE: every bucket and day allowance, all or nothing
+                client[name] = async (numKeys, ...rest) => {
+                    guard();
+                    const keys = rest.slice(0, numKeys), a = rest.slice(numKeys);
+                    const n = num(a[0]), now = num(a[1]), report = a[4] === '1';
+                    const dh = store.get(keys[n]) || {};
+                    let ok = true;
+                    const st = [];
+                    for (let i = 0; i < n; i++) {
+                        const [burst, rate, need, perDay, cost, field] = a.slice(5 + i * 6, 11 + i * 6);
+                        const tokens = refill(store.get(keys[i]) || {}, num(burst), num(rate), now);
+                        const used = num(perDay) > 0 ? num(dh[field] || 0) : 0;
+                        const minuteOk = tokens >= num(need), dayOk = !(num(perDay) > 0) || used + num(cost) <= num(perDay);
+                        if (!(minuteOk && dayOk)) ok = false;
+                        st.push({ tokens, used, need: num(need), perDay: num(perDay), cost: num(cost), field, minuteOk, dayOk });
+                    }
+                    if (ok || report) {
+                        st.forEach((c, i) => {
+                            store.set(keys[i], { tokens: String(Math.max(0, c.tokens - c.need)), at: String(now) });
+                            if (c.perDay > 0) dh[c.field] = String(num(dh[c.field] || 0) + c.cost);
+                        });
+                        store.set(keys[n], dh);
+                    }
+                    return st.map((c) => `${c.tokens},${c.used},${c.minuteOk ? 1 : 0},${c.dayOk ? 1 : 0}`).join(';');
+                };
+            } else if (name === 'ovGuardDayCharge') {   // store.js DAY_CHARGE
+                client[name] = async (_numKeys, key, _ttl, commit, force, ...triples) => {
+                    guard();
+                    const h = store.get(key) || {};
+                    const e = [];
+                    for (let i = 0; i < triples.length; i += 3) e.push({ field: triples[i], n: num(triples[i + 1]), limit: num(triples[i + 2]) });
+                    const used = e.map((x) => num(h[x.field] || 0));
+                    const ok = e.every((x, i) => !(x.limit > 0) || used[i] + x.n <= x.limit);
+                    if ((ok && commit === '1') || force === '1') { e.forEach((x, i) => { if (x.n > 0) h[x.field] = String(used[i] + x.n); }); store.set(key, h); }
+                    return `${ok ? 1 : 0}:${used.join(',')}`;
+                };
+            } else throw new Error(`fakeValkey: no emulation of ${name}`);
         },
     };
     return { client, key: (...p) => p.join(':'), ready: async () => (down ? { ok: false, error: 'down' } : { ok: true }), close: async () => {} };
@@ -314,6 +348,106 @@ async function serve(app) {
         for (let i = 0; i < 6; i++) if ((await g.quotas.check(c, { quotaClass: 'tools-fetch', cost: 1 })).ok) ok++;
         assert.strictEqual(ok, 2, 'the day allowance still holds in this process: the guard never fails open and never fails every request');
         g.close();
+    }
+
+    // ── A refused run takes nothing: a day refusal never drains the minute bucket (shared and local) ──
+    // Just before UTC midnight: 2 runs fit the day (the bucket 5 → 3), ten more are refused on the day
+    // leg. Two seconds later a new day starts with the bucket still at 3 (+ a trickle): 3 runs fit, the
+    // 4th is refused on the minute leg. If the refused runs had spent tokens, the new day would start empty.
+    for (const withValkey of [true, false]) {
+        let clock = Date.UTC(2026, 8, 23, 23, 59, 58);
+        const env = { TOOLS_GUARD: 'enforce', TOOLS_GUARD_LIMITS: JSON.stringify({ 'tools-fetch': { anonymous: { perMinute: 1, burst: 5, perDay: 2 } } }) };
+        const g = makeGuard({ valkey: withValkey ? fakeValkey() : undefined, env, now: () => clock });
+        await g.store.warm();
+        const c = g.resolveCaller({ ip: '198.51.100.40', headers: {}, cookies: {} });
+        const run = () => g.quotas.check(c, { quotaClass: 'tools-fetch', cost: 1 });
+        const label = withValkey ? 'shared' : 'local';
+        assert.ok((await run()).ok && (await run()).ok, `${label}: the day allowance of 2`);
+        for (let i = 0; i < 10; i++) assert.strictEqual((await run()).binding, 'day', `${label}: refused on the day leg`);
+        clock += 2000;
+        const next = [];
+        for (let i = 0; i < 4; i++) next.push(await run());
+        assert.deepStrictEqual(next.map(r => r.ok), [true, true, false, false], `${label}: a new day: the bucket still holds 3, the day allowance is 2 again`);
+        assert.strictEqual(next[2].binding, 'day');
+        g.close();
+    }
+    // The same with a bigger refused run: cost 2 fits the bucket (3 left) but not the day (2 + 2 > 3). Had
+    // the refused runs spent, the next day's cost-3 run would find about 1 token instead of 3.
+    for (const withValkey of [true, false]) {
+        let clock = Date.UTC(2026, 8, 23, 23, 59, 58);
+        const env = { TOOLS_GUARD: 'enforce', TOOLS_GUARD_LIMITS: JSON.stringify({ 'tools-fetch': { anonymous: { perMinute: 1, burst: 5, perDay: 3 } } }) };
+        const g = makeGuard({ valkey: withValkey ? fakeValkey() : undefined, env, now: () => clock });
+        await g.store.warm();
+        const c = g.resolveCaller({ ip: '198.51.100.41', headers: {}, cookies: {} });
+        const label = withValkey ? 'shared' : 'local';
+        for (let i = 0; i < 2; i++) assert.ok((await g.quotas.check(c, { quotaClass: 'tools-fetch', cost: 1 })).ok);
+        for (let i = 0; i < 5; i++) assert.strictEqual((await g.quotas.check(c, { quotaClass: 'tools-fetch', cost: 2 })).binding, 'day');
+        clock += 2000;
+        const r = await g.quotas.check(c, { quotaClass: 'tools-fetch', cost: 3 });
+        assert.strictEqual(r.ok, true, `${label}: the 3 tokens the refused runs never took`);
+        g.close();
+    }
+
+    // ── The day allowance is one atomic check and charge: concurrent runs never overshoot it ──
+    {
+        const env = { TOOLS_GUARD: 'enforce', TOOLS_GUARD_LIMITS: JSON.stringify({ 'tools-fetch': { anonymous: { perMinute: 600, burst: 600, perDay: 3 } } }) };
+        // Two processes, one Valkey, twenty runs at once: exactly 3 fit.
+        const valkey = fakeValkey();
+        const a = makeGuard({ valkey, env }), b = makeGuard({ valkey, env });
+        await a.store.warm(); await b.store.warm();
+        const req = { ip: '198.51.100.50', headers: {}, cookies: {} };
+        const ca = a.resolveCaller(req), cb = b.resolveCaller(req);
+        const all = await Promise.all(Array.from({ length: 20 }, (_, i) => (i % 2 ? a : b).quotas.check(i % 2 ? ca : cb, { quotaClass: 'tools-fetch', cost: 1 })));
+        assert.strictEqual(all.filter(r => r.ok).length, 3, 'shared buckets: 3 of 20 concurrent runs');
+        a.close(); b.close();
+        // The store's own charge (quotas without Valkey, day counters in Valkey): the same.
+        const v2 = fakeValkey();
+        const store = createGuardStore({ valkey: v2, log: quiet });
+        const q = createQuotas({ store, quotas: () => JSON.parse(env.TOOLS_GUARD_LIMITS), log: quiet });
+        const caller = { tier: 'anonymous', ipKey: 'ip:concurrent', key: 'ip:concurrent' };
+        const r2 = await Promise.all(Array.from({ length: 20 }, () => q.check(caller, { quotaClass: 'tools-fetch', cost: 1 })));
+        assert.strictEqual(r2.filter(r => r.ok).length, 3, 'store day charge: 3 of 20 concurrent runs');
+        const day = new Date().toISOString().slice(0, 10);
+        const direct = await Promise.all(Array.from({ length: 10 }, () => store.dayCharge(day, [{ key: 'k', cls: 'c', n: 1, limit: 4 }])));
+        assert.strictEqual(direct.filter(r => r.ok).length, 4, 'dayCharge: 4 of 10');
+        const both = await store.dayCharge(day, [{ key: 'k2', cls: 'c', n: 1, limit: 5 }, { key: 'k', cls: 'c', n: 1, limit: 4 }]);
+        assert.strictEqual(both.ok, false, 'all or nothing: k is full');
+        assert.deepStrictEqual((await store.dayCharge(day, [{ key: 'k2', cls: 'c', n: 0, limit: 5 }], { commit: false })).used, [0], 'so k2 was not charged');
+    }
+
+    // ── A salt handed out before Valkey answered is replaced by the shared one as soon as it loads ──
+    {
+        const valkey = fakeValkey();
+        let release;
+        const gate = new Promise(r => { release = r; });
+        const get = valkey.client.get;
+        valkey.client.get = async (k) => { await gate; return get(k); };
+        const req = { ip: '198.51.100.70', headers: {}, cookies: {} };
+        const a = makeGuard({ valkey });
+        const early = a.resolveCaller(req).ipKey;            // Valkey has not answered: a process-local salt
+        release();
+        await a.store.warm();
+        const b = makeGuard({ valkey });
+        await b.store.warm();
+        const later = a.resolveCaller(req).ipKey;
+        assert.notStrictEqual(later, early, 'the process-local stand-in is gone once the shared salt loads');
+        assert.strictEqual(later, b.resolveCaller(req).ipKey, 'and both processes agree on the key');
+        a.close(); b.close();
+    }
+
+    // ── One app's prune leaves the other apps' abuse rows alone (one shared guard_abuse table) ──
+    {
+        const dir = tmp();
+        const db = await testDb(dir);
+        const old = now0 - 40 * 24 * 3600 * 1000;
+        for (const app of ['img', 'docs']) {
+            await db.query('INSERT INTO guard_abuse (app, at, minute, ip_hash, principal, tool, reason, enforced) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+                [app, old, Math.floor(old / 60_000), 'h', '', 'png', 'quota', 1]);
+        }
+        const img = createGuardStore({ db, app: 'img', log: quiet });
+        assert.strictEqual(await img.pruneAbuse(now0), 1, "img prunes its own row");
+        const left = await db.query('SELECT app FROM guard_abuse ORDER BY app');
+        assert.deepStrictEqual(left.map(r => r.app), ['docs'], "docs' row is untouched");
     }
 
     // ── The abuse log: no raw address anywhere, 30 days ──
@@ -569,5 +703,5 @@ async function serve(app) {
     }
     await closeAllTestDbs();
 
-    console.log('guard: callers (/64, one loopback hop, services by token, aud-checked users, sessions, sandbox), bucket math + cost, session sharing, report vs enforce, headers + problem+json, two processes one Valkey quota + outage fallback, sniffing, target throttle, port cap, abuse log + prune + metric, semaphore, job bounds (queue, disk, per address), challenge hook, Origin check (CSRF): all checks passed');
+    console.log('guard: callers (/64, one loopback hop, services by token, aud-checked users, sessions, sandbox), bucket math + cost, session sharing, report vs enforce, headers + problem+json, two processes one Valkey quota + outage fallback, refused runs take nothing, atomic day charge, salt refresh, per-app prune, sniffing, target throttle, port cap, abuse log + prune + metric, semaphore, job bounds (queue, disk, per address), challenge hook, Origin check (CSRF): all checks passed');
 })().catch((err) => { console.error(err); process.exit(1); });
