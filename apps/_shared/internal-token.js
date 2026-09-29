@@ -1,19 +1,23 @@
 'use strict';
 // ═══════════════════════════════════════════════════════════════
 // Internal analytics access (GET /api/internal/analytics[/bots]), shared by the gateway and every
-// satellite. Replaces the X-Internal-Key alone with a token-or-key check (contracts v0.79.0,
-// capability tools.analytics.read, ADR-014 service tokens) while the key is retired.
-// Two ways in, both loopback-only (./internal-auth.js refuses anything that came through the proxy):
-//   • Authorization: Bearer <Network service token>: aud openvibe.tools, cap tools.analytics.read,
-//     never a sandbox token. A request that presents a Bearer is judged on the token alone and is
-//     never downgraded to the key: 401 for a bad or missing token, 403 without the capability.
-//   • X-Internal-Key, exactly as before, when no Bearer is presented (the key goes in a later step).
-// → { ok: true, via: 'token'|'key', bearer, claims } | { ok: false, status, body }
-// The gateway forwards `bearer` to the satellites when the caller used a token (same audience), and
-// keeps forwarding the key when the caller did not.
+// satellite. The X-Internal-Key is retired (plan T2): a Network service token alone opens the route
+// (contracts v0.79.0, capability tools.analytics.read, ADR-014 service tokens).
+// One way in, loopback-only (loopbackOnly below refuses anything that came through the proxy):
+//   Authorization: Bearer <Network service token>: aud openvibe.tools, cap tools.analytics.read,
+//   never a sandbox token. 401 for a bad or malformed token, 403 without the capability, and 401
+//   token.missing when no Bearer is presented at all.
+// → { ok: true, via: 'token', bearer, claims } | { ok: false, status, body }
+// The gateway forwards the caller's Bearer to the satellites unchanged (same audience).
 // ═══════════════════════════════════════════════════════════════
-const { internalOk, loopbackOnly } = require('./internal-auth');
 const tokens = require('./guard/tokens');
+
+/** The request came straight from loopback, not through the public proxy (nginx adds the headers). */
+function loopbackOnly(req) {
+    if (req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.headers['cf-connecting-ip']) return false;
+    const ip = String(req.socket && req.socket.remoteAddress || '');
+    return /^(::1|::ffff:127\.|127\.)/.test(ip);
+}
 
 const ANALYTICS_CAPABILITY = 'tools.analytics.read';
 
@@ -32,21 +36,18 @@ const authHeader = (req) => String((req.headers && req.headers.authorization) ||
 function checkAccess(req, o = {}) {
     if (!loopbackOnly(req)) return { ok: false, status: 404, body: { error: 'Not found' } };
     const header = authHeader(req);
-    if (header) {
-        const m = /^Bearer\s+(\S+)$/i.exec(header.trim());
-        if (!m) return { ok: false, status: 401, body: { error: 'Unauthorized', code: 'token.malformed' } };
-        const publicKey = o.getPublicKey ? o.getPublicKey() : (o.publicKey || null);
-        const r = tokens.verifyServiceToken(m[1], {
-            publicKey, issuer: o.issuer, audience: o.audience || tokens.AUDIENCE, acceptSandbox: false, contracts: o.contracts || null,
-        });
-        if (!r.ok) return { ok: false, status: 401, body: { error: 'Unauthorized', code: r.code } };
-        const cap = o.capability || ANALYTICS_CAPABILITY;
-        const denied = tokens.capabilityDenied(r.claims, cap, o.contracts || null);
-        if (denied) return { ok: false, status: 403, body: { error: 'Forbidden', code: denied, detail: `${cap} not granted` } };
-        return { ok: true, via: 'token', bearer: header, claims: r.claims };
-    }
-    if (internalOk(req)) return { ok: true, via: 'key', bearer: null, claims: null };
-    return { ok: false, status: 404, body: { error: 'Not found' } };
+    if (!header) return { ok: false, status: 401, body: { error: 'Unauthorized', code: 'token.missing' } };
+    const m = /^Bearer\s+(\S+)$/i.exec(header.trim());
+    if (!m) return { ok: false, status: 401, body: { error: 'Unauthorized', code: 'token.malformed' } };
+    const publicKey = o.getPublicKey ? o.getPublicKey() : (o.publicKey || null);
+    const r = tokens.verifyServiceToken(m[1], {
+        publicKey, issuer: o.issuer, audience: o.audience || tokens.AUDIENCE, acceptSandbox: false, contracts: o.contracts || null,
+    });
+    if (!r.ok) return { ok: false, status: 401, body: { error: 'Unauthorized', code: r.code } };
+    const cap = o.capability || ANALYTICS_CAPABILITY;
+    const denied = tokens.capabilityDenied(r.claims, cap, o.contracts || null);
+    if (denied) return { ok: false, status: 403, body: { error: 'Forbidden', code: denied, detail: `${cap} not granted` } };
+    return { ok: true, via: 'token', bearer: header, claims: r.claims };
 }
 
 /**

@@ -15,8 +15,6 @@ const KEYS = {
     RIDB_API_KEY: 'sentinel-not-a-secret-ridb',
     NPS_API_KEY: 'sentinel-not-a-secret-nps',
     OPEN_CHARGE_MAP_KEY: 'sentinel-not-a-secret-ocm',
-    INTERNAL_API_KEY: 'sentinel-not-a-secret-internal',
-    OV_INTERNAL_KEY: 'sentinel-not-a-secret-ov-internal',
 };
 
 // One loopback proxy hop is trusted (guard/ip.js): a fresh client address per request keeps the

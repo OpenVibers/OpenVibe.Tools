@@ -398,7 +398,7 @@ address). Past a limit: `429` problem+json `rate_limited` with `Retry-After`, on
 |---|---|---|
 | every app | Registry reads `GET`/`HEAD /api/v1/tools[/:id[/schema]]` by a signed-in person or a third-party principal (`app:…`, `mod:…`) | `TOOLS_LIMITS_MINUTE` / `TOOLS_LIMITS_HOUR` (120 / 3000) |
 | gateway, img, audio, docs | Backstop on job submits and retries (`POST /api/v1/jobs`, `…/:id/retry`) and runs (`POST /api/v1/tools/:id/run`) | a person or an address 600 / 20 000; a principal 3000 / 100 000 |
-| gateway | `GET /api/internal/analytics` (the Network admin's analytics page, after the internal key) | 30 / 300 |
+| gateway | `GET /api/internal/analytics` (the Network admin's analytics page, with a Network service token) | 30 / 300 |
 
 Signed-out registry reads keep only the per-address `/api/` limit (many visitors share a carrier or campus
 address); a first-party service (`svc:…`) reading for itself is not counted. The backstop sits above the
@@ -601,7 +601,7 @@ sniffed against the descriptor; every tool that reaches a visitor-chosen host go
 (`apps/_shared/egress.js`: public addresses only, checked after DNS, redirect hops re-checked); `trust proxy`
 is one loopback hop; sign-in `next` accepts only relative paths, `*.openvibe.tools` and `openvibe.network`.
 Secrets (`OV_OAUTH_CLIENT_SECRET`, `TOOLS_EVENTS_SECRET`, `NET_IPINFO_TOKEN`, `RIDB_API_KEY`, `NPS_API_KEY`,
-`OPEN_CHARGE_MAP_KEY`, `YT_COOKIES_FILE`, the fallback `INTERNAL_API_KEY`) live in `/etc/openvibe/tools.env`
+`OPEN_CHARGE_MAP_KEY`, `YT_COOKIES_FILE`) live in `/etc/openvibe/tools.env`
 (0600), by name only.
 
 ## Deploy

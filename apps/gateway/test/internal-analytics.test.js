@@ -1,10 +1,9 @@
 'use strict';
 // The internal analytics route on the real gateway (apps/_shared/internal-token.js, contracts v0.79.0):
-// a Network service token with tools.analytics.read (aud openvibe.tools) opens it, a token without the
-// capability is 403, a wrong audience or a sandbox token is 401, a bad Bearer beside the right key is
-// still 401 (never downgraded to the key), the key alone still works, a proxied request is refused, and
-// the incoming Bearer is forwarded unchanged to the satellites while the key stays forwarded for a key
-// caller. A stub satellite records what the gateway sends.
+// a Network service token with tools.analytics.read (aud openvibe.tools) opens it and the Bearer is
+// forwarded unchanged to all seven satellites, a token without the capability is 403, a wrong audience
+// or a sandbox token is 401, the retired X-Internal-Key alone is 401 (token.missing), a bad Bearer beside
+// the key is still 401, and a proxied request is refused. A stub satellite records what is sent.
 const assert = require('assert');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -68,26 +67,26 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ov-gw-internal-'));
         // 4. A sandbox token is 401.
         assert.strictEqual((await get({ Authorization: `Bearer ${sandbox}` })).status, 401);
 
-        // 5. A Bearer request is judged on the token alone: the right key beside it does not help.
+        // 5. A bad Bearer is 401 whatever else is sent beside it (the retired key does not help).
         assert.strictEqual((await get({ Authorization: 'Bearer not-a-jwt', 'X-Internal-Key': KEY })).status, 401);
-        assert.strictEqual((await get({ Authorization: `Bearer ${noCap}`, 'X-Internal-Key': KEY })).status, 403);
 
         // 6. A proxied request is refused with key or token (loopback only, as before).
         assert.strictEqual((await get({ 'X-Internal-Key': KEY, 'X-Forwarded-For': '203.0.113.9' })).status, 404);
         assert.strictEqual((await get({ Authorization: `Bearer ${good}`, 'X-Forwarded-For': '203.0.113.9' })).status, 404);
 
-        // 7. The key alone still works, and the key is what the gateway forwards.
+        // 7. The retired X-Internal-Key alone is 401 token.missing, with or without the env var set.
         seen.length = 0;
         r = await get({ 'X-Internal-Key': KEY });
         body = await r.json();
-        assert.strictEqual(r.status, 200, JSON.stringify(body));
-        assert.strictEqual(fanout().length, 7);
-        assert.ok(fanout().every(s => s.key === KEY && s.authorization === null), 'the key is forwarded when the caller used the key');
+        assert.strictEqual(r.status, 401, JSON.stringify(body));
+        assert.strictEqual(body.code, 'token.missing');
+        assert.strictEqual(fanout().length, 0, 'nothing is fanned out without a token');
 
-        // 8. No credentials is 404, as before.
-        assert.strictEqual((await get()).status, 404);
+        // 8. No credentials is 401 too.
+        r = await get();
+        assert.strictEqual(r.status, 401, JSON.stringify(await r.json()));
 
-        console.log('gateway internal analytics: token (tools.analytics.read) opens and is forwarded, 403 without it, 401 for wrong audience/sandbox/bad Bearer, key alone still works, proxied refused');
+        console.log('gateway internal analytics: token (tools.analytics.read) opens and is forwarded, 403 without it, 401 for wrong audience/sandbox/bad Bearer, the key alone is 401, proxied refused');
     } finally {
         if (gw) await gw.kill();
         await new Promise(r => stub.close(r));
