@@ -1,0 +1,2340 @@
+OpenVibe.Tools test report
+HEAD: f8f6095; Node: v22.22.1
+
+1. Dependencies
+npm run install:all: NOT RUN; the later handoff explicitly prohibits installs. No output last line exists.
+ls apps/*/node_modules/openvibe-sdk/package.json | wc -l: 0
+ls stderr: ls: cannot access 'apps/*/node_modules/openvibe-sdk/package.json': No such file or directory
+
+2. npm test (Node 22)
+EXIT=1
+10/63 test files passed; failed: apps/_shared/test/actor-limits.test.js, apps/_shared/test/analytics.test.js, apps/_shared/test/egress.test.js, apps/_shared/test/graceful.test.js, apps/_shared/test/guard.test.js, apps/_shared/test/job-events.test.js, apps/_shared/test/job-usage.test.js, apps/_shared/test/jobs-facade.test.js, apps/_shared/test/jobs-start-retry.test.js, apps/_shared/test/jobs-store-scope.test.js, apps/_shared/test/jobs.test.js, apps/_shared/test/observe.test.js, apps/_shared/test/release.test.js, apps/_shared/test/shared-pins.test.js, apps/_shared/test/upload.test.js, apps/audio/test/hardening.test.js, apps/audio/test/jobs.test.js, apps/audio/test/merge.test.js, apps/docs/test/guard.test.js, apps/docs/test/jobs.test.js, apps/docs/test/pdf-tools.test.js, apps/docs/test/pool.test.js, apps/food/test/maps-forwarding.test.js, apps/gateway/test/actor-limits.test.js, apps/gateway/test/descriptors.test.js, apps/gateway/test/dev-runtime.test.js, apps/gateway/test/developers-page.test.js, apps/gateway/test/engines.test.js, apps/gateway/test/guard.test.js, apps/gateway/test/internal-analytics.test.js, apps/gateway/test/net-family.test.js, apps/gateway/test/net-page-input.test.js, apps/gateway/test/net-ssrf.test.js, apps/gateway/test/net-tools.test.js, apps/gateway/test/openapi.test.js, apps/gateway/test/perf-budget.test.js, apps/gateway/test/registry-consistency.test.js, apps/gateway/test/registry.test.js, apps/gateway/test/revocations.test.js, apps/gateway/test/run-api.test.js, apps/gateway/test/search-index.test.js, apps/gateway/test/security-secrets.test.js, apps/gateway/test/security-ssrf.test.js, apps/gateway/test/services-registry.test.js, apps/gateway/test/shipped-pages.test.js, apps/gateway/test/tools-api.test.js, apps/img/test/codec.test.js, apps/img/test/guard.test.js, apps/img/test/internal-analytics.test.js, apps/img/test/jobs.test.js, apps/maps/test/security-secrets.test.js, apps/yt/test/limits.test.js, apps/yt/test/security-ssrf.test.js
+Failing test files: 53. First up to 40 lines of each error follow.
+
+FAIL apps/_shared/test/actor-limits.test.js
+/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11
+    throw new Error(`${name} is not installed in any app (run npm run install:all)`);
+    ^
+
+Error: express is not installed in any app (run npm run install:all)
+    at dep (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11:11)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/actor-limits.test.js:19:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/analytics.test.js
+/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11
+    throw new Error(`${name} is not installed in any app (run npm run install:all)`);
+    ^
+
+Error: openvibe-shared/analytics/pg is not installed in any app (run npm run install:all)
+    at dep (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11:11)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/analytics.test.js:13:59)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/egress.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'openvibe-shared/egress'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/egress.js
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/egress.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at Function.resolve (node:internal/modules/helpers:157:19)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/egress.js:30:32)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/egress.js',
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/egress.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/graceful.test.js
+node:events:497
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EPERM: operation not permitted 127.0.0.1
+    at Server.setupListenHandle [as _listen2] (node:net:1918:21)
+    at listenInCluster (node:net:1997:12)
+    at node:net:2206:7
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1976:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21) {
+  code: 'EPERM',
+  errno: -1,
+  syscall: 'listen',
+  address: '127.0.0.1'
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/guard.test.js
+/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11
+    throw new Error(`${name} is not installed in any app (run npm run install:all)`);
+    ^
+
+Error: express is not installed in any app (run npm run install:all)
+    at dep (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11:11)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/guard.test.js:16:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/job-events.test.js
+/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11
+    throw new Error(`${name} is not installed in any app (run npm run install:all)`);
+    ^
+
+Error: openvibe-contracts is not installed in any app (run npm run install:all)
+    at dep (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11:11)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/job-events.test.js:14:19)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/job-usage.test.js
+/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11
+    throw new Error(`${name} is not installed in any app (run npm run install:all)`);
+    ^
+
+Error: openvibe-contracts is not installed in any app (run npm run install:all)
+    at dep (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11:11)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/job-usage.test.js:15:19)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/jobs-facade.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'sharp'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/jobs-facade.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at Function.resolve (node:internal/modules/helpers:157:19)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/jobs-facade.test.js:19:31)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/jobs-facade.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/jobs-start-retry.test.js
+/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11
+    throw new Error(`${name} is not installed in any app (run npm run install:all)`);
+    ^
+
+Error: express is not installed in any app (run npm run install:all)
+    at dep (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11:11)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/jobs-start-retry.test.js:13:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/jobs-store-scope.test.js
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/jobs.test.js
+/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11
+    throw new Error(`${name} is not installed in any app (run npm run install:all)`);
+    ^
+
+Error: express is not installed in any app (run npm run install:all)
+    at dep (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11:11)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/jobs.test.js:15:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/observe.test.js
+/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11
+    throw new Error(`${name} is not installed in any app (run npm run install:all)`);
+    ^
+
+Error: express is not installed in any app (run npm run install:all)
+    at dep (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11:11)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/observe.test.js:14:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/release.test.js
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/shared-pins.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'openvibe-shared/files'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/shared-pins.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/shared-pins.test.js:16:121)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/shared-pins.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/upload.test.js
+/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11
+    throw new Error(`${name} is not installed in any app (run npm run install:all)`);
+    ^
+
+Error: express is not installed in any app (run npm run install:all)
+    at dep (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11:11)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/upload.test.js:15:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/audio/test/hardening.test.js
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/audio/test/jobs.test.js
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/audio/test/merge.test.js
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/docs/test/guard.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'pdf-lib'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/guard.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/guard.test.js:10:25)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/guard.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/docs/test/jobs.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'pdf-lib'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/jobs.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/jobs.test.js:9:25)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/jobs.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/docs/test/pdf-tools.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'pdf-lib'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/pdf-tools.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/pdf-tools.test.js:16:25)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/pdf-tools.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/docs/test/pool.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'pdf-lib'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/pool.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/pool.test.js:11:40)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/pool.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/food/test/maps-forwarding.test.js
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/actor-limits.test.js
+node:events:497
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EPERM: operation not permitted 127.0.0.1
+    at Server.setupListenHandle [as _listen2] (node:net:1918:21)
+    at listenInCluster (node:net:1997:12)
+    at node:net:2206:7
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1976:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21) {
+  code: 'EPERM',
+  errno: -1,
+  syscall: 'listen',
+  address: '127.0.0.1'
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/descriptors.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'openvibe-contracts'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/descriptors.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/descriptors.test.js:19:19)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/descriptors.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/dev-runtime.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'openvibe-shared/files'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/dev-runtime.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/dev-runtime.test.js:17:11)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/dev-runtime.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/developers-page.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'express'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/developers-page.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/developers-page.test.js:7:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/developers-page.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/engines.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'ajv/dist/2020'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/engines.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/engines.test.js:15:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/engines.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/guard.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'express'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/guard.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/guard.test.js:11:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/guard.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/internal-analytics.test.js
+node:events:497
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EPERM: operation not permitted 127.0.0.1
+    at Server.setupListenHandle [as _listen2] (node:net:1918:21)
+    at listenInCluster (node:net:1997:12)
+    at node:net:2206:7
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1976:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21) {
+  code: 'EPERM',
+  errno: -1,
+  syscall: 'listen',
+  address: '127.0.0.1'
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/net-family.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'express'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/net-family.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/net-family.test.js:22:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/net-family.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/net-page-input.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'openvibe-shared/egress'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/egress.js
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/net/checks.js
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/net/descriptors.js
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/net-page-input.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at Function.resolve (node:internal/modules/helpers:157:19)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/egress.js:30:32)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/egress.js',
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/net/checks.js',
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/net/descriptors.js',
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/net-page-input.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/net-ssrf.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'express'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/net-ssrf.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/net-ssrf.test.js:7:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/net-ssrf.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/net-tools.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'express'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/net-tools.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/net-tools.test.js:9:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/net-tools.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/openapi.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'openvibe-contracts'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/registry/descriptors.js
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/openapi.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/registry/descriptors.js:22:19)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/registry/descriptors.js',
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/openapi.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/perf-budget.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'openvibe-shared/perf-budget'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/perf-budget.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/perf-budget.test.js:9:36)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/perf-budget.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/registry-consistency.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'express'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/net/routes.js
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/registry-consistency.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/net/routes.js:11:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/net/routes.js',
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/registry-consistency.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/registry.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'openvibe-shared/frame'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/pages/site.js
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/registry.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/pages/site.js:14:15)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/pages/site.js',
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/registry.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/revocations.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'express'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/revocations.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/revocations.test.js:13:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/revocations.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/run-api.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'openvibe-contracts'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/run-api.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/run-api.test.js:19:19)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/run-api.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/search-index.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'openvibe-contracts'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/search-index.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/search-index.test.js:7:19)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/search-index.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/security-secrets.test.js
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/security-ssrf.test.js
+node:events:497
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EPERM: operation not permitted 127.0.0.1
+    at Server.setupListenHandle [as _listen2] (node:net:1918:21)
+    at listenInCluster (node:net:1997:12)
+    at node:net:2206:7
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1976:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21) {
+  code: 'EPERM',
+  errno: -1,
+  syscall: 'listen',
+  address: '127.0.0.1'
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/services-registry.test.js
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/shipped-pages.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'express'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/shipped-pages.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/shipped-pages.test.js:6:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/shipped-pages.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/tools-api.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'openvibe-contracts'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/tools-api.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/tools-api.test.js:16:19)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/tools-api.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/img/test/codec.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'sharp'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/img/test/codec.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/img/test/codec.test.js:9:15)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/img/test/codec.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/img/test/guard.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'sharp'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/img/test/guard.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/img/test/guard.test.js:12:15)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/img/test/guard.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/img/test/internal-analytics.test.js
+node:events:497
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EPERM: operation not permitted 127.0.0.1
+    at Server.setupListenHandle [as _listen2] (node:net:1918:21)
+    at listenInCluster (node:net:1997:12)
+    at node:net:2206:7
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1976:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21) {
+  code: 'EPERM',
+  errno: -1,
+  syscall: 'listen',
+  address: '127.0.0.1'
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/img/test/jobs.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'sharp'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/img/test/jobs.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/img/test/jobs.test.js:9:15)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/img/test/jobs.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/maps/test/security-secrets.test.js
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/yt/test/limits.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'dotenv'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/server/config.js
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/server/downloader.js
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/test/limits.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/server/config.js:3:1)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/server/config.js',
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/server/downloader.js',
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/test/limits.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/yt/test/security-ssrf.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'dotenv'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/server/config.js
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/server/downloader.js
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/test/security-ssrf.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/server/config.js:3:1)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/server/config.js',
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/server/downloader.js',
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/test/security-ssrf.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+3. PostgreSQL + Valkey services
+PostgreSQL and Valkey server binaries are absent. OV_TEST_PG_URL, OV_TEST_PG_DIRECT_URL, and OV_TEST_VALKEY_URL were unset; no service PIDs were started or stopped.
+
+npm run test:pg (Node 22; service URLs unset)
+EXIT=1
+10/63 test files passed; failed: apps/_shared/test/actor-limits.test.js, apps/_shared/test/analytics.test.js, apps/_shared/test/egress.test.js, apps/_shared/test/graceful.test.js, apps/_shared/test/guard.test.js, apps/_shared/test/job-events.test.js, apps/_shared/test/job-usage.test.js, apps/_shared/test/jobs-facade.test.js, apps/_shared/test/jobs-start-retry.test.js, apps/_shared/test/jobs-store-scope.test.js, apps/_shared/test/jobs.test.js, apps/_shared/test/observe.test.js, apps/_shared/test/release.test.js, apps/_shared/test/shared-pins.test.js, apps/_shared/test/upload.test.js, apps/audio/test/hardening.test.js, apps/audio/test/jobs.test.js, apps/audio/test/merge.test.js, apps/docs/test/guard.test.js, apps/docs/test/jobs.test.js, apps/docs/test/pdf-tools.test.js, apps/docs/test/pool.test.js, apps/food/test/maps-forwarding.test.js, apps/gateway/test/actor-limits.test.js, apps/gateway/test/descriptors.test.js, apps/gateway/test/dev-runtime.test.js, apps/gateway/test/developers-page.test.js, apps/gateway/test/engines.test.js, apps/gateway/test/guard.test.js, apps/gateway/test/internal-analytics.test.js, apps/gateway/test/net-family.test.js, apps/gateway/test/net-page-input.test.js, apps/gateway/test/net-ssrf.test.js, apps/gateway/test/net-tools.test.js, apps/gateway/test/openapi.test.js, apps/gateway/test/perf-budget.test.js, apps/gateway/test/registry-consistency.test.js, apps/gateway/test/registry.test.js, apps/gateway/test/revocations.test.js, apps/gateway/test/run-api.test.js, apps/gateway/test/search-index.test.js, apps/gateway/test/security-secrets.test.js, apps/gateway/test/security-ssrf.test.js, apps/gateway/test/services-registry.test.js, apps/gateway/test/shipped-pages.test.js, apps/gateway/test/tools-api.test.js, apps/img/test/codec.test.js, apps/img/test/guard.test.js, apps/img/test/internal-analytics.test.js, apps/img/test/jobs.test.js, apps/maps/test/security-secrets.test.js, apps/yt/test/limits.test.js, apps/yt/test/security-ssrf.test.js
+Failing test files: 53. First up to 40 lines of each error follow.
+
+FAIL apps/_shared/test/actor-limits.test.js
+/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11
+    throw new Error(`${name} is not installed in any app (run npm run install:all)`);
+    ^
+
+Error: express is not installed in any app (run npm run install:all)
+    at dep (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11:11)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/actor-limits.test.js:19:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/analytics.test.js
+/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11
+    throw new Error(`${name} is not installed in any app (run npm run install:all)`);
+    ^
+
+Error: openvibe-shared/analytics/pg is not installed in any app (run npm run install:all)
+    at dep (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11:11)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/analytics.test.js:13:59)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/egress.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'openvibe-shared/egress'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/egress.js
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/egress.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at Function.resolve (node:internal/modules/helpers:157:19)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/egress.js:30:32)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/egress.js',
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/egress.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/graceful.test.js
+node:events:497
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EPERM: operation not permitted 127.0.0.1
+    at Server.setupListenHandle [as _listen2] (node:net:1918:21)
+    at listenInCluster (node:net:1997:12)
+    at node:net:2206:7
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1976:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21) {
+  code: 'EPERM',
+  errno: -1,
+  syscall: 'listen',
+  address: '127.0.0.1'
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/guard.test.js
+/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11
+    throw new Error(`${name} is not installed in any app (run npm run install:all)`);
+    ^
+
+Error: express is not installed in any app (run npm run install:all)
+    at dep (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11:11)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/guard.test.js:16:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/job-events.test.js
+/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11
+    throw new Error(`${name} is not installed in any app (run npm run install:all)`);
+    ^
+
+Error: openvibe-contracts is not installed in any app (run npm run install:all)
+    at dep (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11:11)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/job-events.test.js:14:19)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/job-usage.test.js
+/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11
+    throw new Error(`${name} is not installed in any app (run npm run install:all)`);
+    ^
+
+Error: openvibe-contracts is not installed in any app (run npm run install:all)
+    at dep (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11:11)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/job-usage.test.js:15:19)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/jobs-facade.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'sharp'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/jobs-facade.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at Function.resolve (node:internal/modules/helpers:157:19)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/jobs-facade.test.js:19:31)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/jobs-facade.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/jobs-start-retry.test.js
+/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11
+    throw new Error(`${name} is not installed in any app (run npm run install:all)`);
+    ^
+
+Error: express is not installed in any app (run npm run install:all)
+    at dep (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11:11)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/jobs-start-retry.test.js:13:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/jobs-store-scope.test.js
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/jobs.test.js
+/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11
+    throw new Error(`${name} is not installed in any app (run npm run install:all)`);
+    ^
+
+Error: express is not installed in any app (run npm run install:all)
+    at dep (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11:11)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/jobs.test.js:15:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/observe.test.js
+/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11
+    throw new Error(`${name} is not installed in any app (run npm run install:all)`);
+    ^
+
+Error: express is not installed in any app (run npm run install:all)
+    at dep (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11:11)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/observe.test.js:14:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/release.test.js
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/shared-pins.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'openvibe-shared/files'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/shared-pins.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/shared-pins.test.js:16:121)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/shared-pins.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/_shared/test/upload.test.js
+/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11
+    throw new Error(`${name} is not installed in any app (run npm run install:all)`);
+    ^
+
+Error: express is not installed in any app (run npm run install:all)
+    at dep (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/deps.js:11:11)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/test/upload.test.js:15:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/audio/test/hardening.test.js
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/audio/test/jobs.test.js
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/audio/test/merge.test.js
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/docs/test/guard.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'pdf-lib'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/guard.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/guard.test.js:10:25)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/guard.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/docs/test/jobs.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'pdf-lib'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/jobs.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/jobs.test.js:9:25)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/jobs.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/docs/test/pdf-tools.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'pdf-lib'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/pdf-tools.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/pdf-tools.test.js:16:25)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/pdf-tools.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/docs/test/pool.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'pdf-lib'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/pool.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/pool.test.js:11:40)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/docs/test/pool.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/food/test/maps-forwarding.test.js
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/actor-limits.test.js
+node:events:497
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EPERM: operation not permitted 127.0.0.1
+    at Server.setupListenHandle [as _listen2] (node:net:1918:21)
+    at listenInCluster (node:net:1997:12)
+    at node:net:2206:7
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1976:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21) {
+  code: 'EPERM',
+  errno: -1,
+  syscall: 'listen',
+  address: '127.0.0.1'
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/descriptors.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'openvibe-contracts'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/descriptors.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/descriptors.test.js:19:19)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/descriptors.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/dev-runtime.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'openvibe-shared/files'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/dev-runtime.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/dev-runtime.test.js:17:11)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/dev-runtime.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/developers-page.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'express'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/developers-page.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/developers-page.test.js:7:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/developers-page.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/engines.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'ajv/dist/2020'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/engines.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/engines.test.js:15:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/engines.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/guard.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'express'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/guard.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/guard.test.js:11:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/guard.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/internal-analytics.test.js
+node:events:497
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EPERM: operation not permitted 127.0.0.1
+    at Server.setupListenHandle [as _listen2] (node:net:1918:21)
+    at listenInCluster (node:net:1997:12)
+    at node:net:2206:7
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1976:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21) {
+  code: 'EPERM',
+  errno: -1,
+  syscall: 'listen',
+  address: '127.0.0.1'
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/net-family.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'express'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/net-family.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/net-family.test.js:22:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/net-family.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/net-page-input.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'openvibe-shared/egress'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/egress.js
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/net/checks.js
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/net/descriptors.js
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/net-page-input.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at Function.resolve (node:internal/modules/helpers:157:19)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/egress.js:30:32)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/_shared/egress.js',
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/net/checks.js',
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/net/descriptors.js',
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/net-page-input.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/net-ssrf.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'express'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/net-ssrf.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/net-ssrf.test.js:7:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/net-ssrf.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/net-tools.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'express'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/net-tools.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/net-tools.test.js:9:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/net-tools.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/openapi.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'openvibe-contracts'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/registry/descriptors.js
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/openapi.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/registry/descriptors.js:22:19)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/registry/descriptors.js',
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/openapi.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/perf-budget.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'openvibe-shared/perf-budget'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/perf-budget.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/perf-budget.test.js:9:36)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/perf-budget.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/registry-consistency.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'express'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/net/routes.js
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/registry-consistency.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/net/routes.js:11:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/net/routes.js',
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/registry-consistency.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/registry.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'openvibe-shared/frame'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/pages/site.js
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/registry.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/pages/site.js:14:15)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/server/pages/site.js',
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/registry.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/revocations.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'express'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/revocations.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/revocations.test.js:13:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/revocations.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/run-api.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'openvibe-contracts'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/run-api.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/run-api.test.js:19:19)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/run-api.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/search-index.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'openvibe-contracts'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/search-index.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/search-index.test.js:7:19)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/search-index.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/security-secrets.test.js
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/security-ssrf.test.js
+node:events:497
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EPERM: operation not permitted 127.0.0.1
+    at Server.setupListenHandle [as _listen2] (node:net:1918:21)
+    at listenInCluster (node:net:1997:12)
+    at node:net:2206:7
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1976:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21) {
+  code: 'EPERM',
+  errno: -1,
+  syscall: 'listen',
+  address: '127.0.0.1'
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/services-registry.test.js
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/shipped-pages.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'express'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/shipped-pages.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/shipped-pages.test.js:6:17)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/shipped-pages.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/gateway/test/tools-api.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'openvibe-contracts'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/tools-api.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/tools-api.test.js:16:19)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/gateway/test/tools-api.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/img/test/codec.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'sharp'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/img/test/codec.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/img/test/codec.test.js:9:15)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/img/test/codec.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/img/test/guard.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'sharp'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/img/test/guard.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/img/test/guard.test.js:12:15)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/img/test/guard.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/img/test/internal-analytics.test.js
+node:events:497
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EPERM: operation not permitted 127.0.0.1
+    at Server.setupListenHandle [as _listen2] (node:net:1918:21)
+    at listenInCluster (node:net:1997:12)
+    at node:net:2206:7
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1976:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21) {
+  code: 'EPERM',
+  errno: -1,
+  syscall: 'listen',
+  address: '127.0.0.1'
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/img/test/jobs.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'sharp'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/img/test/jobs.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/img/test/jobs.test.js:9:15)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/img/test/jobs.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/maps/test/security-secrets.test.js
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/yt/test/limits.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'dotenv'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/server/config.js
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/server/downloader.js
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/test/limits.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/server/config.js:3:1)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/server/config.js',
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/server/downloader.js',
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/test/limits.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+FAIL apps/yt/test/security-ssrf.test.js
+node:internal/modules/cjs/loader:1386
+  throw err;
+  ^
+
+Error: Cannot find module 'dotenv'
+Require stack:
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/server/config.js
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/server/downloader.js
+- /home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/test/security-ssrf.test.js
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/server/config.js:3:1)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/server/config.js',
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/server/downloader.js',
+    '/home/workstation/openvibe/agents/worktrees/OpenVibe.Tools-t8-tools-pg/apps/yt/test/security-ssrf.test.js'
+  ]
+}
+
+Node.js v22.22.1
+spawnSync /home/workstation/.local/share/fnm/node-versions/v22.22.1/installation/bin/node EPERM
+
+apps/_shared/test/guard-valkey.test.js: skipped its Valkey checks because VALKEY_URL was unset (line 17); a direct Node 22 run printed "guard valkey: skipped (no VALKEY_URL: npm run test:pg runs the Lua on a real Valkey)". The root runner nevertheless labels this file ok and counts it among the 10 passed.
+
+4. openvibe-sdk createPgOutbox DDL
+SDK package is absent from apps/gateway/node_modules. The gateway lockfile pins SDK v0.25.1 (apps/gateway/package-lock.json:1185-1187); findings below are from that exact tag in the local OpenVibe.SDK checkout.
+No: enqueue (OpenVibe.SDK v0.25.1 src/outbox.js:284-290), start/relay (:292-360), pending (:363), rejected (:364), and prune (:365) neither run DDL nor call ensureSchema lazily. ensureSchema is exposed separately at :358; it calls db.query(outboxSchema(table)). The gateway integration explicitly avoids calling it (apps/_shared/jobs/events.js:169-171).
+Exact SQL run by ensureSchema with the default table event_outbox (OpenVibe.SDK v0.25.1 src/outbox.js:228-245):
+CREATE TABLE IF NOT EXISTS event_outbox (
+    id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    event_id        text NOT NULL UNIQUE,
+    envelope        jsonb NOT NULL,
+    traceparent     text,
+    created_at      bigint NOT NULL,
+    attempts        integer NOT NULL DEFAULT 0,
+    next_attempt_at bigint NOT NULL DEFAULT 0,
+    sent_at         bigint,
+    seq             bigint,
+    rejected_at     bigint,
+    last_error      text
+);
+CREATE INDEX IF NOT EXISTS event_outbox_due ON event_outbox (next_attempt_at, id) WHERE sent_at IS NULL AND rejected_at IS NULL;
+CREATE INDEX IF NOT EXISTS event_outbox_sent ON event_outbox (sent_at) WHERE sent_at IS NOT NULL;
