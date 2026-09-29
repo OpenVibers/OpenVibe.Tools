@@ -14,11 +14,13 @@
 // its own tables at boot and a revocation cutoff is re-derivable). The SQLite files are opened read-only.
 //
 // It relies on the newer openvibe-sdk/db (0.25+) and better-sqlite3; OV_SDK_DIR points at an openvibe-sdk
-// checkout, else the gateway's node_modules is used. Not part of `npm test`.
+// checkout, else the gateway's node_modules is used. better-sqlite3 is scripts/' own dependency (no app
+// has it after plan T8): run `npm --prefix scripts install` once before the cutover. Not part of `npm test`.
 // ═══════════════════════════════════════════════════════════════
 const fs = require('fs');
 const path = require('path');
 const { createRequire } = require('module');
+const { loadSqlite } = require('./sqlite');
 
 const ROOT = path.join(__dirname, '..');
 const APPS = path.join(ROOT, 'apps');
@@ -47,7 +49,7 @@ if (has('help')) {
     process.exit(0);
 }
 
-/** Resolve openvibe-sdk/db from OV_SDK_DIR or an app's node_modules (so better-sqlite3 resolves too). */
+/** Resolve openvibe-sdk/db from OV_SDK_DIR or the gateway's node_modules. */
 function sdkRequire() {
     const dir = process.env.OV_SDK_DIR || path.join(APPS, 'gateway', 'node_modules', 'openvibe-sdk');
     try {
@@ -73,11 +75,6 @@ function discover(apps) {
     return out;
 }
 
-/** Require a module as one app would (so better-sqlite3 resolves from that app's node_modules). */
-function appRequire(app, name) {
-    return createRequire(path.join(APPS, app, 'package.json'))(name);
-}
-
 const q = (x) => `"${String(x).replace(/"/g, '""')}"`;
 
 /**
@@ -86,8 +83,7 @@ const q = (x) => `"${String(x).replace(/"/g, '""')}"`;
  * fresh, globally unique id (per-app ids would collide in the one shared database). Nothing references
  * those ids. The file is opened read-only.
  */
-async function importFile({ app, file, spec, db, importSqlite, first }) {
-    const Database = appRequire(app, 'better-sqlite3');
+async function importFile({ file, spec, db, importSqlite, first, Database }) {
     const src = new Database(file, { readonly: true, fileMustExist: true });
     try {
         for (const [table, drop] of Object.entries(spec.omit || {})) {
@@ -104,6 +100,7 @@ async function main() {
     const apps = repeat('app');
     const sdk = sdkRequire();
     const { createDb, importSqlite } = sdk;
+    const Database = loadSqlite();   // before any database is opened: a missing dependency fails fast
 
     let db;
     if (has('pglite') || (has('dry-run') && !opt('url'))) {
@@ -128,7 +125,7 @@ async function main() {
             const spec = KINDS[kind];
             const first = !doneKind.has(kind);
             doneKind.add(kind);
-            const r = await importFile({ app, file, spec, db, importSqlite, first });
+            const r = await importFile({ file, spec, db, importSqlite, first, Database });
             const rows = {};
             for (const t of r.tables) { rows[t.table] = t.rows; sourceCount[t.table] = (sourceCount[t.table] || 0) + t.rows; }
             // Tag the app-scoped rows this file just inserted (they came in with the '' default).

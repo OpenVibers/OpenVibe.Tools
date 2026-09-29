@@ -1,0 +1,13 @@
+{
+  "name": "openvibe-tools-scripts",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The operational scripts' own dependencies: better-sqlite3 reads the pre-cutover SQLite files (scripts/migrate-to-postgres.js, scripts/analytics-prune.js, scripts/guard-abuse-report.js). No app depends on it (plan T8). Install with npm --prefix scripts install.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0"
+  }
+}

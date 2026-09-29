@@ -29,10 +29,8 @@ function fromApps(name) {
     throw new Error(`${name} is not installed in any app (npm run install:all)`);
 }
 
-/** better-sqlite3 from the first app that has it installed. */
-function loadSqlite() {
-    return fromApps('better-sqlite3');
-}
+/** better-sqlite3: scripts/' own dependency (npm --prefix scripts install), else an app that still has it. */
+const { loadSqlite } = require('./sqlite');
 
 /** [{ name, file }] when no --db is given: the --app list, else every app with data/analytics.db. */
 function targets(args) {
@@ -44,7 +42,8 @@ function targets(args) {
 const USAGE_APPS = `  --app <name>     only this app (repeatable); default: every app that has data/analytics.db
                    (an app's DATA_DIR other than data/ needs --db)
   --pg             prune the one tools database (DATABASE_URL) with openvibe-shared/analytics/pg instead
-                   of the apps' analytics.db files; --days <n> and --apply apply here too`;
+                   of the apps' analytics.db files (the default when DATABASE_URL is set and no --db is
+                   given); --days <n> and --apply apply here too, --app is refused (every service at once)`;
 
 /** The tracker's service names in the one tools database (plan T8). */
 const SERVICES = ['openvibe-gateway', 'openvibe-maps', 'openvibe-food', 'openvibe-img', 'openvibe-yt', 'openvibe-audio', 'openvibe-text', 'openvibe-docs'];
@@ -53,9 +52,15 @@ const SERVICES = ['openvibe-gateway', 'openvibe-maps', 'openvibe-food', 'openvib
  * The PostgreSQL branch (plan T8, decision 5): after the cutover the raw analytics events are rows in the
  * one tools database, not SQLite files. Prunes them with openvibe-shared/analytics/pg (the rollups stay);
  * without --apply it counts only, as the SQLite dry run does. The backup/scrub/VACUUM options are for the
- * pre-cutover files and do not apply here.
+ * pre-cutover files and do not apply here, and neither does --app: the retention is one rule for the whole
+ * database (pruneRawEventsPg has no per-service filter), so an --app here is refused rather than silently
+ * pruning every service.
  */
 async function pgMain(argv, log) {
+    if (argv.includes('--app')) {
+        throw new Error('--app does not apply to the one tools database: the PostgreSQL prune covers every service at once. '
+            + 'Drop --app to prune them all, or pass --db <file> to prune one app\'s pre-cutover analytics.db');
+    }
     const i = argv.indexOf('--days');
     const raw = i >= 0 ? parseInt(argv[i + 1], 10) : 30;
     const days = Number.isFinite(raw) ? Math.min(Math.max(raw, 1), 3650) : 30;

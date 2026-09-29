@@ -31,6 +31,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { loadSqlite } = require('./sqlite');
 
 const ROOT = path.join(__dirname, '..');
 const APPS = path.join(ROOT, 'apps');
@@ -159,7 +160,7 @@ async function main(argv, log = console.log) {
         if (!url) throw new Error('--pg needs DATABASE_URL or --url');
         await reportPg(results, url);
     } else {
-        const Database = fromApps('better-sqlite3');
+        const Database = loadSqlite();
         const list = args.dbs.length ? args.dbs.map((f) => ({ name: path.basename(path.dirname(path.dirname(f))) || 'db', file: path.resolve(f) })) : targets(args);
         for (const t of list) reportSqlite(results, t, Database);
     }
