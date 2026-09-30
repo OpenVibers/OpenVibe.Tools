@@ -4,7 +4,7 @@
 --
 -- Not here on purpose (plan T8, decision 4):
 --   guard_salt, guard_day, the minute/burst token buckets  -> Valkey (throttle state, worthless after a day)
---   the event outbox        -> migrations/0004_event_outbox.sql (openvibe-sdk createPgOutbox's table, as owner)
+--   the event outbox        -> openvibe-sdk createPgOutbox creates its own table at boot
 --   token_revocations       -> openvibe-sdk/auth createPgRevocationStore creates its own table at boot
 --
 -- `app` (the owning app, one row per app in the one database) has DEFAULT '' so scripts/migrate-to-postgres.js
