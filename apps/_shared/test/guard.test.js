@@ -446,7 +446,7 @@ async function serve(app) {
         }
         const img = createGuardStore({ db, app: 'img', log: quiet });
         assert.strictEqual(await img.pruneAbuse(now0), 1, "img prunes its own row");
-        const left = await db.query('SELECT app FROM guard_abuse ORDER BY app');
+        const left = await db.many('SELECT app FROM guard_abuse ORDER BY app');
         assert.deepStrictEqual(left.map(r => r.app), ['docs'], "docs' row is untouched");
     }
 
