@@ -95,11 +95,11 @@ function mountJobRoutes(app, o) {
         return w || { owner: null };
     }
     /** The job, if it exists AND belongs to the caller; otherwise the same 404 either way. */
-    function load(req, res, action) {
+    async function load(req, res, action) {
         const w = who(req, res, { action });
         if (!w) return null;
         const id = String(req.params.id || '');
-        const row = ID_RE.test(id) ? system.get(id) : null;
+        const row = ID_RE.test(id) ? await system.get(id) : null;
         if (!row || !w.owner || row.owner !== w.owner) { send(res, 404, 'tools.job.not_found', 'No such job'); return null; }
         return row;
     }
@@ -109,11 +109,11 @@ function mountJobRoutes(app, o) {
     // Which satellite holds a job? Only for a caller on this host with no proxy in between (the
     // gateway's facade); through nginx or the gateway's own proxy it is not found. Says nothing but
     // whether the id exists here.
-    app.get('/api/internal/jobs/:id', (req, res) => {
+    app.get('/api/internal/jobs/:id', async (req, res) => {
         res.set('Cache-Control', 'no-store');
         const direct = isLoopback(req.socket && req.socket.remoteAddress) && !req.headers['x-forwarded-for'] && !req.headers['x-real-ip'];
         const id = String(req.params.id || '');
-        if (!direct || !ID_RE.test(id) || !system.get(id)) return send(res, 404, 'tools.job.not_found', 'No such job');
+        if (!direct || !ID_RE.test(id) || !(await system.get(id))) return send(res, 404, 'tools.job.not_found', 'No such job');
         return res.json({ id, service: system.service || null });
     });
 
@@ -136,8 +136,8 @@ function mountJobRoutes(app, o) {
     };
 
     // Over the store's bounds (queued jobs, disk): answer before an upload is accepted.
-    const notBusy = (req, res, next) => {
-        const busy = system.busy ? system.busy() : null;
+    const notBusy = async (req, res, next) => {
+        const busy = system.busy ? await system.busy() : null;
         if (!busy) return next();
         if (o.onBusy) return o.onBusy(req, res, busy) ? next() : undefined;
         res.set('Retry-After', String(busy.retryAfter || 30));
@@ -160,7 +160,7 @@ function mountJobRoutes(app, o) {
         const files = list.map(f => ({ path: f.path, buffer: f.path ? undefined : f.buffer, name: f.originalname, mime: f.mimetype, size: f.size }));
         const key = req.headers['idempotency-key'] != null ? String(req.headers['idempotency-key']) : (b.idempotency_key != null ? String(b.idempotency_key) : null);
         // Sessions from one address share a bound on unfinished jobs: a new cookie is no new allowance.
-        const full = w.caller && system.addressFull ? system.addressFull(w.owner, w.caller.ipKey) : null;
+        const full = w.caller && system.addressFull ? await system.addressFull(w.owner, w.caller.ipKey) : null;
         if (full) {
             const goOn = o.onAddressFull ? o.onAddressFull(req, res, full) : (send(res, 429, 'tools.job.too_many_active', `At most ${full.limit} unfinished jobs from one address at a time; wait for one to finish`), false);
             if (!goOn) { for (const f of files) if (f.path) fs.unlink(f.path, () => {}); return; }
@@ -177,7 +177,7 @@ function mountJobRoutes(app, o) {
             const { job, replayed } = await system.submit({ owner: w.owner, type: String(b.type || ''), input, files, idempotencyKey: key, ttlMs: ttlMs(req, w), env: w.env || 'production', ipKey: w.caller ? w.caller.ipKey : null, project: w.kind === 'principal' && w.claims && w.claims.actor_type === 'app' ? w.claims.project_id : null, traceId: req.ov && req.ov.traceId });
             res.set('Location', `/api/v1/jobs/${job.id}`);
             if (replayed) res.set('Idempotent-Replayed', 'true');
-            return res.status(replayed ? 200 : 202).json(system.view(job));
+            return res.status(replayed ? 200 : 202).json(await system.view(job));
         } catch (err) {
             if (err instanceof system.JobError) return send(res, err.status, err.code, err.detail, err.extra);
             console.error('[Jobs] submit failed:', err.message);
@@ -185,31 +185,31 @@ function mountJobRoutes(app, o) {
         }
     });
 
-    app.get('/api/v1/jobs/:id', (req, res) => {
+    app.get('/api/v1/jobs/:id', async (req, res) => {
         noStore(res);
-        const row = load(req, res, 'read');
-        if (row) res.json(system.view(row));
+        const row = await load(req, res, 'read');
+        if (row) res.json(await system.view(row));
     });
 
-    app.delete('/api/v1/jobs/:id', origin, (req, res) => {
+    app.delete('/api/v1/jobs/:id', origin, async (req, res) => {
         noStore(res);
-        const row = load(req, res, 'cancel');
+        const row = await load(req, res, 'cancel');
         if (!row) return;
         if (row.state === 'succeeded' || row.state === 'failed') return send(res, 409, 'tools.job.already_finished', `The job already ${row.state}`, { state: row.state });
-        const { job } = system.cancel(row.id);
-        return res.status(job.state === 'cancelled' ? 200 : 202).json(system.view(job));
+        const { job } = await system.cancel(row.id);
+        return res.status(job.state === 'cancelled' ? 200 : 202).json(await system.view(job));
     });
 
     // Retry and references are writes: a principal needs tools.job.create, like a submit.
-    app.post('/api/v1/jobs/:id/retry', origin, ...(o.limiters || []), notBusy, (req, res) => {
+    app.post('/api/v1/jobs/:id/retry', origin, ...(o.limiters || []), notBusy, async (req, res) => {
         noStore(res);
-        const row = load(req, res, 'create');
+        const row = await load(req, res, 'create');
         if (!row) return;
         try {
-            const { job, replayed } = system.retry(row.id);
+            const { job, replayed } = await system.retry(row.id);
             res.set('Location', `/api/v1/jobs/${job.id}`);
             if (replayed) res.set('Idempotent-Replayed', 'true');
-            return res.status(replayed ? 200 : 202).json(system.view(job));
+            return res.status(replayed ? 200 : 202).json(await system.view(job));
         } catch (err) {
             if (err instanceof system.JobError) return send(res, err.status, err.code, err.detail, err.extra);
             console.error('[Jobs] retry failed:', err.message);
@@ -218,13 +218,13 @@ function mountJobRoutes(app, o) {
     });
 
     function referenceRoute(fn) {
-        return (req, res) => {
+        return async (req, res) => {
             noStore(res);
-            const row = load(req, res, 'create');
+            const row = await load(req, res, 'create');
             if (!row) return;
             try {
-                const r = fn(row.id, String(req.params.ref || ''));
-                return res.status(r.created ? 201 : 200).json(system.view(r.job));
+                const r = await fn(row.id, String(req.params.ref || ''));
+                return res.status(r.created ? 201 : 200).json(await system.view(r.job));
             } catch (err) {
                 if (err instanceof system.JobError) return send(res, err.status, err.code, err.detail, err.extra);
                 console.error('[Jobs] reference failed:', err.message);
@@ -235,12 +235,12 @@ function mountJobRoutes(app, o) {
     app.put('/api/v1/jobs/:id/references/:ref', origin, referenceRoute((id, ref) => system.reference(id, ref)));
     app.delete('/api/v1/jobs/:id/references/:ref', origin, referenceRoute((id, ref) => system.unreference(id, ref)));
 
-    app.get('/api/v1/jobs/:id/events', (req, res) => {
-        const row = load(req, res, 'read');
+    app.get('/api/v1/jobs/:id/events', async (req, res) => {
+        const row = await load(req, res, 'read');
         if (!row) return;
         const raw = req.headers['last-event-id'] != null ? req.headers['last-event-id'] : req.query.last_event_id;
         const after = Math.max(0, parseInt(raw, 10) || 0);
-        const pending = system.eventsAfter(row.id, after);
+        const pending = await system.eventsAfter(row.id, after);
         // Finished and nothing new since the client's last event: 204 tells EventSource to stop reconnecting.
         if (TERMINAL.has(row.state) && !pending.length) return res.status(204).set('Cache-Control', 'no-store').end();
 
@@ -264,7 +264,7 @@ function mountJobRoutes(app, o) {
         };
         // Subscribe before replaying so nothing emitted in between is lost; the seq check drops duplicates.
         const unsubscribe = system.subscribe(row.id, (e) => (replaying ? queue.push(e) : write(e)));
-        for (const e of system.eventsAfter(row.id, after)) write(e);
+        for (const e of await system.eventsAfter(row.id, after)) write(e);
         replaying = false;
         queue.forEach(write);
         const keepAlive = setInterval(() => { if (!closed) res.write(': keep-alive\n\n'); }, 15000);
@@ -273,7 +273,7 @@ function mountJobRoutes(app, o) {
     });
 
     app.get('/api/v1/jobs/:id/files/:n', async (req, res) => {
-        const row = load(req, res, 'read');
+        const row = await load(req, res, 'read');
         if (!row) return;
         if (row.state !== 'succeeded') return send(res, 409, 'tools.job.not_ready', `The job is ${row.state}`);
         const f = system.resultFile(row, parseInt(req.params.n, 10));

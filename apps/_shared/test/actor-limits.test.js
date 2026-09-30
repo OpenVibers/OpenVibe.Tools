@@ -46,7 +46,7 @@ const SVC = principal('svc:network');
     const log = { log() {}, error() {}, warn: (m) => lines.push(String(m)) };
     const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ov-actor-limits-'));
     const guard = createGuard({
-        app: 'test', dataDir, Database: dep('better-sqlite3'), contracts, specs: [], issuer: ISSUER,
+        app: 'test', dataDir, contracts, specs: [], issuer: ISSUER,
         keys: { get: () => publicKey, ensure: async () => publicKey }, env: { TOOLS_GUARD: 'report' }, log, pruneIntervalMs: 0,
     });
     const registry = metrics.createRegistry();

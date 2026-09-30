@@ -29,10 +29,8 @@ function fromApps(name) {
     throw new Error(`${name} is not installed in any app (npm run install:all)`);
 }
 
-/** better-sqlite3 from the first app that has it installed. */
-function loadSqlite() {
-    return fromApps('better-sqlite3');
-}
+/** better-sqlite3: scripts/' own dependency (npm --prefix scripts install), else an app that still has it. */
+const { loadSqlite } = require('./sqlite');
 
 /** [{ name, file }] when no --db is given: the --app list, else every app with data/analytics.db. */
 function targets(args) {
@@ -42,9 +40,52 @@ function targets(args) {
 }
 
 const USAGE_APPS = `  --app <name>     only this app (repeatable); default: every app that has data/analytics.db
-                   (an app's DATA_DIR other than data/ needs --db)`;
+                   (an app's DATA_DIR other than data/ needs --db)
+  --pg             prune the one tools database (DATABASE_URL) with openvibe-shared/analytics/pg instead
+                   of the apps' analytics.db files (the default when DATABASE_URL is set and no --db is
+                   given); --days <n> and --apply apply here too, --app is refused (every service at once)`;
+
+/** The tracker's service names in the one tools database (plan T8). */
+const SERVICES = ['openvibe-gateway', 'openvibe-maps', 'openvibe-food', 'openvibe-img', 'openvibe-yt', 'openvibe-audio', 'openvibe-text', 'openvibe-docs'];
+
+/**
+ * The PostgreSQL branch (plan T8, decision 5): after the cutover the raw analytics events are rows in the
+ * one tools database, not SQLite files. Prunes them with openvibe-shared/analytics/pg (the rollups stay);
+ * without --apply it counts only, as the SQLite dry run does. The backup/scrub/VACUUM options are for the
+ * pre-cutover files and do not apply here, and neither does --app: the retention is one rule for the whole
+ * database (pruneRawEventsPg has no per-service filter), so an --app here is refused rather than silently
+ * pruning every service.
+ */
+async function pgMain(argv, log) {
+    if (argv.includes('--app')) {
+        throw new Error('--app does not apply to the one tools database: the PostgreSQL prune covers every service at once. '
+            + 'Drop --app to prune them all, or pass --db <file> to prune one app\'s pre-cutover analytics.db');
+    }
+    const i = argv.indexOf('--days');
+    const raw = i >= 0 ? parseInt(argv[i + 1], 10) : 30;
+    const days = Number.isFinite(raw) ? Math.min(Math.max(raw, 1), 3650) : 30;
+    const apply = argv.includes('--apply');
+    const { createDb } = fromApps('openvibe-sdk/db');
+    const { pruneRawEventsPg } = fromApps('openvibe-shared/analytics/pg');
+    const db = createDb({ url: process.env.DATABASE_URL, service: 'tools-analytics-prune', max: 1, log });
+    try {
+        const cutoff = new Date(Date.now() - days * 86400000).toISOString().slice(0, 19).replace('T', ' ');
+        const rows = await db.query('SELECT service, COUNT(*)::bigint AS n FROM analytics_events WHERE created_at < $1 GROUP BY service ORDER BY service', [cutoff]);
+        for (const r of rows) log(`${r.service}: ${r.n} raw events older than ${days} days`);
+        if (!rows.length) log(`nothing older than ${days} days`);
+        if (apply) {
+            const r = await pruneRawEventsPg(db, { days });
+            log(`removed ${r.removed} raw events, plus visitor days and day salts, older than ${r.cutoff}`);
+        } else {
+            log('dry run: nothing changed (pass --apply)');
+        }
+    } finally {
+        await db.close();
+    }
+}
 
 function main(argv, log) {
+    if (argv.includes('--pg') || (process.env.DATABASE_URL && !argv.includes('--db'))) return pgMain(argv, log);
     const cli = fromApps('openvibe-shared/analytics/prune-cli');
     return cli.main(argv, {
         Database: loadSqlite(),
@@ -57,4 +98,4 @@ function main(argv, log) {
 
 if (require.main === module) fromApps('openvibe-shared/analytics/prune-cli').run(main);
 
-module.exports = { main, targets, loadSqlite };
+module.exports = { main, pgMain, targets, loadSqlite, SERVICES };

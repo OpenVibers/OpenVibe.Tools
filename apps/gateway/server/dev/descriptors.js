@@ -84,7 +84,6 @@ const SPECS = [
         },
         limits: { timeoutMs: 12000, maxInputBytes: 4 * KiB, perTargetPerMinute: 10 },
         auth: ANYONE, quotaClass: 'tools-fetch', cost: 2, egress: true,
-        legacy: ['GET /api/dev/opengraph'],
         route: { method: 'GET', path: '/api/dev/opengraph', query: { url: '{url}' } },
         example: { input: { url: 'https://openvibe.tools' } },
     },

@@ -81,17 +81,6 @@ const seconds = (file) => parseFloat(execFileSync('ffprobe', ['-v', 'error', '-s
         r = await fetch(`${app.base}/api/v1/jobs`, { method: 'POST', body: two, headers: { cookie } });
         assert.strictEqual(r.status, 400, 'single-file tools take one file');
 
-        // The synchronous endpoint (after the burst limiter's window: the jobs above count too).
-        await sleep(5100);
-        const sync = new FormData();
-        sync.append('tool', 'merge');
-        sync.append('files', new Blob([fs.readFileSync(wav)], { type: 'audio/wav' }), 'x.wav');
-        sync.append('files', new Blob([fs.readFileSync(mp3)], { type: 'audio/mpeg' }), 'y.mp3');
-        r = await fetch(`${app.base}/api/process/multi`, { method: 'POST', body: sync });
-        const body = await r.json();
-        assert.strictEqual(r.status, 200, JSON.stringify(body));
-        assert.strictEqual(body.fileCount, 2);
-        assert.strictEqual(body.output.ext, 'mp3');
     } finally {
         await app.kill();
         fs.rmSync(data, { recursive: true, force: true });

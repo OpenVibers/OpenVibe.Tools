@@ -1,49 +1,82 @@
 'use strict';
 // Sign-out everywhere for every Tools app (roadmap WS-B task 4; Contracts 0.39.0
-// network.user.token_valid_after). The gateway receives the event and keeps each person's cutoff in
-// one SQLite file on the host (apps/gateway/server/revocation-events.js); every app's guard reads it
-// here and treats a token issued before the cutoff as nobody signed in (Network's rule:
-// iat * 1000 < valid_after). Lookups are memoised briefly per subject, so a revocation reaches every
-// app within `ttlMs`. Without better-sqlite3 or before the gateway has written the file, nothing is revoked.
-const fs = require('fs');
-const path = require('path');
+// network.user.token_valid_after). The cutoff lives in PostgreSQL (token_revocations, plan T8
+// decision 4): the gateway writes it through openvibe-sdk/auth createPgRevocationStore
+// (apps/gateway/server/revocation-events.js), and every app's guard reads it here.
+//
+// A read happens on the request path (isRevoked), so it stays synchronous against a short in-memory
+// cache loaded from PostgreSQL and refreshed at most every `ttlMs`. With a Valkey connection the
+// refresh is driven by a shared version counter the writer bumps, so a revocation reaches every
+// process as soon as its next refresh (or the ttl elapses). Without a database (tests, or a database
+// outage) nothing is revoked, exactly as before the shared store existed — never a hard failure on a
+// request.
+//
+//   const cutoffs = createCutoffReader({ db, valkey });
+//   cutoffs.isRevoked(claims)   → boolean (from the cache)
+//   await cutoffs.refresh()     → reloads from PostgreSQL now
 
-// In the gateway's data directory: the one place its unit may write (ReadWritePaths); the other apps only read it.
-const DEFAULT_FILE = path.resolve(__dirname, '..', '..', 'gateway', 'data', 'token-revocations.db');
+const DEFAULT_TABLE = 'token_revocations';
 
-function revocationsFile(env = process.env) { return env.TOOLS_REVOCATIONS_DB || DEFAULT_FILE; }
+/**
+ * @param {object} o
+ * @param {object} [o.db]            openvibe-sdk/db handle (token_revocations); absent → nothing revoked
+ * @param {object} [o.valkey]        openvibe-sdk/valkey connection; a shared refresh version
+ * @param {string} [o.table='token_revocations']
+ * @param {number} [o.ttlMs=15_000]  how long a loaded cache is trusted before the next read refreshes it
+ * @param {() => number} [o.now]
+ * @param {object} [o.log]
+ */
+function createCutoffReader(o = {}) {
+    const db = o.db || null;
+    const valkey = o.valkey || null;
+    const table = o.table || DEFAULT_TABLE;
+    const ttlMs = o.ttlMs == null ? 15_000 : o.ttlMs;
+    const now = o.now || Date.now;
+    const log = o.log || console;
+    const cache = new Map();     // subject → cutoff ms
+    let loadedAt = 0;
+    let version = null;
+    let inFlight = null;
 
-function createCutoffReader({ Database = null, file = revocationsFile(), ttlMs = 15_000, now = Date.now } = {}) {
-    let stmt = null, lastTry = 0;
-    const memo = new Map();
-    function open() {
-        if (stmt || !Database) return stmt;
-        if (now() - lastTry < 10_000) return null;
-        lastTry = now();
-        try {
-            if (!fs.existsSync(file)) return null;
-            const db = new Database(file, { readonly: true, fileMustExist: true });
-            db.pragma('busy_timeout = 1000');
-            stmt = db.prepare('SELECT valid_after_ms FROM token_revocations WHERE subject_id = ?');
-        } catch { stmt = null; }
-        return stmt;
-    }
     function cutoffFor(subject) {
         if (!subject) return 0;
-        const hit = memo.get(subject);
-        if (hit && now() - hit.at < ttlMs) return hit.ms;
-        let ms = 0;
-        const s = open();
-        if (s) { try { const row = s.get(subject); ms = row ? Number(row.valid_after_ms) || 0 : 0; } catch { ms = hit ? hit.ms : 0; } }
-        if (memo.size > 20000) memo.clear();
-        memo.set(subject, { at: now(), ms });
-        return ms;
+        if (db && now() - loadedAt > ttlMs) void refresh();   // background; this read uses the cache
+        return cache.get(subject) || 0;
     }
     function isRevoked(claims) {
         if (!claims || typeof claims.iat !== 'number' || typeof claims.subject_id !== 'string') return false;
         return claims.iat * 1000 < cutoffFor(claims.subject_id);
     }
-    return { isRevoked, cutoffFor };
+
+    const versionKey = () => valkey.key('token_revocations_version');
+    async function refresh() {
+        if (!db) return 0;
+        if (inFlight) return inFlight;
+        inFlight = (async () => {
+            try {
+                // With Valkey, an unchanged version means no writer moved a cutoff: the cache still holds.
+                if (valkey) {
+                    const v = await valkey.client.get(versionKey());
+                    if (v && v === version && loadedAt) { loadedAt = now(); return cache.size; }
+                    version = v || version;
+                }
+                const rows = await db.prepare(`SELECT subject_id, valid_after_ms FROM ${table}`).all();
+                cache.clear();
+                for (const r of rows) cache.set(r.subject_id, Number(r.valid_after_ms) || 0);
+                loadedAt = now();
+                return cache.size;
+            } catch (err) {
+                log.warn && log.warn(`[Guard] revocations read failed: ${err.message}; keeping the last cutoffs`);
+                loadedAt = now();
+                return cache.size;
+            } finally { inFlight = null; }
+        })();
+        return inFlight;
+    }
+    /** Load the cutoffs once at boot (the gateway's writer bumps the shared version on every write). */
+    async function warm() { return refresh(); }
+
+    return { isRevoked, cutoffFor, refresh, warm, size: () => cache.size };
 }
 
-module.exports = { createCutoffReader, revocationsFile, DEFAULT_FILE };
+module.exports = { createCutoffReader, DEFAULT_TABLE };

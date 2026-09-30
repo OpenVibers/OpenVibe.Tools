@@ -399,7 +399,10 @@ P.color=(s)=>{
 };
 
 P.opengraph=async(s)=>{
-    const r=await fetch(API+'/opengraph?url='+encodeURIComponent(s.trim()));const d=await r.json();if(!d.ok)throw new Error(d.error||'Failed to fetch');
+    // The tool's run API (plan T8, Phase 1), with the same tags/seo the old /api/dev/opengraph answered.
+    const r=await fetch('/api/v1/tools/opengraph/run',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({input:{url:s.trim()}})});
+    const b=await r.json();if(b.state!=='succeeded'||!b.result)throw new Error((b.error&&(b.error.detail||b.error.title))||b.detail||'Failed to fetch');
+    const d={ok:true,...b.result.data};
     const og=d.tags||{};let u;try{u=new URL(s.trim()).hostname}catch{u=''}
     return{html:'<div class="og-card">'+(og['og:image']?'<img src="'+H(og['og:image'])+'" onerror="this.style.display=\'none\'">':'')+'<div class="og-body"><div class="og-dm">'+H(og['og:site_name']||u)+'</div><div class="og-tt">'+H(og['og:title']||og.title||'No title')+'</div><div class="og-ds">'+H(og['og:description']||og.description||'No description')+'</div></div></div>'
     +'<div style="margin-top:14px"><div class="jl">All Meta Tags</div>'+Object.entries(og).map(([k,v])=>'<div><span style="color:var(--ac)">'+H(k)+'</span>: '+H(String(v))+'</div>').join('')+'</div>'

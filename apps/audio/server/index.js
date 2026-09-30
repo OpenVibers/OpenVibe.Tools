@@ -27,7 +27,6 @@ const { hostGuard, ownHost } = require('../../_shared/host-role');
 const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
 const { satelliteRunApi, ajvFrom } = require('../../_shared/tools/run');
 const { satellitePorts } = require('../../_shared/tools/satellites');
-const { deprecated, runPath } = require('../../_shared/tools/deprecation');
 const { createLocalRegistry, requiresStatus } = require('../../_shared/tools/local');
 const jobsRuntime = require('../../_shared/jobs');
 const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
@@ -35,14 +34,8 @@ const contracts = require('openvibe-contracts');
 const sdk = require('openvibe-sdk');
 
 // ── Analytics ────────────────────────────────────────────────
-const Database = require('better-sqlite3');
-const { AnalyticsTracker } = require('openvibe-shared/analytics'); // ADR-021: no IP/user id, route templates, raw rows pruned after 30 days, Sec-GPC/DNT not recorded
+const { AnalyticsTrackerPg } = require('openvibe-shared/analytics/pg'); // ADR-021: no IP/user id, route templates, raw rows pruned after 30 days, Sec-GPC/DNT not recorded
 const { requireInternalAccess } = require('../../_shared/internal-token');
-const analyticsDbPath = path.resolve(__dirname, '..', config.dataDir, 'analytics.db');
-fs.mkdirSync(path.dirname(analyticsDbPath), { recursive: true });
-const analyticsDb = new Database(analyticsDbPath);
-analyticsDb.pragma('journal_mode = WAL');
-const analytics = new AnalyticsTracker(analyticsDb, 'openvibe-audio', { retention: { days: 30 } });
 
 // ── Guard (apps/_shared/guard) ───────────────────────────────
 // Who is asking (Network sign-in with aud openvibe.tools, service tokens, the browser session, else
@@ -50,8 +43,12 @@ const analytics = new AnalyticsTracker(analyticsDb, 'openvibe-audio', { retentio
 // abuse log (data/guard.db). TOOLS_GUARD=report (default) records what it would refuse. Every audio
 // tool needs a browser session, a sign-in or a token (descriptor auth.anonymous false).
 const SPECS = require('./descriptors').SPECS;
+// The one `tools` database and the shared Valkey (plan T8, decisions 3 and 4).
+const toolsDb = require('../../_shared/db').openToolsDb({ createDb: require('openvibe-sdk/db').createDb, service: 'tools-audio' });
+const analytics = new AnalyticsTrackerPg(toolsDb.db, 'openvibe-audio', { retention: { days: 30 } }); // ADR-021; PostgreSQL (plan T8)
+const toolsValkey = require('../../_shared/db').openToolsValkey({ createValkey: require('openvibe-sdk/valkey').createValkey });
 const guard = createGuard({
-    app: 'audio', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts, specs: SPECS,
+    app: 'audio', db: toolsDb.db, valkey: toolsValkey, contracts, specs: SPECS,
     issuer: config.networkUrl, networkUrl: config.networkUrl, networkInternalUrl: config.networkInternalUrl, publicKeyFiles: config.publicKeyPaths,
 });
 const { apiLimiter, processLimiter, burstLimiter } = guard.legacyLimiters(rateLimit);
@@ -66,16 +63,18 @@ const release = require('../../_shared/release').toolsRelease('audio', require);
 // Metrics (GET /metrics, direct loopback callers only) and GET /api/ready from this server's real
 // dependencies (roadmap Track O). First, so the HTTP metrics see every request.
 const { observe, checks: ready, which } = require('../../_shared/observe');
+// Serve only once the schema is in: the first PGlite migration must not run inside a request (it
+// would block the event loop and time out a satellite's readiness check).
+app.use((req, res, next) => toolsDb.ready.then(() => next(), next));
 const obs = observe({
     app, metrics: require('openvibe-shared/metrics'), ready: require('openvibe-shared/ready'),
     service: 'tools-audio', release: release.release,
     checks: [
-        ready.sqlite('jobs_db', () => jobs.db, { sql: 'SELECT COUNT(*) AS n FROM tool_jobs', description: 'job store (jobs.db)' }),
+        ready.postgres('tools_db', () => toolsDb.db, { description: 'the one tools database (guard_abuse, jobs, analytics, revocations)' }),
         ready.jobRuntime('job_runtime', () => jobs),
-        ready.writableDir('data_dir', path.resolve(__dirname, '..', config.dataDir), { description: 'jobs.db and job inputs/results' }),
+        ready.writableDir('data_dir', path.resolve(__dirname, '..', config.dataDir), { description: 'job inputs/results' }),
         ready.writableDir('uploads_dir', path.resolve(config.uploadsDir), { description: 'synchronous uploads' }),
         ready.writableDir('output_dir', path.resolve(config.outputDir), { description: 'synchronous results' }),
-        ready.sqlite('analytics_db', analyticsDb, { required: false, description: 'visit analytics only; tools work without it' }),
         ready.networkKey('network_key', guard.keys.get, { description: 'verifies signed-in users and service tokens on the job API; anonymous use works without it' }),
         ...jobsRuntime.readyChecks(() => jobs),
         ready.binary('ffmpeg', process.env.FFMPEG_PATH || 'ffmpeg', { description: 'every audio tool runs ffmpeg; without it jobs and conversions fail' }),
@@ -159,9 +158,9 @@ app.use((req, _res, next) => {
 // ── API Routes ───────────────────────────────────────────────
 
 // Health check
-app.get('/api/health', (_req, res) => {
+app.get('/api/health', async (_req, res) => {
     const stats = retention.getStats();
-    res.json({ status: 'ok', service: 'openvibe-audio', version: '1.0.0', files: stats, jobs: jobs.stats() });
+    res.json({ status: 'ok', service: 'openvibe-audio', version: '1.0.0', files: stats, jobs: await jobs.stats() });
 });
 
 // Domain context (frontend calls this on load to get branding). It also starts this browser's session
@@ -202,78 +201,12 @@ app.post('/api/probe', guard.originCheck(), burstLimiter, processLimiter, guard.
     }
 });
 
-// ── Main Processing Endpoint ─────────────────────────────────
-app.post('/api/process', deprecated((req) => runPath(hostTool(req))), guard.originCheck(), burstLimiter, processLimiter, guard.toolQuota(hostTool), uploadSingle, guard.admitUpload(toolOf), guard.heavy(toolOf), async (req, res) => {
-    try {
-        const toolId = req.body.tool || req.ctx.defaultOp || 'convert';
-        const tool = getTool(toolId);
-        if (!tool) {
-            cleanTmp(req.file.path);
-            return res.status(400).json({ error: `Unknown tool: ${toolId}` });
-        }
-        if (tool.multiFile) {
-            cleanTmp(req.file.path);
-            return res.status(400).json({ error: `${tool.label} takes several files: send them in "files" to /api/process/multi` });
-        }
-
-        // Execute the tool (same options, hardening and code path as the audio.process job; killed at its timeout)
-        const result = await runSync(res, toolId, req.file.path, buildOptions(req.body, toolId, req.ctx));
-
-        // Clean up the uploaded input file
-        cleanTmp(req.file.path);
-
-        // Save to retention
-        const saved = retention.saveOutputFromFile(
-            result.outputPath,
-            result.ext,
-            result.mime,
-            !!req.user,
-            req.file.originalname,
-        );
-
-        // Probe input for size comparison
-        const inputSize = req.file.size;
-
-        res.json({ success: true, download: saved, ...describe(toolId, result, saved.size, inputSize) });
-    } catch (err) {
-        cleanTmp(req.file?.path);
-        if (guard.toolRefused(req, res, err, toolOf(req))) return;
-        console.error('[Process] Error:', err.message);
-        res.status(422).json({ error: err.message || 'Audio processing failed' });
-    }
-});
-
-// ── Multi-File Processing Endpoint (merge) ───────────────────
-app.post('/api/process/multi', deprecated((req) => runPath(hostTool(req))), guard.originCheck(), burstLimiter, processLimiter, guard.toolQuota(hostTool), uploadMultiple, guard.admitUpload(toolOf), guard.heavy(toolOf), async (req, res) => {
-    const paths = req.files.map(f => f.path);
-    try {
-        const toolId = req.body.tool || req.ctx.defaultOp;
-        const tool = getTool(toolId);
-        if (!tool || !tool.multiFile) {
-            cleanTmp(...paths);
-            return res.status(400).json({ error: tool ? `Tool "${toolId}" takes one file: use /api/process` : `Unknown tool: ${toolId}` });
-        }
-        const result = await runSync(res, toolId, req.files.map(f => f.path), buildOptions(req.body, toolId, req.ctx));
-        cleanTmp(...paths);
-        const first = req.files[0].originalname || 'audio';
-        const saved = retention.saveOutputFromFile(result.outputPath, result.ext, result.mime, !!req.user,
-            `${path.basename(first, path.extname(first))}-merged${path.extname(first)}`);
-        const inputSize = req.files.reduce((n, f) => n + f.size, 0);
-        res.json({ success: true, download: saved, ...describe(toolId, result, saved.size, inputSize), fileCount: req.files.length });
-    } catch (err) {
-        cleanTmp(...req.files.map(f => f.path));
-        if (guard.toolRefused(req, res, err, toolOf(req))) return;
-        console.error('[Process/Multi] Error:', err.message);
-        res.status(422).json({ error: err.message || 'Audio processing failed' });
-    }
-});
-
 // ── Jobs (/api/v1/jobs) ──────────────────────────────────────
-// The same operation as /api/process, asynchronous and durable: accepted into data/jobs.db,
-// followed over SSE (ffmpeg's own progress), cancellable (ffmpeg is killed), reattachable by id
-// after a reload or a restart (apps/_shared/jobs).
+// The audio operations, asynchronous and durable: accepted into the shared `tools` database, followed over SSE
+// (ffmpeg's own progress), cancellable (ffmpeg is killed), reattachable by id after a reload or a
+// restart (apps/_shared/jobs).
 const jobs = jobsRuntime.setupJobs({
-    app, service: 'audio', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts, sdk,
+    app, service: 'audio', dataDir: path.resolve(__dirname, '..', config.dataDir), db: toolsDb.db, contracts, sdk,
     getPublicKey: guard.keys.get, issuer: config.networkUrl, guard,
     define: defineJobs,
     receive: uploadAny,
@@ -349,12 +282,12 @@ app.get('/api/preview/:id', (req, res) => {
 
 // ── Internal Analytics API ────────────────────────────────────
 const internalAccess = requireInternalAccess({ keys: guard.keys, issuer: guard.issuer, audience: guard.audience, contracts });
-app.get('/api/internal/analytics', internalAccess, (req, res) => {
-    try { const d = Math.min(parseInt(req.query.days) || 30, 365); const h = req.query.hours ? Math.min(parseInt(req.query.hours), 8760) : null; res.json({ ok: true, analytics: analytics.getStats({ days: d, hours: h }) }); }
+app.get('/api/internal/analytics', internalAccess, async (req, res) => {
+    try { const d = Math.min(parseInt(req.query.days) || 30, 365); const h = req.query.hours ? Math.min(parseInt(req.query.hours), 8760) : null; res.json({ ok: true, analytics: await analytics.getStats({ days: d, hours: h }) }); }
     catch (err) { res.status(500).json({ ok: false, error: err.message }); }
 });
-app.get('/api/internal/analytics/bots', internalAccess, (req, res) => {
-    try { res.json({ ok: true, bots: analytics.getBotAnalysis(Math.min(parseInt(req.query.days) || 30, 365)) }); }
+app.get('/api/internal/analytics/bots', internalAccess, async (req, res) => {
+    try { res.json({ ok: true, bots: await analytics.getBotAnalysis(Math.min(parseInt(req.query.days) || 30, 365)) }); }
     catch (err) { res.status(500).json({ ok: false, error: err.message }); }
 });
 
@@ -406,8 +339,9 @@ require('../../_shared/graceful').gracefulStop({
     close: [
         () => require('../../_shared/usage').stopRecorder(800),
         () => analytics.destroy(),
-        () => analyticsDb.close(),
-        () => jobs.close(),   // running jobs stay 'running' in data/jobs.db; the next boot re-queues them
+        () => jobs.close(),   // running jobs stay 'running' in the tools database; the next boot re-queues them
         () => guard.close(),
+        () => toolsDb.db.close(),
+        () => toolsValkey && toolsValkey.close(),
     ],
 });

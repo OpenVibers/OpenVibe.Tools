@@ -24,6 +24,15 @@ async function startApp(app, env = {}, port, { readyPath = '/api/health' } = {})
     port = port || await freePort();
     const dir = path.join(__dirname, '..', '..', app);
     let out = '';
+    // Without a DATABASE_URL the app serves from an embedded PGlite database. Point it at a directory
+    // under the test's own DATA_DIR, so it survives the kill a restart test does (production uses a real
+    // PostgreSQL, which outlives the process the same way). One directory per app: PGlite is a
+    // single-process database, and tests that start several apps on one DATA_DIR (observe.test.js runs
+    // img, text and yt at once) aborted when two processes opened the same files.
+    const url = env.DATABASE_URL !== undefined ? env.DATABASE_URL : process.env.DATABASE_URL;
+    const pglite = (!String(url || '').trim() && env.DATA_DIR && env.TOOLS_PGLITE_DIR === undefined)
+        ? { TOOLS_PGLITE_DIR: path.join(env.DATA_DIR, 'pglite', app) }
+        : {};
     const child = spawn(process.execPath, ['server/index.js'], {
         cwd: dir,
         env: {
@@ -35,6 +44,7 @@ async function startApp(app, env = {}, port, { readyPath = '/api/health' } = {})
             OV_NETWORK_URL: 'http://127.0.0.1:9',
             OV_NETWORK_INTERNAL_URL: 'http://127.0.0.1:9',
             TOOLS_JOB_RESULTS: 'local',
+            ...pglite,
             ...env,
         },
         stdio: ['ignore', 'pipe', 'pipe'],

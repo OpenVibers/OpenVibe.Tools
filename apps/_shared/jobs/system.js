@@ -4,34 +4,34 @@
 //
 //   accepted (202) → queued → running → succeeded | failed | cancelled
 //
-// Durable: a job is written to the satellite's SQLite, and its input files moved under
-// <dataDir>/jobs/<id>/in/, BEFORE the 202 goes out. On boot, rows left 'running' by a restart
-// are re-queued (onRestart: 'requeue', while attempts remain) or failed with retryable = true
-// (onRestart: 'fail'), per job type. Queued rows simply start again.
+// Durable: a job is written to the one `tools` PostgreSQL database (plan T8), and its input files moved
+// under <dataDir>/jobs/<id>/in/, BEFORE the 202 goes out. On boot, rows left 'running' by a restart are
+// re-queued (onRestart: 'requeue', while attempts remain) or failed with retryable = true (onRestart:
+// 'fail'), per job type. Queued rows simply start again.
 //
-// Bounded: at most `concurrency` jobs run at once in this process, and each owner may have at
-// most `maxActivePerOwner` queued + running jobs. busy() says when the whole store is over its
-// bounds — `maxQueued` jobs waiting (all owners), or `diskBudgetBytes` under <dataDir>/jobs — so the
-// HTTP layer can answer 503 tools.busy with Retry-After before it accepts an upload (through the
-// guard: refused in enforce mode, recorded in report mode). Finished jobs expire (ttl chosen at submit),
-// and the pruner deletes the row, its events, its files and any Media objects it made — except
-// while something references the result (reference(), e.g. a paste or a project that points at the
-// Media object), and never while Media keeps an object (a retention hold, or Media unreachable):
-// then the job is kept and looked at again later, so no referenced result loses its record.
+// Bounded: at most `concurrency` jobs run at once in this process, and each owner may have at most
+// `maxActivePerOwner` queued + running jobs. busy() says when the whole store is over its bounds —
+// `maxQueued` jobs waiting (all owners), or `diskBudgetBytes` under <dataDir>/jobs — so the HTTP layer can
+// answer 503 tools.busy with Retry-After before it accepts an upload (through the guard: refused in
+// enforce mode, recorded in report mode). Finished jobs expire (ttl chosen at submit), and the pruner
+// deletes the row, its events, its files and any Media objects it made — except while something
+// references the result (reference(), e.g. a paste or a project that points at the Media object), and
+// never while Media keeps an object (a retention hold, or Media unreachable): then the job is kept and
+// looked at again later, so no referenced result loses its record.
 //
 // Retry: a failed job keeps its input files until it expires; retry(id) moves them to a new job
-// (retry_of → the failed one, which records retried_by). Retrying the same failed job again
-// returns that same new job, so the call is idempotent.
+// (retry_of → the failed one, which records retried_by). Retrying the same failed job again returns
+// that same new job, so the call is idempotent.
 //
-// Events: with an outbox (./events, openvibe-sdk createOutbox on this same database), created,
-// started, succeeded and failed are also announced to OpenVibe.Events as tools.job.*, each written
-// in the transaction that records the transition. Without one, nothing is announced.
+// Events: with an outbox (./events, openvibe-sdk createPgOutbox on this same database), created,
+// started, succeeded and failed are also announced to OpenVibe.Events as tools.job.*, each written in
+// the transaction that records the transition. Without one, nothing is announced.
 //
 // Usage (WS-N task 4): with an outbox, a developer project's job that ends is also counted in the
 // transaction that records its end (./usage.js), and each closed hour goes out as tools.usage.recorded
 // from the pruner's timer.
 //
-// No dependencies of its own: the app passes its better-sqlite3 handle and openvibe-contracts.
+// No dependencies of its own: the app passes the shared openvibe-sdk/db handle and openvibe-contracts.
 // ═══════════════════════════════════════════════════════════════
 
 const fs = require('fs');
@@ -86,9 +86,9 @@ const scrub = (msg) => String(msg || '').replace(/(?:\/[\w.-]+){2,}/g, '[file]')
 
 /**
  * @param {object} o
- * @param {object} o.db            better-sqlite3 Database (the satellite's own jobs database)
+ * @param {object} o.db            openvibe-sdk/db handle (the one tools database)
+ * @param {string} o.service       'img' | 'audio' | 'docs' | … (also the store's `app`)
  * @param {object} o.contracts     require('openvibe-contracts')
- * @param {string} o.service       'img' | 'audio' | 'docs' | …
  * @param {string} o.dataDir       where job files live (<dataDir>/jobs/<id>/…)
  * @param {number} [o.concurrency=2]
  * @param {number} [o.maxActivePerOwner=10]
@@ -104,7 +104,7 @@ const scrub = (msg) => String(msg || '').replace(/(?:\/[\w.-]+){2,}/g, '[file]')
 function createJobSystem(o) {
     if (!o || !o.db || !o.contracts || !o.dataDir) throw new TypeError('createJobSystem needs db, contracts and dataDir');
     const { contracts } = o;
-    const store = createStore(o.db);
+    const store = createStore(o.db, { app: o.service });
     const log = o.log || console;
     const concurrency = Math.max(0, Number.isFinite(o.concurrency) ? o.concurrency : 2);
     const maxActivePerOwner = Math.max(1, o.maxActivePerOwner || 10);
@@ -117,17 +117,18 @@ function createJobSystem(o) {
     const diskBudget = o.diskBudgetBytes > 0 ? o.diskBudgetBytes : 0;
     const disk = { bytes: 0, at: 0, scanning: null };
     const announce = createJobEvents({ contracts, service: o.service, outbox: o.outbox || null, referenceCount: (id) => store.referenceCount(id), log });
-    const usage = createJobUsage({ db: o.db, contracts, outbox: o.outbox || null, log });
-    /** Inside the transaction that recorded the end: tools.job.succeeded|failed and the project's usage. */
-    function ended(id) {
-        const row = store.get(id);
-        announce.finished(row);
-        usage.finished(row);
+    const usage = createJobUsage({ db: o.db, app: o.service, contracts, outbox: o.outbox || null, log });
+    /** Inside the transaction `t` that recorded the end: tools.job.succeeded|failed and the project's usage. */
+    async function ended(t, id) {
+        const row = await store.get(id);
+        await announce.finished(t, row);
+        await usage.finished(row);
     }
 
     const types = new Map();
     const active = new Map();      // id → { ctrl, reason, last: { pct, msg, at } }
     const listeners = new Map();   // id → Set<fn>
+    const emitChains = new Map();  // id → the tail of this job's event appends (strict per-job order)
     const stopHooks = new Set();   // e.g. open SSE streams, ended on stop()
     let started = false, stopped = false, pruneTimer = null, kicking = false;
 
@@ -151,7 +152,7 @@ function createJobSystem(o) {
     }
 
     // ── Public representation ─────────────────────────────────
-    const iso = (ms) => (ms == null ? null : new Date(ms).toISOString());
+    const iso = (ms) => (ms == null ? null : new Date(Number(ms)).toISOString());
     function publicResult(result, id) {
         if (!result) return null;
         return {
@@ -164,21 +165,21 @@ function createJobSystem(o) {
             data: result.data || {},
         };
     }
-    function view(row) {
+    async function view(row) {
         if (!row) return null;
         const live = row.state === 'queued' || row.state === 'running';
-        const references = store.references(row.id).map(r => ({ ref: r.ref, created_at: iso(r.created_at) }));
+        const references = (await store.references(row.id)).map(r => ({ ref: r.ref, created_at: iso(r.created_at) }));
         return {
             id: row.id,
             object: 'tools.job',
             service: o.service,
             ...(row.tool && { tool: row.tool }),
             type: row.type,
-            type_version: row.type_version,
+            type_version: Number(row.type_version),
             state: row.state,
-            progress: { percent: row.progress == null ? null : Math.round(row.progress * 10) / 10, message: row.progress_message || null },
-            attempts: row.attempts,
-            max_attempts: row.max_attempts,
+            progress: { percent: row.progress == null ? null : Math.round(Number(row.progress) * 10) / 10, message: row.progress_message || null },
+            attempts: Number(row.attempts),
+            max_attempts: Number(row.max_attempts),
             cancel_requested: !!row.cancel_requested,
             created_at: iso(row.created_at),
             started_at: iso(row.started_at),
@@ -202,13 +203,20 @@ function createJobSystem(o) {
     }
 
     // ── Events ─────────────────────────────────────────────────
+    /** Append this job's next SSE event and tell its listeners; appends are serialized per job. */
     function emit(id, event) {
-        if (stopped) return;
-        const data = view(store.get(id));
-        if (!data) return;
-        const seq = store.appendEvent(id, event, data);
-        const set = listeners.get(id);
-        if (set) for (const fn of [...set]) { try { fn({ seq, event, data }); } catch (err) { log.error('[Jobs] listener error:', err.message); } }
+        const prev = emitChains.get(id) || Promise.resolve();
+        const next = prev.then(async () => {
+            if (stopped) return;
+            const data = await view(await store.get(id));
+            if (!data) return;
+            const seq = await store.appendEvent(id, event, data);
+            const set = listeners.get(id);
+            if (set) for (const fn of [...set]) { try { fn({ seq, event, data }); } catch (err) { log.error('[Jobs] listener error:', err.message); } }
+        }).catch(err => log.error('[Jobs] could not record the event:', err.message))
+            .finally(() => { if (emitChains.get(id) === next) emitChains.delete(id); });
+        emitChains.set(id, next);
+        return next;
     }
     function subscribe(id, fn) {
         if (!listeners.has(id)) listeners.set(id, new Set());
@@ -247,7 +255,7 @@ function createJobSystem(o) {
             const requestHash = crypto.createHash('sha256').update(canonical({ type, input, files: fileHashes })).digest('hex');
 
             if (idempotencyKey != null) {
-                const prior = store.byIdempotencyKey(owner, String(idempotencyKey));
+                const prior = await store.byIdempotencyKey(owner, String(idempotencyKey));
                 if (prior) {
                     await discard();
                     if (prior.request_hash !== requestHash) throw new JobError(409, 'tools.job.idempotency_conflict', 'This Idempotency-Key was used for a different request', { job_id: prior.id });
@@ -255,7 +263,7 @@ function createJobSystem(o) {
                 }
             }
             const limit = env === 'sandbox' ? Math.min(SANDBOX_MAX_ACTIVE, maxActivePerOwner) : maxActivePerOwner;
-            if (store.activeForOwner(owner) >= limit) throw new JobError(429, 'tools.job.too_many_active', `At most ${limit} unfinished jobs at a time; wait for one to finish or cancel one`);
+            if (await store.activeForOwner(owner) >= limit) throw new JobError(429, 'tools.job.too_many_active', `At most ${limit} unfinished jobs at a time; wait for one to finish or cancel one`);
 
             const id = `job_${contracts.ids.ulid()}`;
             const inDir = path.join(jobDir(id), 'in');
@@ -265,11 +273,11 @@ function createJobSystem(o) {
                 const f = files[i];
                 const dest = path.join(inDir, `${i}-${SAFE_NAME(f.name)}`);
                 if (f.buffer) await fsp.writeFile(dest, f.buffer); else await moveFile(f.path, dest);
-                stored.push({ name: String(f.name || `file-${i}`).slice(0, 200), mime: f.mime || 'application/octet-stream', size: f.size != null ? f.size : fs.statSync(dest).size, sha256: fileHashes[i], _path: dest });
+                stored.push({ name: String(f.name || `file-${i}`).slice(0, 200), mime: f.mime || 'application/octet-stream', size: f.size != null ? f.size : (await fsp.stat(dest)).size, sha256: fileHashes[i], _path: dest });
             }
             try {
-                store.transaction(() => {
-                    store.insert({
+                await store.tx(async (t) => {
+                    await store.insert({
                         id, type, type_version: def.version, owner, input_json: JSON.stringify(input), files_json: JSON.stringify(stored),
                         idempotency_key: idempotencyKey == null ? null : String(idempotencyKey), request_hash: requestHash,
                         max_attempts: def.maxAttempts, ttl_ms: ttlMs, now: Date.now(), env,
@@ -278,22 +286,22 @@ function createJobSystem(o) {
                         project_id: projectOf(project),
                         trace_id: /^[0-9a-f]{32}$/.test(String(traceId || '')) ? String(traceId) : null,
                     });
-                    announce.created(store.get(id));
-                })();
+                    await announce.created(t, await store.get(id));
+                });
             } catch (err) {
                 await fsp.rm(jobDir(id), { recursive: true, force: true });
                 // Two submits with one key raced: the other one won, so this is a replay of it.
-                if (/UNIQUE/.test(err.message) && idempotencyKey != null) {
-                    const prior = store.byIdempotencyKey(owner, String(idempotencyKey));
+                if (/UNIQUE|duplicate key/i.test(err.message) && idempotencyKey != null) {
+                    const prior = await store.byIdempotencyKey(owner, String(idempotencyKey));
                     if (prior && prior.request_hash === requestHash) return { job: prior, replayed: true };
                     throw new JobError(409, 'tools.job.idempotency_conflict', 'This Idempotency-Key was used for a different request');
                 }
                 throw err;
             }
             disk.bytes += stored.reduce((n, f) => n + (f.size || 0), 0);
-            emit(id, 'job.queued');
+            await emit(id, 'job.queued');
             kick();
-            return { job: store.get(id), replayed: false };
+            return { job: await store.get(id), replayed: false };
         } catch (err) {
             await discard();
             throw err;
@@ -301,21 +309,21 @@ function createJobSystem(o) {
     }
 
     // ── Scheduling ─────────────────────────────────────────────
-    function kick() {
+    async function kick() {
         if (!started || stopped || kicking) return;
         kicking = true;
         try {
             while (active.size < concurrency) {
-                const [row] = store.nextQueued(1);
+                const [row] = await store.nextQueued(1);
                 if (!row) break;
                 // The claim and its tools.job.started event commit together (or neither does).
                 let claimed;
                 try {
-                    claimed = store.transaction(() => {
-                        if (!store.claim(row.id)) return false;
-                        announce.started(store.get(row.id));
+                    claimed = await store.tx(async (t) => {
+                        if (!(await store.claim(row.id))) return false;
+                        await announce.started(t, await store.get(row.id));
                         return true;
-                    })();
+                    });
                 } catch (err) {
                     log.error(`[Jobs] could not start ${row.id}:`, err.message);
                     break;   // it stays queued; the next kick tries again
@@ -323,7 +331,7 @@ function createJobSystem(o) {
                 if (!claimed) continue;
                 const entry = { ctrl: new AbortController(), reason: null, last: { pct: -1, msg: null, at: 0 } };
                 active.set(row.id, entry);
-                emit(row.id, 'job.running');
+                await emit(row.id, 'job.running');
                 setImmediate(() => execute(row.id, entry));
             }
         } finally { kicking = false; }
@@ -337,12 +345,12 @@ function createJobSystem(o) {
             const now = Date.now();
             if (msg === entry.last.msg && (Math.abs(pct - entry.last.pct) < 1 || now - entry.last.at < throttleMs)) return;
             entry.last = { pct, msg, at: now };
-            if (store.setProgress(id, pct, msg, now)) emit(id, 'job.progress');
+            store.setProgress(id, pct, msg, now).then((changed) => { if (changed) return emit(id, 'job.progress'); }).catch(() => {});
         };
     }
 
     async function execute(id, entry) {
-        const row = stopped ? null : store.get(id);
+        const row = stopped ? null : await store.get(id);
         if (!row) { active.delete(id); return; }
         const def = types.get(row.type);
         const outDir = path.join(jobDir(row.id), 'out');
@@ -351,9 +359,12 @@ function createJobSystem(o) {
         if (timer.unref) timer.unref();
         try {
             await fsp.mkdir(outDir, { recursive: true });
+            // A cancel (or a timeout) that arrived while we were preparing must end the job now: the run
+            // would not see an abort that fired before it registered its listener.
+            if (entry.reason) throw new Error(entry.reason);
             const files = store.parse(row.files_json, []).map(f => ({ name: f.name, mime: f.mime, size: f.size, sha256: f.sha256, path: f._path }));
             const out = await def.run({
-                job: { id: row.id, type: row.type, attempt: row.attempts, owner: row.owner },
+                job: { id: row.id, type: row.type, attempt: Number(row.attempts), owner: row.owner },
                 input: store.parse(row.input_json, {}), files, outDir,
                 signal: entry.ctrl.signal,
                 progress: progressFn(row.id, entry),
@@ -366,7 +377,7 @@ function createJobSystem(o) {
             outcome = { state: 'succeeded', result };
         } catch (err) {
             if (stopped) return;
-            const fresh = store.get(row.id) || row;
+            const fresh = (await store.get(row.id)) || row;
             if (entry.reason === 'cancel' || fresh.cancel_requested) outcome = { state: 'cancelled', error: problem(409, 'tools.job.cancelled', 'The job was cancelled') };
             else if (entry.reason === 'timeout') outcome = { state: 'failed', error: problem(504, 'tools.job.timeout', `The job ran longer than ${Math.round(def.timeoutMs / 1000)} s`), retryable: true };
             else {
@@ -381,9 +392,9 @@ function createJobSystem(o) {
         let recorded = false;
         try {
             // The end state and its tools.job.succeeded|failed event commit together (or neither does).
-            store.transaction(() => { if (store.finish(row.id, outcome)) ended(row.id); })();
+            await store.tx(async (t) => { if (await store.finish(row.id, outcome)) await ended(t, row.id); });
             recorded = true;
-            emit(row.id, EVENT_FOR[outcome.state]);
+            await emit(row.id, EVENT_FOR[outcome.state]);
         } catch (err) {
             // Nothing committed: the row is still 'running' with its inputs, which the next start() recovers.
             log.error(`[Jobs] could not record the end of ${row.id}:`, err.message);
@@ -409,7 +420,7 @@ function createJobSystem(o) {
                 await moveFile(local, dest);
                 local = dest;
             }
-            const size = fs.statSync(local).size;
+            const size = (await fsp.stat(local)).size;
             const sha256 = await sha256File(local);
             const rec = { name: String(f.name || `result-${i}`).slice(0, 200), mime: f.mime || 'application/octet-stream', size, sha256, storage: 'local', media: null, _path: local };
             // A developer app's results (sandbox too) go under its project's namespace (WS-L task 5); other
@@ -442,23 +453,29 @@ function createJobSystem(o) {
 
     // ── Cancel ─────────────────────────────────────────────────
     /** → { job, changed } — queued jobs end at once; running ones are signalled and end as cancelled. */
-    function cancel(id) {
-        const row = store.get(id);
+    async function cancel(id) {
+        const row = await store.get(id);
         if (!row) return null;
         if (TERMINAL.includes(row.state)) return { job: row, changed: false };
         if (row.state === 'queued') {
-            const done = store.transaction(() => store.requestCancel(id) && store.finish(id, { state: 'cancelled', error: problem(409, 'tools.job.cancelled', 'The job was cancelled before it started') }))();
+            const done = await store.tx(async () => {
+                if (!(await store.requestCancel(id))) return false;
+                return store.finish(id, { state: 'cancelled', error: problem(409, 'tools.job.cancelled', 'The job was cancelled before it started') });
+            });
             if (done) {
-                emit(id, 'job.cancelled');
+                await emit(id, 'job.cancelled');
                 fsp.rm(jobDir(id), { recursive: true, force: true }).catch(() => {});
             }
-            return { job: store.get(id), changed: done };
+            return { job: await store.get(id), changed: done };
         }
-        store.requestCancel(id);
+        await store.requestCancel(id);
+        // Read the row (still 'running') before signalling the worker: the HTTP layer decides 200 vs 202
+        // from it, and the abort must not race that answer.
+        const job = await store.get(id);
         const entry = active.get(id);
         if (entry && !entry.reason) { entry.reason = 'cancel'; entry.ctrl.abort(new Error('cancelled')); }
-        emit(id, 'job.cancel_requested');
-        return { job: store.get(id), changed: true };
+        await emit(id, 'job.cancel_requested');
+        return { job, changed: true };
     }
 
     // ── Retry ──────────────────────────────────────────────────
@@ -466,13 +483,12 @@ function createJobSystem(o) {
      * Retry a failed job as a new job with the same type, input, files and lifetime.
      * → { job, replayed } | null (no such job). Idempotent: a failed job is retried once, and asking
      * again returns that retry, whatever state it is in now. Only failed jobs can be retried.
-     * Everything up to the insert is synchronous, so two concurrent calls cannot both retry it.
      */
-    function retry(id) {
-        const row = store.get(id);
+    async function retry(id) {
+        const row = await store.get(id);
         if (!row) return null;
         if (row.retried_by) {
-            const next = store.get(row.retried_by);
+            const next = await store.get(row.retried_by);
             if (next) return { job: next, replayed: true };
             throw new JobError(410, 'tools.job.retry_gone', 'This job was retried and the retry has since expired', { retried_by: row.retried_by });
         }
@@ -481,7 +497,7 @@ function createJobSystem(o) {
         const def = types.get(row.type);
         if (!def) throw new JobError(409, 'tools.job.unknown_type', `This service no longer runs "${row.type}" jobs`);
         const limit = row.env === 'sandbox' ? Math.min(SANDBOX_MAX_ACTIVE, maxActivePerOwner) : maxActivePerOwner;
-        if (store.activeForOwner(row.owner) >= limit) throw new JobError(429, 'tools.job.too_many_active', `At most ${limit} unfinished jobs at a time; wait for one to finish or cancel one`);
+        if (await store.activeForOwner(row.owner) >= limit) throw new JobError(429, 'tools.job.too_many_active', `At most ${limit} unfinished jobs at a time; wait for one to finish or cancel one`);
         const inputs = store.parse(row.files_json, []);
         if (inputs.some(f => !f._path || !fs.existsSync(f._path))) throw new JobError(410, 'tools.job.inputs_gone', 'The input files of this job are no longer kept; submit it again');
 
@@ -496,23 +512,23 @@ function createJobSystem(o) {
         }
         const stored = inputs.map(f => ({ ...f, _path: path.join(newIn, path.basename(f._path)) }));
         try {
-            store.transaction(() => {
-                if (!store.markRetried(row.id, next)) throw new JobError(409, 'tools.job.not_failed', 'This job cannot be retried any more');
-                store.insert({
+            await store.tx(async (t) => {
+                if (!(await store.markRetried(row.id, next))) throw new JobError(409, 'tools.job.not_failed', 'This job cannot be retried any more');
+                await store.insert({
                     id: next, type: row.type, type_version: def.version, owner: row.owner, input_json: row.input_json, files_json: JSON.stringify(stored),
                     idempotency_key: null, request_hash: row.request_hash, max_attempts: def.maxAttempts, ttl_ms: row.ttl_ms, now: Date.now(),
                     env: row.env, retry_of: row.id, ip_key: row.ip_key || null, tool: row.tool || null, project_id: row.project_id || null,
                 });
-                announce.created(store.get(next));
-            })();
+                await announce.created(t, await store.get(next));
+            });
         } catch (err) {
             if (moved) { try { fs.renameSync(newIn, oldIn); } catch { /* best effort */ } }
             fs.rmSync(jobDir(next), { recursive: true, force: true });
             throw err;
         }
-        emit(next, 'job.queued');
+        await emit(next, 'job.queued');
         kick();
-        return { job: store.get(next), replayed: false };
+        return { job: await store.get(next), replayed: false };
     }
 
     // ── References (results something still points at) ─────────
@@ -525,58 +541,58 @@ function createJobSystem(o) {
     /**
      * Keep a succeeded job's result while `ref` points at it. → { job, created }. Idempotent.
      */
-    function reference(id, ref) {
+    async function reference(id, ref) {
         ref = checkRef(ref);
-        const row = store.get(id);
+        const row = await store.get(id);
         if (!row) return null;
         if (row.state !== 'succeeded') throw new JobError(409, 'tools.job.not_succeeded', `Only a succeeded job's result can be referenced; this one is ${row.state}`, { state: row.state });
         if (row.env === 'sandbox') throw new JobError(409, 'tools.job.sandbox', 'Sandbox results are kept briefly and cannot be referenced');
-        const has = store.references(id).some(r => r.ref === ref);
-        if (!has && store.referenceCount(id) >= MAX_REFS) throw new JobError(409, 'tools.job.too_many_references', `At most ${MAX_REFS} references per job`);
-        const created = store.addReference(id, ref);
-        return { job: store.get(id), created };
+        const has = (await store.references(id)).some(r => r.ref === ref);
+        if (!has && await store.referenceCount(id) >= MAX_REFS) throw new JobError(409, 'tools.job.too_many_references', `At most ${MAX_REFS} references per job`);
+        const created = await store.addReference(id, ref);
+        return { job: await store.get(id), created };
     }
     /** Stop keeping the result for `ref`. → { job, removed }. Idempotent. */
-    function unreference(id, ref) {
+    async function unreference(id, ref) {
         ref = checkRef(ref);
-        if (!store.get(id)) return null;
-        const removed = store.dropReference(id, ref);
-        return { job: store.get(id), removed };
+        if (!(await store.get(id))) return null;
+        const removed = await store.dropReference(id, ref);
+        return { job: await store.get(id), removed };
     }
 
     // ── Boot recovery, pruning ─────────────────────────────────
     /** A job the restart ended as failed: the row and its tools.job.failed event in one transaction. */
-    function failRecovered(id, outcome) {
-        store.transaction(() => { if (store.finish(id, outcome)) ended(id); })();
+    async function failRecovered(id, outcome) {
+        await store.tx(async (t) => { if (await store.finish(id, outcome)) await ended(t, id); });
     }
 
-    function recover() {
+    async function recover() {
         let requeued = 0, failed = 0;
-        for (const row of store.running()) {
+        for (const row of await store.running()) {
             const def = types.get(row.type);
             if (row.cancel_requested) {
-                store.finish(row.id, { state: 'cancelled', error: problem(409, 'tools.job.cancelled', 'The job was cancelled') });
-                emit(row.id, 'job.cancelled');
+                await store.finish(row.id, { state: 'cancelled', error: problem(409, 'tools.job.cancelled', 'The job was cancelled') });
+                await emit(row.id, 'job.cancelled');
             } else if (!def) {
-                failRecovered(row.id, { state: 'failed', error: problem(500, 'tools.job.unknown_type', `This service no longer runs "${row.type}" jobs`) });
-                emit(row.id, 'job.failed'); failed++;
-            } else if (def.onRestart === 'requeue' && row.attempts < row.max_attempts) {
-                store.requeue(row.id);
-                emit(row.id, 'job.queued'); requeued++;
+                await failRecovered(row.id, { state: 'failed', error: problem(500, 'tools.job.unknown_type', `This service no longer runs "${row.type}" jobs`) });
+                await emit(row.id, 'job.failed'); failed++;
+            } else if (def.onRestart === 'requeue' && Number(row.attempts) < Number(row.max_attempts)) {
+                await store.requeue(row.id);
+                await emit(row.id, 'job.queued'); requeued++;
             } else {
                 const retryable = def.onRestart === 'fail';
-                failRecovered(row.id, {
+                await failRecovered(row.id, {
                     state: 'failed', retryable,
                     error: problem(503, 'tools.job.interrupted', retryable ? 'The service restarted while this job was running; submit it again' : `The service restarted during each of ${row.attempts} attempts`),
                 });
-                emit(row.id, 'job.failed'); failed++;
+                await emit(row.id, 'job.failed'); failed++;
             }
             fs.rmSync(path.join(jobDir(row.id), 'out'), { recursive: true, force: true });
         }
         // Directories without a row: a crash between moving the upload and recording the job.
         // That job was never accepted (no 202 went out), so its files have no owner.
         for (const name of fs.readdirSync(root)) {
-            if (/^job_[0-9A-Z]{26}$/.test(name) && !store.get(name)) fs.rmSync(path.join(root, name), { recursive: true, force: true });
+            if (/^job_[0-9A-Z]{26}$/.test(name) && !(await store.get(name))) fs.rmSync(path.join(root, name), { recursive: true, force: true });
         }
         return { requeued, failed };
     }
@@ -590,7 +606,7 @@ function createJobSystem(o) {
      */
     async function prune(now = Date.now()) {
         let n = 0;
-        for (const row of store.expired(now)) {
+        for (const row of await store.expired(now)) {
             const result = store.parse(row.result_json, null);
             let kept = null;
             for (const f of (result && result.files) || []) {
@@ -602,11 +618,11 @@ function createJobSystem(o) {
             }
             if (kept) {
                 log.warn(`[Jobs] kept expired job ${row.id} (${kept}); checking again later`);
-                store.deferExpiry(row.id, now + PRUNE_RECHECK_MS);
+                await store.deferExpiry(row.id, now + PRUNE_RECHECK_MS);
                 continue;
             }
             await fsp.rm(jobDir(row.id), { recursive: true, force: true }).catch(() => {});
-            store.remove(row.id);
+            await store.remove(row.id);
             listeners.delete(row.id);
             n++;
         }
@@ -640,9 +656,9 @@ function createJobSystem(o) {
      * Is the store over its bounds? → null, or { reason: 'queue'|'disk', detail, retryAfter } for a
      * 503 tools.busy. Cheap: one COUNT and the last disk walk (a stale walk is refreshed in the background).
      */
-    function busy() {
+    async function busy() {
         if (maxQueued) {
-            const queued = store.counts().queued || 0;
+            const queued = (await store.counts()).queued || 0;
             if (queued >= maxQueued) return { reason: 'queue', detail: `${queued} jobs are already waiting on this server; try again in a minute.`, retryAfter: 60, queued, limit: maxQueued };
         }
         if (diskBudget) {
@@ -657,26 +673,35 @@ function createJobSystem(o) {
      * { active, limit } when a new session job from `ipKey` would pass it (the HTTP layer answers 429
      * tools.job.too_many_active through the guard). Principals and people are bounded per owner only.
      */
-    function addressFull(owner, ipKey) {
+    async function addressFull(owner, ipKey) {
         if (!ipKey || !String(owner || '').startsWith('session:')) return null;
-        const active = store.activeForIp(ipKey);
+        const active = await store.activeForIp(ipKey);
         return active >= maxActivePerAddress ? { active, limit: maxActivePerAddress } : null;
     }
 
+    /**
+     * Recover, prune, start the timer and the worker. A failed recovery (the database not reachable yet)
+     * rejects and leaves the system unstarted, so start() can simply be called again (index.js retries
+     * it with a backoff): queued jobs are never stranded behind a `started` flag nothing will reset.
+     */
+    let starting = null;
     function start() {
-        if (started) return api;
-        started = true;
+        if (!starting) starting = boot().catch((err) => { starting = null; throw err; });
+        return starting;
+    }
+    async function boot() {
         if (diskBudget) refreshDisk();
-        const r = recover();
+        const r = await recover();
+        started = true;   // only now: the worker never claims a job while recovery is still reading 'running' rows
         if (r.requeued || r.failed) log.log(`[Jobs] ${o.service}: ${r.requeued} job(s) re-queued, ${r.failed} failed after restart`);
-        prune().catch(() => {});
-        flushUsage();
+        await prune().catch(() => {});
+        await flushUsage();
         pruneTimer = setInterval(() => {
             prune().catch(err => log.error('[Jobs] prune:', err.message));
             flushUsage();
         }, o.pruneIntervalMs || 5 * 60 * 1000);
         if (pruneTimer.unref) pruneTimer.unref();
-        kick();
+        await kick();
         return api;
     }
 
@@ -685,8 +710,8 @@ function createJobSystem(o) {
      * crash or a restart leaves behind; the next start() recovers them per type.
      */
     /** Closed hours of project usage → the outbox (./usage.js); a failure is logged and retried next tick. */
-    function flushUsage(at) {
-        try { return usage.flush(at); } catch (err) { log.error('[Jobs] usage flush:', err.message); return { queued: 0, invalid: 0 }; }
+    async function flushUsage(at) {
+        try { return await usage.flush(at); } catch (err) { log.error('[Jobs] usage flush:', err.message); return { queued: 0, invalid: 0 }; }
     }
 
     function stop() {
@@ -701,8 +726,8 @@ function createJobSystem(o) {
     function onStop(fn) { stopHooks.add(fn); return () => stopHooks.delete(fn); }
 
     /** The owner's succeeded job with a result file stored as Media object `mediaId` → { row, index } or null. */
-    function findResultMedia(owner, mediaId) {
-        for (const row of store.byResultMedia(owner, mediaId)) {
+    async function findResultMedia(owner, mediaId) {
+        for (const row of await store.byResultMedia(owner, mediaId)) {
             const files = (store.parse(row.result_json, null) || {}).files || [];
             const index = files.findIndex(f => f.media && f.media.media_id === mediaId);
             if (index >= 0) return { row, index };
@@ -728,7 +753,7 @@ function createJobSystem(o) {
         types: () => [...types.keys()],
         media,
         // running (after the spread) is the store's count of rows in 'running'; executing is this process's.
-        stats: () => ({ running: active.size, concurrency, ...store.counts(), executing: active.size, results: media ? 'media' : 'local', events: announce.status(), usage: usage.enabled ? usage.status() : { enabled: false } }),
+        stats: async () => ({ running: active.size, concurrency, ...(await store.counts()), executing: active.size, results: media ? 'media' : 'local', events: await announce.status(), usage: usage.enabled ? await usage.status() : { enabled: false } }),
         usage, flushUsage,
         outbox: o.outbox || null,
         /** True between start() and stop(): the worker picks up queued jobs. */

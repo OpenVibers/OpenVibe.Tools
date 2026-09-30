@@ -31,20 +31,22 @@ for app in apps/*/; do
     fi
   done
 done
-# Apps that run jobs (apps/_shared/jobs, required by relative path) hand it their own better-sqlite3,
-# openvibe-contracts and openvibe-sdk (the tools.job.* outbox relay): check they load under this Node (a
-# native-module ABI mismatch shows up here, not in a crash loop) and that the shared runtime itself loads.
+# Apps that run jobs (apps/_shared/jobs, required by relative path) hand it their own openvibe-contracts
+# and openvibe-sdk (openvibe-sdk/db for the job store in the one tools database, and the tools.job.*
+# outbox relay): check they load under this Node and that the shared runtime itself loads. Nothing here
+# needs better-sqlite3 any more (plan T8: no app depends on it).
 for app in img audio docs; do
-  (cd "apps/$app" && node -e "const D=require('better-sqlite3'); new D(':memory:').close(); require('openvibe-contracts'); require('openvibe-sdk'); require('../_shared/jobs')") \
+  (cd "apps/$app" && node -e "require('openvibe-contracts'); require('openvibe-sdk'); require('openvibe-sdk/db'); require('../_shared/jobs')") \
     || { echo "ABORT: apps/$app cannot load the jobs runtime; nothing restarted" >&2; exit 1; }
 done
-# Every app keeps its guard (apps/_shared/guard) state in data/guard.db through its own better-sqlite3;
-# the units' ReadWritePaths name each data directory, which must exist before systemd starts them.
+# Every app's guard (apps/_shared/guard) keeps its state in PostgreSQL (guard_abuse) and Valkey (salt, day
+# counters, buckets); check it loads. The units' ReadWritePaths still name each data directory (uploads,
+# job files), which must exist before systemd starts them.
 for app in apps/*/; do
   case "$app" in apps/_*) continue ;; esac   # apps/_shared is a package the apps require, not an app
   [ -f "$app/package.json" ] || continue
   mkdir -p "$app/data"
-  (cd "$app" && node -e "const D=require('better-sqlite3'); new D(':memory:').close(); require('../_shared/guard')") \
+  (cd "$app" && node -e "require('openvibe-sdk/db'); require('../_shared/guard')") \
     || { echo "ABORT: $app cannot load the guard; nothing restarted" >&2; exit 1; }
 done
 UNITS=$(systemctl list-unit-files 'openvibe-tools*' --no-legend | awk '{print $1}')

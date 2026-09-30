@@ -157,12 +157,12 @@ const is503 = (e) => e.status === 503 && e.code === 'tools.unavailable' && /bein
         assert.match(p.detail, /being set up/);
 
         const sync = new FormData();
-        sync.append('tool', 'unlock');
+        sync.append('input', JSON.stringify({ password: 'pw' }));
         sync.append('file', new Blob([three], { type: 'application/pdf' }), 'doc.pdf');
-        res = await fetch(`${app.base}/api/process`, { method: 'POST', body: sync });
+        res = await fetch(`${app.base}/api/v1/tools/unlockpdf/run`, { method: 'POST', body: sync });
         assert.strictEqual(res.status, 503);
         p = await res.json();
-        assert.strictEqual(p.code, 'tools.unavailable');
+        assert.strictEqual(p.code, 'tools.tool.unavailable');
 
         const ctx = await (await fetch(`${app.base}/api/context`, { headers: { 'X-OV-Tool': 'protectpdf' } })).json();
         assert.strictEqual(ctx.defaultOp, 'protect');

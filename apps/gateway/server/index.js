@@ -56,13 +56,19 @@ let auth = null;   // created below; the key check reads it at request time
 // the address), the tools-api quota, the net and dev tools' quotas by descriptor, the per-target
 // throttle, the port-scan cap, webhook bin caps and the abuse log (data/guard.db). The Network key is
 // the OAuth client's (loaded and retried by it). TOOLS_GUARD=report (default) records what it would refuse.
+// The one `tools` database and the shared Valkey (plan T8, decisions 3 and 4).
+const toolsDb = require('../../_shared/db').openToolsDb({ createDb: require('openvibe-sdk/db').createDb, service: 'tools-gateway' });
+const toolsValkey = require('../../_shared/db').openToolsValkey({ createValkey: require('openvibe-sdk/valkey').createValkey });
+require('./revocation-events').configure({ db: toolsDb.db, valkey: toolsValkey });
 const guard = createGuard({
-    app: 'gateway', dataDir: require('path').resolve(__dirname, '..', process.env.DATA_DIR || 'data'),
-    Database: require('better-sqlite3'), contracts: require('openvibe-contracts'),
+    app: 'gateway', db: toolsDb.db, valkey: toolsValkey, contracts: require('openvibe-contracts'),
     specs: [...require('./net/descriptors').SPECS, ...require('./dev/descriptors').SPECS],
     issuer: config.networkUrl,
     keys: { get: () => (auth && auth.client.publicKey) || null, ensure: () => (auth ? auth.ensureKey() : Promise.resolve(null)) },
 });
+// Serve only once the schema is in: the first PGlite migration must not run inside a request (it
+// would block the event loop and time out a satellite's readiness check).
+app.use((req, res, next) => toolsDb.ready.then(() => next(), next));
 const obs = observe({
     app, metrics: require('openvibe-shared/metrics'), ready: require('openvibe-shared/ready'),
     service: 'tools', release: release.release, mountReady: false,
@@ -78,6 +84,7 @@ const obs = observe({
             name: 'catalog', required: true, description: 'the tool catalog every apex page, host route and proxy decision is built from',
             check: () => { const n = registry.get().tools.length; return n > 0 ? { ok: true, detail: { tools: n } } : 'catalog is empty'; },
         },
+        ready.postgres('tools_db', () => toolsDb.db, { description: 'the one tools database (guard_abuse, revocations)' }),
         ready.networkKey('network_key', () => auth && auth.client.publicKey, { description: 'verifies signed-in visitors offline; signed-out use works without it' }),
         {
             name: 'service_directory', required: false, description: 'other services\' origins from the Network registry (a built-in fallback list is used without it)',
@@ -268,29 +275,6 @@ app.post(['/api/v1/jobs', '/api/v1/jobs/:id/retry'], actorLimits.backstop('tools
 app.use(runApi.handle);
 app.use((req, res, next) => { jobsFacade.handle(req, res, next); });
 
-// ── The older tool endpoints: still answered, and they say what replaces them ──
-const { deprecated, runPath } = require('../../_shared/tools/deprecation');
-const NET_BY_ENDPOINT = new Map();
-for (const sp of require('./net/descriptors').SPECS) {
-    if (!sp.route || !sp.api) continue;
-    const ep = sp.route.path.replace(/^\/api\/net/, '');
-    (NET_BY_ENDPOINT.get(ep) || NET_BY_ENDPOINT.set(ep, []).get(ep)).push(sp.id);
-}
-/** /api/net/<endpoint>… → the run route of the tool it serves here (the host's own, else the one named after it). */
-function netSuccessor(req) {
-    const ep = `/${String(req.path || '').split('/')[1] || ''}`;
-    if (ep === '/tools') return '/api/v1/tools?family=net';
-    const ids = NET_BY_ENDPOINT.get(ep);
-    if (!ids) return null;
-    const host = req.ovHost && req.ovHost.tool;
-    return runPath(ids.find(i => i === host) || ids.find(i => i === ep.slice(1)) || ids[0]);
-}
-function devSuccessor(req) {
-    if (req.path === '/opengraph') return runPath('opengraph');
-    if (req.path === '/tools') return '/api/v1/tools?family=dev';
-    return null;   // webhook bins: page-only (api false), no successor
-}
-
 // ── Auth (OAuth2 client of OpenVibe.Network) ─────────────────
 auth = createAuthClient(config);
 app.locals.auth = auth;
@@ -355,14 +339,13 @@ app.use('/api/pastes', guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonym
     }
 });
 
-// ── Net.OpenVibe — Network Tools API ─────────────────────────
-app.use('/api/net', deprecated(netSuccessor), guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: 60, signedIn: 120, message: 'Too many requests. Please try again later.' }), netRouter);
-
-// ── Dev.OpenVibe — Developer & SEO Tools API ─────────────────
+// ── Dev.OpenVibe — the webhook bins' own API ─────────────────
+// The rest of /api/dev is gone (network probes and lookups run through /api/v1/tools/<id>/run).
 // Webhook bins are created and deleted with the browser's session cookie: those writes must come from
 // our pages (the /in URL a bin receives on is anyone's to call).
+const { createWebhookRouter } = require('./dev/routes');
 const devOrigin = guard.originCheck();
-app.use('/api/dev', deprecated(devSuccessor), (req, res, next) => (/^\/webhook\/bins\/[^/]+\/in(\/|$)/.test(req.path) ? next() : devOrigin(req, res, next)), guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: 60, signedIn: 120, message: 'Too many requests. Please try again later.' }), devRouter);
+app.use('/api/dev/webhook', (req, res, next) => (/^\/bins\/[^/]+\/in(\/|$)/.test(req.path) ? next() : devOrigin(req, res, next)), guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: 60, signedIn: 120, message: 'Too many requests. Please try again later.' }), createWebhookRouter({ guard }));
 
 // ── Host-header subdomain routing ────────────────────────────
 function subdomainOf(req) {
@@ -542,6 +525,8 @@ require('../../_shared/graceful').gracefulStop({
         () => require('../../_shared/usage').stopRecorder(800),
         () => runApi.pool.close(),
         () => guard.close(),
+        () => toolsDb.db.close(),
+        () => toolsValkey && toolsValkey.close(),
         () => require('./revocation-events').close(),
     ],
 });

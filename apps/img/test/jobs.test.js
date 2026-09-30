@@ -63,16 +63,6 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
         assert.match(r.headers.get('content-type'), /problem\+json/);
         assert.strictEqual((await r.json()).code, 'tools.job.invalid');
 
-        // The synchronous endpoint is unchanged.
-        const sync = new FormData();
-        sync.append('tool', 'resize'); sync.append('width', '32');
-        sync.append('file', new Blob([png], { type: 'image/png' }), 'red.png');
-        r = await fetch(`${app.base}/api/process`, { method: 'POST', body: sync });
-        const body = await r.json();
-        assert.strictEqual(body.success, true);
-        assert.match(body.download.downloadUrl, /^\/api\/download\/[a-f0-9]{32}$/);
-        assert.strictEqual(body.dimensions.resized.width, 32);
-
         // Canonical host: through the gateway the page names the host the gateway says.
         // (fetch cannot set Host, so pages are requested with http.request)
         const page = (headers) => new Promise((resolve, reject) => {

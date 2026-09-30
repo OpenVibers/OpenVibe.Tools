@@ -31,7 +31,7 @@ async function finished(app, id, cookie) {
 
 function mergeForm(files, job) {
     const fd = new FormData();
-    if (job) { fd.append('type', 'docs.process'); fd.append('input', JSON.stringify({ tool: 'merge' })); } else fd.append('tool', 'merge');
+    if (job) { fd.append('type', 'docs.process'); fd.append('input', JSON.stringify({ tool: 'merge' })); } else fd.append('input', JSON.stringify({}));
     files.forEach((b, i) => fd.append('files', new Blob([b], { type: 'application/pdf' }), `part-${i}.pdf`));
     return fd;
 }
@@ -48,7 +48,7 @@ function mergeForm(files, job) {
         const ctx = await fetch(`${app.base}/api/context`);
         const cookie = ctx.headers.get('set-cookie').split(';')[0];
         const t0 = Date.now();
-        const merging = fetch(`${app.base}/api/process/multi`, { method: 'POST', body: mergeForm([big, big]), headers: { cookie } }).then(async r => ({ status: r.status, body: await r.json(), at: Date.now() }));
+        const merging = fetch(`${app.base}/api/v1/tools/mergepdf/run?wait_ms=60000`, { method: 'POST', body: mergeForm([big, big]), headers: { cookie } }).then(async r => ({ status: r.status, body: await r.json(), at: Date.now() }));
         const latencies = [];
         let done = null;
         merging.then(r => { done = r; });
@@ -64,7 +64,8 @@ function mergeForm(files, job) {
         }
         const took = done.at - t0;
         assert.strictEqual(done.status, 200, JSON.stringify(done.body));
-        assert.strictEqual(done.body.pageCount, 5000, 'every page of both documents');
+        assert.strictEqual(done.body.state, 'succeeded', JSON.stringify(done.body.error));
+        assert.strictEqual(done.body.result.data.pageCount, 5000, 'every page of both documents');
         assert.ok(took > 700, `the merge is large enough to measure (${took} ms)`);
         assert.ok(latencies.length >= 5, `health was asked during the merge (${latencies.length} times)`);
         const worst = Math.max(...latencies);
@@ -94,10 +95,12 @@ function mergeForm(files, job) {
         assert.strictEqual(next.result.data.pageCount, 4);
         const stats = (await (await fetch(`${small.base}/api/health`)).json()).workers;
         assert.strictEqual(stats.out_of_memory, 1);
-        // The synchronous endpoint says the same (413, the legacy { error, code } shape).
-        r = await fetch(`${small.base}/api/process/multi`, { method: 'POST', body: mergeForm([big, big, big]), headers: { cookie: c2 } });
-        assert.strictEqual(r.status, 413);
-        assert.strictEqual((await r.json()).code, 'tools.input.too_large');
+        // A run says the same: the tool fails with 413 tools.input.too_large.
+        r = await fetch(`${small.base}/api/v1/tools/mergepdf/run?wait_ms=60000`, { method: 'POST', body: mergeForm([big, big, big]), headers: { cookie: c2 } });
+        assert.strictEqual(r.status, 200);
+        const oomRun = await r.json();
+        assert.strictEqual(oomRun.state, 'failed');
+        assert.strictEqual(oomRun.error.code, 'tools.input.too_large');
     } finally {
         for (const a of apps) await a.kill('SIGTERM');
     }

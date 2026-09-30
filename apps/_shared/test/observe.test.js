@@ -84,7 +84,7 @@ function assertShape(body, service) {
         let r = await json(`${img.base}/api/ready`);
         assertShape(r.body, 'tools-img');
         assert.strictEqual(r.status, 200, JSON.stringify(r.body));
-        for (const n of ['jobs_db', 'job_runtime', 'data_dir', 'uploads_dir', 'output_dir']) {
+        for (const n of ['tools_db', 'job_runtime', 'data_dir', 'uploads_dir', 'output_dir']) {
             assert.strictEqual(r.body.checks[n].required, true, `${n} is required`);
             assert.strictEqual(r.body.checks[n].status, 'ok', `${n} ok`);
         }

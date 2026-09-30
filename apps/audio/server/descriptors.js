@@ -89,7 +89,6 @@ function tool(id, extra = {}) {
     return {
         id, execution: 'job', api: true,
         job: { type: 'audio.process', operation: op, ...(fixed && { preset: { format: ctx.defaultFormat } }) },
-        legacy: [op === 'merge' ? 'POST /api/process/multi' : 'POST /api/process'],
         input: INPUT[op](),
         files: { min: op === 'merge' ? 2 : 1, max: op === 'merge' ? 5 : 1, accept: op === 'extract' ? ACCEPT : AUDIO_ACCEPT, maxBytes: MAX_BYTES },
         output: { kind: 'file', mime, schema: RESULT },

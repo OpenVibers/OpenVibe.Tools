@@ -3,45 +3,41 @@
  * Sign-out everywhere reaches OpenVibe.Tools (roadmap WS-B task 4; Contracts 0.39.0
  * network.user.token_valid_after). The gateway is the one consumer: POST /internal/events (the
  * endpoint of its Events subscription, TOOLS_EVENTS_SECRET, signature v2 only, never through the
- * proxy) writes each person's cutoff into the shared file every app's guard reads
- * (apps/_shared/guard/revocations.js). The subscription is created at boot when EVENTS_URL, the
- * service secret and TOOLS_EVENTS_SECRET are set (grant tools events.subscription.manage).
+ * proxy) writes each person's cutoff into PostgreSQL through openvibe-sdk/auth createPgRevocationStore
+ * (the `token_revocations` table of the one `tools` database, migrations/0003); every app's guard
+ * reads it (apps/_shared/guard/revocations.js). The subscription is created at boot when EVENTS_URL,
+ * the service secret and TOOLS_EVENTS_SECRET are set (grant tools events.subscription.manage).
+ *
+ * The gateway owns the write, so it also bumps the shared Valkey version the readers watch: with it,
+ * a revocation reaches every app on their next read rather than after their cache ttl.
  */
-const fs = require('fs');
-const path = require('path');
 const express = require('express');
-const { revocationsFile } = require('../../_shared/guard/revocations');
+const { createPgRevocationStore } = require('openvibe-sdk/auth');
 
 const TOPIC = 'network.user.token_valid_after';
 let store = null;
 let storeDb = null;
-function cutoffs() {
+let storeValkey = null;
+
+/** The gateway calls this once, at boot, with the one `tools` database and the shared Valkey. */
+function configure({ db = null, valkey = null } = {}) { storeDb = db; storeValkey = valkey; store = null; }
+
+async function cutoffs() {
     if (store) return store;
-    const Database = require('better-sqlite3');
-    const file = revocationsFile();
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    const db = new Database(file);
-    storeDb = db;
-    // A rollback journal, not WAL: the other apps open the file read-only under ProtectSystem=strict and could not
-    // create a WAL's -shm file. Writes are one row per sign-out-everywhere.
-    db.pragma('journal_mode = DELETE');
-    db.pragma('busy_timeout = 2000');
-    store = require('openvibe-sdk/auth').createRevocationStore(db, { table: 'token_revocations' });
+    if (!storeDb) throw new Error('revocation-events: configure({ db }) was not called');
+    const s = createPgRevocationStore(storeDb, { table: 'token_revocations' });
+    await s.load();
+    store = s;
     return store;
 }
-/** Close the cutoff store (graceful stop); the next request opens it again. */
-function close() {
-    const db = storeDb;
-    store = null;
-    storeDb = null;
-    if (db) try { db.close(); } catch { /* already closed */ }
-}
+/** Close the cutoff store (graceful stop); the next request loads it again. */
+function close() { store = null; }
 const secrets = () => String(process.env.TOOLS_EVENTS_SECRET || '').split(',').map((s) => s.trim()).filter((s) => s.length >= 32);
 const stats = { received: 0, revoked: 0, refused: 0 };
 
 function handler() {
     const { parseDelivery } = require('openvibe-sdk/events');
-    return [express.raw({ type: () => true, limit: '256kb' }), (req, res) => {
+    return [express.raw({ type: () => true, limit: '256kb' }), async (req, res) => {
         if (req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.headers['cf-connecting-ip']) return res.status(404).json({ error: 'Not found' });
         const keys = secrets();
         if (!keys.length) return res.status(503).json({ error: 'TOOLS_EVENTS_SECRET is not set' });
@@ -50,8 +46,11 @@ function handler() {
         for (const k of keys) { d = parseDelivery(raw, req.headers, k, { requireV2: true }); if (d) break; }
         if (!d || !d.event) { stats.refused++; return res.status(401).json({ error: 'bad signature' }); }
         stats.received++;
-        const outcome = cutoffs().apply(d.event);
-        if (outcome === 'revoked') stats.revoked++;
+        const outcome = await (await cutoffs()).apply(d.event);
+        if (outcome === 'revoked') {
+            stats.revoked++;
+            if (storeValkey) { try { await storeValkey.client.incr(storeValkey.key('token_revocations_version')); } catch { /* the readers fall back to their ttl */ } }
+        }
         res.json({ event_id: d.event.event_id || null, outcome });
     }];
 }
@@ -80,4 +79,4 @@ async function ensureSubscription({ port, fetchImpl = globalThis.fetch, log = co
     return 'created';
 }
 
-module.exports = { handler, ensureSubscription, close, stats, TOPIC, _cutoffs: cutoffs };
+module.exports = { handler, ensureSubscription, close, configure, stats, TOPIC, _cutoffs: cutoffs };

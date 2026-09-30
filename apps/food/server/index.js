@@ -13,26 +13,24 @@ const fs = require('fs');
 const cookieParser = require('cookie-parser');
 
 // ── Analytics ────────────────────────────────────────────────
-const Database = require('better-sqlite3');
-const { AnalyticsTracker } = require('openvibe-shared/analytics'); // ADR-021: no IP/user id, route templates, raw rows pruned after 30 days, Sec-GPC/DNT not recorded
+const { AnalyticsTrackerPg } = require('openvibe-shared/analytics/pg'); // ADR-021: no IP/user id, route templates, raw rows pruned after 30 days, Sec-GPC/DNT not recorded
 const { requireInternalAccess } = require('../../_shared/internal-token');
 const { hostGuard, stampedPage } = require('../../_shared/host-role');
 const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
 const { createLocalRegistry, requiresStatus } = require('../../_shared/tools/local');
 const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
-const analyticsDbPath = path.join(__dirname, '..', 'data', 'analytics.db');
-fs.mkdirSync(path.dirname(analyticsDbPath), { recursive: true });
-const analyticsDb = new Database(analyticsDbPath);
-analyticsDb.pragma('journal_mode = WAL');
-const analytics = new AnalyticsTracker(analyticsDb, 'openvibe-food', { retention: { days: 30 } });
 
 // ── Guard (apps/_shared/guard) ───────────────────────────────
 // Who is asking (Network sign-in with aud openvibe.tools, else the address), the tools-api quota and
 // the abuse log (data/guard.db). The data lookups are counted by maps (tools-map), which gets the
 // visitor's address from here. TOOLS_GUARD=report (default) records what it would refuse.
 const NETWORK_URL = process.env.OV_NETWORK_URL || 'https://openvibe.network';
+// The one `tools` database and the shared Valkey (plan T8, decisions 3 and 4).
+const toolsDb = require('../../_shared/db').openToolsDb({ createDb: require('openvibe-sdk/db').createDb, service: 'tools-food' });
+const analytics = new AnalyticsTrackerPg(toolsDb.db, 'openvibe-food', { retention: { days: 30 } }); // ADR-021; PostgreSQL (plan T8)
+const toolsValkey = require('../../_shared/db').openToolsValkey({ createValkey: require('openvibe-sdk/valkey').createValkey });
 const guard = createGuard({
-    app: 'food', dataDir: path.join(__dirname, '..', 'data'), Database, specs: require('../../maps/server/descriptors').SPECS.filter(s => s.id === 'food'),
+    app: 'food', db: toolsDb.db, valkey: toolsValkey, specs: require('../../maps/server/descriptors').SPECS.filter(s => s.id === 'food'),
     issuer: NETWORK_URL, networkUrl: NETWORK_URL, networkInternalUrl: process.env.OV_NETWORK_INTERNAL_URL || 'http://127.0.0.1:4000',
     publicKeyFiles: [process.env.OV_NETWORK_PUBLIC_KEY].filter(Boolean),
 });
@@ -46,13 +44,16 @@ const release = require('../../_shared/release').toolsRelease('food', require); 
 // Metrics (GET /metrics, direct loopback callers only) and GET /api/ready from this server's real
 // dependencies (roadmap Track O). First, so the HTTP metrics see every request.
 const { observe, checks: ready } = require('../../_shared/observe');
+// Serve only once the schema is in: the first PGlite migration must not run inside a request (it
+// would block the event loop and time out a satellite's readiness check).
+app.use((req, res, next) => toolsDb.ready.then(() => next(), next));
 const obs = observe({
     app, metrics: require('openvibe-shared/metrics'), ready: require('openvibe-shared/ready'),
     service: 'tools-food', release: release.release,
     checks: [
         // Every food API answer comes from the maps satellite; without it this server only has its page.
+        ready.postgres('tools_db', () => toolsDb.db, { description: 'the one tools database (guard_abuse, analytics, revocations)' }),
         ready.upstream('maps', `${MAPS_API}/api/ready`, { required: true, cacheMs: 5000, description: 'food APIs are proxied to the maps satellite' }),
-        ready.sqlite('analytics_db', analyticsDb, { required: false, description: 'visit analytics only' }),
     ],
 });
 guard.attachMetrics(obs.registry);
@@ -146,12 +147,12 @@ app.get('/api/geocode', proxyToMaps('/api/geocode'));
 
 // ── Internal Analytics API ────────────────────────────────────
 const internalAccess = requireInternalAccess({ keys: guard.keys, issuer: guard.issuer, audience: guard.audience });
-app.get('/api/internal/analytics', internalAccess, (req, res) => {
-    try { const d = Math.min(parseInt(req.query.days) || 30, 365); const h = req.query.hours ? Math.min(parseInt(req.query.hours), 8760) : null; res.json({ ok: true, analytics: analytics.getStats({ days: d, hours: h }) }); }
+app.get('/api/internal/analytics', internalAccess, async (req, res) => {
+    try { const d = Math.min(parseInt(req.query.days) || 30, 365); const h = req.query.hours ? Math.min(parseInt(req.query.hours), 8760) : null; res.json({ ok: true, analytics: await analytics.getStats({ days: d, hours: h }) }); }
     catch (err) { res.status(500).json({ ok: false, error: err.message }); }
 });
-app.get('/api/internal/analytics/bots', internalAccess, (req, res) => {
-    try { res.json({ ok: true, bots: analytics.getBotAnalysis(Math.min(parseInt(req.query.days) || 30, 365)) }); }
+app.get('/api/internal/analytics/bots', internalAccess, async (req, res) => {
+    try { res.json({ ok: true, bots: await analytics.getBotAnalysis(Math.min(parseInt(req.query.days) || 30, 365)) }); }
     catch (err) { res.status(500).json({ ok: false, error: err.message }); }
 });
 
@@ -169,7 +170,8 @@ require('../../_shared/graceful').gracefulStop({
     name: 'Food.OpenVibe', server,
     close: [
         () => analytics.destroy(),
-        () => analyticsDb.close(),
         () => guard.close(),
+        () => toolsDb.db.close(),
+        () => toolsValkey && toolsValkey.close(),
     ],
 });

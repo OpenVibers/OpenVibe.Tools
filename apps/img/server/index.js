@@ -27,7 +27,6 @@ const { hostGuard, ownHost } = require('../../_shared/host-role');
 const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
 const { satelliteRunApi, ajvFrom } = require('../../_shared/tools/run');
 const { satellitePorts } = require('../../_shared/tools/satellites');
-const { deprecated, runPath } = require('../../_shared/tools/deprecation');
 const { createLocalRegistry, requiresStatus } = require('../../_shared/tools/local');
 const jobsRuntime = require('../../_shared/jobs');
 const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
@@ -35,22 +34,21 @@ const contracts = require('openvibe-contracts');
 const sdk = require('openvibe-sdk');
 
 // ── Analytics ────────────────────────────────────────────────
-const Database = require('better-sqlite3');
-const { AnalyticsTracker } = require('openvibe-shared/analytics'); // ADR-021: no IP/user id, route templates, raw rows pruned after 30 days, Sec-GPC/DNT not recorded
+const { AnalyticsTrackerPg } = require('openvibe-shared/analytics/pg'); // ADR-021: no IP/user id, route templates, raw rows pruned after 30 days, Sec-GPC/DNT not recorded
 const { requireInternalAccess } = require('../../_shared/internal-token');
-const analyticsDbPath = path.resolve(__dirname, '..', config.dataDir, 'analytics.db');
-fs.mkdirSync(path.dirname(analyticsDbPath), { recursive: true });
-const analyticsDb = new Database(analyticsDbPath);
-analyticsDb.pragma('journal_mode = WAL');
-const analytics = new AnalyticsTracker(analyticsDb, 'openvibe-img', { retention: { days: 30 } });
 
 // ── Guard (apps/_shared/guard) ───────────────────────────────
 // Who is asking (Network sign-in with aud openvibe.tools, service tokens, the browser session, else
 // the address), tiered quotas by each tool's descriptor, upload sniffing, the sync semaphore and the
 // abuse log (data/guard.db). TOOLS_GUARD=report (default) records what it would refuse.
 const SPECS = require('./descriptors').SPECS;
+// The one `tools` database and the shared Valkey (plan T8, decisions 3 and 4): guard_abuse in
+// PostgreSQL, guard_salt/guard_day and the quota buckets in Valkey. `ready` resolves when the schema is in.
+const toolsDb = require('../../_shared/db').openToolsDb({ createDb: require('openvibe-sdk/db').createDb, service: 'tools-img' });
+const analytics = new AnalyticsTrackerPg(toolsDb.db, 'openvibe-img', { retention: { days: 30 } }); // ADR-021; PostgreSQL (plan T8)
+const toolsValkey = require('../../_shared/db').openToolsValkey({ createValkey: require('openvibe-sdk/valkey').createValkey });
 const guard = createGuard({
-    app: 'img', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts, specs: SPECS,
+    app: 'img', db: toolsDb.db, valkey: toolsValkey, contracts, specs: SPECS,
     issuer: config.networkUrl, networkUrl: config.networkUrl, networkInternalUrl: config.networkInternalUrl, publicKeyFiles: config.publicKeyPaths,
 });
 const { apiLimiter, processLimiter, burstLimiter } = guard.legacyLimiters(rateLimit);
@@ -64,24 +62,6 @@ const toolOf = (req) => { const d = guard.toolForJob('img.process', String((req.
 // once for the synchronous endpoints and the jobs together, each with a heap limit
 // (TOOLS_WORKER_MEMORY_MB, 512) and terminated at its timeout, on cancel, or when the client goes away.
 const pool = poolFromEnv('img', path.join(__dirname, 'worker.js'));
-/** The sync endpoints' bounds for a run: the tool's descriptor timeout, and the client leaving. */
-function syncRun(req, res) {
-    const ac = new AbortController();
-    res.on('close', () => { if (!res.writableFinished) ac.abort(); });
-    const d = guard.tool(toolOf(req));
-    return { signal: ac.signal, timeoutMs: (d && d.limits && d.limits.timeoutMs) || 5 * 60 * 1000, transfer: true };
-}
-/** A tool's failure on the synchronous endpoints: its own 503 (with Retry-After when busy), else { error }. */
-function syncError(req, res, err, label) {
-    if (guard.toolRefused(req, res, err, toolOf(req))) return;
-    if (err.status === 503) {
-        if (err.retryAfter) res.set('Retry-After', String(err.retryAfter));
-        return contracts.http.sendProblem(res, 503, err.code, { detail: err.message, ctx: req.ov });
-    }
-    if (err.code === 'tools.job.cancelled') return;   // the client went away
-    console.error(`[${label}] Error:`, err.message);
-    res.status(422).json({ error: err.message || 'Image processing failed' });
-}
 
 const app = express();
 // What this deploy runs (ADR-016); the shared navbar's release-watch polls it on every tool host.
@@ -89,16 +69,18 @@ const release = require('../../_shared/release').toolsRelease('img', require);  
 // Metrics (GET /metrics, direct loopback callers only) and GET /api/ready from this server's real
 // dependencies (roadmap Track O). First, so the HTTP metrics see every request.
 const { observe, checks: ready } = require('../../_shared/observe');
+// Serve only once the schema is in: the first PGlite migration must not run inside a request (it
+// would block the event loop and time out a satellite's readiness check).
+app.use((req, res, next) => toolsDb.ready.then(() => next(), next));
 const obs = observe({
     app, metrics: require('openvibe-shared/metrics'), ready: require('openvibe-shared/ready'),
     service: 'tools-img', release: release.release,
     checks: [
-        ready.sqlite('jobs_db', () => jobs.db, { sql: 'SELECT COUNT(*) AS n FROM tool_jobs', description: 'job store (jobs.db)' }),
+        ready.postgres('tools_db', () => toolsDb.db, { description: 'the one tools database (guard_abuse, jobs, analytics, revocations)' }),
         ready.jobRuntime('job_runtime', () => jobs),
-        ready.writableDir('data_dir', path.resolve(__dirname, '..', config.dataDir), { description: 'jobs.db and job inputs/results' }),
+        ready.writableDir('data_dir', path.resolve(__dirname, '..', config.dataDir), { description: 'job inputs/results' }),
         ready.writableDir('uploads_dir', path.resolve(config.uploadsDir), { description: 'synchronous uploads' }),
         ready.writableDir('output_dir', path.resolve(config.outputDir), { description: 'synchronous results' }),
-        ready.sqlite('analytics_db', analyticsDb, { required: false, description: 'visit analytics only; tools work without it' }),
         ready.networkKey('network_key', guard.keys.get, { description: 'verifies signed-in users and service tokens on the job API; anonymous use works without it' }),
         ...jobsRuntime.readyChecks(() => jobs),
         codec.heif.readyCheck('HEIC (iPhone) photos: heif-dec or heif-convert with an HEVC decoder plugin (libheif-examples + libheif-plugin-libde265); other formats work without it'),
@@ -182,9 +164,9 @@ app.use((req, _res, next) => {
 // ── API Routes ───────────────────────────────────────────────
 
 // Health check
-app.get('/api/health', (_req, res) => {
+app.get('/api/health', async (_req, res) => {
     const stats = retention.getStats();
-    res.json({ status: 'ok', service: 'openvibe-img', version: '1.0.0', files: stats, jobs: jobs.stats(), workers: pool.stats() });
+    res.json({ status: 'ok', service: 'openvibe-img', version: '1.0.0', files: stats, jobs: await jobs.stats(), workers: pool.stats() });
 });
 
 // Domain context (frontend calls this on load to get branding). It also starts this browser's session
@@ -214,59 +196,11 @@ app.get('/api/tools', (_req, res) => {
     res.json({ tools: listTools() });
 });
 
-// ── Main Processing Endpoint ─────────────────────────────────
-app.post('/api/process', deprecated((req) => runPath(hostTool(req))), guard.originCheck(), burstLimiter, processLimiter, guard.toolQuota(hostTool), uploadSingle, guard.admitUpload(toolOf), guard.heavy(toolOf), async (req, res) => {
-    try {
-        const toolId = req.body.tool || req.ctx.defaultOp || 'convert';
-        const tool = getTool(toolId);
-        if (!tool) {
-            return res.status(400).json({ error: `Unknown tool: ${toolId}` });
-        }
-
-        // Execute the tool (the same code, pool and limits the img.process job uses)
-        const result = await runProcess(pool, req.file.buffer, toolId, buildOptions(req.body, req.ctx, req.file.mimetype), syncRun(req, res));
-
-        // Save to retention
-        const saved = retention.saveOutput(
-            result.buffer,
-            result.ext,
-            result.mime,
-            !!req.user,
-            req.file.originalname,
-        );
-
-        res.json({ success: true, download: saved, ...describe(toolId, result) });
-    } catch (err) {
-        syncError(req, res, err, 'Process');
-    }
-});
-
-// ── Direct Download (inline preview) ─────────────────────────
-app.post('/api/process/direct', deprecated((req) => runPath(hostTool(req))), guard.originCheck(), burstLimiter, processLimiter, guard.toolQuota(hostTool), uploadSingle, guard.admitUpload(toolOf), guard.heavy(toolOf), async (req, res) => {
-    try {
-        const toolId = req.body.tool || req.ctx.defaultOp || 'convert';
-        const tool = getTool(toolId);
-        if (!tool) return res.status(400).json({ error: `Unknown tool: ${toolId}` });
-
-        const result = await runProcess(pool, req.file.buffer, toolId, buildOptions(req.body, req.ctx, req.file.mimetype), syncRun(req, res));
-        const baseName = path.basename(req.file.originalname, path.extname(req.file.originalname));
-
-        res.set({
-            'Content-Type': result.mime,
-            'Content-Disposition': `attachment; filename="${baseName}.${result.ext}"`,
-            'Content-Length': result.buffer.length,
-        });
-        res.send(result.buffer);
-    } catch (err) {
-        syncError(req, res, err, 'Process/Direct');
-    }
-});
-
 // ── Jobs (/api/v1/jobs) ──────────────────────────────────────
-// The same operation as /api/process, asynchronous and durable: accepted into data/jobs.db,
-// followed over SSE, reattachable by id after a reload or a restart (apps/_shared/jobs).
+// The image operations, asynchronous and durable: accepted into the shared `tools` database, followed
+// over SSE, reattachable by id after a reload or a restart (apps/_shared/jobs).
 const jobs = jobsRuntime.setupJobs({
-    app, service: 'img', dataDir: path.resolve(__dirname, '..', config.dataDir), Database, contracts, sdk,
+    app, service: 'img', dataDir: path.resolve(__dirname, '..', config.dataDir), db: toolsDb.db, contracts, sdk,
     getPublicKey: guard.keys.get, issuer: config.networkUrl, guard,
     define: (system) => defineJobs(system, pool),
     receive: uploadSingle,
@@ -311,12 +245,12 @@ app.get('/api/download/:id', (req, res) => {
 
 // ── Internal Analytics API ────────────────────────────────────
 const internalAccess = requireInternalAccess({ keys: guard.keys, issuer: guard.issuer, audience: guard.audience, contracts });
-app.get('/api/internal/analytics', internalAccess, (req, res) => {
-    try { const d = Math.min(parseInt(req.query.days) || 30, 365); const h = req.query.hours ? Math.min(parseInt(req.query.hours), 8760) : null; res.json({ ok: true, analytics: analytics.getStats({ days: d, hours: h }) }); }
+app.get('/api/internal/analytics', internalAccess, async (req, res) => {
+    try { const d = Math.min(parseInt(req.query.days) || 30, 365); const h = req.query.hours ? Math.min(parseInt(req.query.hours), 8760) : null; res.json({ ok: true, analytics: await analytics.getStats({ days: d, hours: h }) }); }
     catch (err) { res.status(500).json({ ok: false, error: err.message }); }
 });
-app.get('/api/internal/analytics/bots', internalAccess, (req, res) => {
-    try { res.json({ ok: true, bots: analytics.getBotAnalysis(Math.min(parseInt(req.query.days) || 30, 365)) }); }
+app.get('/api/internal/analytics/bots', internalAccess, async (req, res) => {
+    try { res.json({ ok: true, bots: await analytics.getBotAnalysis(Math.min(parseInt(req.query.days) || 30, 365)) }); }
     catch (err) { res.status(500).json({ ok: false, error: err.message }); }
 });
 
@@ -370,9 +304,10 @@ require('../../_shared/graceful').gracefulStop({
     close: [
         () => require('../../_shared/usage').stopRecorder(800),
         () => analytics.destroy(),
-        () => analyticsDb.close(),
-        () => jobs.close(),   // running jobs stay 'running' in data/jobs.db; the next boot re-queues them
+        () => jobs.close(),   // running jobs stay 'running' in the tools database; the next boot re-queues them
         () => pool.close(),
         () => guard.close(),
+        () => toolsDb.db.close(),
+        () => toolsValkey && toolsValkey.close(),
     ],
 });

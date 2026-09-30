@@ -7,19 +7,19 @@
 //   succeeded                    → tools.job.succeeded   priority important  actor: service:tools
 //   failed (tool, timeout, boot) → tools.job.failed      priority important  actor: service:tools
 //
-// Each event is written to the satellite's own `event_outbox` table (openvibe-sdk createOutbox) in
-// the SQLite transaction that records the transition, so it exists if and only if the transition
-// committed; the relay posts it to OpenVibe.Events afterwards (at least once; Events dedupes on
-// event_id). A cancelled job, a progress tick and a requeue after a restart are not announced (a
-// requeued job is announced again when it starts). Sandbox jobs (developer-app sandbox tokens) are
-// never announced.
+// Each event is written to the one tools database's `event_outbox` table (openvibe-sdk createPgOutbox) in
+// the SAME transaction that records the transition, so it exists if and only if the transition committed;
+// the relay posts it to OpenVibe.Events afterwards (at least once; Events dedupes on event_id). A cancelled
+// job, a progress tick and a requeue after a restart are not announced (a requeued job is announced again
+// when it starts). Sandbox jobs (developer-app sandbox tokens) are never announced.
 //
 // Payloads (openvibe-contracts tools.job.*@1, validated before they are enqueued) carry ids, type,
 // owner, state, times, where result files are and the error; never the job's input, file names,
 // output data or a browser session: a session-owned job has owner null.
 //
 // Inert unless EVENTS_URL is set (and OV_OAUTH_CLIENT_SECRET, for the tools service token with
-// events.event.publish on openvibe.events): no outbox table, nothing written, nothing relayed.
+// events.event.publish on openvibe.events): nothing written, nothing relayed. The event_outbox table is
+// migrations/0004_event_outbox.sql (run as the owner), never created at runtime.
 // EVENTS_PUBLISH=off turns it off with EVENTS_URL set.
 // ═══════════════════════════════════════════════════════════════
 
@@ -29,7 +29,7 @@ const SERVICE_ACTOR = Object.freeze({ type: 'service', id: SOURCE });
 const OWNER_TYPES = { user: 'user', svc: 'service', app: 'app', mod: 'mod' };
 const PRIORITY = { 'tools.job.created': 'low', 'tools.job.started': 'low', 'tools.job.succeeded': 'important', 'tools.job.failed': 'important' };
 
-const iso = (ms) => (ms == null ? null : new Date(ms).toISOString());
+const iso = (ms) => (ms == null ? null : new Date(Number(ms)).toISOString());
 const parse = (s, fallback) => { if (s == null) return fallback; try { return JSON.parse(s); } catch { return fallback; } };
 
 /** 'user:usr_…' | 'svc:<slug>' | 'app:app_…' | 'mod:mod_…' → SubjectRef; anything else (a session) → null. */
@@ -60,11 +60,11 @@ function payloadFor(eventType, row, { contracts, service, referenced = false }) 
         job_id: row.id,
         service,
         type: row.type,
-        type_version: row.type_version,
+        type_version: Number(row.type_version),
         state: row.state,
         owner: ownerRef(contracts, row.owner),
-        attempts: row.attempts,
-        max_attempts: row.max_attempts,
+        attempts: Number(row.attempts),
+        max_attempts: Number(row.max_attempts),
         created_at: iso(row.created_at),
         retry_of: row.retry_of || null,
     };
@@ -103,23 +103,24 @@ function payloadFor(eventType, row, { contracts, service, referenced = false }) 
  * @param {object} o
  * @param {object} o.contracts   require('openvibe-contracts') (v0.30.0+ knows tools.job.*@1)
  * @param {string} o.service     the satellite ('img' | 'audio' | 'docs' | …) → payload.service
- * @param {object|null} o.outbox openvibe-sdk createOutbox(db, …) on the jobs database, or null
- * @param {(id) => number} [o.referenceCount]
+ * @param {object|null} o.outbox openvibe-sdk createPgOutbox(db, …) on the one tools database, or null
+ * @param {(id) => Promise<number>} [o.referenceCount]
  * @param {object} [o.log]
  */
-function createJobEvents({ contracts, service, outbox = null, referenceCount = () => 0, log = console }) {
+function createJobEvents({ contracts, service, outbox = null, referenceCount = async () => 0, log = console }) {
     const stats = { queued: 0, invalid: 0, lastInvalid: null };
 
     /**
-     * Enqueue `eventType` for this row (just read back inside the caller's transaction). A payload that
-     * fails its contract is logged and skipped, never thrown: a bug here must not stop jobs. An outbox
-     * write error does throw, so the caller's transaction rolls back with it.
+     * Enqueue `eventType` for this row inside the caller's transaction `t` (the row was just read back).
+     * A payload that fails its contract is logged and skipped, never thrown: a bug here must not stop
+     * jobs. An outbox write error does throw, so the caller's transaction rolls back with it.
      */
-    function announce(eventType, row) {
+    async function announce(t, eventType, row) {
         if (!outbox || !row || row.env === 'sandbox') return null;
         let payload;
         try {
-            payload = payloadFor(eventType, row, { contracts, service, referenced: eventType !== 'tools.job.created' && eventType !== 'tools.job.started' && referenceCount(row.id) > 0 });
+            const referenced = eventType !== 'tools.job.created' && eventType !== 'tools.job.started' && (await referenceCount(row.id)) > 0;
+            payload = payloadFor(eventType, row, { contracts, service, referenced });
             const v = contracts.validate(`${eventType}@1`, payload);
             if (!v.valid) throw new Error(v.errors.map(e => `${e.path} ${e.message}`).join('; '));
         } catch (err) {
@@ -128,7 +129,7 @@ function createJobEvents({ contracts, service, outbox = null, referenceCount = (
             log.error(`[Jobs] ${eventType} for ${row.id} not announced (payload does not match the contract): ${err.message}`);
             return null;
         }
-        const env = outbox.enqueue({
+        const env = await outbox.enqueue(t, {
             event_type: eventType,
             actor: eventType === 'tools.job.created' && payload.owner ? payload.owner : SERVICE_ACTOR,
             subject: { type: 'job', id: row.id },
@@ -143,14 +144,14 @@ function createJobEvents({ contracts, service, outbox = null, referenceCount = (
 
     return {
         enabled: !!outbox,
-        created: (row) => announce('tools.job.created', row),
-        started: (row) => announce('tools.job.started', row),
+        created: (t, row) => announce(t, 'tools.job.created', row),
+        started: (t, row) => announce(t, 'tools.job.started', row),
         /** succeeded → tools.job.succeeded, failed → tools.job.failed; cancelled is not announced. */
-        finished: (row) => (row && row.state === 'succeeded' ? announce('tools.job.succeeded', row)
-            : row && row.state === 'failed' ? announce('tools.job.failed', row) : null),
-        status() {
+        finished: (t, row) => (row && row.state === 'succeeded' ? announce(t, 'tools.job.succeeded', row)
+            : row && row.state === 'failed' ? announce(t, 'tools.job.failed', row) : null),
+        async status() {
             if (!outbox) return { enabled: false };
-            return { enabled: true, pending: outbox.pending(), rejected: outbox.rejected(), queued_since_boot: stats.queued, invalid: stats.invalid, last_invalid: stats.lastInvalid };
+            return { enabled: true, pending: await outbox.pending(), rejected: await outbox.rejected(), queued_since_boot: stats.queued, invalid: stats.invalid, last_invalid: stats.lastInvalid };
         },
     };
 }
@@ -165,8 +166,13 @@ function createJobEvents({ contracts, service, outbox = null, referenceCount = (
  *   OV_NETWORK_INTERNAL_URL    token endpoint host (default http://127.0.0.1:4000)
  *   EVENTS_RELAY_INTERVAL_MS   relay poll (default 2000)
  *
+ * The event_outbox table is an owner migration (migrations/0004_event_outbox.sql, DATABASE_DIRECT_URL):
+ * the runtime role (DATABASE_URL) may have no DDL rights, so createPgOutbox.ensureSchema is never called
+ * here. outbox.ready checks the table is there (after the app's migrations) and rejects, naming the
+ * migration, when it is not; index.js logs that.
+ *
  * @param {object} o
- * @param {object} o.db       the jobs database (better-sqlite3) — the outbox table lives beside tool_jobs
+ * @param {object} o.db       openvibe-sdk/db handle — the outbox table lives beside tool_jobs
  * @param {object} [o.sdk]    require('openvibe-sdk')
  * @param {object} [o.env]
  * @param {Function} [o.fetch]
@@ -190,7 +196,7 @@ function outboxFromEnv({ db, sdk, env = process.env, fetch: fetchImpl, log = con
     const client = sdk.createClient({ baseUrls: { events: url }, tokenProvider: tokens, retries: 0, ...(fetchImpl ? { fetch: fetchImpl } : {}) });
     let lastError = null;
     const interval = parseInt(env.EVENTS_RELAY_INTERVAL_MS, 10);
-    const outbox = sdk.events.createOutbox(db, {
+    const outbox = sdk.events.createPgOutbox(db, {
         events: sdk.events.createEventsClient(client, { source: SOURCE }),
         intervalMs: Number.isFinite(interval) && interval >= 100 ? interval : 2000,
         onError: (err) => {
@@ -199,8 +205,10 @@ function outboxFromEnv({ db, sdk, env = process.env, fetch: fetchImpl, log = con
             lastError = msg;
         },
     });
-    outbox.ensureSchema();
     outbox.url = url;
+    outbox.ready = Promise.resolve(db.maybe("SELECT to_regclass('event_outbox') IS NOT NULL AS ok")).then((r) => {
+        if (!r || !r.ok) throw new Error('the event_outbox table is missing: run migrations/0004_event_outbox.sql as the owner (DATABASE_DIRECT_URL)');
+    });
     return { outbox, reason: null };
 }
 

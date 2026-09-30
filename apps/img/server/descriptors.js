@@ -72,7 +72,6 @@ function tool(id, extra = {}) {
     return {
         id, execution: 'job', api: true,
         job: { type: 'img.process', operation: op, ...(ctx.defaultFormat && { preset: { defaultFormat: ctx.defaultFormat } }) },
-        legacy: ['POST /api/process', 'POST /api/process/direct'],
         input: INPUT[op](ctx.defaultFormat),
         files: { min: 1, max: 1, accept: ACCEPT, maxBytes: MAX_BYTES },
         output: { kind: 'file', mime: out, schema: RESULT },

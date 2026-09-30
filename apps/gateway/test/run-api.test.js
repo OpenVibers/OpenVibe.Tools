@@ -129,9 +129,13 @@ function checkProblem(r, status, code, where) {
         checkRun(r.body, 'headers refused');
         assert.deepStrictEqual([r.body.state, r.body.error.status, r.body.error.code], ['failed', 403, 'tools.net.target_not_public']);
 
-        // ── Probes: a token with tools.net.probe, nobody else ──
+        // ── Probes: a token with tools.net.probe, a signed-in person under their quota, nobody else ──
         checkProblem(await run('ping', { input: { target: '127.0.0.1' } }), 401, 'token.missing', 'probe, anonymous');
-        checkProblem(await run('ping', { input: { target: '127.0.0.1' } }, { headers: { Authorization: `Bearer ${net.user()}` } }), 403, 'capability.denied', 'probe, a person');
+        // Plan T8, Phase 1: the net pages call the run API with the session token, so a signed-in person
+        // may run a probe (under their per-person quota); the SSRF guard still keeps it off loopback.
+        r = await run('ping', { input: { target: '127.0.0.1' } }, { headers: { Authorization: `Bearer ${net.user()}` } });
+        checkRun(r.body, 'probe, a person');
+        assert.deepStrictEqual([r.body.state, r.body.error.code], ['failed', 'tools.net.target_not_public'], 'a person runs a probe: it ran and the SSRF guard refused loopback');
         checkProblem(await run('ping', { input: { target: '127.0.0.1' } }, { headers: { Authorization: `Bearer ${net.service(['tools.tool.run'])}` } }), 403, 'capability.denied', 'probe, runner token');
         r = await run('ping', { input: { target: '127.0.0.1', count: 1 } }, { headers: { Authorization: `Bearer ${net.service(['tools.net.probe'], { name: 'prober' })}` } });
         checkRun(r.body, 'ping with tools.net.probe');
@@ -252,9 +256,9 @@ function checkProblem(r, status, code, where) {
         assert.strictEqual((await run('slug', { input: { text: 'x' } }, { headers: { ...evil, Authorization: `Bearer ${net.service(['tools.tool.run'])}` } })).status, 200, 'a Bearer token is not a cookie');
         r = await call('/api/v1/tools/png/run', { form: upload({}, [{ name: 'x.png', data: png }]), headers: evil });
         checkProblem(r, 403, 'tools.origin.refused', 'a job tool, checked on its satellite');
-        // The older endpoints' CORS already turns a foreign Origin away; a foreign Referer alone is refused here.
-        r = await call('/api/process', { base: img.base, form: upload({ tool: 'convert', format: 'webp' }, [{ name: 'x.png', data: png, type: 'image/png' }]), headers: { Cookie: session, Referer: 'https://evil.example/page' } });
-        checkProblem(r, 403, 'tools.origin.refused', 'the older endpoints too');
+        // A foreign Referer alone is refused too.
+        r = await call('/api/v1/tools/png/run', { base: img.base, form: upload({}, [{ name: 'x.png', data: png, type: 'image/png' }]), headers: { Cookie: session, Referer: 'https://evil.example/page' } });
+        checkProblem(r, 403, 'tools.origin.refused', 'a foreign Referer too');
         r = await call('/api/v1/jobs', { base: img.base, form: upload({ type: 'img.process', input: { tool: 'convert' } }, [{ name: 'x.png', data: png, type: 'image/png' }]), headers: { Cookie: session, Origin: 'https://evil.example' } });
         assert.strictEqual(r.status, 403, 'and the job routes');
         // Preflight from another site's page.
@@ -262,31 +266,6 @@ function checkProblem(r, status, code, where) {
         assert.strictEqual(r.status, 204);
         assert.strictEqual(r.h.get('access-control-allow-origin'), '*');
         assert.match(r.h.get('access-control-allow-headers'), /Idempotency-Key/);
-
-        // ── The older endpoints: same answers, and what replaces them ──
-        r = await call('/api/net/myip', { method: 'GET' });
-        assert.strictEqual(r.status, 200);
-        assert.strictEqual(r.body.ok, true, 'the legacy shape');
-        assert.strictEqual(r.h.get('deprecation'), 'true');
-        assert.strictEqual(r.h.get('sunset'), 'Thu, 31 Dec 2026 23:59:59 GMT');
-        assert.strictEqual(r.h.get('link'), '</api/v1/tools/myip/run>; rel="successor-version"');
-        assert.strictEqual((await call('/api/net/dns/example.invalid?types=MX', { method: 'GET' })).h.get('link'), '</api/v1/tools/dns/run>; rel="successor-version"');
-        assert.strictEqual((await call('/api/dev/tools', { method: 'GET' })).h.get('link'), '</api/v1/tools?family=dev>; rel="successor-version"');
-        r = await call('/api/process', { base: img.base, form: upload({ tool: 'convert', format: 'webp' }, [{ name: 'x.png', data: png, type: 'image/png' }]) });
-        assert.strictEqual(r.status, 200, r.text);
-        assert.strictEqual(r.body.success, true, 'the legacy shape');
-        assert.strictEqual(r.h.get('deprecation'), 'true');
-        assert.strictEqual(r.h.get('link'), '</api/v1/tools/convert/run>; rel="successor-version"');
-        {
-            // On png.openvibe.tools the successor is png's run route (fetch cannot set Host: node:http).
-            const req = new Request('http://x/', { method: 'POST', body: upload({ tool: 'convert' }, [{ name: 'x.png', data: png, type: 'image/png' }]) });
-            const bodyBuf = Buffer.from(await req.arrayBuffer());
-            const link = await new Promise((resolve, reject) => {
-                const q = require('http').request({ host: '127.0.0.1', port: img.port, method: 'POST', path: '/api/process', headers: { Host: 'png.openvibe.tools', 'Content-Type': req.headers.get('content-type'), 'Content-Length': bodyBuf.length, 'X-Forwarded-For': freshIp() } }, (res) => { res.resume(); resolve(res.headers.link); });
-                q.on('error', reject); q.end(bodyBuf);
-            });
-            assert.strictEqual(link, '</api/v1/tools/png/run>; rel="successor-version"', 'the host\'s own tool');
-        }
 
         // ── Health shows the run API ──
         const health = (await call('/api/health', { method: 'GET' })).body;
@@ -296,5 +275,5 @@ function checkProblem(r, status, code, where) {
         for (const p of procs) await p.kill('SIGTERM');
         await net.close();
     }
-    console.log('run API: inline engines (cache, fresh), net routes (myip, SSRF), refusals and contract codes, probes need tools.net.probe, quotas, inline and job idempotency, job tools via the gateway (wait, 202, sniffing, schema), tools.unavailable vs tools.tool.unavailable, session rule, cross-satellite job references, CSRF origin check + CORS, deprecation headers: all checks passed');
+    console.log('run API: inline engines (cache, fresh), net routes (myip, SSRF), refusals and contract codes, probes need tools.net.probe, quotas, inline and job idempotency, job tools via the gateway (wait, 202, sniffing, schema), tools.unavailable vs tools.tool.unavailable, session rule, cross-satellite job references, CSRF origin check + CORS: all checks passed');
 })().catch((err) => { console.error(err); process.exit(1); });

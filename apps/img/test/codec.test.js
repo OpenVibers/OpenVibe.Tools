@@ -125,23 +125,27 @@ function bmp({ width, height, bpp, compression = 0, palette = [], rows }) {
         HEIF_DEC_PATH: '/nonexistent/heif-dec',
     });
     try {
-        let fd = new FormData();
-        fd.append('tool', 'convert'); fd.append('format', 'bmp');
-        fd.append('file', new Blob([opaque], { type: 'image/png' }), 'x.png');
-        let res = await fetch(`${app.base}/api/process/direct`, { method: 'POST', body: fd });
+        const run = (buf, name, type, input) => {
+            const f = new FormData();
+            f.append('input', JSON.stringify(input));
+            f.append('file', new Blob([buf], { type }), name);
+            return fetch(`${app.base}/api/v1/tools/convert/run?wait_ms=30000`, { method: 'POST', body: f });
+        };
+        let res = await run(opaque, 'x.png', 'image/png', { format: 'bmp' });
         assert.strictEqual(res.status, 200);
-        assert.strictEqual(res.headers.get('content-type'), 'image/bmp');
-        assert.strictEqual(Buffer.from(await res.arrayBuffer()).toString('latin1', 0, 2), 'BM');
+        const cookie = String(res.headers.get('set-cookie') || '').split(';')[0];
+        const made = await res.json();
+        assert.strictEqual(made.state, 'succeeded', JSON.stringify(made.error));
+        const out = await fetch(`${app.base}${made.result.files[0].url}`, { headers: cookie ? { cookie } : {} });
+        assert.strictEqual(out.headers.get('content-type'), 'image/bmp');
+        assert.strictEqual(Buffer.from(await out.arrayBuffer()).toString('latin1', 0, 2), 'BM');
 
-        fd = new FormData();
-        fd.append('tool', 'convert'); fd.append('format', 'jpg');
-        fd.append('file', new Blob([HEIC], { type: 'image/heic' }), 'photo.heic');
-        res = await fetch(`${app.base}/api/process`, { method: 'POST', body: fd });
-        assert.strictEqual(res.status, 503);
-        assert.strictEqual(res.headers.get('content-type'), 'application/problem+json');
+        res = await run(HEIC, 'photo.heic', 'image/heic', { format: 'jpg' });
+        assert.strictEqual(res.status, 200);
         const p = await res.json();
-        assert.strictEqual(p.code, 'tools.unavailable');
-        assert.match(p.error, /being set up/);
+        assert.strictEqual(p.state, 'failed');
+        assert.strictEqual(p.error.code, 'tools.unavailable');
+        assert.match(p.error.detail, /being set up/);
 
         const ctx = await (await fetch(`${app.base}/api/context`, { headers: { 'X-OV-Tool': 'heic' } })).json();
         assert.strictEqual(ctx.inputs.heic, false, 'the HEIC page is told the decoder is missing');

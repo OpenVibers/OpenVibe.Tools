@@ -215,6 +215,15 @@
             border-radius: var(--radius-sm); color: var(--red); font-size: 14px;
         }
 
+        /* A probe asked for by a signed-out visitor: probes reach other machines, so they need an account. */
+        .signin-card { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+        .signin-card > i { font-size: 22px; color: var(--cyan); flex: none; }
+        .signin-card .signin-text { flex: 1 1 240px; min-width: 0; }
+        .signin-card .signin-text b { display: block; font-size: 15px; margin-bottom: 4px; color: var(--text-primary); }
+        .signin-card .signin-text p { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--text-secondary, #b0b0b8); }
+        .signin-card .btn-go { padding: 10px 22px; border-radius: 10px; font-weight: 600; font-size: 14px; background: var(--cyan); color: #fff; white-space: nowrap; }
+        .signin-card .btn-go:hover { background: #0891b2; color: #fff; }
+
         /* A tool this server cannot run */
         .tool-unavailable p { font-size: 14px; color: var(--text-secondary, #b0b0b8); margin: 8px 0 12px; line-height: 1.5; }
 
@@ -632,10 +641,10 @@
     // ═══════════════════════════════════════════════════════════
     // Net.OpenVibe — Client-Side App
     // Detects subdomain to determine active tool, renders UI,
-    // calls /api/net/* endpoints on openvibe.tools.
+    // calls the tools run API (/api/v1/tools/<id>/run) on openvibe.tools.
     // ═══════════════════════════════════════════════════════════
 
-    const API_BASE = 'https://openvibe.tools/api/net';
+    const API_BASE = '/api/v1/tools';
 
     // ── Tool definitions (mirrors server/net/config.js: endpoint and status must agree, which
     //    test/registry-consistency.test.js checks) ──────
@@ -909,6 +918,47 @@
         location.href = url;
     }
 
+    // The message of a run that did not succeed (a refusal problem, or the tool's own error).
+    function runError(body) {
+        const e = body && body.error;
+        return (e && (e.detail || e.title || e.message)) || (body && (body.detail || body.title)) || 'Lookup failed';
+    }
+
+    // ── The run input, from the tool's descriptor ────────────
+    // Every net tool's input schema has additionalProperties: false, so a field it does not declare
+    // (types on mx., count on latency.) would refuse the run: send only what the schema lists.
+    const schemas = new Map();
+    function inputSchema(id) {
+        if (!schemas.has(id)) {
+            schemas.set(id, fetch(`${API_BASE}/${encodeURIComponent(id)}/schema`, { credentials: 'same-origin' })
+                .then(r => (r.ok ? r.json() : null))
+                .then(s => (s && s.$defs && s.$defs.input) || null)
+                .catch(() => null)
+                .then(s => { if (!s) schemas.delete(id); return s; }));
+        }
+        return schemas.get(id);
+    }
+    /** What the page collected for `tool`, as run input fields (before the schema filter). */
+    function runFields(tool, ui) {
+        const f = {};
+        if (ui.target) f.target = ui.target;
+        if (ui.types && ui.types.length) f.types = ui.types;
+        if (ui.selector) f.selector = ui.selector;
+        if (tool.count) f.count = tool.count;
+        if (ui.propType) f.type = ui.propType;
+        if (ui.smtpPort) f.port = parseInt(ui.smtpPort, 10);
+        const path = String(ui.robotsPath || '').trim();
+        if (path) { f.path = path; f.ua = ui.robotsUa; }
+        return f;
+    }
+    /** The fields `schema` declares (no schema, say the descriptor could not be fetched: the target only). */
+    function runInput(schema, fields) {
+        const props = (schema && schema.properties) || { target: {} };
+        const input = {};
+        for (const [k, v] of Object.entries(fields)) if (v !== undefined && Object.prototype.hasOwnProperty.call(props, k)) input[k] = v;
+        return input;
+    }
+
     // ── Run the active tool ──────────────────────────────────
     async function runTool() {
         const input = document.getElementById('search-input');
@@ -928,54 +978,44 @@
         resultsEl.innerHTML = `<div class="loading"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Running ${tool.name}…</p></div>`;
 
         try {
-            let url = `${API_BASE}${tool.endpoint}`;
-            const params = new URLSearchParams();
-            if (target) params.set('target', target);
-
-            // DNS type overrides
-            if (tool.defaultTypes) params.set('types', tool.defaultTypes);
-            if (tool.dnsTypes) {
-                const sel = document.getElementById('dns-types');
-                if (sel) {
-                    const selected = [...sel.selectedOptions].map(o => o.value);
-                    if (selected.length) params.set('types', selected.join(','));
-                }
-            }
-            // DKIM special: query selector._domainkey.domain
-            if (activeTool === 'dkim' && target) {
-                const selector = prompt('DKIM selector (e.g., "default", "google", "s1"):', 'default') || 'default';
-                params.set('target', `${selector}._domainkey.${target}`);
-            }
-            // DMARC: prepend _dmarc.
-            if (activeTool === 'dmarc' && target) {
-                params.set('target', `_dmarc.${target}`);
-            }
-            // SPF: just TXT
-            if (activeTool === 'spf') params.set('types', 'TXT');
-            if (tool.count) params.set('count', String(tool.count));
-            if (tool.propTypes) params.set('type', document.getElementById('prop-type').value);
-            if (tool.smtpPorts) params.set('port', document.getElementById('smtp-port').value);
-            if (tool.robotsTest) {
-                const p = document.getElementById('robots-path').value.trim();
-                if (p) { params.set('path', p); params.set('ua', document.getElementById('robots-ua').value); }
-            }
-
-            const qs = params.toString();
-            if (qs) url += (url.includes('?') ? '&' : '?') + qs;
+            // The tool's run API (plan T8, Phase 1): the fields the page collected, kept only where the
+            // tool's own input schema (its descriptor, GET /api/v1/tools/<id>/schema) declares them. The
+            // descriptor adds the rest itself: MX/TXT/NS types, the _dmarc. and <selector>._domainkey.
+            // targets, the latency count.
+            let selector;
+            if (activeTool === 'dkim' && target) selector = prompt('DKIM selector (e.g., "default", "google", "s1"):', 'default') || 'default';
+            const fields = runFields(tool, {
+                target,
+                types: tool.dnsTypes && document.getElementById('dns-types') ? [...document.getElementById('dns-types').selectedOptions].map(o => o.value) : undefined,
+                selector,
+                propType: tool.propTypes ? document.getElementById('prop-type').value : undefined,
+                smtpPort: tool.smtpPorts ? document.getElementById('smtp-port').value : undefined,
+                robotsPath: tool.robotsTest ? document.getElementById('robots-path').value : undefined,
+                robotsUa: tool.robotsTest ? document.getElementById('robots-ua').value : undefined,
+            });
+            const input = runInput(await inputSchema(activeTool), fields);
 
             const token = localStorage.getItem('ov_token') || getCookie('ov_token');
-            const headers = {};
+            const headers = { 'Content-Type': 'application/json' };
             if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            const r = await fetch(url, { headers });
-            const data = await r.json();
-
-            if (!data.ok) throw new Error(data.error || 'Lookup failed');
+            const r = await fetch(`${API_BASE}/${activeTool}/run`, { method: 'POST', headers, credentials: 'same-origin', body: JSON.stringify({ input }) });
+            if (r.status === 401) return renderSignIn(resultsEl);
+            const body = await r.json();
+            if (body.state !== 'succeeded' || !body.result) throw new Error(runError(body));
+            const data = { ok: true, ...body.result.data };
 
             renderResults(data);
         } catch (err) {
             resultsEl.innerHTML = `<div class="error-msg"><i class="fa-solid fa-circle-exclamation"></i> ${esc(err.message)}</div>`;
         }
+    }
+
+    // A probe (port, ping, latency, traceroute, mtr) sends traffic to the target, so the run API asks for an account
+    // (401); an expired sign-in answers 401 too, and the same card signs the visitor back in.
+    function renderSignIn(el) {
+        const next = encodeURIComponent(location.href);
+        el.innerHTML = `<div class="card signin-card"><i class="fa-solid fa-lock" aria-hidden="true"></i><div class="signin-text"><b>Sign in to run ${esc(tool.name)}</b><p>Probes like ping, port checks and traceroute send traffic to the target itself, so they run under an OpenVibe account. It is free, and lookups like DNS still work without one.</p></div><a class="btn-go" href="https://openvibe.tools/auth/login?next=${next}">Sign in</a></div>`;
     }
 
     // ── Render results based on tool type ────────────────────
@@ -1029,12 +1069,13 @@
     async function fetchAndAppendIPInfo(el, ip) {
         try {
             const token = localStorage.getItem('ov_token') || getCookie('ov_token');
-            const headers = {};
+            const headers = { 'Content-Type': 'application/json' };
             if (token) headers['Authorization'] = `Bearer ${token}`;
-            const r = await fetch(`${API_BASE}/ip?target=${encodeURIComponent(ip)}`, { headers });
-            const data = await r.json();
-            if (data.ok) {
-                el.innerHTML += renderIPCard(data);
+            const r = await fetch(`${API_BASE}/ip/run`, { method: 'POST', headers, credentials: 'same-origin', body: JSON.stringify({ input: { target: ip } }) });
+            const body = await r.json();
+            if (body.state === 'succeeded' && body.result) {
+                const data = { ok: true, ...body.result.data };
+                if (data.ok) el.innerHTML += renderIPCard(data);
             }
         } catch {}
     }

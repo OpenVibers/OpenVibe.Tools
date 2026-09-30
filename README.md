@@ -183,8 +183,9 @@ audio and docs answer the same route for their own tools. `openvibe-sdk/tools` (
   the per-target throttle for egress tools and upload sniffing (hard).
 - **Where it runs.** Dev and text tools with a server engine: the page's own engine code in the gateway's
   worker pool (`TOOLS_WORKERS_GATEWAY`, default 2, 256 MB each; the descriptor's `timeoutMs` terminates a
-  runaway input). Net tools and Open Graph: the same `/api/net` and `/api/dev` route the page calls, in
-  process, with the run's input as its query (`myip` is the caller's address). Job tools (img, audio, docs): a
+  runaway input). Net tools and Open Graph: the gateway's net and dev handlers (once `/api/net` and
+  `/api/dev`, now reachable only through the run API), in process, with the run's input as their query
+  (`myip` is the caller's address). Job tools (img, audio, docs): a
   job of the satellite that owns the tool (`{ ...input, ...preset, tool: operation }`), the run streamed there
   by the gateway, uploads included; the job's `tool` names the tool.
 - **Cache and replays.** An inline answer is reused per tool and input where that is safe (spec `cacheTtlMs`:
@@ -208,13 +209,13 @@ the job when asked on loopback (`GET /api/internal/jobs/:id`, direct loopback ca
 limited). Events (SSE) and files stream through. Owners, quotas, the Origin check and idempotency stay the
 satellite's: the request reaches it with the caller's credentials and address.
 
-## Older endpoints (deprecated, still answered)
+## Removed endpoints (plan T8, phase 6)
 
 `/api/process`, `/api/process/direct`, `/api/process/multi` (img, audio, docs), `/api/net/*` and `/api/dev/*`
-keep their response shapes and add `Deprecation: true`, `Sunset: Thu, 31 Dec 2026 23:59:59 GMT` and
-`Link: </api/v1/tools/{id}/run>; rel="successor-version"` (the host's own tool; `/api/net/tools` and
-`/api/dev/tools` point at `/api/v1/tools?family=…`). The webhook bins (`/api/dev/webhook/…`, page-only) have no
-successor and are not marked.
+(with the `/api/net/tools` and `/api/dev/tools` lists) are gone; nothing answers them any more. Their
+successors: `POST /api/v1/tools/{id}/run` for any tool (or the job API below for img, audio and docs), and
+`GET /api/v1/tools?family=…` for the lists. The webhook bins (`/api/dev/webhook/…`, page-only) keep
+their URL on their own router.
 
 ## Jobs (Img, Audio, Docs)
 
@@ -233,13 +234,13 @@ routes answer on every host of the img, audio and docs satellites:
 | `DELETE /api/v1/jobs/:id/references/:ref` | Drop it → `200`; after the last one the job expires one ttl later at the earliest. |
 
 Job types: `img.process` (input `{ tool: convert|compress|resize|crop, format, quality, width, … }`, one image),
-`audio.process` (`{ tool, …options }` as `/api/process` takes them, one audio/video file; progress from ffmpeg),
+`audio.process` (`{ tool, …options }`, one audio/video file; progress from ffmpeg),
 `docs.process` (`{ tool, …options }`, one PDF, or several files for `merge` / `img2pdf`). A format host fills
-in its format (`webp.openvibe.tools` converts to WebP). The synchronous `/api/process` endpoints still work and
-run the same code; the pages use jobs and keep the job id in the address (`?job=`) and in sessionStorage, so a
+in its format (`webp.openvibe.tools` converts to WebP). The run API (`POST /api/v1/tools/{id}/run`) submits the
+same job and waits for it; the pages use jobs and keep the job id in the address (`?job=`) and in sessionStorage, so a
 reload reattaches.
 
-- **Durable.** A job and its uploaded input are in `data/jobs.db` and `data/jobs/<id>/` before the `202` is sent.
+- **Durable.** A job and its uploaded input are in the `tools` database (`tool_jobs`) and `data/jobs/<id>/` before the `202` is sent.
   After a restart, queued jobs run; jobs that were running are re-queued (all three types, up to their attempt
   limit) — a type can instead declare `onRestart: 'fail'`, which fails them with `retryable: true`.
 - **Owner-scoped.** A job is visible only to whoever created it: a signed-in person (`user:usr_…` from the
@@ -248,7 +249,7 @@ reload reattaches.
   stored). Anyone else gets `404 tools.job.not_found`.
 - **Worker threads.** sharp (img) and pdf-lib (docs) never run on the event loop: `apps/_shared/jobs/pool.js`
   runs them in `worker_threads`, `TOOLS_WORKERS` at once per satellite (default 2; `TOOLS_WORKERS_<APP>`), shared
-  by the jobs and the synchronous `/api/process` endpoints (which submit to the pool and wait), with
+  by the jobs and the synchronous calls that remain (docs' `/api/info`; they submit to the pool and wait), with
   `TOOLS_WORKER_QUEUE` (64) more waiting before `503 tools.busy`. Each worker has a V8 heap limit
   (`TOOLS_WORKER_MEMORY_MB`, 512; `TOOLS_WORKER_MEMORY_MB_<APP>`): a run that needs more fails with
   `413 tools.input.too_large` and its worker is replaced. A run past its timeout (the job's, or the descriptor's
@@ -330,7 +331,7 @@ One module used by the gateway and every satellite, driven by each tool's descri
   3 × one session's allowance, so dropping the cookie never resets anything. Counted answers carry
   `RateLimit-Limit`/`-Remaining`/`-Reset`; a refusal is `429` problem+json `tools.quota.exceeded` with `Retry-After`
   and `quota_class`, `scope`, `tier`.
-- **Heavy work.** Synchronous `/api/process` (img, audio, docs) holds one of `TOOLS_SYNC_CONCURRENCY` slots
+- **Heavy work.** A synchronous heavy call (docs' `/api/info`) holds one of `TOOLS_SYNC_CONCURRENCY` slots
   (default 2; `TOOLS_SYNC_QUEUE` may wait, 8, for `TOOLS_SYNC_WAIT_MS`, 30 s), else `503 tools.busy`. Every sync
   path is stopped at the descriptor's `timeoutMs` (`504 tools.run.timeout`) or when the client goes away: audio's
   ffmpeg is killed, img's and docs' worker thread is terminated (Jobs → Worker threads). Liveness and readiness
@@ -359,7 +360,7 @@ One module used by the gateway and every satellite, driven by each tool's descri
   must come from an OpenVibe.Tools page: `Origin` (else `Referer`) `https://openvibe.tools`,
   `https://*.openvibe.tools`, one of the tool's own hosts (custom domains included) or the request's own host.
   Calls with a Bearer token, calls without those cookies and requests with neither header pass. Checked on the
-  run API, the job routes' writes, `/api/process…`, `/api/info`, `/api/probe` and the webhook bins' create and
+  run API, the job routes' writes, `/api/info`, `/api/probe` and the webhook bins' create and
   delete; `403 tools.origin.refused`, recorded as reason `origin`.
 - **Mode.** `TOOLS_GUARD=report` (default) records and counts what it would refuse and refuses nothing, and the
   apps' older express-rate-limit limiters stay in force (now keyed by the resolved caller, after sign-in is read).
@@ -512,7 +513,7 @@ Bound by ADR-021 (OpenVibe.Contracts `docs/adr/ADR-021-analytics.md`):
 A few operations run a program that is not part of Node. Each satellite looks for it at boot (on `PATH`,
 or at the path in its environment variable) and again every minute while it is missing; until it is
 there, the operation answers **503 problem `tools.unavailable`** ("this tool is being set up") on
-`/api/process` and at job submit, its page says so instead of offering the upload, and `/api/ready`
+the run API and at job submit, its page says so instead of offering the upload, and `/api/ready`
 lists it under `degraded`. Nothing pretends to work.
 
 | Package (Ubuntu) | Program | Used by | Override |
@@ -629,8 +630,10 @@ when the gateway's `/api/ready` or `/release.json` does not come up with every u
 
 All eight apps move from `better-sqlite3` to **one `tools` PostgreSQL database** and to **Valkey** for the
 guard's throttle state. The schema is in `migrations/0001_tools.sql` (job store, `guard_abuse`) and
-`migrations/0002_analytics.sql` (request analytics, the DDL of `openvibe-shared/analytics/pg.js`); the event
-outbox and the revocation store create their own tables at boot. `scripts/migrate-to-postgres.js` imports
+`migrations/0002_analytics.sql` (request analytics, the DDL of `openvibe-shared/analytics/pg.js`),
+`migrations/0003_token_revocations.sql` and `migrations/0004_event_outbox.sql` (the tools.job.* outbox,
+`openvibe-sdk` createPgOutbox's table). All of them run as the owner (`DATABASE_DIRECT_URL`); nothing creates a
+table at runtime, so the runtime role needs no DDL rights. `scripts/migrate-to-postgres.js` imports
 every `apps/*/data/{guard,jobs,analytics}.db` into that one database (each file's rows tagged with its app):
 run it with `--pglite` for an in-memory rehearsal, `--dry-run --url <scratch>` for a scratch database, or
 with `DATABASE_DIRECT_URL` set for the cutover; it prints a per-table count and checksum report.
@@ -638,5 +641,13 @@ with `DATABASE_DIRECT_URL` set for the cutover; it prints a per-table count and 
 After the move the apps read `DATABASE_URL` / `DATABASE_DIRECT_URL` (PostgreSQL, via PgBouncer) and
 `VALKEY_URL` (Valkey); `guard_salt`, `guard_day` and the minute/burst buckets live in Valkey (a throttle,
 never authoritative), while `guard_abuse`, the job store and the analytics tables stay in PostgreSQL.
-`TOOLS_GUARD` (default `report`) and its meaning are unchanged. Until the cutover lands the apps still run
-on `better-sqlite3` exactly as described above.
+`TOOLS_GUARD` (default `report`) and its meaning are unchanged.
+
+State (plan T8 phases 1–4 and 6 done, not deployed; the cutover is pending): every app opens the one `tools`
+database (`apps/_shared/db.js`, `DATABASE_URL` else an embedded PGlite database in development;
+`DATABASE_DIRECT_URL` runs the migrations as owner) and the shared Valkey (`VALKEY_URL`, else the guard's
+counters and salt stay in this process); the job store, `guard_abuse`, `token_revocations` and the request
+analytics are on PostgreSQL, the net and dev pages call the run API, and the `/api/process`, `/api/net/*` and
+`/api/dev/*` routes are removed (above). No app depends on `better-sqlite3` any more; the operational scripts
+that still read the old SQLite files (the importer, `scripts/analytics-prune.js`, `scripts/guard-abuse-report.js`)
+have it in `scripts/package.json`: run `npm --prefix scripts install` once on the host before the cutover.

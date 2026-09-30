@@ -3,9 +3,9 @@
 // The Tools guard (apps/_shared/guard): anti-abuse for the gateway and every satellite, driven by
 // the tools' descriptors (tools.tool@1: quotaClass, cost, auth, files.accept, limits) and the host-wide
 // numbers in ./limits.js. Like the rest of apps/_shared it has no dependencies: the app passes its
-// better-sqlite3 class, openvibe-contracts (when it has it) and its descriptor specs.
+// openvibe-sdk/db handle, its Valkey and openvibe-contracts (when it has it) and its descriptor specs.
 //
-//   const guard = createGuard({ app: 'img', dataDir, Database, contracts, specs, networkUrl, … });
+//   const guard = createGuard({ app: 'img', dataDir, db, valkey, contracts, specs, networkUrl, … });
 //   app.set('trust proxy', TRUST_PROXY);                 // ./ip.js: one loopback hop
 //   app.use(guard.identify);                             // req.user (Network sign-in, aud checked)
 //   app.use('/api/', legacyLimiter, guard.apiQuota);     // every /api/ request (tools-api)
@@ -82,8 +82,9 @@ function discardUploads(req) {
 /**
  * @param {object} o
  * @param {string} o.app                  'gateway' | 'img' | … (logs, metrics)
- * @param {string} [o.dataDir]            guard.db goes here (with o.Database)
- * @param {Function} [o.Database]         require('better-sqlite3'); without it everything stays in memory
+ * @param {string} [o.dataDir]            where the app keeps its files (job inputs/results)
+ * @param {object} [o.db]                 openvibe-sdk/db handle (guard_abuse); without it everything stays in memory
+ * @param {object} [o.valkey]             the shared Valkey (day counters, salt, buckets)
  * @param {object} [o.contracts]          openvibe-contracts, when the app has it
  * @param {object[]} [o.specs]            the app's descriptor specs (server/descriptors.js SPECS)
  * @param {object} [o.keys]               { get(), ensure() } — or networkUrl/networkInternalUrl/publicKeyFiles
@@ -100,22 +101,24 @@ function createGuard(o = {}) {
     const enforcing = mode === 'enforce';
     const bounds = limits.bounds(env);
     const table = limits.quotas(env, log);
-    const store = createGuardStore({ Database: o.Database, dataDir: o.dataDir, now, log });
+    // guard_abuse in PostgreSQL, guard_salt and guard_day in Valkey (plan T8, decision 4); without
+    // them (tests, or a Valkey outage) the counters and the salt stay in this process.
+    const store = o.store || createGuardStore({ db: o.db || null, valkey: o.valkey || null, app: appName, now, log });
+    if (!o.store) void store.warm();
 
-    let saltDay = null, saltValue = null;
-    const salt = () => {
-        const d = dayOf(now());
-        if (d !== saltDay) { saltValue = store.salt(d); saltDay = d; }
-        return saltValue;
-    };
+    // Asked of the store every time (a Map lookup), never cached here: a salt handed out before Valkey
+    // answered is a process-local stand-in, and the shared one must replace it as soon as it loads.
+    const salt = () => store.salt(dayOf(now()));
 
-    // Network's sign-out-everywhere cutoffs, written by the gateway (./revocations.js).
-    const cutoffs = o.cutoffs || require('./revocations').createCutoffReader({ Database: o.Database, file: o.revocationsFile, now });
+    // Network's sign-out-everywhere cutoffs (PostgreSQL, read through a short shared cache): the gateway
+    // writes them (apps/gateway/server/revocation-events.js); every app reads them here.
+    const cutoffs = o.cutoffs || require('./revocations').createCutoffReader({ db: o.db || null, valkey: o.valkey || null, now, log });
+    if (!o.cutoffs) void cutoffs.warm();
     const keys = o.keys || tokens.createKeySource({ networkUrl: o.networkUrl, networkInternalUrl: o.networkInternalUrl, files: o.publicKeyFiles || [], log });
     const issuer = o.issuer;
     const audience = env.OV_TOOLS_AUDIENCE || tokens.AUDIENCE;
     const callers = createCallerResolver({ getPublicKey: () => keys.get(), issuer, audience, contracts: o.contracts, salt, secureCookie: o.secureCookie });
-    const quotas = createQuotas({ store, quotas: () => table, now });
+    const quotas = createQuotas({ store, quotas: () => table, now, valkey: o.valkey || null, log });
     const targets = createTargetThrottle({ now });
     const ports = createPortScanCap({ ...bounds.ports, now });
     const sync = createSemaphore({ max: bounds.sync.concurrency, queue: bounds.sync.queue, waitMs: bounds.sync.waitMs });
@@ -203,7 +206,7 @@ function createGuard(o = {}) {
     // ── Quotas ───────────────────────────────────────────────
     async function charge(req, res, { quotaClass, cost, tool: toolId }) {
         const c = caller(req, res);
-        const r = quotas.check(c, { quotaClass, cost }, { report: !enforcing });
+        const r = await quotas.check(c, { quotaClass, cost }, { report: !enforcing });
         // In report mode an older limiter that ran on this request (req.rateLimit) is the one in force:
         // its RateLimit-* headers stay. Otherwise the guard's describe the allowance closest to running out.
         if (enforcing || !req.rateLimit) setHeaders(res, r);
@@ -257,7 +260,7 @@ function createGuard(o = {}) {
             return charge(req, res, { quotaClass: d.quotaClass, cost, tool: d.id });
         }
         if (cost > was.cost) { req._ovCharged = { ...was, cost }; return charge(req, res, { quotaClass: d.quotaClass, cost: cost - was.cost, tool: d.id }); }
-        if (cost < was.cost) { quotas.refund(caller(req, res), { quotaClass: d.quotaClass, cost: was.cost - cost }); req._ovCharged = { ...was, cost }; }
+        if (cost < was.cost) { await quotas.refund(caller(req, res), { quotaClass: d.quotaClass, cost: was.cost - cost }); req._ovCharged = { ...was, cost }; }
         return true;
     }
 
@@ -477,11 +480,10 @@ function createGuard(o = {}) {
 
     // ── Upkeep ───────────────────────────────────────────────
     function prune() {
-        try {
-            const cutoff = now() - bounds.abuseRetentionDays * DAY_MS;
-            store.pruneAbuse(cutoff);
-            store.pruneDays(dayOf(now() - DAY_MS));
-        } catch (err) { log.error(`[Guard] ${appName}: prune failed: ${err.message}`); }
+        const cutoff = now() - bounds.abuseRetentionDays * DAY_MS;
+        return Promise.resolve(store.pruneAbuse(cutoff))
+            .then(() => store.pruneDays(dayOf(now() - DAY_MS)))
+            .catch((err) => log.error(`[Guard] ${appName}: prune failed: ${err.message}`));
     }
     prune();
     const pruneTimer = o.pruneIntervalMs === 0 ? null : setInterval(prune, o.pruneIntervalMs || 6 * 60 * 60 * 1000);
