@@ -5,7 +5,7 @@
  *
  * Returns unified: { current, daily[], hourly[], alerts[], sun, moon }
  */
-const axios = require('axios');
+const http = require('../egress');
 
 const UA = 'GhostCamp-WA/2.0 (stealth-camping-locator)';
 
@@ -82,7 +82,7 @@ async function getWeather(lat, lon) {
       'forecast_hours=48',
     ].join('&');
 
-    const resp = await axios.get(`https://api.open-meteo.com/v1/forecast?${params}`, { timeout: 10000 });
+    const resp = await http.get(`https://api.open-meteo.com/v1/forecast?${params}`, { timeout: 10000 });
     const d = resp.data;
 
     // Current conditions
@@ -176,14 +176,14 @@ async function getWeather(lat, lon) {
 
   // ─── NWS Alerts only ───
   try {
-    const ptResp = await axios.get(`https://api.weather.gov/points/${lat},${lon}`, {
+    const ptResp = await http.get(`https://api.weather.gov/points/${lat},${lon}`, {
       headers: { 'User-Agent': UA, Accept: 'application/geo+json' },
       timeout: 5000,
     });
     const zone = ptResp.data?.properties?.forecastZone;
     if (zone) {
       const zoneId = zone.split('/').pop();
-      const alertResp = await axios.get(`https://api.weather.gov/alerts/active?zone=${zoneId}`, {
+      const alertResp = await http.get(`https://api.weather.gov/alerts/active?zone=${zoneId}`, {
         headers: { 'User-Agent': UA },
         timeout: 5000,
       });

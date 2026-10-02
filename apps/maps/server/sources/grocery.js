@@ -14,7 +14,7 @@
  * Nutritional data from USDA FoodData Central API
  */
 
-const axios = require('axios');
+const http = require('../egress');
 const cheerio = require('cheerio');
 const { haversine } = require('./utils');
 
@@ -822,7 +822,7 @@ async function findNearbyStores(lat, lon, radiusMeters = 8000) {
   const query = `[out:json][timeout:15];(\n${filters}\n);out body;`;
 
   try {
-    const resp = await axios.post('https://overpass-api.de/api/interpreter', `data=${encodeURIComponent(query)}`, {
+    const resp = await http.post('https://overpass-api.de/api/interpreter', `data=${encodeURIComponent(query)}`, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       timeout: 15000,
     });
@@ -895,7 +895,7 @@ out skel qt;
 `;
 
   try {
-    const resp = await axios.post('https://overpass-api.de/api/interpreter',
+    const resp = await http.post('https://overpass-api.de/api/interpreter',
       `data=${encodeURIComponent(query)}`,
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 30000 }
     );
@@ -986,7 +986,7 @@ out skel qt;
 async function scrapeWalmartPrices(searchTerm) {
   try {
     const url = `https://www.walmart.com/search?q=${encodeURIComponent(searchTerm)}`;
-    const resp = await axios.get(url, {
+    const resp = await http.get(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',

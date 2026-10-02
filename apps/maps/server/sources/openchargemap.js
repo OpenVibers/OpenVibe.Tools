@@ -8,7 +8,7 @@
  * Free & open — works without key but key gives higher rate limits
  */
 
-const axios = require('axios');
+const http = require('../egress');
 const { haversine } = require('./utils');
 
 const BASE_URL = 'https://api.openchargemap.io/v3/poi';
@@ -18,6 +18,7 @@ const BASE_URL = 'https://api.openchargemap.io/v3/poi';
  * Useful for van/vehicle dwellers: parking spots with power, restrooms nearby
  */
 async function search(lat, lon, radiusMiles, apiKey) {
+  if (!apiKey) return [];
   try {
     const params = {
       output: 'json',
@@ -32,7 +33,7 @@ async function search(lat, lon, radiusMiles, apiKey) {
 
     if (apiKey) params.key = apiKey;
 
-    const resp = await axios.get(BASE_URL, {
+    const resp = await http.get(BASE_URL, {
       params,
       timeout: 12000,
       headers: { 'User-Agent': 'OpenVibeApp/2.0' },

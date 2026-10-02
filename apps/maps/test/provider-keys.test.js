@@ -1,7 +1,7 @@
 'use strict';
 // Provider keys live in the satellite's config (apps/maps/server/config.js) and are handed to each
 // source — never read from the environment inside a source module, never a key in the code.
-// Here the transport the sources use (axios) is stubbed, so nothing touches the network:
+// The transport is mocked (setEgress), so nothing touches the network:
 //   1. the RIDB key the caller passes reaches the RIDB request,
 //   2. that key never appears in the search results a caller gets back,
 //   3. with no RIDB key, RIDB sends nothing and search still answers (an empty list),
@@ -9,15 +9,31 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-
-// Stub axios before the source module is loaded: both hold the same cached module object.
-const axios = require('axios');
-const requests = [];
-axios.get = async (url, opts = {}) => { requests.push({ url, opts }); return { data: {} }; };
-
-const ridb = require('../server/sources/ridb');
+const { EventEmitter } = require('events');
+const { createEgress } = require('../../_shared/egress');
+const { setEgress } = require('../server/egress');
 
 const RIDB_KEY = 'sentinel-ridb-key-not-a-secret';
+
+// A guard whose transport records every request and answers 200 with a small JSON body.
+const requests = [];
+setEgress(createEgress({
+    lookup: (host, opts, cb) => cb(null, [{ address: '93.184.216.34', family: 4 }]),
+    httpsRequest: (opts, cb) => {
+        requests.push({ hostname: opts.hostname, path: opts.path, opts: { headers: opts.headers } });
+        const req = new EventEmitter();
+        req.destroy = () => {};
+        req.end = () => process.nextTick(() => {
+            const res = new EventEmitter();
+            res.statusCode = 200; res.statusMessage = 'OK'; res.headers = {}; res.destroy = () => {};
+            cb(res);
+            process.nextTick(() => { res.emit('data', Buffer.from('{"RECDATA":[]}')); res.emit('end'); });
+        });
+        return req;
+    },
+}));
+
+const ridb = require('../server/sources/ridb');
 
 (async () => {
     let failures = 0;
@@ -31,8 +47,8 @@ const RIDB_KEY = 'sentinel-ridb-key-not-a-secret';
         await ridb.search(47.6062, -122.3321, 25, RIDB_KEY);
         assert.ok(requests.length > 0, 'RIDB sent a request');
         for (const r of requests) {
-            assert.ok(/recreation\.gov/.test(r.url), `request goes to RIDB: ${r.url}`);
-            assert.strictEqual(r.opts.headers && r.opts.headers.apikey, RIDB_KEY, `apikey header on ${r.url}`);
+            assert.ok(/recreation\.gov/.test(`https://${r.hostname}${r.path}`), `request goes to RIDB: ${r.hostname}${r.path}`);
+            assert.strictEqual(r.opts.headers && r.opts.headers.apikey, RIDB_KEY, `apikey header on ${r.hostname}${r.path}`);
         }
     });
 

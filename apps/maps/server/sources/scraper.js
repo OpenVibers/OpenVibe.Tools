@@ -12,7 +12,7 @@
  *   - USGS Waterfall database
  */
 
-const axios = require('axios');
+const http = require('../egress');
 const cheerio = require('cheerio');
 const { haversine, overpassQuery } = require('./utils');
 
@@ -27,7 +27,7 @@ const HEADERS = {
  */
 async function scrapeCampendium(lat, lon, radiusMiles) {
   try {
-    const resp = await axios.get('https://www.campendium.com/api/v2/campgrounds', {
+    const resp = await http.get('https://www.campendium.com/api/v2/campgrounds', {
       params: {
         lat,
         lng: lon,
@@ -91,7 +91,7 @@ async function scrapeCampendium(lat, lon, radiusMiles) {
 async function scrapeUSGSFeatures(lat, lon, radiusMiles) {
   try {
     // GNIS Feature Search API
-    const resp = await axios.get('https://edits.nationalmap.gov/apps/gaz-domestic/api/search', {
+    const resp = await http.get('https://edits.nationalmap.gov/apps/gaz-domestic/api/search', {
       params: {
         lat,
         lon,

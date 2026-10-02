@@ -16,6 +16,7 @@ const NodeCache = require('node-cache');
 const cookieParser = require('cookie-parser');
 
 const config = require('./config');
+const http = require('./egress');
 
 // ── Analytics ────────────────────────────────────────────────
 const { AnalyticsTrackerPg } = require('openvibe-shared/analytics/pg'); // ADR-021: no IP/user id, route templates, raw rows pruned after 30 days, Sec-GPC/DNT not recorded
@@ -164,8 +165,7 @@ app.get('/api/geocode', async (req, res) => {
   if (cached) return res.json(cached);
 
   try {
-    const axios = require('axios');
-    const resp = await nominatim.run(() => axios.get('https://nominatim.openstreetmap.org/search', {
+    const resp = await nominatim.run(() => http.get('https://nominatim.openstreetmap.org/search', {
       params: { q, format: 'json', limit: 5, countrycodes: 'us,ca,mx' },
       headers: { 'User-Agent': 'Maps.OpenVibe/1.0 (maps.openvibe.tools)' },
       timeout: 8000,

@@ -9,7 +9,7 @@
  * Free API key required: https://www.nps.gov/subjects/developer/get-started.htm
  */
 
-const axios = require('axios');
+const http = require('../egress');
 const { haversine } = require('./utils');
 
 const BASE_URL = 'https://developer.nps.gov/api/v1';
@@ -73,7 +73,7 @@ async function searchCampgrounds(lat, lon, radiusMiles, apiKey) {
       stateCode,
     };
 
-    const resp = await axios.get(`${BASE_URL}/campgrounds`, {
+    const resp = await http.get(`${BASE_URL}/campgrounds`, {
       params,
       timeout: 15000,
       headers: { 'User-Agent': 'OpenVibeApp/2.0' },
@@ -145,7 +145,7 @@ async function searchVisitorCenters(lat, lon, radiusMiles, apiKey) {
   if (!apiKey) return [];
 
   try {
-    const resp = await axios.get(`${BASE_URL}/visitorcenters`, {
+    const resp = await http.get(`${BASE_URL}/visitorcenters`, {
       params: { api_key: apiKey, limit: 100, stateCode: getNearbyCodes(lat, lon, radiusMiles) || 'WA' },
       timeout: 10000,
       headers: { 'User-Agent': 'OpenVibeApp/2.0' },
@@ -197,7 +197,7 @@ async function searchParkingLots(lat, lon, radiusMiles, apiKey) {
   if (!apiKey) return [];
 
   try {
-    const resp = await axios.get(`${BASE_URL}/parkinglots`, {
+    const resp = await http.get(`${BASE_URL}/parkinglots`, {
       params: { api_key: apiKey, limit: 100, stateCode: getNearbyCodes(lat, lon, radiusMiles) || 'WA' },
       timeout: 10000,
       headers: { 'User-Agent': 'OpenVibeApp/2.0' },

@@ -5,7 +5,7 @@
  * - OpenStreetMap land use data via Overpass
  * - Slope/terrain classification
  */
-const axios = require('axios');
+const http = require('../egress');
 
 /**
  * Get elevation data for a point.
@@ -13,7 +13,7 @@ const axios = require('axios');
 async function getElevation(lat, lon) {
   try {
     const url = `https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lon}`;
-    const resp = await axios.get(url, { timeout: 5000 });
+    const resp = await http.get(url, { timeout: 5000 });
     return resp.data?.elevation?.[0] ?? null;
   } catch (e) {
     return null;
@@ -29,7 +29,7 @@ async function getBulkElevation(coords) {
   const lons = coords.map(c => c.lon).join(',');
   try {
     const url = `https://api.open-meteo.com/v1/elevation?latitude=${lats}&longitude=${lons}`;
-    const resp = await axios.get(url, { timeout: 8000 });
+    const resp = await http.get(url, { timeout: 8000 });
     return resp.data?.elevation || [];
   } catch (e) {
     return coords.map(() => null);
@@ -62,7 +62,7 @@ async function analyzeLandUse(lat, lon, radiusMeters = 500) {
       );
       out tags;
     `;
-    const resp = await axios.post('https://overpass-api.de/api/interpreter', `data=${encodeURIComponent(query)}`, {
+    const resp = await http.post('https://overpass-api.de/api/interpreter', `data=${encodeURIComponent(query)}`, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       timeout: 10000,
     });

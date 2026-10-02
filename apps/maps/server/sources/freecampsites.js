@@ -5,7 +5,7 @@
  *
  * We fetch their API-like endpoints that serve map data.
  */
-const axios = require('axios');
+const http = require('../egress');
 const cheerio = require('cheerio');
 const { haversine } = require('./utils');
 
@@ -23,7 +23,7 @@ async function search(lat, lon, radiusMiles) {
 
   try {
     // Try the WordPress REST API that many WP sites expose
-    const { data } = await axios.get(`${BASE_URL}/wp-json/wp/v2/posts`, {
+    const { data } = await http.get(`${BASE_URL}/wp-json/wp/v2/posts`, {
       params: {
         per_page: 50,
         search: 'camping',
@@ -68,7 +68,7 @@ async function search(lat, lon, radiusMiles) {
 
   // Also try scraping their map page for WA state campsite markers
   try {
-    const { data: html } = await axios.get(`${BASE_URL}/?s=washington+camping`, {
+    const { data: html } = await http.get(`${BASE_URL}/?s=washington+camping`, {
       headers: {
         'User-Agent': 'WA-StealthCampLocator/1.0 (research-project)',
       },

@@ -16,7 +16,7 @@
  *      - Finer-grained local bridge data with name, surface, layer info
  *      - Can determine what a bridge crosses by checking nearby waterways
  */
-const axios = require('axios');
+const http = require('../egress');
 const { haversine, OVERPASS_URL, overpassQuery } = require('./utils');
 
 // ─── Constants ─────────────────────────────────────────────────────
@@ -177,7 +177,7 @@ async function fetchNbiBridges(lat, lon, radiusMiles = 5) {
       f: 'json',
     };
 
-    const resp = await axios.get(NBI_API, { params, timeout: 15000 });
+    const resp = await http.get(NBI_API, { params, timeout: 15000 });
     if (!resp.data || !resp.data.features) return [];
 
     return resp.data.features.map(f => {

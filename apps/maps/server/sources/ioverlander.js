@@ -3,7 +3,7 @@
  * Scrapes camping/overlanding spots from iOverlander.com for Washington State.
  * iOverlander has a web interface with location data we can extract.
  */
-const axios = require('axios');
+const http = require('../egress');
 const cheerio = require('cheerio');
 const { haversine } = require('./utils');
 
@@ -45,7 +45,7 @@ async function search(lat, lon, radiusMiles = 25) {
 
     // Try iOverlander's search page
     const url = `https://www.ioverlander.com/places?lat=${lat}&lng=${lon}&zoom=10`;
-    const resp = await axios.get(url, {
+    const resp = await http.get(url, {
       headers: { 'User-Agent': UA },
       timeout: 12000,
     });

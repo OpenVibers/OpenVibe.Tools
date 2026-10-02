@@ -3,7 +3,7 @@
  * Common functions used across multiple modules.
  */
 
-const axios = require('axios');
+const http = require('../egress');
 
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 
@@ -29,7 +29,7 @@ async function _processOverpassQueue() {
 
 async function _runOverpassJob({ query, timeout, resolve, reject, attempt = 0 }) {
   try {
-    const resp = await axios.post(OVERPASS_URL, `data=${encodeURIComponent(query)}`, {
+    const resp = await http.post(OVERPASS_URL, `data=${encodeURIComponent(query)}`, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       timeout,
     });

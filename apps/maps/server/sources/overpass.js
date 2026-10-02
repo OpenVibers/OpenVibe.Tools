@@ -11,7 +11,6 @@
  *
  * Overpass API: https://overpass-api.de/api/interpreter
  */
-const axios = require('axios');
 const { haversine, OVERPASS_URL, overpassQuery } = require('./utils');
 
 /**
