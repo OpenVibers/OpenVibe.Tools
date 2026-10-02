@@ -26,6 +26,7 @@ function declaredRoutes(file, from = 0) {
 
 function checkInventory() {
     assert.deepStrictEqual(declaredRoutes('net/routes.js'), NET.map(p => `GET ${p}`), 'update the sunset test for every net route');
+    // The slice starts at createDevRoutes: the webhook routes (inside createWebhookRouter) are checked by behaviour below.
     const devSource = fs.readFileSync(path.join(__dirname, '..', 'server', 'dev', 'routes.js'), 'utf8');
     assert.deepStrictEqual(
         declaredRoutes('dev/routes.js', devSource.indexOf('module.exports = function createDevRoutes')),
