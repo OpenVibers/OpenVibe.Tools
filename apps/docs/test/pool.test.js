@@ -51,7 +51,10 @@ function mergeForm(files, job) {
         const merging = fetch(`${app.base}/api/v1/tools/mergepdf/run?wait_ms=60000`, { method: 'POST', body: mergeForm([big, big]), headers: { cookie } }).then(async r => ({ status: r.status, body: await r.json(), at: Date.now() }));
         const latencies = [];
         let done = null;
-        merging.then(r => { done = r; });
+        let sawBusy = false;
+        // Settle `done` either way: an unhandled rejection here would end the process before the
+        // real assertion failure is printed.
+        merging.then(r => { done = r; }, err => { done = { error: err }; });
         await sleep(150);                          // the upload is in and pdf-lib is working
         while (!done) {
             const s = Date.now();
@@ -59,9 +62,13 @@ function mergeForm(files, job) {
             assert.strictEqual(h.status, 200);
             const body = await h.json();
             latencies.push(Date.now() - s);
-            if (!done && latencies.length === 3) assert.strictEqual(body.workers.busy, 1, 'the merge is in a worker thread');
+            if (!done && body.workers.busy === 1) sawBusy = true;
             await sleep(40);
         }
+        if (done.error) throw done.error;
+        // On a loaded machine the upload can outlast the first few health calls, so look for the busy
+        // worker at any point during the merge rather than at a fixed call.
+        assert.ok(sawBusy, 'the merge is in a worker thread');
         const took = done.at - t0;
         assert.strictEqual(done.status, 200, JSON.stringify(done.body));
         assert.strictEqual(done.body.state, 'succeeded', JSON.stringify(done.body.error));
