@@ -111,12 +111,12 @@ function rawGet(port, p, headers = {}) {
                 if (e.isDirectory()) walk(f);
                 else if (e.name.endsWith('.js')) {
                     const src = fs.readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1');
-                    if (/(^|[^.\w])(fetch|fetchImpl)\(|\bhttps?\.(get|request)\(|\bmod\.(get|request)\(|new WebSocket\(|require\(['"](axios|got|node-fetch|undici)['"]\)/m.test(src)) found.push(path.relative(APPS, f));
+                    if (/(^|[^.\w])(fetch|fetchImpl)\(|\bhttps?\.(get|post|request)\(|\bmod\.(get|request)\(|new WebSocket\(|require\(['"](axios|got|node-fetch|undici)['"]\)/m.test(src)) found.push(path.relative(APPS, f));
                 }
             }
         };
         for (const app of fs.readdirSync(APPS)) {
-            if (app === '_shared') { for (const e of fs.readdirSync(path.join(APPS, '_shared'), { withFileTypes: true })) { if (e.isFile() && e.name.endsWith('.js')) { const f = path.join(APPS, '_shared', e.name); const src = fs.readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1'); if (/(^|[^.\w])(fetch|fetchImpl)\(|\bhttps?\.(get|request)\(|\bmod\.(get|request)\(|new WebSocket\(|require\(['"](axios|got|node-fetch|undici)['"]\)/m.test(src)) found.push(path.relative(APPS, f)); } else if (e.isDirectory() && !['node_modules', 'test'].includes(e.name)) walk(path.join(APPS, '_shared', e.name)); } continue; }
+            if (app === '_shared') { for (const e of fs.readdirSync(path.join(APPS, '_shared'), { withFileTypes: true })) { if (e.isFile() && e.name.endsWith('.js')) { const f = path.join(APPS, '_shared', e.name); const src = fs.readFileSync(f, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1'); if (/(^|[^.\w])(fetch|fetchImpl)\(|\bhttps?\.(get|post|request)\(|\bmod\.(get|request)\(|new WebSocket\(|require\(['"](axios|got|node-fetch|undici)['"]\)/m.test(src)) found.push(path.relative(APPS, f)); } else if (e.isDirectory() && !['node_modules', 'test'].includes(e.name)) walk(path.join(APPS, '_shared', e.name)); } continue; }
             if (fs.existsSync(path.join(APPS, app, 'server'))) walk(path.join(APPS, app, 'server'));
         }
         assert.ok(found.length >= 20, `the scan finds the known sites (${found.length})`);

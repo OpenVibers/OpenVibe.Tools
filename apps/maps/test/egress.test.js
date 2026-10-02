@@ -86,14 +86,13 @@ function makeMock(respond) {
         for (const key of [RIDB_KEY, NPS_KEY, OCM_KEY]) assert.ok(!all.includes(key), `${key} leaked into results or logs`);
     });
 
-    await check('with an empty key RIDB, NPS and OpenChargeMap send nothing and still resolve', async () => {
+    await check('with an empty key RIDB and NPS send nothing and still resolve', async () => {
         const mock = makeMock({ status: 200, body: '{"data":[],"RECDATA":[]}' });
         setEgress(mock.guard);
         const r1 = await ridb.search(47.6062, -122.3321, 25, '');
         const r2 = await nps.search(47.6062, -122.3321, 25, '');
-        const r3 = await ocm.search(47.6062, -122.3321, 25, '');
         assert.deepStrictEqual(mock.seen.length, 0, 'no request was sent');
-        for (const r of [r1, r2, r3]) assert.deepStrictEqual(r, [], 'search resolves empty');
+        for (const r of [r1, r2]) assert.deepStrictEqual(r, [], 'search resolves empty');
     });
 
     await check('a redirect to a non-allowlisted host is refused before any DNS lookup', async () => {

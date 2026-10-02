@@ -18,7 +18,6 @@ const BASE_URL = 'https://api.openchargemap.io/v3/poi';
  * Useful for van/vehicle dwellers: parking spots with power, restrooms nearby
  */
 async function search(lat, lon, radiusMiles, apiKey) {
-  if (!apiKey) return [];
   try {
     const params = {
       output: 'json',
