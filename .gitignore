@@ -1,5 +1,5 @@
 # Dependencies
-node_modules/
+node_modules
 
 # Runtime data (SQLite DBs, uploads, downloads, generated output)
 data/
