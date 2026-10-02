@@ -101,6 +101,13 @@ function mergeForm(files, job) {
         const oomRun = await r.json();
         assert.strictEqual(oomRun.state, 'failed');
         assert.strictEqual(oomRun.error.code, 'tools.input.too_large');
+    } catch (err) {
+        // A fetch that fails with "other side closed" means the server went away: show what it said.
+        for (const a of apps) {
+            const code = await Promise.race([a.exited, sleep(200).then(() => 'still running')]);
+            console.error(`── docs ${a.base} (exit: ${code}) ──\n${a.output().slice(-4000)}`);
+        }
+        throw err;
     } finally {
         for (const a of apps) await a.kill('SIGTERM');
     }
