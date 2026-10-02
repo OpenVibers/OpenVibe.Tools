@@ -117,6 +117,29 @@ function makeMock(respond) {
             (e) => e instanceof MapsEgressError && e.code === 'tools.maps.too_many_redirects');
     });
 
+    await check('a redirect to another allowlisted host drops the caller headers', async () => {
+        const mock = makeMock((rec) => rec.hostname === 'ridb.recreation.gov'
+            ? { status: 302, headers: { location: 'https://api.weather.gov/next' } }
+            : { status: 200, body: '{}' });
+        setEgress(mock.guard);
+        await maps.get('https://ridb.recreation.gov/api/v1/facilities', { headers: { apikey: 'k' } });
+        assert.strictEqual(mock.seen.length, 2, 'both hops were made');
+        assert.strictEqual(mock.seen[0].headers.apikey, 'k', 'the key goes to the host the caller asked for');
+        assert.strictEqual(mock.seen[1].hostname, 'api.weather.gov');
+        assert.strictEqual(mock.seen[1].headers.apikey, undefined, 'the key is not resent cross-origin');
+        assert.strictEqual(mock.seen[1].headers['Accept-Encoding'], 'identity');
+    });
+
+    await check('a same-origin redirect keeps the caller headers', async () => {
+        const mock = makeMock((rec) => rec.path.endsWith('/start')
+            ? { status: 302, headers: { location: 'https://ridb.recreation.gov/api/v1/facilities' } }
+            : { status: 200, body: '{}' });
+        setEgress(mock.guard);
+        await maps.get('https://ridb.recreation.gov/api/v1/start', { headers: { apikey: 'k' } });
+        assert.strictEqual(mock.seen.length, 2, 'both hops were made');
+        assert.strictEqual(mock.seen[1].headers.apikey, 'k', 'a same-origin redirect keeps the key');
+    });
+
     await check('a host resolving to a private address is refused by the pinned guard', async () => {
         setEgress(createEgress({ lookup: (h, o, cb) => cb(null, [{ address: '10.0.0.5', family: 4 }]) }));
         await assert.rejects(maps.get('https://api.weather.gov/points/47,-122'), (e) => e instanceof TargetRefused);

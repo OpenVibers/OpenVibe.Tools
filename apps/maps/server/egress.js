@@ -80,6 +80,10 @@ async function send(method, rawUrl, { params, headers = {}, timeout = 10000, bod
         }
     }
 
+    // The caller's headers (an API key rides in RIDB's apikey) belong to the origin the caller asked
+    // for; a redirect to another allowlisted host must not carry them across.
+    const origin = url.origin;
+
     for (let redirects = 0; ;) {
         const host = url.hostname;
         if (url.protocol !== 'https:' || !Object.prototype.hasOwnProperty.call(ALLOW, host)) {
@@ -90,7 +94,7 @@ async function send(method, rawUrl, { params, headers = {}, timeout = 10000, bod
         try {
             r = await egress.request(url.href, {
                 method,
-                headers: { 'Accept-Encoding': 'identity', ...headers },
+                headers: { 'Accept-Encoding': 'identity', ...(url.origin === origin ? headers : {}) },
                 timeoutMs: timeout,
                 maxBytes: ALLOW[host],
                 body,
