@@ -9,9 +9,8 @@
 const axios = require('axios');
 const { haversine } = require('./utils');
 
-// RIDB_API_KEY from the environment (/etc/openvibe/tools.env in production); never a key in the code.
+// The RIDB key is passed in by the caller (server/config.js); never a key in the code.
 // Without one, RIDB is skipped (search answers the other sources).
-const API_KEY = process.env.RIDB_API_KEY || '';
 const BASE_URL = 'https://ridb.recreation.gov/api/v1';
 let _ridbDisabled = false; // Disable after first 401 to avoid duplicate errors
 
@@ -27,10 +26,8 @@ const CAMPING_ACTIVITY_IDS = [
 /**
  * Search RIDB for facilities near lat/lon within radiusMiles
  */
-let _warnedNoKey = false;
-
-async function search(lat, lon, radiusMiles) {
-  if (!API_KEY) { if (!_warnedNoKey) { _warnedNoKey = true; console.warn('[RIDB] RIDB_API_KEY is not set: RIDB results are skipped'); } return []; }
+async function search(lat, lon, radiusMiles, apiKey) {
+  if (!apiKey) return [];
   if (_ridbDisabled) return []; // Skip after auth failure
   const results = [];
 
@@ -46,7 +43,7 @@ async function search(lat, lon, radiusMiles) {
         offset: 0,
       },
       headers: {
-        apikey: API_KEY,
+        apikey: apiKey,
         Accept: 'application/json',
       },
       timeout: 15000,
@@ -100,7 +97,7 @@ async function search(lat, lon, radiusMiles) {
         limit: 25,
       },
       headers: {
-        apikey: API_KEY,
+        apikey: apiKey,
         Accept: 'application/json',
       },
       timeout: 15000,
@@ -146,9 +143,9 @@ async function search(lat, lon, radiusMiles) {
 /**
  * Get detailed facility info from RIDB
  */
-async function getDetail(facilityId) {
+async function getDetail(facilityId, apiKey) {
   const { data } = await axios.get(`${BASE_URL}/facilities/${facilityId}`, {
-    headers: { apikey: API_KEY, Accept: 'application/json' },
+    headers: { apikey: apiKey, Accept: 'application/json' },
     timeout: 10000,
   });
   return data;
