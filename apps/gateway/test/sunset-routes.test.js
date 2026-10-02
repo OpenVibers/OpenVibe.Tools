@@ -75,8 +75,8 @@ async function gone(base, method, route, app) {
                 const base = `/api/${prefix}${route.replace('/:target?', '')}`;
                 await gone(gateway.base, 'GET', base, 'gateway');
                 if (route.endsWith('/:target?')) {
-                    // Invalid percent encoding would be rejected before any network call if a router reappears.
-                    await gone(gateway.base, 'GET', `${base}/%`, 'gateway');
+                    // A target segment: a reappeared router would answer it (never 404); the catch-all 404s.
+                    await gone(gateway.base, 'GET', `${base}/localhost`, 'gateway');
                 }
             }
         }
