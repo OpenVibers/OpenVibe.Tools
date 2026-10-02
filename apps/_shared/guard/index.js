@@ -9,7 +9,7 @@
 //   app.set('trust proxy', TRUST_PROXY);                 // ./ip.js: one loopback hop
 //   app.use(guard.identify);                             // req.user (Network sign-in, aud checked)
 //   app.use('/api/', legacyLimiter, guard.apiQuota);     // every /api/ request (tools-api)
-//   app.post('/api/process', guard.toolQuota(hostTool), upload, guard.admitUpload(toolOf), guard.heavy(), …)
+//   app.post('/api/v1/tools/:id/run', guard.toolQuota(hostTool), upload, guard.admitUpload(toolOf), guard.heavy(), …)
 //
 // What it does:
 //   callers    one resolver (./caller.js): anonymous (address, IPv6 /64) < session < user < service;

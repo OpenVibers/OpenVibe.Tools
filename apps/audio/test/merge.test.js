@@ -1,7 +1,7 @@
 'use strict';
 // Merge (merge.openvibe.tools): the host pointed at an operation that did not exist. Now 2–5 files of
 // any format are re-encoded to one rate and stereo and joined in order, as a job (files in "files")
-// and on /api/process/multi; wrong file counts are refused before anything runs.
+// and inline; wrong file counts are refused before anything runs.
 const assert = require('assert');
 const fs = require('fs');
 const os = require('os');

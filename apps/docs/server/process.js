@@ -2,7 +2,7 @@
 
 // ═══════════════════════════════════════════════════════════════
 // Docs.OpenVibe — one document operation, shared by the synchronous endpoints
-// (/api/process, /api/process/multi, /api/info) and the docs.process job (see defineJobs). Both run
+// (the run API's inline runs, /api/info) and the docs.process job (see defineJobs). Both run
 // it through runTool(): pdf-lib work goes to the worker pool (./worker.js), so the two share one
 // concurrency cap, one heap limit and terminate-on-timeout or cancel.
 // ═══════════════════════════════════════════════════════════════
