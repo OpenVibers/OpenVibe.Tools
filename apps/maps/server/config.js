@@ -7,7 +7,7 @@ module.exports = {
   baseUrl: process.env.BASE_URL || 'https://maps.openvibe.tools',
 
   // API Keys (optional — free tiers work without most of these)
-  ridbApiKey: process.env.RIDB_API_KEY || '',   // sources/ridb.js reads RIDB_API_KEY itself; never a key in the code
+  ridbApiKey: process.env.RIDB_API_KEY || '',   // passed to sources/ridb.js; never a key in the code
   npsApiKey: process.env.NPS_API_KEY || '',
   openChargeMapKey: process.env.OPEN_CHARGE_MAP_KEY || '',
 

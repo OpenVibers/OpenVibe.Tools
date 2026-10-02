@@ -1024,45 +1024,6 @@ async function scrapeWalmartPrices(searchTerm) {
   }
 }
 
-// ─── USDA FoodData Central Nutrition Lookup ────────────────────────
-async function getNutritionData(foodName) {
-  try {
-    const resp = await axios.get('https://api.nal.usda.gov/fdc/v1/foods/search', {
-      params: {
-        api_key: 'DEMO_KEY',
-        query: foodName,
-        pageSize: 1,
-        dataType: 'Survey (FNDDS)',
-      },
-      timeout: 8000,
-    });
-
-    if (resp.data?.foods?.[0]) {
-      const food = resp.data.foods[0];
-      const nutrients = {};
-      for (const n of (food.foodNutrients || [])) {
-        nutrients[n.nutrientName] = { value: n.value, unit: n.unitName };
-      }
-      return {
-        description: food.description,
-        calories: nutrients['Energy']?.value || 0,
-        protein: nutrients['Protein']?.value || 0,
-        carbs: nutrients['Carbohydrate, by difference']?.value || 0,
-        fat: nutrients['Total lipid (fat)']?.value || 0,
-        fiber: nutrients['Fiber, total dietary']?.value || 0,
-        vitaminC: nutrients['Vitamin C, total ascorbic acid']?.value || 0,
-        calcium: nutrients['Calcium, Ca']?.value || 0,
-        iron: nutrients['Iron, Fe']?.value || 0,
-        potassium: nutrients['Potassium, K']?.value || 0,
-      };
-    }
-    return null;
-  } catch (err) {
-    console.warn('USDA API error:', err.message);
-    return null;
-  }
-}
-
 // ─── Meal Assignments (which items fit which meals) ────────────────
 const MEAL_TAGS = {
   // Map food IDs to meal suitability: breakfast, lunch, dinner, snack
@@ -1387,7 +1348,6 @@ module.exports = {
   findNearbyStores,
   findFoodBanks,
   scrapeWalmartPrices,
-  getNutritionData,
   optimizeMealPlan,
   getAllFoods,
 };
