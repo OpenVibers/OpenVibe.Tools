@@ -2,7 +2,7 @@
 
 // ═══════════════════════════════════════════════════════════════
 // Img.OpenVibe — one image operation, shared by the synchronous endpoints
-// (/api/process, /api/process/direct) and the img.process job (defineJobs). Both run it through
+// (the run API's inline runs) and the img.process job (defineJobs). Both run it through
 // runProcess(): the worker pool (./worker.js), so they share one concurrency cap, one heap limit and
 // terminate-on-timeout or cancel.
 // ═══════════════════════════════════════════════════════════════

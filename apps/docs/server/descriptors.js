@@ -6,7 +6,7 @@
 // Every PDF tool is its host's operation (domain-map.js) run as a docs.process job; pdf2jpg's host
 // default (JPG) is its preset. Protect and Unlock need qpdf, PDF to image needs poppler's pdftoppm
 // and pdfinfo (`requires`): while one is missing on the host the satellite lists the tool as
-// unavailable, as its page and /api/process already say. Pure data: nothing here loads pdf-lib.
+// unavailable, as its page already says. Pure data: nothing here loads pdf-lib.
 // apps/gateway/test/descriptors.test.js holds it to tools/index.js, process.js and config.js.
 // ═══════════════════════════════════════════════════════════════
 

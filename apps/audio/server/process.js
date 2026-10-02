@@ -1,7 +1,7 @@
 'use strict';
 
 // ═══════════════════════════════════════════════════════════════
-// Audio.OpenVibe — one audio operation, shared by the synchronous endpoint (/api/process) and the
+// Audio.OpenVibe — one audio operation, shared by the run API's inline path and the
 // audio.process job (defineJobs below).
 //
 // Jobs can be cancelled and report progress although the tools build their own ffmpeg commands:
