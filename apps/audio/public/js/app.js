@@ -11,7 +11,7 @@
     let currentTool = null;   // active tool ID
     let uploadedFile = null;  // File object
     let uploadedFiles = [];   // merge: the files in the order they are joined
-    let resultId = null;      // retention ID from /api/process
+    let resultId = null;      // retention ID from POST /api/v1/tools/:id/run
 
     /* ---------- DOM refs ---------- */
     const $ = (sel) => document.querySelector(sel);
