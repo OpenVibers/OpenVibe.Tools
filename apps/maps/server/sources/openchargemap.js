@@ -8,10 +8,11 @@
  * Free & open — works without key but key gives higher rate limits
  */
 
-const axios = require('axios');
+const { createEgress } = require('../../../_shared/egress');
 const { haversine } = require('./utils');
 
 const BASE_URL = 'https://api.openchargemap.io/v3/poi';
+const egress = createEgress();
 
 /**
  * Search for EV charging stations near a location
@@ -32,15 +33,19 @@ async function search(lat, lon, radiusMiles, apiKey) {
 
     if (apiKey) params.key = apiKey;
 
-    const resp = await axios.get(BASE_URL, {
-      params,
-      timeout: 12000,
-      headers: { 'User-Agent': 'OpenVibeApp/2.0' },
+    const url = new URL(BASE_URL);
+    for (const [name, value] of Object.entries(params)) url.searchParams.set(name, value);
+    const resp = await egress.follow(url.href, {
+      timeoutMs: 12000,
+      maxBytes: 2 * 1024 * 1024,
+      headers: { 'User-Agent': 'OpenVibeApp/2.0', Accept: 'application/json' },
     });
+    if (resp.status < 200 || resp.status >= 300) throw new Error(`HTTP ${resp.status}`);
+    if (resp.truncated) throw new Error('Response too large');
+    const data = JSON.parse(resp.body.toString('utf8'));
+    if (!Array.isArray(data)) return [];
 
-    if (!Array.isArray(resp.data)) return [];
-
-    return resp.data
+    return data
       .filter(s => s.AddressInfo?.Latitude && s.AddressInfo?.Longitude)
       .map(s => {
         const addr = s.AddressInfo;
