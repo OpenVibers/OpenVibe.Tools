@@ -26,8 +26,10 @@ const https = require('https');
 const path = require('path');
 
 // The public-address rule is openvibe-shared/egress (the one Live and Events use too). apps/_shared has
-// no node_modules of its own: resolve it from the gateway, the only app that loads this file.
-const shared = require(require.resolve('openvibe-shared/egress', { paths: [path.join(__dirname, '..', 'gateway')] }));
+// no node_modules of its own: resolve it from either satellite that uses this adapter.
+const shared = require(require.resolve('openvibe-shared/egress', {
+    paths: [path.join(__dirname, '..', 'gateway'), path.join(__dirname, '..', 'maps')],
+}));
 const { isPublicAddress, embeddedV4, normalizeHost, isInternalName } = shared;
 
 class TargetRefused extends Error {
