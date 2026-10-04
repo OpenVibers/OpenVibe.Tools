@@ -36,8 +36,8 @@ release wait on the same lock and find it applied.
    table, nothing is posted, the rollups and job events behave as before.
 4. **Network grant** (OpenVibe.Network, its own PR): the `tools` client needs
    `billing.usage.record` on audience `openvibe.billing`. Without it every token request for that audience is
-   refused, each post is logged as `[Billing] reading tools:job:<id> not sent: token: 401 …`, and the readings
-   wait in the table (no job is affected).
+   refused, each post is logged as `[Billing] reading tools:job:<id> not sent: token: 400 invalid_scope`, the tick
+   stops after that first reading, and the readings wait in the table (no job is affected).
 5. **Turn it on** once the grant is live: add `OV_BILLING_URL` (Billing's internal URL) and, only if it
    differs, `OV_BILLING_AUDIENCE` to `/etc/openvibe/tools.env`, then restart through `ovhost deploy tools
    --restart`.
@@ -49,7 +49,7 @@ release wait on the same lock and find it applied.
   `0005 | billing_readings | expand`, and `SELECT COUNT(*) FROM tool_job_billing_readings` is 0 while
   `OV_BILLING_URL` is unset.
 - After step 5: `GET /api/health` on img, audio or docs shows `jobs.billing` with `pending` going back to 0
-  after a tick (5 minutes) and `posted` growing; `refused` with a `last_error` of `401 …` means the grant is
+  after a tick (5 minutes) and `posted` growing; `refused` with a `last_error` of `token: 400 invalid_scope` means the grant is
   missing. `SELECT COUNT(*) FROM tool_job_billing_readings WHERE sent_at IS NULL` stays small.
 - In Billing: `GET /api/v1/usage?service=openvibe.tools` (`billing.ledger.admin`) lists the readings, one per
   ended job, `idempotency_key` `tools:job:<job id>`.

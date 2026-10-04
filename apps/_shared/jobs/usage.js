@@ -130,7 +130,7 @@ function createJobUsage({ db, app, contracts, outbox = null, billing = null, now
                 readings.lastError = res.error || String(res.status);
                 await r.failed.run({ job_id: row.job_id, error: readings.lastError.slice(0, 500) });
                 // Billing or the token is down (or the grant is missing): stop here, the rest waits for the next call.
-                if (!res.status || res.status === 401 || res.status === 403 || res.status === 429 || res.status >= 500) break;
+                if (res.token || !res.status || res.status === 401 || res.status === 403 || res.status === 429 || res.status >= 500) break;
             }
             await r.prune.run({ app, at: at - KEEP_SENT_MS });
             readings.posted += posted; readings.refused += refused;

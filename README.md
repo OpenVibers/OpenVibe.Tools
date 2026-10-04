@@ -311,11 +311,11 @@ reload reattaches.
   `tool_job_billing_readings` in the transaction that records the end (no network call there); the pruner's timer
   posts the unsent ones (500 at most a tick) to `POST /api/v1/usage` and marks each sent. A refused post is logged,
   never thrown: the reading keeps its error and attempt count and is posted again on the next tick (Billing answers
-  a replay with 200), and an outage, a 401/403 or a 429 stops that tick's batch. The hourly `tools.usage.recorded`
+  a replay with 200), and an outage, a 401/403, a 429 or a refused token stops that tick's batch. The hourly `tools.usage.recorded`
   rollups above are unchanged and stay subject-less. Off without `OV_BILLING_URL` (nothing is stored). The token is
   Network `client_credentials` for the `tools` client on audience `OV_BILLING_AUDIENCE` (default
   `openvibe.billing`); Network must grant that client `billing.usage.record` on it — until the grant exists every
-  post is refused (401) and only logged, and the readings wait in the table. `GET /api/health` shows
+  token request is refused (400 invalid_scope) and only logged, and the readings wait in the table. `GET /api/health` shows
   `jobs.billing` (pending, posted, refused, invalid, last_error) when it is on.
 
 Environment (all in `/etc/openvibe/tools.env`): `TOOLS_WORKERS`, `TOOLS_WORKERS_<APP>`, `TOOLS_WORKER_MEMORY_MB`,

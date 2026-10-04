@@ -171,6 +171,7 @@ function define(system) {
                     const form = new URLSearchParams(String(init.body));
                     tokens.push(form.get('audience'));
                     if (mode === 'no-grant') return new Response(JSON.stringify({ error: 'invalid_scope' }), { status: 401 });
+                    if (mode === 'invalid-scope') return new Response(JSON.stringify({ error: 'invalid_scope' }), { status: 400 });
                     return new Response(JSON.stringify({ access_token: 'tools-billing-token', expires_in: 3600 }), { status: 200 });
                 }
                 assert.strictEqual(String(url), 'http://billing.test/api/v1/usage');
@@ -260,6 +261,21 @@ function define(system) {
             mode = 'ok';
             const st = (await bsys.stats()).billing;
             assert.deepStrictEqual([st.pending, st.posted, st.refused, st.invalid], [0, 5, 3, 0]);
+
+            // ── Network answers a missing grant with 400 invalid_scope: the tick stops after the first reading ──
+            const scopeId = [await brun({ project: PRJ }, 'succeeded'), await brun({ project: PRJ }, 'succeeded'), await brun({ project: PRJ }, 'succeeded')];
+            const noScope = createBillingClient({ env: { OV_BILLING_URL: 'http://billing.test', OV_NETWORK_INTERNAL_URL: 'http://network.test' }, fetchImpl: billingFetch, log: blog });
+            const ssys = jobs.createJobSystem({ db: bdb, contracts, service: 'img', dataDir: bdir, concurrency: 1, billing: noScope, progressThrottleMs: 0, pruneIntervalMs: 60 * 60 * 1000, log: blog });
+            mode = 'invalid-scope';
+            const tokensBefore = tokens.length;
+            assert.deepStrictEqual(await ssys.flushReadings(), { posted: 0, refused: 1 }, 'a token refusal ends the tick after the first reading');
+            assert.strictEqual(tokens.length - tokensBefore, 1, 'one token request in the tick');
+            const unsent = (await readingRows()).filter(r => scopeId.includes(r.job_id));
+            assert.strictEqual(unsent.length, 3);
+            assert.ok(unsent.every(r => r.sent_at == null), 'all three readings are still unsent');
+            assert.deepStrictEqual(unsent.map(r => Number(r.attempts)).sort(), [0, 0, 1], 'attempts raised on the first one only');
+            assert.ok(unsent.some(r => /^token: 400 invalid_scope/.test(r.last_error)));
+            mode = 'ok';
             bsys.stop();
         }
         console.log('job usage: all checks passed');

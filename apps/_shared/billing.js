@@ -34,10 +34,12 @@ function createBillingClient({ env = process.env, fetchImpl = globalThis.fetch, 
 
     /** One reading → Billing. { ok: true, status } when stored (201) or replayed (200); else logged, { ok: false, status, error }. */
     async function post(reading) {
+        let auth;
         try {
+            try { auth = `Bearer ${await bearer()}`; } catch (err) { err.token = true; throw err; }
             const r = await fetchImpl(`${base}${PATH}`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${await bearer()}` },
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: auth },
                 body: JSON.stringify(reading), signal: AbortSignal.timeout(TIMEOUT_MS),
             });
             if (r.ok) return { ok: true, status: r.status };
@@ -49,7 +51,7 @@ function createBillingClient({ env = process.env, fetchImpl = globalThis.fetch, 
         } catch (err) {
             const error = String(err && err.message || err).slice(0, 300);
             log.error(`[Billing] reading ${reading && reading.idempotency_key} not sent: ${error}`);
-            return { ok: false, status: err && err.status || 0, error };
+            return err && err.token ? { ok: false, status: err.status || 0, error, token: true } : { ok: false, status: err && err.status || 0, error };
         }
     }
 
