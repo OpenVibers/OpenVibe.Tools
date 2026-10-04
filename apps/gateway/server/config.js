@@ -39,4 +39,8 @@ module.exports = {
     liveUrl: process.env.LIVE_URL || 'http://127.0.0.1:3000',
     // OpenVibe.Community owns pastes (roadmap Wave 5); the paste front-end's API goes straight there.
     communityUrl: (process.env.OV_COMMUNITY_INTERNAL_URL || 'http://127.0.0.1:4200').replace(/\/$/, ''),
+
+    // IndexNow (openvibe-shared/indexnow): with INDEXNOW_KEY set the key file is served at
+    // /<key>.txt so engines can verify this site. Unset: off — nothing is mounted and nothing is sent.
+    indexnow: { key: process.env.INDEXNOW_KEY || '' },
 };
