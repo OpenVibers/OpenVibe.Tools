@@ -124,13 +124,19 @@ app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: '1d', ind
 
 // Proxy food-related API calls to openvibe-maps backend. The visitor's address goes along, so maps
 // rate-limits each person instead of putting every food visitor in one 127.0.0.1 bucket.
-function proxyToMaps(apiPath) {
+function proxyToMaps(apiPath, allowedParams) {
   return async (req, res) => {
-    const qs = new URL(req.url, `http://localhost`).search;
-    const url = `${MAPS_API}${apiPath}${qs}`;
+    const incoming = new URL(req.url, 'http://localhost').searchParams;
+    const query = new URLSearchParams();
+    for (const key of allowedParams) {
+      for (const value of incoming.getAll(key)) query.append(key, value);
+    }
+    const qs = query.toString();
+    const url = `${MAPS_API}${apiPath}${qs ? `?${qs}` : ''}`;
     try {
       const headers = req.ip ? { 'X-Forwarded-For': req.ip, 'X-Real-IP': req.ip } : {};
       const response = await fetch(url, { headers, signal: AbortSignal.timeout(15000) });
+      if (response.status >= 500 && response.status < 600) return res.status(502).json({ error: 'Backend unavailable' });
       const data = await response.json();
       res.status(response.status).json(data);
     } catch (e) {
@@ -139,11 +145,12 @@ function proxyToMaps(apiPath) {
   };
 }
 
-app.get('/api/food-banks', proxyToMaps('/api/food-banks'));
-app.get('/api/stores', proxyToMaps('/api/stores'));
-app.get('/api/foods', proxyToMaps('/api/foods'));
-app.get('/api/meal-plan', proxyToMaps('/api/meal-plan'));
-app.get('/api/geocode', proxyToMaps('/api/geocode'));
+// Keep these in step with the query fields read by the matching maps routes.
+app.get('/api/food-banks', proxyToMaps('/api/food-banks', ['lat', 'lon', 'radius']));
+app.get('/api/stores', proxyToMaps('/api/stores', ['lat', 'lon']));
+app.get('/api/foods', proxyToMaps('/api/foods', ['group', 'campFriendly', 'shelfStable', 'search']));
+app.get('/api/meal-plan', proxyToMaps('/api/meal-plan', ['budget', 'days', 'campFriendly', 'shelfStable', 'randomize']));
+app.get('/api/geocode', proxyToMaps('/api/geocode', ['q']));
 
 // ── Internal Analytics API ────────────────────────────────────
 const internalAccess = requireInternalAccess({ keys: guard.keys, issuer: guard.issuer, audience: guard.audience });
