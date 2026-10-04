@@ -6,7 +6,7 @@
 //   • with no provider key configured, maps' "source skipped" answer is passed through (200), and food
 //     sends no key or credential of its own upstream
 //   • the parameters the route allows are forwarded
-// The two known defects this uncovered stay as todo tests in maps-upstream-todo.test.js.
+// Maps 5xx responses and query filtering are checked in maps-upstream-todo.test.js.
 const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
