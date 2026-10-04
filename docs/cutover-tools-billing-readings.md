@@ -51,7 +51,7 @@ release wait on the same lock and find it applied.
 - After step 5: `GET /api/health` on img, audio or docs shows `jobs.billing` with `pending` going back to 0
   after a tick (5 minutes) and `posted` growing; `refused` with a `last_error` of `token: 400 invalid_scope` means the grant is
   missing. `SELECT COUNT(*) FROM tool_job_billing_readings WHERE sent_at IS NULL` stays small.
-- In Billing: `GET /api/v1/usage?service=openvibe.tools` (`billing.ledger.admin`) lists the readings, one per
+- In Billing: `GET /api/v1/usage?service=tools` (`billing.ledger.admin`) lists the readings, one per
   ended job, `idempotency_key` `tools:job:<job id>`.
 
 ```rehearse

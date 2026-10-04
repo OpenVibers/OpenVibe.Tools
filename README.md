@@ -304,8 +304,9 @@ reload reattaches.
   `GET /api/health` shows `jobs.usage` (pending, invalid).
 - **Usage readings to OpenVibe.Billing** (`apps/_shared/billing.js`, `apps/_shared/jobs/usage.js`, plan T5 step 7):
   every job that succeeds or fails (anyone's, not only a project's; a cancelled one is not billed) gets one
-  `platform.usage-sample@1` reading — id `tools-job-<id>`, `idempotency_key` `tools:job:<id>`, service and source
-  `openvibe.tools`, operation `tools.tool.run` (a tool run) or `tools.job.create`, resource the tool or job type,
+  `platform.usage-sample@1` reading — id `tools-job-<id>`, `idempotency_key` `tools:job:<id>`, service `tools` (the
+  Contracts manifest id, so Billing keys ratings and budgets on the reading) and source `openvibe.tools`, operation
+  `tools.tool.run` (a tool run) or `tools.job.create`, resource the tool or job type,
   quantity 1, unit `jobs`, `at` the job's end, plus `project` and `trace_id` when the job has them and `subject`
   (`user:usr_…`) only for a signed-in person's job, never an app or a browser session. It is stored in
   `tool_job_billing_readings` in the transaction that records the end (no network call there); the pruner's timer

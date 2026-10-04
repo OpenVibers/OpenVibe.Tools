@@ -66,7 +66,7 @@ function readingOf(row) {
     const r = {
         id: `tools-job-${row.id}`,
         idempotency_key: `tools:job:${row.id}`,
-        service: 'openvibe.tools',
+        service: 'tools',   // the Contracts manifest id (services/tools.json): Billing keys ratings and budgets on it
         operation: row.tool ? 'tools.tool.run' : 'tools.job.create',
         resource: DIMENSION_RE.test(resource) ? resource : 'other',
         quantity: 1,
