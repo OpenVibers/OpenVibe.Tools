@@ -11,7 +11,7 @@
  *
  * Combined → deduplicated, enriched with distance/walking time, scored for stealth-camper utility.
  */
-const axios = require('axios');
+const http = require('../egress');
 const { haversine, OVERPASS_URL, overpassQuery } = require('./utils');
 
 // ─── Constants ─────────────────────────────────────────────────────
@@ -105,7 +105,7 @@ async function fetchRefugeRestrooms(lat, lon, perPage = 30) {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       const timeout = attempt === 0 ? 15000 : 25000;
-      const resp = await axios.get(REFUGE_API, {
+      const resp = await http.get(REFUGE_API, {
         params: { lat, lng: lon, per_page: perPage },
         timeout,
         headers: { 'Accept': 'application/json' },

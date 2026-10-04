@@ -11,7 +11,6 @@
  *
  * All data sourced from OpenStreetMap via Overpass API.
  */
-const axios = require('axios');
 const { haversine, OVERPASS_URL, overpassQuery } = require('./utils');
 
 // ═══════════════════════════════════════════════════════════════════

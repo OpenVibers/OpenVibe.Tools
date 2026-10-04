@@ -103,6 +103,30 @@ const { createEgress, isPublicAddress, embeddedV4, TargetRefused } = require('..
     const head = await g3.request(`http://127.0.0.1:${port}/`, { method: 'HEAD' });
     assert.equal(head.status, 200); assert.equal(head.body.length, 0);
 
+    // A request body is written verbatim, with its Content-Length.
+    let sent = null;
+    const { EventEmitter: EE } = require('events');
+    const poster = createEgress({
+        lookup: (h, o, cb) => cb(null, [{ address: '127.0.0.1', family: 4 }]),
+        isAllowed: (a) => a === '127.0.0.1' || isPublicAddress(a),
+        httpRequest: (opts, cb) => {
+            const req = new EE();
+            req.end = (b) => { sent = { headers: opts.headers, body: b }; };
+            req.destroy = () => {};
+            process.nextTick(() => {
+                const res = new EE();
+                res.statusCode = 200; res.statusMessage = 'OK'; res.headers = {}; res.destroy = () => {};
+                cb(res);
+                process.nextTick(() => res.emit('end'));
+            });
+            return req;
+        },
+    });
+    const posted = await poster.request('http://site.example/post', { method: 'POST', body: 'data=x', maxBytes: 100 });
+    assert.equal(posted.status, 200);
+    assert.equal(sent.body, 'data=x');
+    assert.equal(sent.headers['Content-Length'], 6);
+
     // request() never follows; follow() re-checks each hop and refuses before dialling.
     const one = await g3.request(`http://127.0.0.1:${port}/to-private`);
     assert.equal(one.status, 302);

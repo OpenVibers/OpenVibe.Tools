@@ -6,7 +6,7 @@
  * NOTE: RIDB requires an API key; the caller passes it in (server/config.js, RIDB_API_KEY).
  * Register at https://ridb.recreation.gov/ for one. Without it RIDB is skipped.
  */
-const axios = require('axios');
+const http = require('../egress');
 const { haversine } = require('./utils');
 
 // The RIDB key is passed in by the caller (server/config.js); never a key in the code.
@@ -33,7 +33,7 @@ async function search(lat, lon, radiusMiles, apiKey) {
 
   try {
     // Search facilities by lat/lon with radius
-    const { data } = await axios.get(`${BASE_URL}/facilities`, {
+    const { data } = await http.get(`${BASE_URL}/facilities`, {
       params: {
         latitude: lat,
         longitude: lon,
@@ -89,7 +89,7 @@ async function search(lat, lon, radiusMiles, apiKey) {
   // Also try RecAreas (larger tracts like national forests)
   if (_ridbDisabled) return results;
   try {
-    const { data } = await axios.get(`${BASE_URL}/recareas`, {
+    const { data } = await http.get(`${BASE_URL}/recareas`, {
       params: {
         latitude: lat,
         longitude: lon,
@@ -144,7 +144,7 @@ async function search(lat, lon, radiusMiles, apiKey) {
  * Get detailed facility info from RIDB
  */
 async function getDetail(facilityId, apiKey) {
-  const { data } = await axios.get(`${BASE_URL}/facilities/${facilityId}`, {
+  const { data } = await http.get(`${BASE_URL}/facilities/${facilityId}`, {
     headers: { apikey: apiKey, Accept: 'application/json' },
     timeout: 10000,
   });

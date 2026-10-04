@@ -12,7 +12,7 @@
  *           OPERATIONAL_HOURS, FORESTNAME, RECAREAURL, OPENSTATUS,
  *           RESERVATION_INFO, RESTRICTIONS, ACCESSIBILITY
  */
-const axios = require('axios');
+const http = require('../egress');
 const { haversine } = require('./utils');
 
 const USFS_API = 'https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_RecreationOpportunities_01/MapServer/0/query';
@@ -109,7 +109,7 @@ async function search(lat, lon, radiusMiles = 25) {
     resultRecordCount: '200',
   });
 
-  const { data } = await axios.get(`${USFS_API}?${params.toString()}`, {
+  const { data } = await http.get(`${USFS_API}?${params.toString()}`, {
     timeout: 30000,
     headers: {
       'User-Agent': 'OpenVibeApp/2.0 (stealth camping tool)',

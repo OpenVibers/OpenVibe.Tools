@@ -26,10 +26,8 @@ const https = require('https');
 const path = require('path');
 
 // The public-address rule is openvibe-shared/egress (the one Live and Events use too). apps/_shared has
-// no node_modules of its own: resolve it from either satellite that uses this adapter.
-const shared = require(require.resolve('openvibe-shared/egress', {
-    paths: [path.join(__dirname, '..', 'gateway'), path.join(__dirname, '..', 'maps')],
-}));
+// no node_modules of its own: resolve it from the gateway and maps, the apps that load this file.
+const shared = require(require.resolve('openvibe-shared/egress', { paths: [path.join(__dirname, '..', 'gateway'), path.join(__dirname, '..', 'maps')] }));
 const { isPublicAddress, embeddedV4, normalizeHost, isInternalName } = shared;
 
 class TargetRefused extends Error {
@@ -158,12 +156,14 @@ function createEgress({
     /**
      * One HTTP(S) request to a user-chosen URL; redirects are NOT followed.
      * → Promise<{ url, status, statusText, headers, body, truncated }>. body is a Buffer ('' for HEAD
-     * or when maxBytes is 0).
+     * or when maxBytes is 0). `body` is the request body (string or Buffer, default none).
      */
-    async function request(rawUrl, { method = 'GET', headers = {}, timeoutMs = 12000, maxBytes = 0 } = {}) {
+    async function request(rawUrl, { method = 'GET', headers = {}, timeoutMs = 12000, maxBytes = 0, body } = {}) {
         const url = parseUrl(rawUrl);
         const target = await resolve(url.hostname);
         const secure = url.protocol === 'https:';
+        const outHeaders = body == null || Object.keys(headers).some(h => h.toLowerCase() === 'content-length')
+            ? headers : { ...headers, 'Content-Length': Buffer.byteLength(body) };
         return new Promise((ok, fail) => {
             let settled = false;
             let deadline = null;
@@ -173,7 +173,7 @@ function createEgress({
                 port: url.port || (secure ? 443 : 80),
                 path: `${url.pathname}${url.search}`,
                 method,
-                headers,
+                headers: outHeaders,
                 agent: false,
                 // Only the checked addresses: no second DNS answer is ever used.
                 lookup: target.literal ? undefined : pinnedLookup(target.addresses),
@@ -204,7 +204,7 @@ function createEgress({
             deadline = setTimeout(timeout, timeoutMs);
             req.on('timeout', timeout);
             req.on('error', (err) => done(fail, err));
-            req.end();
+            req.end(body == null ? undefined : body);
         });
     }
 
