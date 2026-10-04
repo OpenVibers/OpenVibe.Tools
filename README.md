@@ -28,9 +28,10 @@ offline against the Network's public key (JWKS).
 
 - OpenVibe.Network (SSO as OAuth client `tools`, JWKS, client-credentials tokens, the domains registry),
   OpenVibe.Media (job results), OpenVibe.Events (job and usage events, revocation cutoffs),
-  OpenVibe.Search (tool documents), OpenVibe.Community (the paste hand-over)
+  OpenVibe.Search (tool documents), OpenVibe.Community (the paste hand-over), OpenVibe.Billing (job usage
+  readings)
 - host programs some tools need (ffmpeg, yt-dlp, qpdf, poppler, libheif; [Host packages](#host-packages-some-tools-need))
-- in each app: `openvibe-contracts` v0.63.0, `openvibe-sdk` v0.12.0 and `openvibe-shared` v1.23.0, pinned
+- in each app: `openvibe-contracts` v0.92.0 (img, audio, docs, gateway), `openvibe-sdk` v0.12.0 and `openvibe-shared` v1.23.0, pinned
   by release tarball, and `apps/_shared` (openvibe-tools-shared) by relative path
 
 ## Capabilities
@@ -46,6 +47,7 @@ Called elsewhere, as the service principal `tools` (the OAuth client `tools`):
 | OpenVibe.Media | `media.object.upload`, `media.object.read` | job results |
 | OpenVibe.Events | `events.event.publish`, `events.subscription.manage` | job and usage events; the `network.user.token_valid_after` subscription |
 | OpenVibe.Search | `search.document.write` | tool documents for the network index |
+| OpenVibe.Billing | `billing.usage.record` (audience `openvibe.billing`) | one usage reading per ended job |
 
 ## Layout
 
@@ -300,12 +302,27 @@ reload reattaches.
   `env: sandbox`. No owner, session, address, input, file name or output leaves. OpenVibe.Network adds the rollups
   up for the project's usage page on openvibe.codes. Off without `EVENTS_URL`, like the job events;
   `GET /api/health` shows `jobs.usage` (pending, invalid).
+- **Usage readings to OpenVibe.Billing** (`apps/_shared/billing.js`, `apps/_shared/jobs/usage.js`, plan T5 step 7):
+  every job that succeeds or fails (anyone's, not only a project's; a cancelled one is not billed) gets one
+  `platform.usage-sample@1` reading — id `tools-job-<id>`, `idempotency_key` `tools:job:<id>`, service and source
+  `openvibe.tools`, operation `tools.tool.run` (a tool run) or `tools.job.create`, resource the tool or job type,
+  quantity 1, unit `jobs`, `at` the job's end, plus `project` and `trace_id` when the job has them and `subject`
+  (`user:usr_…`) only for a signed-in person's job, never an app or a browser session. It is stored in
+  `tool_job_billing_readings` in the transaction that records the end (no network call there); the pruner's timer
+  posts the unsent ones (500 at most a tick) to `POST /api/v1/usage` and marks each sent. A refused post is logged,
+  never thrown: the reading keeps its error and attempt count and is posted again on the next tick (Billing answers
+  a replay with 200), and an outage, a 401/403, a 429 or a refused token stops that tick's batch. The hourly `tools.usage.recorded`
+  rollups above are unchanged and stay subject-less. Off without `OV_BILLING_URL` (nothing is stored). The token is
+  Network `client_credentials` for the `tools` client on audience `OV_BILLING_AUDIENCE` (default
+  `openvibe.billing`); Network must grant that client `billing.usage.record` on it — until the grant exists every
+  token request is refused (400 invalid_scope) and only logged, and the readings wait in the table. `GET /api/health` shows
+  `jobs.billing` (pending, posted, refused, invalid, last_error) when it is on.
 
 Environment (all in `/etc/openvibe/tools.env`): `TOOLS_WORKERS`, `TOOLS_WORKERS_<APP>`, `TOOLS_WORKER_MEMORY_MB`,
 `TOOLS_WORKER_MEMORY_MB_<APP>`, `TOOLS_WORKER_QUEUE`, `TOOLS_WORKER_IDLE_MS`, `TOOLS_JOBS_CONCURRENCY`, `TOOLS_JOBS_CONCURRENCY_<APP>`,
 `TOOLS_JOBS_MAX_ACTIVE`, `TOOLS_JOB_RESULTS`, `TOOLS_MEDIA_NAMESPACE`, `OV_MEDIA_INTERNAL_URL`, `OV_MEDIA_URL`,
 `OV_NETWORK_INTERNAL_URL`, `OV_OAUTH_CLIENT_ID`, `OV_OAUTH_CLIENT_SECRET`, `EVENTS_URL`, `EVENTS_PUBLISH`,
-`EVENTS_RELAY_INTERVAL_MS`.
+`EVENTS_RELAY_INTERVAL_MS`, `OV_BILLING_URL`, `OV_BILLING_AUDIENCE`.
 
 Not done yet: quotas for external developer apps are the guard's service and sandbox tiers, not a Codes-issued quota.
 

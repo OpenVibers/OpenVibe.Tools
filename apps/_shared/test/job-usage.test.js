@@ -5,6 +5,10 @@
 // count; each closed hour is written to the outbox once as tools.usage.recorded (valid against
 // openvibe-contracts, no owner, input or file name); a job ending in an hour already sent re-sends it
 // as revision 2; without an outbox nothing is counted. On PostgreSQL (plan T8): openvibe-sdk/db.
+// Billing readings (plan T5 step 7, a fetch stub as OpenVibe.Billing): every job that succeeded or failed
+// stores one platform.usage-sample@1 reading in that transaction and the flush posts it once (subject only
+// for a person, idempotency_key tools:job:<id>); a cancelled job posts nothing; a refused post is logged,
+// never thrown, and retried; without OV_BILLING_URL nothing is stored and the rollups still work.
 const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
@@ -16,7 +20,8 @@ const contracts = dep('openvibe-contracts');
 const sdk = dep('openvibe-sdk');
 const jobs = require('../jobs');
 const { outboxFromEnv } = require('../jobs/events');
-const { keyOf, HOUR_MS } = require('../jobs/usage');
+const { keyOf, readingOf, HOUR_MS } = require('../jobs/usage');
+const { createBillingClient } = require('../billing');
 
 const PRJ = 'prj_01JDDDDDDDDDDDDDDDDDDDDDDD';
 const APP = 'app_01JCCCCCCCCCCCCCCCCCCCCCCC';
@@ -70,6 +75,9 @@ function define(system) {
             await until(async () => (await system.get(job.id)).state === 'succeeded', 'inert job');
             assert.strictEqual(Number((await db.prepare('SELECT COUNT(*) AS n FROM tool_job_usage').get()).n), 0, 'inert: nothing counted');
             assert.deepStrictEqual((await system.stats()).usage, { enabled: false });
+            assert.strictEqual(Number((await db.prepare('SELECT COUNT(*) AS n FROM tool_job_billing_readings').get()).n), 0, 'inert: no reading stored');
+            assert.strictEqual(createBillingClient({ env: {}, fetchImpl: () => { throw new Error('no fetch while inert'); } }).enabled, false);
+            assert.ok(!('billing' in (await system.stats())), 'no billing stats while inert');
             system.stop();
         }
 
@@ -145,8 +153,131 @@ function define(system) {
         const p = (typeof resent.envelope === 'string' ? JSON.parse(resent.envelope) : resent.envelope).payload;
         assert.deepStrictEqual([p.dimension, p.quantity, p.errors, p.revision], ['test.boom', 2, 1, 2]);
         assert.deepStrictEqual((await system.stats()).usage, { pending: 0, invalid: 0, last_invalid: null });
+        assert.strictEqual(Number((await db.prepare('SELECT COUNT(*) AS n FROM tool_job_billing_readings').get()).n), 0, 'rollups without OV_BILLING_URL: no reading stored');
 
         system.stop(); await outbox.stop();
+
+        // ── Billing readings (no events outbox: the readings work without one) ──
+        {
+            const bdir = path.join(root, 'billing');
+            fs.mkdirSync(bdir, { recursive: true });
+            const bdb = await testDb(bdir);
+            const posts = [];                 // what Billing stored, by idempotency_key
+            const stored = new Map();
+            const tokens = [];
+            let mode = 'ok';
+            const billingFetch = async (url, init) => {
+                if (String(url) === 'http://network.test/oauth/token') {
+                    const form = new URLSearchParams(String(init.body));
+                    tokens.push(form.get('audience'));
+                    if (mode === 'no-grant') return new Response(JSON.stringify({ error: 'invalid_scope' }), { status: 401 });
+                    if (mode === 'invalid-scope') return new Response(JSON.stringify({ error: 'invalid_scope' }), { status: 400 });
+                    return new Response(JSON.stringify({ access_token: 'tools-billing-token', expires_in: 3600 }), { status: 200 });
+                }
+                assert.strictEqual(String(url), 'http://billing.test/api/v1/usage');
+                assert.strictEqual(init.headers.Authorization, 'Bearer tools-billing-token');
+                if (mode === 'down') return new Response('{"error":{"code":"billing.unavailable"}}', { status: 503 });
+                if (mode === 'bad') return new Response('{"error":{"code":"billing.invalid_reading"}}', { status: 400 });
+                const reading = JSON.parse(init.body);
+                posts.push(reading);
+                const replay = stored.has(reading.idempotency_key);
+                stored.set(reading.idempotency_key, reading);
+                return new Response(JSON.stringify(reading), { status: replay ? 200 : 201 });
+            };
+            const errors = [];
+            const blog = { log() {}, warn() {}, error: (...a) => errors.push(a.join(' ')) };
+            const billing = createBillingClient({ env: { OV_BILLING_URL: 'http://billing.test/', OV_NETWORK_INTERNAL_URL: 'http://network.test', OV_OAUTH_CLIENT_SECRET: 'tools-secret' }, fetchImpl: billingFetch, log: blog });
+            assert.strictEqual(billing.enabled, true);
+            const bsys = jobs.createJobSystem({ db: bdb, contracts, service: 'img', dataDir: bdir, concurrency: 1, billing, progressThrottleMs: 0, pruneIntervalMs: 60 * 60 * 1000, log: blog });
+            define(bsys);
+            await bsys.start();
+            const brun = async (o, state) => {
+                const { job } = await bsys.submit({ owner: `app:${APP}`, type: 'test.upper', input: { text: SECRET_INPUT }, ...o });
+                await until(async () => { const r = await bsys.get(job.id); return r && r.state === state; }, `${job.id} ${state}`);
+                return job.id;
+            };
+            const readingRows = async () => bdb.prepare('SELECT * FROM tool_job_billing_readings ORDER BY created_at, job_id').all();
+
+            const personId = await brun({ owner: `user:${USER}`, project: null, tool: 'image-resize', traceId: TRACE }, 'succeeded');
+            const appId = await brun({ project: PRJ }, 'succeeded');
+            const failId = await brun({ project: PRJ, type: 'test.boom', files: [{ buffer: Buffer.from('x'), name: SECRET_FILE, mime: 'text/plain' }] }, 'failed');
+            const { job: held } = await bsys.submit({ owner: `user:${USER}`, type: 'test.upper', input: { hold: true } });
+            await until(async () => (await bsys.get(held.id)).state === 'running', 'held job running');
+            await bsys.cancel(held.id);
+            await until(async () => (await bsys.get(held.id)).state === 'cancelled', 'held job cancelled');
+            assert.deepStrictEqual((await readingRows()).map(r => [r.job_id, r.sent_at]), [[personId, null], [appId, null], [failId, null]], 'stored in the job-end transaction, unsent; a cancelled job has none');
+            assert.strictEqual(posts.length, 0, 'nothing is posted inside the job\'s transaction');
+
+            assert.deepStrictEqual(await bsys.flushReadings(), { posted: 3, refused: 0 });
+            assert.deepStrictEqual(tokens, ['openvibe.billing'], 'one token for the Billing audience, cached');
+            assert.deepStrictEqual(posts.map(p => p.idempotency_key), [personId, appId, failId].map(id => `tools:job:${id}`));
+            for (const p of posts) {
+                const v = contracts.validate('platform.usage-sample@1', p);
+                assert.ok(v.valid, JSON.stringify(v.errors));
+                assert.deepStrictEqual([p.service, p.source, p.quantity, p.unit], ['openvibe.tools', 'openvibe.tools', 1, 'jobs']);
+            }
+            const [person, appJob, failJob] = posts;
+            assert.deepStrictEqual([person.id, person.operation, person.resource, person.subject, person.trace_id, person.project], [`tools-job-${personId}`, 'tools.tool.run', 'image-resize', `user:${USER}`, TRACE, undefined]);
+            assert.deepStrictEqual([appJob.operation, appJob.resource, appJob.project, 'subject' in appJob], ['tools.job.create', 'test.upper', PRJ, false], 'an app\'s job carries its project, no subject');
+            assert.deepStrictEqual([failJob.operation, failJob.resource, failJob.quantity], ['tools.job.create', 'test.boom', 1], 'a failed job is billed');
+            const text = JSON.stringify(posts);
+            for (const s of [APP, SECRET_INPUT, SECRET_FILE, 'secret-output-name', 'Cannot read', held.id]) assert.ok(!text.includes(s), `no "${s}" in readings`);
+            assert.ok((await readingRows()).every(r => r.sent_at != null && Number(r.attempts) === 0));
+
+            // ── Once per job: a second flush and a re-run of the job's end add nothing ──
+            assert.deepStrictEqual(await bsys.flushReadings(), { posted: 0, refused: 0 });
+            await bdb.tx(async () => bsys.usage.finished(await bsys.get(personId)));
+            assert.strictEqual((await readingRows()).length, 3, 'a re-run stores no second reading');
+            assert.deepStrictEqual(await bsys.flushReadings(), { posted: 0, refused: 0 });
+            assert.strictEqual(posts.length, 3);
+            assert.strictEqual(readingOf(await bsys.get(personId)).idempotency_key, `tools:job:${personId}`, 'the key is stable');
+            assert.deepStrictEqual(readingOf(await bsys.get(personId)), person, 'the stored reading is the job\'s reading');
+            assert.strictEqual(readingOf(await bsys.get(held.id)), null);
+
+            // ── Refused: logged, never thrown into the job, kept unsent with the error for the next flush ──
+            mode = 'down';
+            const downId = await brun({ project: PRJ }, 'succeeded');
+            const downId2 = await brun({ project: PRJ }, 'succeeded');
+            assert.deepStrictEqual(await bsys.flushReadings(), { posted: 0, refused: 1 }, 'Billing down: stop after the first refusal');
+            let rows = await readingRows();
+            const down = rows.find(r => r.job_id === downId);
+            assert.deepStrictEqual([down.sent_at, Number(down.attempts)], [null, 1]);
+            assert.match(down.last_error, /^503 /);
+            assert.ok(errors.some(e => e.includes(`tools:job:${downId}`) && e.includes('503')), 'the refusal is logged');
+            mode = 'bad';
+            assert.deepStrictEqual(await bsys.flushReadings(), { posted: 0, refused: 2 }, 'a 4xx for one reading does not stop the others');
+            mode = 'ok';
+            assert.deepStrictEqual(await bsys.flushReadings(), { posted: 2, refused: 0 });
+            rows = await readingRows();
+            assert.ok(rows.every(r => r.sent_at != null), 'sent on the next flush');
+            assert.deepStrictEqual(posts.slice(3).map(p => p.idempotency_key).sort(), [downId, downId2].map(id => `tools:job:${id}`).sort());
+            assert.strictEqual((await bsys.get(downId)).state, 'succeeded', 'the job is untouched by the refusal');
+
+            // ── No grant yet (the token is refused): logged, never thrown ──
+            const noGrant = createBillingClient({ env: { OV_BILLING_URL: 'http://billing.test', OV_NETWORK_INTERNAL_URL: 'http://network.test' }, fetchImpl: billingFetch, log: blog });
+            mode = 'no-grant';
+            const res = await noGrant.post(person);
+            assert.deepStrictEqual([res.ok, res.status], [false, 401]);
+            mode = 'ok';
+            const st = (await bsys.stats()).billing;
+            assert.deepStrictEqual([st.pending, st.posted, st.refused, st.invalid], [0, 5, 3, 0]);
+
+            // ── Network answers a missing grant with 400 invalid_scope: the tick stops after the first reading ──
+            const scopeId = [await brun({ project: PRJ }, 'succeeded'), await brun({ project: PRJ }, 'succeeded'), await brun({ project: PRJ }, 'succeeded')];
+            const noScope = createBillingClient({ env: { OV_BILLING_URL: 'http://billing.test', OV_NETWORK_INTERNAL_URL: 'http://network.test' }, fetchImpl: billingFetch, log: blog });
+            const ssys = jobs.createJobSystem({ db: bdb, contracts, service: 'img', dataDir: bdir, concurrency: 1, billing: noScope, progressThrottleMs: 0, pruneIntervalMs: 60 * 60 * 1000, log: blog });
+            mode = 'invalid-scope';
+            const tokensBefore = tokens.length;
+            assert.deepStrictEqual(await ssys.flushReadings(), { posted: 0, refused: 1 }, 'a token refusal ends the tick after the first reading');
+            assert.strictEqual(tokens.length - tokensBefore, 1, 'one token request in the tick');
+            const unsent = (await readingRows()).filter(r => scopeId.includes(r.job_id));
+            assert.strictEqual(unsent.length, 3);
+            assert.ok(unsent.every(r => r.sent_at == null), 'all three readings are still unsent');
+            assert.deepStrictEqual(unsent.map(r => Number(r.attempts)).sort(), [0, 0, 1], 'attempts raised on the first one only');
+            assert.ok(unsent.some(r => /^token: 400 invalid_scope/.test(r.last_error)));
+            mode = 'ok';
+            bsys.stop();
+        }
         console.log('job usage: all checks passed');
     } finally {
         await closeAllTestDbs();
