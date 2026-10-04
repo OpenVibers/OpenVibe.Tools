@@ -31,6 +31,10 @@
 // transaction that records its end (./usage.js), and each closed hour goes out as tools.usage.recorded
 // from the pruner's timer.
 //
+// Billing (plan T5 step 7): with OV_BILLING_URL set (../billing.js), every job that succeeds or fails
+// also stores its usage reading in that transaction, and the pruner's timer posts the unsent ones to
+// OpenVibe.Billing (./usage.js flushReadings). Without it, nothing is stored or posted.
+//
 // No dependencies of its own: the app passes the shared openvibe-sdk/db handle and openvibe-contracts.
 // ═══════════════════════════════════════════════════════════════
 
@@ -41,6 +45,7 @@ const crypto = require('crypto');
 const { createStore, TERMINAL } = require('./store');
 const { createJobEvents } = require('./events');
 const { createJobUsage } = require('./usage');
+const { createBillingClient } = require('../billing');
 
 const HOUR = 60 * 60 * 1000;
 
@@ -98,6 +103,7 @@ const scrub = (msg) => String(msg || '').replace(/(?:\/[\w.-]+){2,}/g, '[file]')
  * @param {number} [o.diskBudgetBytes=0]  bytes under <dataDir>/jobs before busy() says so; 0 = no bound
  * @param {object} [o.media]       result store from ./media (null = keep results on local disk)
  * @param {object} [o.outbox]      openvibe-sdk outbox on `db` (./events outboxFromEnv); null = no platform events
+ * @param {object} [o.billing]     ../billing createBillingClient (default: one from process.env; inert without OV_BILLING_URL)
  * @param {number} [o.pruneIntervalMs=300000]
  * @param {number} [o.progressThrottleMs=250]
  */
@@ -117,8 +123,9 @@ function createJobSystem(o) {
     const diskBudget = o.diskBudgetBytes > 0 ? o.diskBudgetBytes : 0;
     const disk = { bytes: 0, at: 0, scanning: null };
     const announce = createJobEvents({ contracts, service: o.service, outbox: o.outbox || null, referenceCount: (id) => store.referenceCount(id), log });
-    const usage = createJobUsage({ db: o.db, app: o.service, contracts, outbox: o.outbox || null, log });
-    /** Inside the transaction `t` that recorded the end: tools.job.succeeded|failed and the project's usage. */
+    const billing = o.billing || createBillingClient({ log });
+    const usage = createJobUsage({ db: o.db, app: o.service, contracts, outbox: o.outbox || null, billing, log });
+    /** Inside the transaction `t` that recorded the end: tools.job.succeeded|failed, the project's usage and the Billing reading. */
     async function ended(t, id) {
         const row = await store.get(id);
         await announce.finished(t, row);
@@ -696,9 +703,11 @@ function createJobSystem(o) {
         if (r.requeued || r.failed) log.log(`[Jobs] ${o.service}: ${r.requeued} job(s) re-queued, ${r.failed} failed after restart`);
         await prune().catch(() => {});
         await flushUsage();
+        flushReadings();   // not awaited: posting to Billing never holds up the start
         pruneTimer = setInterval(() => {
             prune().catch(err => log.error('[Jobs] prune:', err.message));
             flushUsage();
+            flushReadings();
         }, o.pruneIntervalMs || 5 * 60 * 1000);
         if (pruneTimer.unref) pruneTimer.unref();
         await kick();
@@ -712,6 +721,10 @@ function createJobSystem(o) {
     /** Closed hours of project usage → the outbox (./usage.js); a failure is logged and retried next tick. */
     async function flushUsage(at) {
         try { return await usage.flush(at); } catch (err) { log.error('[Jobs] usage flush:', err.message); return { queued: 0, invalid: 0 }; }
+    }
+    /** Unsent Billing readings → OpenVibe.Billing (./usage.js); a failure is logged and retried next tick. */
+    async function flushReadings(at) {
+        try { return await usage.flushReadings(at); } catch (err) { log.error('[Jobs] billing flush:', err.message); return { posted: 0, refused: 0 }; }
     }
 
     function stop() {
@@ -753,8 +766,8 @@ function createJobSystem(o) {
         types: () => [...types.keys()],
         media,
         // running (after the spread) is the store's count of rows in 'running'; executing is this process's.
-        stats: async () => ({ running: active.size, concurrency, ...(await store.counts()), executing: active.size, results: media ? 'media' : 'local', events: await announce.status(), usage: usage.enabled ? await usage.status() : { enabled: false } }),
-        usage, flushUsage,
+        stats: async () => ({ running: active.size, concurrency, ...(await store.counts()), executing: active.size, results: media ? 'media' : 'local', events: await announce.status(), usage: usage.enabled ? await usage.status() : { enabled: false }, ...(usage.billed ? { billing: await usage.readings() } : {}) }),
+        usage, flushUsage, flushReadings,
         outbox: o.outbox || null,
         /** True between start() and stop(): the worker picks up queued jobs. */
         isRunning: () => started && !stopped,
