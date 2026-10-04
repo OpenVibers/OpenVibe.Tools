@@ -214,7 +214,7 @@ function define(system) {
             for (const p of posts) {
                 const v = contracts.validate('platform.usage-sample@1', p);
                 assert.ok(v.valid, JSON.stringify(v.errors));
-                assert.deepStrictEqual([p.service, p.source, p.quantity, p.unit], ['openvibe.tools', 'openvibe.tools', 1, 'jobs']);
+                assert.deepStrictEqual([p.service, p.source, p.quantity, p.unit], ['tools', 'openvibe.tools', 1, 'jobs']);
             }
             const [person, appJob, failJob] = posts;
             assert.deepStrictEqual([person.id, person.operation, person.resource, person.subject, person.trace_id, person.project], [`tools-job-${personId}`, 'tools.tool.run', 'image-resize', `user:${USER}`, TRACE, undefined]);
