@@ -643,11 +643,12 @@ After the move the apps read `DATABASE_URL` / `DATABASE_DIRECT_URL` (PostgreSQL,
 never authoritative), while `guard_abuse`, the job store and the analytics tables stay in PostgreSQL.
 `TOOLS_GUARD` (default `report`) and its meaning are unchanged.
 
-State (plan T8 phases 1–4 and 6 done, not deployed; the cutover is pending): every app opens the one `tools`
+State (plan T8 landed 2026-10-02; production serves the PostgreSQL-only release): every app opens the one `tools`
 database (`apps/_shared/db.js`, `DATABASE_URL` else an embedded PGlite database in development;
 `DATABASE_DIRECT_URL` runs the migrations as owner) and the shared Valkey (`VALKEY_URL`, else the guard's
 counters and salt stay in this process); the job store, `guard_abuse`, `token_revocations` and the request
 analytics are on PostgreSQL, the net and dev pages call the run API, and the `/api/process`, `/api/net/*` and
 `/api/dev/*` routes are removed (above). No app depends on `better-sqlite3` any more; the operational scripts
 that still read the old SQLite files (the importer, `scripts/analytics-prune.js`, `scripts/guard-abuse-report.js`)
-have it in `scripts/package.json`: run `npm --prefix scripts install` once on the host before the cutover.
+have it in `scripts/package.json`: run `npm --prefix scripts install` on the host only to read the archived SQLite
+files (the importer has run; production writes PostgreSQL). The cutover evidence is in `docs/cutover-evidence-t8.md`.
