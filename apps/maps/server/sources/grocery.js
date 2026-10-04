@@ -10,8 +10,6 @@
  *   - Dollar Tree ($1.25 fixed price model)
  *   - Grocery Outlet (discount pricing data)
  *   - Fred Meyer / Kroger (API + built-in pricing)
- *
- * Nutritional data from USDA FoodData Central API
  */
 
 const http = require('../egress');
@@ -19,6 +17,7 @@ const cheerio = require('cheerio');
 const { haversine } = require('./utils');
 
 // ─── Store Definitions ─────────────────────────────────────────────
+// searchUrl/storeFinderUrl (fredmeyer, safeway, dollartree, groceryoutlet) and fredmeyer's krogerApiBase are link metadata shown to users, not request hosts — the egress ALLOW inventory needs no entry for them (walmart is scraped, so its URLs are real hosts).
 const STORES = {
   walmart: {
     name: 'Walmart',

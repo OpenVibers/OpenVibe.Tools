@@ -46,7 +46,7 @@ const QUOTAS = {
     'tools-probe': {
         anonymous: q(30, 15, 600), session: q(45, 25, 1000), user: q(120, 60, 5000), service: q(600, 300, 50000), sandbox: q(15, 10, 200),
     },
-    // Uploads processed by sharp, ffmpeg, pdf-lib, qpdf, poppler (sync /api/process and job submits).
+    // Uploads processed by sharp, ffmpeg, pdf-lib, qpdf, poppler (inline runs and job submits).
     'tools-job': {
         anonymous: q(60, 30, 1500), session: q(90, 45, 3000), user: q(240, 120, 20000), service: q(1200, 600, 200000), sandbox: q(30, 15, 300),
     },
@@ -81,7 +81,7 @@ function envInt(name, fallback, env = process.env) {
 /** The host-wide bounds, read from the environment at call time (tests set it per process). */
 function bounds(env = process.env) {
     return {
-        // Synchronous heavy calls (img, audio, docs /api/process…) running at once per satellite, and
+        // Synchronous heavy calls (img, audio, docs run API, /api/info…) running at once per satellite, and
         // how many may wait for a slot, and for how long, before 503 tools.busy.
         sync: {
             concurrency: Math.max(1, envInt('TOOLS_SYNC_CONCURRENCY', 2, env)),

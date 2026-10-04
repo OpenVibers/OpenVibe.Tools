@@ -3,8 +3,8 @@
  * Free federal recreation data: campgrounds, facilities, rec areas.
  * API Docs: https://ridb.recreation.gov/docs
  *
- * NOTE: RIDB API requires an API key.  We use a demo/public-tier key.
- * Users should register at https://ridb.recreation.gov/ for their own key.
+ * NOTE: RIDB requires an API key; the caller passes it in (server/config.js, RIDB_API_KEY).
+ * Register at https://ridb.recreation.gov/ for one. Without it RIDB is skipped.
  */
 const http = require('../egress');
 const { haversine } = require('./utils');
