@@ -102,6 +102,7 @@ function rawGet(port, p, headers = {}) {
             '_shared/observe.js': 'the satellites on loopback', '_shared/tools/proxy.js': 'the satellites on loopback',
             '_shared/tools/run.js': 'the satellites on loopback', '_shared/usage.js': 'Network user modules (configured)',
             '_shared/egress.js': 'the egress guard itself',
+            '_shared/billing.js': 'OpenVibe.Billing and Network token endpoint (configured)',
         };
         const found = [];
         const walk = (dir) => {
