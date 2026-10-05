@@ -6,7 +6,7 @@
 //   /tool/<id>        one tool: what it does, where it lives (primary host + mirrors), related
 //   /all-tools        A–Z
 //   /search?q=        results (works as a plain form; JS only makes it instant)
-//   /sitemap.xml /robots.txt /llms.txt /api/catalog.json
+//   /sitemap.xml /robots.txt /llms.txt /llms-full.txt /api/catalog.json
 // Every page is complete HTML without JavaScript. Pages are rendered once per registry version
 // and served from memory with an ETag.
 // ═══════════════════════════════════════════════════════════════
@@ -297,6 +297,35 @@ function sitemapEntries() {
     ].map(u => Object.assign({ lastmod: today }, u));
 }
 
+// ── llms.txt + llms-full.txt ─────────────────────────────────
+// The public pages, once, as the data both artifacts read: /llms.txt lists each with its tagline,
+// /llms-full.txt carries the same pages with their full description. One source, so the two can
+// never disagree about what is public. The noindex search page and the site's own /tool/*,
+// /developers and /updates pages were never in llms.txt and stay out of both.
+function llmsSections() {
+    const { tools, families } = registry.get();
+    return families.filter(f => f.path).map(f => ({
+        title: f.name,
+        links: tools.filter(t => t.family === f.id).map(t => ({ title: t.name, url: t.url, note: t.tagline, text: t.description || t.tagline })),
+    }));
+}
+function llmsSummary() {
+    const { tools } = registry.get();
+    return `${tools.length} online tools for files, text, code and networks. Open source and community-run. A machine-readable catalog is at ${SITE}/api/catalog.json.`;
+}
+function llmsTxtBody() {
+    return seo.llmsTxt({ name: NAME, summary: llmsSummary(),
+        sections: [{ title: 'API', links: [{ title: 'Developer guide', url: SITE + '/developers', note: 'run any tool from code' }, { title: 'OpenAPI 3.1', url: SITE + '/api/v1/openapi.json' }, { title: 'Tool registry (JSON)', url: SITE + '/api/v1/tools' }, { title: 'Full text (llms-full.txt)', url: SITE + '/llms-full.txt', note: 'the public pages below as one plain-text document' }] }].concat(llmsSections()) });
+}
+// /llms-full.txt: the same header and summary as /llms.txt, then every public page llms.txt lists
+// with its text, under the same sections. The 512 KB ceiling keeps the answer a document, not a
+// payload — llmsFull stops before the page that would pass it.
+const LLMS_FULL_MAX_BYTES = 512 * 1024;
+function llmsFullBody() {
+    return seo.llmsFull({ site: { name: NAME, url: SITE }, summary: llmsSummary(), maxBytes: LLMS_FULL_MAX_BYTES,
+        sections: llmsSections().map(s => ({ title: s.title, pages: s.links.map(l => ({ title: l.title, url: l.url, text: l.text })) })) });
+}
+
 function createSiteRouter() {
     const router = express.Router();
     const apexOnly = (req, res, next) => (!req.ovHost || req.ovHost.kind === 'apex' || (req.ovHost.kind === 'unknown' && !req.ovHost.inZone) ? next() : next('router'));
@@ -312,8 +341,9 @@ function createSiteRouter() {
     router.get('/tool/:id', (req, res, next) => { const t = registry.get().tools.find(x => x.id === req.params.id); return t ? send(req, res, '/tool/' + t.id, () => pageTool(t)) : next(); });
     router.get('/sitemap.xml', (req, res) => send(req, res, 'sitemap', () => seo.sitemapXml(sitemapEntries()), 'application/xml; charset=utf-8'));
     router.get('/robots.txt', (req, res) => send(req, res, 'robots', () => seo.robotsTxt({ sitemaps: [SITE + '/sitemap.xml'], disallow: ['/api/', '/auth/'], allow: ['/api/catalog.json'], allowAI: true }), 'text/plain; charset=utf-8'));
-    router.get('/llms.txt', (req, res) => send(req, res, 'llms', () => { const { tools, families } = registry.get(); return seo.llmsTxt({ name: NAME, summary: `${tools.length} online tools for files, text, code and networks. Open source and community-run. A machine-readable catalog is at ${SITE}/api/catalog.json.`,
-        sections: [{ title: 'API', links: [{ title: 'Developer guide', url: SITE + '/developers', note: 'run any tool from code' }, { title: 'OpenAPI 3.1', url: SITE + '/api/v1/openapi.json' }, { title: 'Tool registry (JSON)', url: SITE + '/api/v1/tools' }] }].concat(families.filter(f => f.path).map(f => ({ title: f.name, links: tools.filter(t => t.family === f.id).map(t => ({ title: t.name, url: t.url, note: t.tagline })) }))) }); }, 'text/plain; charset=utf-8'));
+    router.get('/llms.txt', (req, res) => send(req, res, 'llms', llmsTxtBody, 'text/plain; charset=utf-8'));
+    // The same document with every public page's text: what /llms.txt lists, readable whole.
+    router.get('/llms-full.txt', (req, res) => send(req, res, 'llms-full', llmsFullBody, 'text/plain; charset=utf-8'));
     router.get('/:slug', (req, res, next) => { const f = registry.get().families.find(x => x.path === '/' + req.params.slug); return f ? send(req, res, f.path, () => pageFamily(f)) : next(); });
     return router;
 }

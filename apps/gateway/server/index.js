@@ -21,6 +21,8 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 
 const config = require('./config');
+// IndexNow: with INDEXNOW_KEY set, serve its key file; Tools publishes no user-created pages, so nothing pings.
+const { createToolsIndexNow } = require('./seo/indexnow');
 const { BRAND } = require('openvibe-shared/brand');
 const { createAuthClient, createAuthRoutes, extractToken, fedcmCors } = require('./auth/routes');
 const createNetRoutes = require('./net/routes');
@@ -466,6 +468,10 @@ app.get('/openvibe-sw.js', (req, res) => {
 });
 
 // ── Static Files ─────────────────────────────────────────────
+// IndexNow's key file (openvibe-shared/indexnow) comes first: /<key>.txt must answer its own text,
+// not fall through to the SPA/static handlers. Unset INDEXNOW_KEY → off, nothing mounted (404).
+const indexnow = createToolsIndexNow(config.baseUrl, config.indexnow.key);
+if (indexnow.enabled) app.use(indexnow.keyFile);
 app.use(express.static(path.join(__dirname, '..', 'public'), {
     setHeaders(res, filePath) {
         if (filePath.endsWith('.js') || filePath.endsWith('.css')) {
