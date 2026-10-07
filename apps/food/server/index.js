@@ -84,8 +84,8 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net', 'unpkg.com', 'cdnjs.cloudflare.com', 'fonts.googleapis.com', 'fonts.gstatic.com'],
       fontSrc: ["'self'", 'fonts.gstatic.com', 'cdnjs.cloudflare.com'],
       imgSrc: ["'self'", 'data:', 'image.tmdb.org', '*.tile.openstreetmap.org', '*.basemaps.cartocdn.com', 'server.arcgisonline.com'],
-      // events.openvibe.network: release notifications (release-watch's EventSource, openvibe-shared 1.17).
-      connectSrc: ["'self'", 'nominatim.openstreetmap.org', 'https://openvibe.network', 'https://events.openvibe.network'],
+      // openvibe.events (and events.openvibe.network until this app pins openvibe-shared 2.13.0): release notifications.
+      connectSrc: ["'self'", 'nominatim.openstreetmap.org', 'https://openvibe.network', 'https://openvibe.events', 'https://events.openvibe.network'],
       scriptSrcAttr: ["'unsafe-inline'"],
     },
   },
