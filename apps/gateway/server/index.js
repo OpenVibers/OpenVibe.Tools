@@ -57,7 +57,8 @@ let auth = null;   // created below; the key check reads it at request time
 // Who is asking (Network sign-in with aud openvibe.tools, service tokens, the browser session, else
 // the address), the tools-api quota, the net and dev tools' quotas by descriptor, the per-target
 // throttle, the port-scan cap, webhook bin caps and the abuse log (data/guard.db). The Network key is
-// the OAuth client's (loaded and retried by it). TOOLS_GUARD=report (default) records what it would refuse.
+// the OAuth client's (loaded and retried by it). TOOLS_GUARD=enforce (default) refuses; report records
+// what it would refuse.
 // The one `tools` database and the shared Valkey (plan T8, decisions 3 and 4).
 const toolsDb = require('../../_shared/db').openToolsDb({ createDb: require('openvibe-sdk/db').createDb, service: 'tools-gateway' });
 const toolsValkey = require('../../_shared/db').openToolsValkey({ createValkey: require('openvibe-sdk/valkey').createValkey });
@@ -191,17 +192,17 @@ app.use(exceptRegistry(cors({
     exposedHeaders: ['Location', 'Idempotent-Replayed', 'Retry-After', 'RateLimit-Limit', 'RateLimit-Remaining', 'RateLimit-Reset', 'X-OpenVibe-Request-Id', 'Deprecation', 'Sunset', 'Link'],
 }), { isFirstParty: isAllowedOrigin }));
 
-// ── Who is asking, then rate limits (sign-in first, so a signed-in tier applies) ──
+// ── Who is asking, then the guard's quotas (sign-in first, so a signed-in tier applies) ──
 app.use(guard.identify);
 // A signed-in person's page view of a tool goes into their tools.usage module (the launchers' recent tools).
 app.use(require('../../_shared/usage').usagePages({ snapshot: toolRegistry.snapshot }));
-app.use('/api/', guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: 120, signedIn: 240, message: 'Too many requests. Please try again later.' }), guard.apiQuota);
+app.use('/api/', guard.apiQuota);
 app.use('/auth/', rateLimit({ windowMs: 15 * 60_000, max: 60, keyGenerator: (req) => guard.caller(req).ipKey }));
 
 // ── Tool registry (ADR-027, capability tools.tool.read) ──────
 // GET /api/v1/tools (tools.tool-list@1), /api/v1/tools/:id (tools.tool@1), /api/v1/tools/:id/schema.
 // Every tool, every family; satellite hosts answer the same routes for their own tools. Counted by
-// the /api/ limiter above. /api/catalog.json stays as it is (Network reads it).
+// the /api/ quota above. /api/catalog.json stays as it is (Network reads it).
 // Per-actor limits (apps/_shared/actor-limits.js, roadmap WS-R task 4): signed-in registry reads, a backstop above the
 // guard's quotas on runs and on the jobs facade's submits, and the admin analytics route.
 const actorLimits = require('../../_shared/actor-limits').createToolsLimits({ app: 'gateway', createActorLimiter: require('openvibe-sdk/limits').createActorLimiter, guard, registry: obs.registry });
@@ -307,7 +308,7 @@ app.get('/api/brand', (_req, res) => res.json(BRAND));
 // which owns pastes (roadmap Wave 5). The visitor's Network JWT goes along: Community verifies it and
 // files writes under the person's canonical subject, so no site has to translate ids any more. The
 // client address goes along too, for Community's anonymous-write limits.
-app.use('/api/pastes', guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: 120, signedIn: 240, message: 'Too many requests. Please try again later.' }), async (req, res) => {
+app.use('/api/pastes', async (req, res) => {
     try {
         const target = `${config.communityUrl}/api/pastes${req.url}`;
         // The path is the visitor's: "/api/pastes/../../internal/x" (or %2e%2e) resolves to another of
@@ -347,7 +348,7 @@ app.use('/api/pastes', guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonym
 // our pages (the /in URL a bin receives on is anyone's to call).
 const { createWebhookRouter } = require('./dev/routes');
 const devOrigin = guard.originCheck();
-app.use('/api/dev/webhook', (req, res, next) => (/^\/bins\/[^/]+\/in(\/|$)/.test(req.path) ? next() : devOrigin(req, res, next)), guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: 60, signedIn: 120, message: 'Too many requests. Please try again later.' }), createWebhookRouter({ guard }));
+app.use('/api/dev/webhook', (req, res, next) => (/^\/bins\/[^/]+\/in(\/|$)/.test(req.path) ? next() : devOrigin(req, res, next)), createWebhookRouter({ guard }));
 
 // ── Host-header subdomain routing ────────────────────────────
 function subdomainOf(req) {

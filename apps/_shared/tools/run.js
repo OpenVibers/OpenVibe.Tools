@@ -59,7 +59,7 @@ const REPLAY_TTL_MS = 15 * 60 * 1000;
 
 const isRunPath = (p) => RUN_RE.test(String(p || ''));
 
-/** Run Express middleware in order (the apps' older limiters) → true when every one called next(). */
+/** Run Express middleware in order (a route's limiters) → true when every one called next(). */
 async function passes(list, req, res) {
     for (const mw of list || []) {
         const ok = await new Promise((resolve) => {
@@ -454,7 +454,7 @@ function createRunApi(o) {
             // The tool's quota class and cost (recorded for the job admission, so it is not charged twice).
             req._ovCharged = { quotaClass: d.quotaClass, cost: d.cost || 1, tool: d.id };
             if (!(await guard.charge(req, res, { quotaClass: d.quotaClass, cost: d.cost || 1, tool: d.id }))) return undefined;
-            // A satellite's older per-route limiters count job runs like its job submits (report mode: in force).
+            // The satellite's limiters (the actor backstop, the tool's quota) count a run like a job submit.
             if (mode === 'job' && o.jobs.limiters && !(await passes(o.jobs.limiters, req, res))) return undefined;
             const multipart = req.is && req.is('multipart/form-data');
             if (multipart && mode !== 'job') throw new Refusal(400, 'tools.run.invalid', `${d.id} takes no files: send JSON (tools.run-request@1).`);
@@ -572,7 +572,7 @@ function createSiblingFetch({ self, ports, fetchImpl = fetch }) {
  * @param {Function} o.multer       @param {string} o.uploadsDir
  * @param {Function} o.Ajv          @param {Function} [o.addFormats]
  * @param {() => object} o.ports    satellite ports (./satellites.js)
- * @param {Function[]} [o.limiters] the app's older burst and processing limiters (as on its job submits)
+ * @param {Function[]} [o.limiters] the app's limiters (as on its job submits: the actor backstop, the tool's quota)
  */
 function satelliteRunApi(o) {
     const uploadsDir = path.resolve(o.uploadsDir);

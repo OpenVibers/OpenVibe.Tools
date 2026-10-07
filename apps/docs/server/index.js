@@ -14,7 +14,6 @@ const path = require('path');
 const fs = require('fs');
 
 const fsp = require('fs/promises');
-const rateLimit = require('express-rate-limit');
 const config = require('./config');
 const { resolveContext, DOMAIN_MAP } = require('./domain-map');
 const { getTool, listTools, BINARIES } = require('./tools');
@@ -40,8 +39,8 @@ const { requireInternalAccess } = require('../../_shared/internal-token');
 // ── Guard (apps/_shared/guard) ───────────────────────────────
 // Who is asking (Network sign-in with aud openvibe.tools, service tokens, the browser session, else
 // the address), tiered quotas by each tool's descriptor, upload sniffing, the sync semaphore and the
-// abuse log (data/guard.db). TOOLS_GUARD=report (default) records what it would refuse. Every PDF
-// tool needs a browser session, a sign-in or a token (descriptor auth.anonymous false).
+// abuse log (data/guard.db). TOOLS_GUARD=enforce (default) refuses; report records what it would
+// refuse. Every PDF tool needs a browser session, a sign-in or a token (descriptor auth.anonymous false).
 const SPECS = require('./descriptors').SPECS;
 // The one `tools` database and the shared Valkey (plan T8, decisions 3 and 4).
 const toolsDb = require('../../_shared/db').openToolsDb({ createDb: require('openvibe-sdk/db').createDb, service: 'tools-docs' });
@@ -51,7 +50,6 @@ const guard = createGuard({
     app: 'docs', db: toolsDb.db, valkey: toolsValkey, contracts, specs: SPECS,
     issuer: config.networkUrl, networkUrl: config.networkUrl, networkInternalUrl: config.networkInternalUrl, publicKeyFiles: config.publicKeyPaths,
 });
-const { apiLimiter, processLimiter, burstLimiter } = guard.legacyLimiters(rateLimit);
 /** The tool a request is for before its body is read: the host's own (the hubs: merge, the first). */
 const hostTool = (req) => (guard.tool(req.ctx.toolId) ? req.ctx.toolId : (guard.toolForJob('docs.process', req.ctx.defaultOp || 'merge', null) || { id: null }).id);
 /** The tool a parsed request runs: its `tool` (operation) on this host. */
@@ -139,12 +137,12 @@ app.use(exceptRegistry(cors({
     credentials: true,
 }), { isFirstParty: (origin) => /^https:\/\/([a-z0-9-]+\.)?openvibe\.tools$/.test(origin) || (process.env.NODE_ENV === 'development' && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) }));
 
-// ── Who is asking, then rate limits (sign-in first, so a signed-in tier applies) ──
+// ── Who is asking, then the guard's quotas ───────────────────
 app.use(guard.identify);
-app.use('/api/', apiLimiter, guard.apiQuota);
+app.use('/api/', guard.apiQuota);
 
 // ── Tool registry (ADR-027): GET /api/v1/tools[/:id[/schema]] for this app's PDF tools ──
-// Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the limiter above. The
+// Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the quota above. The
 // gateway (openvibe.tools) answers the same routes for every tool and reads this list for status.
 const pdfPrograms = require('./tools/pdf');
 const toolRegistry = createLocalRegistry({ specs: require('./descriptors').SPECS, statusOf: requiresStatus((p) => (pdfPrograms[p] ? pdfPrograms[p].available() : true)) });
@@ -218,7 +216,7 @@ app.get('/api/tools', (_req, res) => {
 });
 
 // ── PDF Info (no file mutation) ──────────────────────────────
-app.post('/api/info', guard.originCheck(), burstLimiter, processLimiter, guard.toolQuota(hostTool), uploadSingle, guard.admitUpload(hostTool), guard.heavy(hostTool), async (req, res) => {
+app.post('/api/info', guard.originCheck(), guard.toolQuota(hostTool), uploadSingle, guard.admitUpload(hostTool), guard.heavy(hostTool), async (req, res) => {
     try {
         const tool = getTool('metadata');
         const [buffer] = await readUploads([req.file]);
@@ -237,7 +235,7 @@ const jobs = jobsRuntime.setupJobs({
     getPublicKey: guard.keys.get, issuer: config.networkUrl, guard,
     define: (system) => defineJobs(system, pool),
     receive: uploadAny,
-    limiters: [actorLimits.backstop('tools.job.create'), burstLimiter, processLimiter, guard.toolQuota(hostTool)],
+    limiters: [actorLimits.backstop('tools.job.create'), guard.toolQuota(hostTool)],
     jobTool: (req, type, input) => { const op = String((input && input.tool) || req.ctx.defaultOp || ''); const d = op ? guard.toolForJob('docs.process', op, req.ctx.toolId) : null; return d ? d.id : null; },
     defaults(req, input) {
         const out = { ...input };
@@ -254,7 +252,7 @@ const jobs = jobsRuntime.setupJobs({
 const runApi = satelliteRunApi({
     app: 'docs', guard, contracts, snapshot: toolRegistry.snapshot, system: () => jobs,
     multer: require('multer'), uploadsDir: path.resolve(config.uploadsDir), ...ajvFrom(require), ports: () => satellitePorts(),
-    limiters: [actorLimits.backstop('tools.tool.run'), burstLimiter, processLimiter],
+    limiters: [actorLimits.backstop('tools.tool.run')],
 });
 app.use(runApi.handle);
 

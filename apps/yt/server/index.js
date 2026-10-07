@@ -9,7 +9,6 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
-const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
 
@@ -28,7 +27,7 @@ const { requireInternalAccess } = require('../../_shared/internal-token');
 // ── Guard (apps/_shared/guard) ───────────────────────────────
 // Who is asking (Network sign-in with aud openvibe.tools, the browser session, else the address),
 // the tools-download quota (a download costs 50, descriptor yt) and the abuse log (data/guard.db).
-// TOOLS_GUARD=report (default) records what it would refuse; the older limiters below stay until enforce.
+// TOOLS_GUARD=enforce (default) refuses; report records what it would refuse.
 // The one `tools` database and the shared Valkey (plan T8, decisions 3 and 4).
 const toolsDb = require('../../_shared/db').openToolsDb({ createDb: require('openvibe-sdk/db').createDb, service: 'tools-yt' });
 const analytics = new AnalyticsTrackerPg(toolsDb.db, 'openvibe-yt', { retention: { days: 30 } }); // ADR-021; PostgreSQL (plan T8)
@@ -105,18 +104,14 @@ app.use(exceptRegistry(cors({
 })));
 
 // ── Rate Limiting ────────────────────────────────────────────
-// Progress is one SSE connection, or a poll every 1–3 s when SSE is unavailable; the poll must
-// not eat the general budget (60/min would cut a download off after a minute).
 // Sign-in is read first, so limits know who is asking; everyone else counts by address (IPv6 by /64).
-const isStatusRoute = (req) => req.method === 'GET' && /^\/status\/[a-f0-9]+(\/stream)?$/.test(req.path);
+// The guard's tools-api quota covers every /api/ call, the progress polls included.
 app.use(guard.identify);
-const apiLimiter = guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: 60, signedIn: 120, message: 'Too many requests. Please try again later.' });
-app.use('/api/', (req, res, next) => (isStatusRoute(req) ? next() : apiLimiter(req, res, (err) => (err ? next(err) : guard.apiQuota(req, res, next)))));
-app.use('/api/status/', guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: 240, signedIn: 240, message: 'Too many requests. Please try again later.' }));
+app.use('/api/', guard.apiQuota);
 app.use('/api/', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
 
 // ── Tool registry (ADR-027): GET /api/v1/tools[/:id[/schema]] for this app's YouTube downloader ──
-// Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the limiter above. The
+// Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the quota above. The
 // gateway (openvibe.tools) answers the same routes for every tool and reads this list for status.
 const toolRegistry = createLocalRegistry({ specs: require('./descriptors').SPECS, statusOf: requiresStatus((p) => (p === 'yt-dlp' ? !!which(config.ytdlpPath) : true)) });
 // A signed-in person's page view of a tool goes into their tools.usage module (the launchers' recent tools).
@@ -130,10 +125,9 @@ app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
 // ── Analytics Middleware ─────────────────────────────────────
 app.use(analytics.middleware());
 
-// Downloads: the older hourly limit (5 anonymous, 20 signed in) until enforce mode, and the guard's
-// tools-download quota (descriptor yt: cost 50) in both. A download belongs to whoever started it (the
-// browser session cookie, minted on the start, or a sign-in): its status, progress stream, file and
-// cancel answer 404 to anyone else, the same as for an id that does not exist.
+// Downloads: the guard's tools-download quota (descriptor yt: cost 50). A download belongs to whoever
+// started it (the browser session cookie, minted on the start, or a sign-in): its status, progress
+// stream, file and cancel answer 404 to anyone else, the same as for an id that does not exist.
 const owners = new Map();   // download id → owner
 const ownsDownload = (req, res, id) => {
     const owner = owners.get(String(id || ''));
@@ -141,7 +135,6 @@ const ownsDownload = (req, res, id) => {
     return !!owner && !!who.owner && owner === who.owner;
 };
 setInterval(() => { for (const id of owners.keys()) if (!downloader.getStatus(id) && !downloader.getFile(id)) owners.delete(id); }, 10 * 60_000).unref();
-const downloadLimiter = guard.legacyLimiter(rateLimit, { windowMs: 60 * 60 * 1000, anonymous: config.rateLimit.anonPerHour, signedIn: config.rateLimit.authedPerHour, message: 'Download limit reached. Sign in for more downloads or wait an hour.' });
 
 // ── Hosts ────────────────────────────────────────────────────
 // Pages are only rendered for hosts this tool serves (or that the gateway vouches for with
@@ -176,7 +169,7 @@ app.post('/api/info', async (req, res) => {
 });
 
 // Start download
-app.post('/api/download', downloadLimiter, guard.toolQuota('yt'), async (req, res) => {
+app.post('/api/download', guard.toolQuota('yt'), async (req, res) => {
     const { url, quality, title } = req.body;
     if (!url) return res.status(400).json({ error: 'URL is required' });
     if (!downloader.isValidUrl(url)) return res.status(400).json({ error: 'Only YouTube URLs are supported' });

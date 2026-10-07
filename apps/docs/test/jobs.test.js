@@ -29,7 +29,7 @@ async function finished(app, id, cookie) {
 
 (async () => {
     const data = fs.mkdtempSync(path.join(os.tmpdir(), 'ov-docs-'));
-    const env = { DATA_DIR: data, UPLOADS_DIR: path.join(data, 'uploads'), OUTPUT_DIR: path.join(data, 'output') };
+    const env = { DATA_DIR: data, UPLOADS_DIR: path.join(data, 'uploads'), OUTPUT_DIR: path.join(data, 'output'), TOOLS_GUARD: 'report' };   // submits here carry no session; enforce would refuse them 401
     const a = await pdf(2, 'First'), b = await pdf(3);
     let app;
     try {

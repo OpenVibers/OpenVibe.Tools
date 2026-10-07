@@ -8,7 +8,7 @@
 //   const guard = createGuard({ app: 'img', dataDir, db, valkey, contracts, specs, networkUrl, … });
 //   app.set('trust proxy', TRUST_PROXY);                 // ./ip.js: one loopback hop
 //   app.use(guard.identify);                             // req.user (Network sign-in, aud checked)
-//   app.use('/api/', legacyLimiter, guard.apiQuota);     // every /api/ request (tools-api)
+//   app.use('/api/', guard.apiQuota);                    // every /api/ request (tools-api)
 //   app.post('/api/v1/tools/:id/run', guard.toolQuota(hostTool), upload, guard.admitUpload(toolOf), guard.heavy(), …)
 //
 // What it does:
@@ -30,11 +30,10 @@
 //              own hosts (custom domains included) or the request's own host (CSRF); calls with a
 //              Bearer token and calls without those cookies do not need it. 403 tools.origin.refused
 //
-// Mode: TOOLS_GUARD=report (default) logs and counts what it would refuse and refuses nothing, except
-// the hard limits that apply in both modes: the image pixel limit, ffmpeg's protocol and format
-// whitelists and duration cap, upload sniffing, the port-scan cap and the per-target throttle.
-// TOOLS_GUARD=enforce refuses. The apps' older per-route limiters keep working in report mode and step
-// aside in enforce mode (guard.enforcing), where the tiered quotas replace them.
+// Mode: TOOLS_GUARD=enforce (default, production) refuses what is past a limit. TOOLS_GUARD=report
+// (local debugging) logs and counts what it would refuse and refuses nothing, except the hard limits
+// that apply in both modes: the image pixel limit, ffmpeg's protocol and format whitelists and
+// duration cap, upload sniffing, the port-scan cap and the per-target throttle.
 // ═══════════════════════════════════════════════════════════════
 
 const fs = require('fs');
@@ -97,7 +96,7 @@ function createGuard(o = {}) {
     const log = o.log || console;
     const now = o.now || Date.now;
     const appName = o.app || 'tools';
-    const mode = String(env.TOOLS_GUARD || 'report').trim().toLowerCase() === 'enforce' ? 'enforce' : 'report';
+    const mode = String(env.TOOLS_GUARD || 'enforce').trim().toLowerCase() === 'enforce' ? 'enforce' : 'report';
     const enforcing = mode === 'enforce';
     const bounds = limits.bounds(env);
     const table = limits.quotas(env, log);
@@ -207,9 +206,8 @@ function createGuard(o = {}) {
     async function charge(req, res, { quotaClass, cost, tool: toolId }) {
         const c = caller(req, res);
         const r = await quotas.check(c, { quotaClass, cost }, { report: !enforcing });
-        // In report mode an older limiter that ran on this request (req.rateLimit) is the one in force:
-        // its RateLimit-* headers stay. Otherwise the guard's describe the allowance closest to running out.
-        if (enforcing || !req.rateLimit) setHeaders(res, r);
+        // The guard's RateLimit-* headers describe the allowance closest to running out.
+        setHeaders(res, r);
         if (r.ok) return true;
         if (enforcing && (c.tier === 'anonymous' || c.tier === 'session') && challenge.required(req, c, { reason: 'quota', tool: toolId })) {
             if (await challenge.verify(req, c)) return true;
@@ -427,47 +425,7 @@ function createGuard(o = {}) {
         return false;
     }
 
-    // ── Older limiters, and tool errors ──────────────────────
-    /**
-     * One of the apps' older express-rate-limit limiters, keyed by the resolved caller: a signed-in
-     * person or a principal by who they are (their higher number applies — these limiters used to run
-     * before sign-in was read), everyone else by address (IPv6 /64, hashed). Skipped in enforce mode.
-     * @param {Function} rateLimit   require('express-rate-limit')
-     */
-    function legacyLimiter(rateLimit, { windowMs, anonymous, signedIn = anonymous, message, headers = true }) {
-        const signed = (c) => c.tier === 'user' || c.tier === 'service';
-        return rateLimit({
-            windowMs,
-            max: (req) => (signed(caller(req)) ? signedIn : anonymous),
-            standardHeaders: headers,
-            legacyHeaders: false,
-            keyGenerator: (req) => { const c = caller(req); return signed(c) || c.tier === 'sandbox' ? c.key : c.ipKey; },
-            skip: (req) => enforcing || isProbe(req),   // liveness and readiness probes are never limited
-            message: { error: message },
-            // The platform API (/api/v1/…) answers like the guard does: problem+json tools.quota.exceeded
-            // with Retry-After; the older routes keep their { error } shape.
-            handler: (req, res, _next, options) => {
-                const reset = req.rateLimit && req.rateLimit.resetTime ? new Date(req.rateLimit.resetTime).getTime() : 0;
-                const retry = Math.max(1, Math.ceil(((reset || (now() + windowMs)) - now()) / 1000));
-                res.setHeader('Retry-After', String(retry));
-                if (/^\/api\/v1\//.test(String(req.originalUrl || req.url || ''))) {
-                    const c = caller(req);
-                    return sendProblem(req, res, 429, 'tools.quota.exceeded', message, { scope: 'legacy', tier: c.tier, retry_after: retry }, o.contracts);
-                }
-                return res.status(options.statusCode).json(options.message);
-            },
-        });
-    }
-    /** The three limiters an upload app had (LEGACY numbers in ./limits.js). */
-    function legacyLimiters(rateLimit, numbers) {
-        const n = numbers || limits.LEGACY[appName];
-        return {
-            apiLimiter: legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: n.api[0], signedIn: n.api[1], message: 'Too many requests. Please try again later.' }),
-            processLimiter: legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: n.process[0], signedIn: n.process[1], message: 'Processing rate limit reached. Sign in for higher limits or wait a moment.' }),
-            burstLimiter: legacyLimiter(rateLimit, { windowMs: 5_000, anonymous: n.burst, signedIn: n.burst, headers: false, message: 'Too many requests in quick succession. Please slow down.' }),
-        };
-    }
-
+    // ── Tool errors ──────────────────────────────────────────
     /**
      * A tool refused its input on a hard limit (err.guardReason: 'pixels', 'ffmpeg.format',
      * 'ffmpeg.duration', 'timeout'): record it and answer its problem. → true when answered.
@@ -503,7 +461,7 @@ function createGuard(o = {}) {
         checkFiles, admitUpload, admitJob, uploadsOf, discardUploads,
         heavy, sync, jobsBusy,
         target, portScan, targets, ports, normalizeTarget,
-        legacyLimiter, legacyLimiters, toolRefused,
+        toolRefused,
         originOk, originCheck, allowedOrigin, tokens,
         attachMetrics, prune,
         close() { if (pruneTimer) clearInterval(pruneTimer); if (keys.stop) keys.stop(); store.close(); },

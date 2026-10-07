@@ -33,12 +33,6 @@ module.exports = {
         cleanupInterval: 5 * 60 * 1000,  // every 5 min
     },
 
-    // Rate limits (per user/IP)
-    rateLimit: {
-        anonPerHour: 5,
-        authedPerHour: 20,
-    },
-
     // Paths
     dataDir: process.env.DATA_DIR || 'data',
     downloadsDir: process.env.DOWNLOADS_DIR || 'data/downloads',

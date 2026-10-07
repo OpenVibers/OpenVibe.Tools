@@ -143,7 +143,7 @@ const is503 = (e) => e.status === 503 && e.code === 'tools.unavailable' && /bein
 
     // ── As a real process without qpdf: the API answers 503 and the page is told ──
     const data = fs.mkdtempSync(path.join(os.tmpdir(), 'ov-docs-tools-'));
-    const app = await startApp('docs', { DATA_DIR: data, UPLOADS_DIR: path.join(data, 'uploads'), OUTPUT_DIR: path.join(data, 'output'), QPDF_PATH: '/nonexistent/qpdf' });
+    const app = await startApp('docs', { DATA_DIR: data, UPLOADS_DIR: path.join(data, 'uploads'), OUTPUT_DIR: path.join(data, 'output'), QPDF_PATH: '/nonexistent/qpdf', TOOLS_GUARD: 'report' });   // no session here: enforce would answer 401 before the tool's 503
     try {
         const fd = new FormData();
         fd.append('type', 'docs.process');

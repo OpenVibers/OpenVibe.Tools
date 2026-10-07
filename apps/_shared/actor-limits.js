@@ -2,8 +2,8 @@
 // ═══════════════════════════════════════════════════════════════
 // Per-actor rate limits (roadmap WS-R task 4; openvibe-sdk/limits), one limiter per app, only where
 // the guard (./guard) has no per-caller limit of its own. The guard is not changed: its tiered quotas
-// (quotaClass × tier × cost, day allowances), the older express-rate-limit limiters, the per-target
-// throttle and TOOLS_GUARD's report/enforce mode stay exactly as they are. These limits read the
+// (quotaClass × tier × cost, day allowances), the per-target throttle and TOOLS_GUARD's report/enforce
+// mode stay exactly as they are. These limits read the
 // guard's resolved caller (guard.caller) and add:
 //
 //   registry reads   GET/HEAD /api/v1/tools[/:id[/schema]] by a signed-in person or a third-party
@@ -15,7 +15,7 @@
 //   backstop         job submits and retries (POST /api/v1/jobs, /api/v1/jobs/:id/retry) and runs
 //                    (POST /api/v1/tools/:id/run): a ceiling ABOVE the guard's quotas, so it never
 //                    decides a normal caller's allowance (the guard does) and still stops a runaway
-//                    one while the guard only reports (TOOLS_GUARD=report, the default).
+//                    one while the guard only reports (TOOLS_GUARD=report, for local debugging).
 //   admin            the gateway's /api/internal/analytics (the Network admin's analytics page).
 //
 // Counted: a person as user:usr_…, a service or app by its principal (svc:…, app:…), a browser session
