@@ -79,8 +79,8 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-inline'", "unpkg.com", "cdn.jsdelivr.net", "cdnjs.cloudflare.com", "static.cloudflareinsights.com", "https://openvibe.network"],
       styleSrc: ["'self'", "'unsafe-inline'", "unpkg.com", "cdn.jsdelivr.net", "cdnjs.cloudflare.com", "fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "blob:", "*.tile.openstreetmap.org", "*.basemaps.cartocdn.com", "server.arcgisonline.com", "image.tmdb.org", "*.wp.com"],
-      // openvibe.events (and events.openvibe.network until this app pins openvibe-shared 2.13.0): release notifications.
-      connectSrc: ["'self'", "nominatim.openstreetmap.org", "api.weather.gov", "api.open-meteo.com", "*.tile.openstreetmap.org", "*.basemaps.cartocdn.com", "server.arcgisonline.com", "https://openvibe.network", "https://openvibe.events", "https://events.openvibe.network"],
+      // openvibe.events: release notifications (release-watch's EventSource, openvibe-shared 2.13.0).
+      connectSrc: ["'self'", "nominatim.openstreetmap.org", "api.weather.gov", "api.open-meteo.com", "*.tile.openstreetmap.org", "*.basemaps.cartocdn.com", "server.arcgisonline.com", "https://openvibe.network", "https://openvibe.events"],
       fontSrc: ["'self'", "fonts.gstatic.com", "cdnjs.cloudflare.com", "cdn.jsdelivr.net"],
       frameSrc: ["'none'"],
       scriptSrcAttr: ["'unsafe-inline'"],
