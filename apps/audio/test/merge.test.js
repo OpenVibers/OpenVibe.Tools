@@ -21,7 +21,7 @@ const seconds = (file) => parseFloat(execFileSync('ffprobe', ['-v', 'error', '-s
 (async () => {
     const data = fs.mkdtempSync(path.join(os.tmpdir(), 'ov-audio-merge-'));
     process.env.DATA_DIR = data;   // the tool's temp files go here, not into the app directory
-    const env = { DATA_DIR: data, UPLOADS_DIR: path.join(data, 'uploads'), OUTPUT_DIR: path.join(data, 'output') };
+    const env = { DATA_DIR: data, UPLOADS_DIR: path.join(data, 'uploads'), OUTPUT_DIR: path.join(data, 'output'), TOOLS_GUARD: 'report' };   // the merge job is submitted without a session; enforce would refuse it 401
     // Different formats, rates and channel counts: a 1 s mono MP3 at 44.1 kHz and a 0.5 s stereo WAV at 22.05 kHz.
     const mp3 = path.join(data, 'one.mp3'), wav = path.join(data, 'two.wav');
     execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1', '-ac', '1', '-ar', '44100', mp3]);

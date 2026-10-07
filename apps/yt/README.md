@@ -7,7 +7,7 @@ Free YouTube video and audio downloader at `yt.openvibe.tools`.
 - Video: Best, 1080p, 720p, 480p, 360p, WebM
 - Audio: MP3, M4A, OPUS, FLAC
 - Real-time SSE progress streaming
-- Tiered rate limiting (anon: 5/hr, authed: 20/hr)
+- Rate limiting and quotas through the shared guard (`tools-download`: a download costs 50; `tools-api` for every `/api/` call)
 
 ## Stack
 

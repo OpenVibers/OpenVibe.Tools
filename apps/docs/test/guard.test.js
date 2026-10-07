@@ -24,7 +24,7 @@ async function makePdf(pages) {
         const data = fs.mkdtempSync(path.join(os.tmpdir(), 'ov-docs-guard-'));
         const uploads = path.join(data, 'uploads');
         const app = await startApp('docs', { DATA_DIR: data, UPLOADS_DIR: uploads, OUTPUT_DIR: path.join(data, 'output'), TOOLS_GUARD: mode });
-        // Each call from its own address, so the older burst limiter (4 in 5 s per address) stays out of it.
+        // Each call from its own address, so the per-address quota never sees two calls in a row.
         let n = 0;
         const post = (id, files, input, cookie) => {
             const f = new FormData();

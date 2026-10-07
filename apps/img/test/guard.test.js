@@ -36,7 +36,7 @@ const { startApp } = require('../../_shared/test/spawn');
 
     // ── Through the app ──
     const data = fs.mkdtempSync(path.join(os.tmpdir(), 'ov-img-guard-'));
-    const app = await startApp('img', { DATA_DIR: data, UPLOADS_DIR: path.join(data, 'uploads'), OUTPUT_DIR: path.join(data, 'output'), TOOLS_MAX_INPUT_PIXELS: '10000' });
+    const app = await startApp('img', { DATA_DIR: data, UPLOADS_DIR: path.join(data, 'uploads'), OUTPUT_DIR: path.join(data, 'output'), TOOLS_MAX_INPUT_PIXELS: '10000', TOOLS_GUARD: 'report' });
     const run = (buf, name, type) => {
         const f = new FormData();
         f.append('input', JSON.stringify({ format: 'png' }));

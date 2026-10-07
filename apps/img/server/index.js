@@ -13,7 +13,6 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
 
-const rateLimit = require('express-rate-limit');
 const config = require('./config');
 const { resolveContext, DOMAIN_MAP } = require('./domain-map');
 const { getTool, listTools } = require('./tools');
@@ -40,7 +39,7 @@ const { requireInternalAccess } = require('../../_shared/internal-token');
 // ── Guard (apps/_shared/guard) ───────────────────────────────
 // Who is asking (Network sign-in with aud openvibe.tools, service tokens, the browser session, else
 // the address), tiered quotas by each tool's descriptor, upload sniffing, the sync semaphore and the
-// abuse log (data/guard.db). TOOLS_GUARD=report (default) records what it would refuse.
+// abuse log (data/guard.db). TOOLS_GUARD=enforce (default) refuses; report records what it would refuse.
 const SPECS = require('./descriptors').SPECS;
 // The one `tools` database and the shared Valkey (plan T8, decisions 3 and 4): guard_abuse in
 // PostgreSQL, guard_salt/guard_day and the quota buckets in Valkey. `ready` resolves when the schema is in.
@@ -51,7 +50,6 @@ const guard = createGuard({
     app: 'img', db: toolsDb.db, valkey: toolsValkey, contracts, specs: SPECS,
     issuer: config.networkUrl, networkUrl: config.networkUrl, networkInternalUrl: config.networkInternalUrl, publicKeyFiles: config.publicKeyPaths,
 });
-const { apiLimiter, processLimiter, burstLimiter } = guard.legacyLimiters(rateLimit);
 /** The tool a request is for before its body is read: the host's own, else the operation it defaults to. */
 const hostTool = (req) => (guard.tool(req.ctx.toolId) ? req.ctx.toolId : (guard.toolForJob('img.process', req.ctx.defaultOp || 'convert', null) || { id: null }).id);
 /** The tool a parsed request runs: its `tool` (operation) on this host. */
@@ -129,12 +127,12 @@ app.use(exceptRegistry(cors({
     credentials: true,
 }), { isFirstParty: (origin) => /^https:\/\/([a-z0-9-]+\.)?openvibe\.tools$/.test(origin) || (process.env.NODE_ENV === 'development' && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) }));
 
-// ── Who is asking, then rate limits (sign-in first, so a signed-in tier applies) ──
+// ── Who is asking, then the guard's quotas ───────────────────
 app.use(guard.identify);
-app.use('/api/', apiLimiter, guard.apiQuota);
+app.use('/api/', guard.apiQuota);
 
 // ── Tool registry (ADR-027): GET /api/v1/tools[/:id[/schema]] for this app's image tools ──
-// Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the limiter above. The
+// Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the quota above. The
 // gateway (openvibe.tools) answers the same routes for every tool and reads this list for status.
 const toolRegistry = createLocalRegistry({ specs: require('./descriptors').SPECS, statusOf: requiresStatus((p) => (p === 'heif-dec' ? codec.heif.available() : true)) });
 // A signed-in person's page view of a tool goes into their tools.usage module (the launchers' recent tools).
@@ -204,7 +202,7 @@ const jobs = jobsRuntime.setupJobs({
     getPublicKey: guard.keys.get, issuer: config.networkUrl, guard,
     define: (system) => defineJobs(system, pool),
     receive: uploadSingle,
-    limiters: [actorLimits.backstop('tools.job.create'), burstLimiter, processLimiter, guard.toolQuota(hostTool)],
+    limiters: [actorLimits.backstop('tools.job.create'), guard.toolQuota(hostTool)],
     jobTool: (req, type, input) => { const d = guard.toolForJob('img.process', String((input && input.tool) || req.ctx.defaultOp || 'convert'), req.ctx.toolId); return d ? d.id : null; },
     defaults(req, input) {
         const out = { ...input };
@@ -221,7 +219,7 @@ const jobs = jobsRuntime.setupJobs({
 const runApi = satelliteRunApi({
     app: 'img', guard, contracts, snapshot: toolRegistry.snapshot, system: () => jobs,
     multer: require('multer'), uploadsDir: path.resolve(config.uploadsDir), ...ajvFrom(require), ports: () => satellitePorts(),
-    limiters: [actorLimits.backstop('tools.tool.run'), burstLimiter, processLimiter],
+    limiters: [actorLimits.backstop('tools.tool.run')],
 });
 app.use(runApi.handle);
 

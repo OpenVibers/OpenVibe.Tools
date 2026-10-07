@@ -6,7 +6,6 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 const path = require('path');
 const http = require('http');
 const fs = require('fs');
@@ -23,7 +22,7 @@ const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
 // ── Guard (apps/_shared/guard) ───────────────────────────────
 // Who is asking (Network sign-in with aud openvibe.tools, else the address), the tools-api quota and
 // the abuse log (data/guard.db). The data lookups are counted by maps (tools-map), which gets the
-// visitor's address from here. TOOLS_GUARD=report (default) records what it would refuse.
+// visitor's address from here. TOOLS_GUARD=enforce (default) refuses; report records what it would refuse.
 const NETWORK_URL = process.env.OV_NETWORK_URL || 'https://openvibe.network';
 // The one `tools` database and the shared Valkey (plan T8, decisions 3 and 4).
 const toolsDb = require('../../_shared/db').openToolsDb({ createDb: require('openvibe-sdk/db').createDb, service: 'tools-food' });
@@ -94,11 +93,10 @@ app.use(helmet({
 // Sign-in first, so limits know who is asking; everyone else counts by address (IPv6 /64).
 app.use(cookieParser());
 app.use(guard.identify);
-app.use(guard.legacyLimiter(rateLimit, { windowMs: 60000, anonymous: 60, signedIn: 120, message: 'Too many requests. Please try again later.' }));
 app.use('/api/', guard.apiQuota);
 
 // ── Tool registry (ADR-027): GET /api/v1/tools[/:id[/schema]] for this app's food finder ──
-// Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the limiter above. The
+// Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the quota above. The
 // gateway (openvibe.tools) answers the same routes for every tool and reads this list for status.
 // The food finder is built on the maps backend; its descriptor lives with the maps app's.
 const toolRegistry = createLocalRegistry({ specs: require('../../maps/server/descriptors').SPECS.filter(s => s.id === 'food') });

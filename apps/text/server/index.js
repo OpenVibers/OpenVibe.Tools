@@ -4,7 +4,6 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
-const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
 
@@ -20,7 +19,8 @@ const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
 
 // ── Guard (apps/_shared/guard) ───────────────────────────────
 // Who is asking (Network sign-in with aud openvibe.tools, else the address), the tools-api quota on
-// /api/ and the abuse log (data/guard.db). TOOLS_GUARD=report (default) records what it would refuse.
+// /api/ and the abuse log (data/guard.db). TOOLS_GUARD=enforce (default) refuses; report records what
+// it would refuse.
 const NETWORK_URL = process.env.OV_NETWORK_URL || 'https://openvibe.network';
 // The one `tools` database and the shared Valkey (plan T8, decisions 3 and 4).
 const toolsDb = require('../../_shared/db').openToolsDb({ createDb: require('openvibe-sdk/db').createDb, service: 'tools-text' });
@@ -89,13 +89,12 @@ app.use(exceptRegistry(cors({
     credentials: true,
 })));
 
-// ── Who is asking, then rate limits ──────────────────────────
+// ── Who is asking, then the guard's quotas ───────────────────
 app.use(guard.identify);
-app.use(guard.legacyLimiter(rateLimit, { windowMs: 60_000, anonymous: 200, signedIn: 400, message: 'Too many requests. Please try again later.' }));
 app.use('/api/', guard.apiQuota);
 
 // ── Tool registry (ADR-027): GET /api/v1/tools[/:id[/schema]] for this app's text and logo tools ──
-// Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the limiter above. The
+// Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the quota above. The
 // gateway (openvibe.tools) answers the same routes for every tool and reads this list for status.
 const toolRegistry = createLocalRegistry({ specs: require('./descriptors').SPECS });
 // A signed-in person's page view of a tool goes into their tools.usage module (the launchers' recent tools).

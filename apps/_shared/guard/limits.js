@@ -64,15 +64,6 @@ const QUOTAS = {
 // dropping the cookie starts a new session, never a new allowance.
 const SESSION_IP_SHARE = 3;
 
-// The apps' older per-route limiters (express-rate-limit, requests per window per address, or per
-// person when signed in). They stay in force in report mode and step aside with TOOLS_GUARD=enforce,
-// where the tiered quotas above take over. [anonymous or session, signed in or service].
-const LEGACY = {
-    img: { api: [60, 120], process: [10, 30], burst: 4 },
-    audio: { api: [60, 120], process: [6, 20], burst: 3 },
-    docs: { api: [60, 120], process: [10, 30], burst: 4 },
-};
-
 function envInt(name, fallback, env = process.env) {
     const v = parseInt(env[name], 10);
     return Number.isFinite(v) && v >= 0 ? v : fallback;
@@ -128,4 +119,4 @@ function quotas(env = process.env, log = console) {
     }
 }
 
-module.exports = { TIERS, QUOTAS, SESSION_IP_SHARE, LEGACY, bounds, quotas, merge };
+module.exports = { TIERS, QUOTAS, SESSION_IP_SHARE, bounds, quotas, merge };

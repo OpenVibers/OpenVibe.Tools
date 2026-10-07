@@ -9,7 +9,6 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
 const NodeCache = require('node-cache');
@@ -30,7 +29,7 @@ const { createPacer, Busy } = require('../../_shared/guard/semaphore');
 // ── Guard (apps/_shared/guard) ───────────────────────────────
 // Who is asking (Network sign-in with aud openvibe.tools, else the address — the food app forwards its
 // visitor's), the tools-map quota on the data routes (descriptor maps: cost 2 a call) and the abuse log
-// (data/guard.db). TOOLS_GUARD=report (default) records what it would refuse.
+// (data/guard.db). TOOLS_GUARD=enforce (default) refuses; report records what it would refuse.
 const NETWORK_URL = process.env.OV_NETWORK_URL || 'https://openvibe.network';
 // The one `tools` database and the shared Valkey (plan T8, decisions 3 and 4).
 const toolsDb = require('../../_shared/db').openToolsDb({ createDb: require('openvibe-sdk/db').createDb, service: 'tools-maps' });
@@ -94,13 +93,12 @@ app.use(express.json());
 
 // Rate limits: sign-in first, so limits know who is asking; everyone else counts by address (IPv6 /64).
 app.use(guard.identify);
-const apiLimiter = guard.legacyLimiter(rateLimit, { windowMs: 60 * 1000, anonymous: 30, signedIn: 60, message: 'Too many requests — slow down, traveler.' });
-app.use('/api/', apiLimiter, guard.apiQuota);
+app.use('/api/', guard.apiQuota);
 // The map's data lookups (OpenStreetMap, weather, food banks…): the tools-map quota, by descriptor.
 app.use(['/api/geocode', '/api/search', '/api/weather', '/api/terrain', '/api/food-banks', '/api/stores', '/api/foods', '/api/meal-plan'], guard.toolQuota('maps'));
 
 // ── Tool registry (ADR-027): GET /api/v1/tools[/:id[/schema]] for this app's survival map ──
-// Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the limiter above. The
+// Public (Access-Control-Allow-Origin *), cacheable (ETag), counted by the quota above. The
 // gateway (openvibe.tools) answers the same routes for every tool and reads this list for status.
 const toolRegistry = createLocalRegistry({ specs: require('./descriptors').SPECS.filter(s => s.id === 'maps') });
 // A signed-in person's page view of a tool goes into their tools.usage module (the launchers' recent tools).

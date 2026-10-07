@@ -264,7 +264,7 @@ reload reattaches.
   address key), at most
   `TOOLS_JOBS_MAX_QUEUED` queued jobs in all (default 200) and `TOOLS_DISK_BUDGET_MB` under `data/jobs` (default
   8192) before a submit answers `503 tools.busy` with `Retry-After` (through the guard, below), plus the guard's
-  quotas and the satellites' older burst and processing limits on submit.
+  quotas on submit.
 - **Retention.** Finished jobs expire after 1 hour (browser sessions) or 24 hours (signed-in people, principals);
   the pruner deletes the row, its events, its files and its Media objects. It never touches a job that has a
   reference (above). If Media will not delete a result object (a retention hold, `409 media.object.held`), cannot
@@ -380,12 +380,10 @@ One module used by the gateway and every satellite, driven by each tool's descri
   Calls with a Bearer token, calls without those cookies and requests with neither header pass. Checked on the
   run API, the job routes' writes, `/api/info`, `/api/probe` and the webhook bins' create and
   delete; `403 tools.origin.refused`, recorded as reason `origin`.
-- **Mode.** `TOOLS_GUARD=report` (default) records and counts what it would refuse and refuses nothing, and the
-  apps' older express-rate-limit limiters stay in force (now keyed by the resolved caller, after sign-in is read).
-  `TOOLS_GUARD=enforce` refuses and the older limiters step aside. (On `/api/v1/…` an older limiter's refusal is
-  problem+json `tools.quota.exceeded`, `scope: "legacy"`, with `Retry-After`; job runs through the run API pass the
-  same burst and processing limiters as job submits.) Hard limits apply in both modes: the pixel limit,
-  ffmpeg's whitelists and duration cap, upload sniffing, the port-scan cap and the per-target throttle.
+- **Mode.** `TOOLS_GUARD=enforce` (default, production) refuses what is past a limit with `429`
+  problem+json `tools.quota.exceeded`. `TOOLS_GUARD=report` (local debugging) records and counts what it
+  would refuse and refuses nothing. Hard limits apply in both modes: the pixel limit, ffmpeg's whitelists
+  and duration cap, upload sniffing, the port-scan cap and the per-target throttle.
 
 Default quotas (units = descriptor `cost` per run; `perMinute` / `burst` / `perDay`, 0 = none):
 
@@ -407,7 +405,7 @@ Environment: `TOOLS_GUARD`, `TOOLS_GUARD_LIMITS` (JSON merged into the table, e.
 ## Per-actor limits (`apps/_shared/actor-limits.js`)
 
 Roadmap WS-R task 4, openvibe-sdk/limits, one limiter per app, only where the guard has no per-caller
-limit of its own. The guard, its quotas, the older limiters and `TOOLS_GUARD` are unchanged; these limits
+limit of its own. The guard, its quotas and `TOOLS_GUARD` are unchanged; these limits
 read the guard's resolved caller (`guard.caller`): a person as `user:usr_…`, a service or app by its
 principal, a browser session or nobody by the guard's hashed address key (`ip:<HMAC>`, never a raw
 address). Past a limit: `429` problem+json `rate_limited` with `Retry-After`, one `[Limits]` log line and
@@ -659,7 +657,7 @@ with `DATABASE_DIRECT_URL` set for the cutover; it prints a per-table count and 
 After the move the apps read `DATABASE_URL` / `DATABASE_DIRECT_URL` (PostgreSQL, via PgBouncer) and
 `VALKEY_URL` (Valkey); `guard_salt`, `guard_day` and the minute/burst buckets live in Valkey (a throttle,
 never authoritative), while `guard_abuse`, the job store and the analytics tables stay in PostgreSQL.
-`TOOLS_GUARD` (default `report`) and its meaning are unchanged.
+`TOOLS_GUARD` (default `enforce`) and its meaning are unchanged.
 
 State (plan T8 landed 2026-10-02; production serves the PostgreSQL-only release): every app opens the one `tools`
 database (`apps/_shared/db.js`, `DATABASE_URL` else an embedded PGlite database in development;

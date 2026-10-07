@@ -22,13 +22,13 @@ async function waitFor(app, id, cookie, pred, what, ms = 30000) {
         const job = await (await fetch(`${app.base}/api/v1/jobs/${id}`, { headers: { cookie } })).json();
         if (pred(job)) return job;
         if (Date.now() - t0 > ms) throw new Error(`timed out waiting for ${what}: ${JSON.stringify(job)}`);
-        await sleep(150);   // the older /api/ limiter allows an address 60 requests a minute
+        await sleep(150);   // the guard's tools-api quota allows an address 120 requests a minute
     }
 }
 
 (async () => {
     const data = fs.mkdtempSync(path.join(os.tmpdir(), 'ov-audio-'));
-    const env = { DATA_DIR: data, UPLOADS_DIR: path.join(data, 'uploads'), OUTPUT_DIR: path.join(data, 'output') };
+    const env = { DATA_DIR: data, UPLOADS_DIR: path.join(data, 'uploads'), OUTPUT_DIR: path.join(data, 'output'), TOOLS_GUARD: 'report' };   // a session-less submit is the point here; enforce would refuse it 401
     // Three minutes of tone: small to upload, a couple of seconds to re-encode.
     const input = path.join(data, 'tone.mp3');
     execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=180', '-ac', '1', '-b:a', '16k', input]);
