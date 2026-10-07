@@ -103,8 +103,8 @@ app.use(helmet({
             styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com", "https://cdnjs.cloudflare.com"],
             imgSrc: ["'self'", "data:", "blob:", jobsRuntime.mediaOrigin()],   // job result previews are 302s to Media
-            // events.openvibe.network: release notifications (release-watch's EventSource, openvibe-shared 1.17).
-            connectSrc: ["'self'", "https://openvibe.network", "https://*.openvibe.tools", "https://events.openvibe.network"],
+            // openvibe.events (and events.openvibe.network until this app pins openvibe-shared 2.13.0): release notifications.
+            connectSrc: ["'self'", "https://openvibe.network", "https://*.openvibe.tools", "https://openvibe.events", "https://events.openvibe.network"],
             workerSrc: ["'self'", "blob:"],
             scriptSrcAttr: ["'unsafe-inline'"],
         },
