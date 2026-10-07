@@ -18,7 +18,14 @@
   "domain": "openvibe.tools and *.openvibe.tools",
   "contracts": "openvibe-contracts v0.92.0 (each app's package.json; the root package.json pins none)",
   "shared": "openvibe-shared v2.13.0 (each app's package.json; the root package.json pins none)",
-  "capabilities": ["tools.job.create", "tools.job.read", "tools.job.cancel", "tools.tool.read", "tools.tool.run", "tools.net.probe"],
+  "capabilities": [
+    "tools.job.create",
+    "tools.job.read",
+    "tools.job.cancel",
+    "tools.tool.read",
+    "tools.tool.run",
+    "tools.net.probe"
+  ],
   "capabilitiesRegistered": true,
   "deployed": true,
   "deployment": "Public at https://openvibe.tools: deployed with `sudo ovhost deploy tools` (OpenVibe.Host strategy multi-app since the 2026-09-27 cutover; deploy/scripts/deploy.sh is the wrapper), /opt/openvibe.tools, units openvibe-tools (gateway, 127.0.0.1:4001) and openvibe-tools-<app> per satellite, env /etc/openvibe/tools.env.",
