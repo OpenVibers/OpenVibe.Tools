@@ -17,6 +17,7 @@
   },
   "domain": "openvibe.tools and *.openvibe.tools",
   "contracts": "openvibe-contracts v0.92.0 (each app's package.json; the root package.json pins none)",
+  "shared": "openvibe-shared v2.13.0 (each app's package.json; the root package.json pins none)",
   "capabilities": ["tools.job.create", "tools.job.read", "tools.job.cancel", "tools.tool.read", "tools.tool.run", "tools.net.probe"],
   "capabilitiesRegistered": true,
   "deployed": true,
