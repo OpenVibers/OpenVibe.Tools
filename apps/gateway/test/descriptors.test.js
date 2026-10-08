@@ -192,7 +192,7 @@ for (const m of ['jsonfmt', 'md', 'codediff', 'slugify', 'entities']) { assert.o
 // ── Counts ──
 const tally = (f) => snap.tools.reduce((o, d) => { const k = f(d); o[k] = (o[k] || 0) + 1; return o; }, {});
 const fam = tally(d => d.family);
-assert.deepStrictEqual(fam, { dev: 33, net: 38, img: 15, audio: 36, docs: 10, text: 33, media: 1, places: 2, pastes: 1 });
+assert.deepStrictEqual(fam, { dev: 34, net: 38, img: 15, audio: 36, docs: 10, text: 33, media: 1, places: 2, pastes: 1 });
 
 fs.rmSync(process.env.DATA_DIR, { recursive: true, force: true });
 console.log(`descriptors: ${snap.tools.length} tools valid (${Object.entries(tally(d => `${d.execution}${d.api ? '+api' : ''}`)).map(([k, n]) => `${k} ${n}`).join(', ')}); ${jobs} job tools pass their app's validation; ${syncApi} sync tools run through served routes`);

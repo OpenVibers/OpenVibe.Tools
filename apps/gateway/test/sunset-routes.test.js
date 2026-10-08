@@ -14,7 +14,7 @@ const NET = [
     '/robots/:target?', '/sitemap/:target?', '/uptime/:target?',
     '/smtp/:target?', '/blacklist/:target?', '/dnsprop/:target?',
 ];
-const DEV = ['/tools', '/opengraph'];
+const DEV = ['/tools', '/opengraph', '/read'];
 const PROCESS = ['/api/process', '/api/process/direct', '/api/process/multi', '/api/process/anything', '/api/process/anything/nested'];
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ov-sunset-routes-'));
 

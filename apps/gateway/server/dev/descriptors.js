@@ -87,6 +87,33 @@ const SPECS = [
         route: { method: 'GET', path: '/api/dev/opengraph', query: { url: '{url}' } },
         example: { input: { url: 'https://openvibe.tools' } },
     },
+    {
+        id: 'read', execution: 'sync', api: true,
+        input: obj({
+            url: { type: 'string', minLength: 1, maxLength: 2048, description: 'A page URL (https:// is assumed when missing)' },
+            format: { enum: ['markdown', 'text'], default: 'markdown', description: 'markdown keeps headings, list items and [links](href); text is plain' },
+            max_chars: { type: 'integer', minimum: 1000, maximum: 50000, default: 20000, description: 'Longest text to return; longer pages are cut and truncated is true' },
+        }, ['url']),
+        files: null,
+        output: {
+            kind: 'json', schema: {
+                type: 'object', required: ['url', 'status', 'title', 'text', 'truncated', 'chars', 'links'],
+                properties: {
+                    url: { type: 'string', description: 'The final URL after redirects' },
+                    status: { type: 'integer' }, content_type: { type: 'string' },
+                    title: { type: 'string' }, description: { type: 'string' }, lang: { type: 'string' },
+                    text: { type: 'string', description: 'The main text of the page' },
+                    truncated: { type: 'boolean', description: 'The page or the text was cut at a limit' },
+                    chars: { type: 'integer', description: 'Length of text' },
+                    links: { type: 'array', maxItems: 50, items: { type: 'object', required: ['text', 'href'], properties: { text: { type: 'string' }, href: { type: 'string' } } } },
+                },
+            },
+        },
+        limits: { timeoutMs: 14000, maxInputBytes: 4 * KiB, perTargetPerMinute: 10 },
+        auth: ANYONE, quotaClass: 'tools-fetch', cost: 2, egress: true,
+        route: { method: 'GET', path: '/api/dev/read', query: { url: '{url}' } },
+        example: { input: { url: 'https://openvibe.tools' } },
+    },
     page('jsminify'), page('jsformat'),
     engine('cssminify', obj({ text: text() }), TEXT, { text: '.a { color: #aabbcc; margin: 0px; }' }),
     engine('cssformat', obj({ text: text() }), TEXT, { text: '.a{color:red}' }),
@@ -103,11 +130,11 @@ const SPECS = [
 ];
 
 // The run API reuses an engine's answer for 10 minutes (same tool, same input): not for these, whose
-// output is random or depends on the time. Open Graph (a page's tags) may be reused for 10 minutes.
+// output is random or depends on the time. Open Graph (a page's tags) and the page reader may be reused for 10 minutes.
 const FRESH = new Set(['jwt', 'uuid', 'timestamp', 'cron', 'lorem']);
 for (const spec of SPECS) {
     if (FRESH.has(spec.id)) spec.cacheTtlMs = 0;
-    if (spec.id === 'opengraph') spec.cacheTtlMs = 10 * 60 * 1000;
+    if (spec.id === 'opengraph' || spec.id === 'read') spec.cacheTtlMs = 10 * 60 * 1000;
 }
 
 module.exports = { SPECS };
