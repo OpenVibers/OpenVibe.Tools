@@ -15,7 +15,7 @@
     "pg": "^8.23.0",
     "@electric-sql/pglite": "^0.5.8",
     "openvibe-sdk": "https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.35.0",
-    "openvibe-shared": "https://codeload.github.com/OpenVibers/OpenVibe.Shared/tar.gz/refs/tags/v2.13.2",
+    "openvibe-shared": "https://codeload.github.com/OpenVibers/OpenVibe.Shared/tar.gz/refs/tags/v2.14.1",
     "cheerio": "^1.0.0-rc.12",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",

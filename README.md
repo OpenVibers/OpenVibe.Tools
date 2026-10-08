@@ -31,7 +31,7 @@ offline against the Network's public key (JWKS).
   OpenVibe.Search (tool documents), OpenVibe.Community (the paste hand-over), OpenVibe.Billing (job usage
   readings)
 - host programs some tools need (ffmpeg, yt-dlp, qpdf, poppler, libheif; [Host packages](#host-packages-some-tools-need))
-- in each app: `openvibe-contracts` v0.92.0 (img, audio, docs, gateway), `openvibe-sdk` v0.12.0 and `openvibe-shared` v2.13.2, pinned
+- in each app: `openvibe-contracts` v0.92.0 (img, audio, docs, gateway), `openvibe-sdk` v0.12.0 and `openvibe-shared` v2.14.1, pinned
   by release tarball, and `apps/_shared` (openvibe-tools-shared) by relative path
 
 ## Capabilities
