@@ -66,7 +66,7 @@ const get = async (url, headers = {}, method = 'GET') => {
         const list = r.body;
         const lc = contracts.tools.checkList(list);
         assert.ok(lc.valid, JSON.stringify(lc.errors.slice(0, 5)));
-        assert.strictEqual(list.count, 169);
+        assert.strictEqual(list.count, 170);
         assert.ok(list.tools.every(d => !d.input || d.input.$ref), 'inputs are $refs in the list');
         assert.ok(!Number.isNaN(Date.parse(list.updated_at)));
         assert.deepStrictEqual(list.families.map(f => f.id).sort(), ['audio', 'dev', 'docs', 'img', 'media', 'net', 'pastes', 'places', 'text']);
@@ -150,7 +150,7 @@ const get = async (url, headers = {}, method = 'GET') => {
 
         // ── /api/catalog.json is unchanged (Network reads it) ──
         const catalog = (await get(`${G}/api/catalog.json`)).body;
-        assert.strictEqual(catalog.tools.length, 169);
+        assert.strictEqual(catalog.tools.length, 170);
         assert.ok(catalog.tools.every(t => ['available', 'unavailable'].includes(t.status) && t.hosts && t.hosts.canonical));
         assert.ok(!('api' in catalog.tools[0]) && !('execution' in catalog.tools[0]), 'no descriptor fields leak into the catalogue');
 

@@ -56,6 +56,8 @@ const DEV_TOOLS = [
     { id: 'color',     subdomain: 'color',     name: 'OpenVibeColor',     icon: 'fa-palette',              desc: 'Color picker, HEX/RGB/HSL converter & palette generator', category: 'frontend' },
     { id: 'opengraph', subdomain: 'opengraph', name: 'OpenVibeOpenGraph', icon: 'fa-share-nodes',          desc: 'Open Graph & Twitter Card preview & validator', category: 'frontend' },
 
+    { id: 'read',      subdomain: 'read',      name: 'OpenVibeReader',    icon: 'fa-book-open',            desc: 'Read any web page as clean text or Markdown: title, description, main text and links', category: 'frontend' },
+
     // Single-purpose tools: one job per address (search engines and people both look for the exact job).
     { id: 'jsminify', subdomain: 'jsminify', name: "JavaScript Minifier", icon: 'fa-compress', desc: "Shrink JavaScript with a real parser, not regex", category: 'quality' },
     { id: 'jsformat', subdomain: 'jsformat', name: "JavaScript Beautifier", icon: 'fa-wand-magic-sparkles', desc: "Turn minified or messy JavaScript into readable code", category: 'quality' },
@@ -86,6 +88,8 @@ const DEV_ALIASES = {
     colours:      'color',
     colors:       'color',
     og:           'opengraph',
+    reader:       'read',
+    readability:  'read',
     guid:         'uuid',
     unix:         'timestamp',
     unixtime:     'timestamp',

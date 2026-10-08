@@ -238,6 +238,14 @@ const DEV = {
         bullets: ['Live preview of the social card for any public URL', 'Lists Open Graph, Twitter Card and standard meta tags', 'Flags missing titles, descriptions and images'],
         faq: [['Why does my link preview show no image?', 'Usually a missing og:image tag, or an image URL that is relative rather than absolute. Social platforms need a full https URL.'], ['Why has my preview not updated after I fixed the tags?', 'Platforms cache previews aggressively. Most offer a debugger that forces a re-scrape; this tool always fetches live so you can confirm the tags themselves are correct.']],
     },
+    read: {
+        name: 'Web Page Reader', title: 'Website to Text & URL to Markdown Converter — Web Page Reader',
+        desc: 'Read any web page as clean text or Markdown: title, description, main text and links. A reader mode for any URL, and an API for scripts and AI agents.',
+        kw: 'website to text, url to markdown, reader mode, extract text from webpage, web page to markdown, webpage reader, scrape article text',
+        about: 'Enter a URL and the reader fetches the page and returns what a person would read: its title and description, the main text as light Markdown (headings, lists and links kept) and the page\'s outgoing links. Navigation, headers, footers, scripts and styles are left out. The same result is available as JSON from the tools API, which is how scripts and AI agents read pages.',
+        bullets: ['Title, description, main text and up to 50 outgoing links', 'Markdown with headings, lists and links, or plain text', 'Only public web addresses: private and internal targets are refused'],
+        faq: [['Does it run JavaScript?', 'No. It reads the HTML the server sends, which covers articles, documentation and most blogs. A page that builds its content in the browser will come back mostly empty.'], ['Is there a size limit?', 'The page is read up to about 2 MB and the text is cut at max_chars (20,000 by default, up to 50,000); the result says when it was truncated.'], ['Can I call it from code?', 'Yes: POST /api/v1/tools/read/run with {"input":{"url":"https://example.com"}}. No account is needed within the free limits.']],
+    },
     jsminify: {
         name: "JavaScript Minifier", title: "JavaScript Minifier \u2014 Minify JS Online",
         desc: "Shrink JavaScript with a real parser, not regex. Paste JavaScript and get a smaller file that behaves the same.",

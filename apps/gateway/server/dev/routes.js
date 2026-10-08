@@ -17,6 +17,7 @@ const { DEV_TOOLS } = require('./config');
 const { createEgress, TargetRefused } = require('../../../_shared/egress');
 const { createCallerResolver } = require('../../../_shared/guard/caller');
 const guardLimits = require('../../../_shared/guard/limits');
+const { readHtml, decodeBody } = require('./reader');
 
 // ── In-memory webhook bin storage ────────────────────────────
 const webhookBins = new Map();                // binId → { created, requests, owner, ipKey }
@@ -33,6 +34,8 @@ setInterval(cleanupBins, 5 * 60 * 1000).unref();
 
 // ── Helpers ──────────────────────────────────────────────────
 const OG_MAX_BYTES = 2 * 1024 * 1024;   // Open Graph tags live in <head>; never buffer more than this
+const READ_MAX_BYTES = 2 * 1024 * 1024; // the reader never buffers more than this of a page
+const READ_USER_AGENT = 'OpenVibeReader/1.0 (+https://read.openvibe.tools)';
 
 function extractOGTags(html) {
     const tags = {};
@@ -164,7 +167,7 @@ module.exports = function createDevRoutes(db, requireAuth, opts = {}) {
     const guard = opts.guard || null;
 
     // Every dev API call (and the Open Graph fetcher's own tools-fetch quota, below).
-    if (guard) router.use(guard.toolQuota((req) => (req.method === 'GET' && req.path === '/opengraph' ? 'opengraph' : null)));
+    if (guard) router.use(guard.toolQuota((req) => (req.method === 'GET' && (req.path === '/opengraph' || req.path === '/read') ? req.path.slice(1) : null)));
 
     // ── List all dev tools ───────────────────────────────────
     router.get('/tools', (_req, res) => {
@@ -239,6 +242,78 @@ module.exports = function createDevRoutes(db, requireAuth, opts = {}) {
             if (!tags['og:site_name']) result.recommendations.push({ level: 'info', msg: 'Missing og:site_name — helps brand recognition' });
 
             res.json(result);
+        } catch (err) {
+            if (err instanceof TargetRefused) return res.status(403).json({ error: err.message, code: err.code });
+            if (err && err.status === 400) return res.status(400).json({ error: err.message });
+            res.status(502).json({ error: `Failed to fetch: ${err.message}` });
+        }
+    });
+
+    // ── Web page reader ──────────────────────────────────────
+    // A page's readable text (title, description, main text as light Markdown, outgoing links),
+    // fetched through the same SSRF guard as Open Graph.
+    router.get('/read', async (req, res) => {
+        let targetUrl = String(req.query.url || req.query.target || '').trim();
+        if (!targetUrl) return res.status(400).json({ error: 'Missing ?url= parameter' });
+        const format = req.query.format === undefined || req.query.format === '' ? 'markdown' : String(req.query.format);
+        if (format !== 'markdown' && format !== 'text') return res.status(400).json({ error: 'format must be "markdown" or "text"' });
+        let maxChars = 20000;
+        if (req.query.max_chars !== undefined && req.query.max_chars !== '') {
+            maxChars = Number(req.query.max_chars);
+            if (!Number.isInteger(maxChars) || maxChars < 1000 || maxChars > 50000) return res.status(400).json({ error: 'max_chars must be an integer from 1000 to 50000' });
+        }
+        if (targetUrl.length > 2048) return res.status(400).json({ error: 'URL is too long' });
+        if (/^[a-z][a-z0-9+.-]*:\/\//i.test(targetUrl) && !/^https?:\/\//i.test(targetUrl)) return res.status(400).json({ error: 'Only http and https URLs are supported' });
+        if (!/^https?:\/\//i.test(targetUrl)) targetUrl = 'https://' + targetUrl;
+        try {
+            new URL(targetUrl);
+        } catch {
+            return res.status(400).json({ error: 'Invalid URL' });
+        }
+        // Per-target throttle (descriptor read: limits.perTargetPerMinute), across every caller.
+        if (guard && !guard.target(req, res, { tool: 'read', target: targetUrl })) return;
+
+        try {
+            const response = await egress.follow(targetUrl, {
+                method: 'GET',
+                headers: {
+                    'User-Agent': READ_USER_AGENT,
+                    'Accept': 'text/html,application/xhtml+xml,text/plain;q=0.9',
+                },
+                timeoutMs: 10000,
+                maxBytes: READ_MAX_BYTES,
+                maxRedirects: 5,
+            });
+            const finalUrl = response.url || targetUrl;
+            const contentType = String(response.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+            const raw = response.body;
+            const sniffedHtml = !contentType && /^\s*(<!doctype html|<html|<head|<body)/i.test(raw.subarray(0, 512).toString('latin1'));
+            const isHtml = /^(text\/html|application\/xhtml\+xml)$/.test(contentType) || sniffedHtml;
+            const isText = contentType === 'text/plain';
+            if (!isHtml && !isText) {
+                return res.status(415).json({ error: `Not a readable page (${contentType || 'unknown content type'}); the reader handles HTML and plain text`, code: 'tools.read.unsupported_content_type', content_type: contentType || null });
+            }
+            const decoded = decodeBody(raw, response.headers['content-type']);
+            let out;
+            if (isHtml) {
+                out = readHtml(decoded, { baseUrl: finalUrl, format, maxChars });
+            } else {
+                const plain = decoded.replace(/\r\n?/g, '\n').trim();
+                out = { title: '', description: '', lang: '', text: plain.slice(0, maxChars), truncated: plain.length > maxChars, links: [] };
+            }
+            res.json({
+                ok: true,
+                url: finalUrl,
+                status: response.status,
+                content_type: contentType || (isHtml ? 'text/html' : 'text/plain'),
+                title: out.title,
+                description: out.description,
+                lang: out.lang,
+                text: out.text,
+                truncated: out.truncated || Boolean(response.truncated),
+                chars: out.text.length,
+                links: out.links,
+            });
         } catch (err) {
             if (err instanceof TargetRefused) return res.status(403).json({ error: err.message, code: err.code });
             if (err && err.status === 400) return res.status(400).json({ error: err.message });

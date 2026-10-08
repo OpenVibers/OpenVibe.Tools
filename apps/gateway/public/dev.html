@@ -193,7 +193,8 @@ lorem:{n:'Lorem Ipsum Generator',i:'fa-paragraph',c:'qual',d:'Lorem ipsum genera
 curlconvert:{n:'Online curl',i:'fa-terminal',c:'http',d:'Parse curl \u2192 fetch, Python, Node.js',p:"curl -X POST https://api.example.com/users -H 'Content-Type: application/json' -H 'Authorization: Bearer tok123' -d '{\"name\":\"openvibe\"}'",m:['To fetch','To Python','To Node','Parsed']},
 webhook:{n:'Webhook Tester',i:'fa-satellite-dish',c:'http',d:'Webhook request inspector bin',p:'',m:['Create Bin']},
 color:{n:'Color Converter',i:'fa-palette',c:'fe',d:'Color picker & HEX/RGB/HSL converter',p:'#a78bfa',m:['Convert']},
-opengraph:{n:'Open Graph Preview',i:'fa-share-nodes',c:'fe',d:'Open Graph & Twitter Card preview',p:'https://openvibe.live',m:['Preview']}
+opengraph:{n:'Open Graph Preview',i:'fa-share-nodes',c:'fe',d:'Open Graph & Twitter Card preview',p:'https://openvibe.live',m:['Preview']},
+read:{n:'Web Page Reader',i:'fa-book-open',c:'fe',d:'Read any web page as clean text or Markdown',p:'https://openvibe.live',m:['Markdown','Text']}
 };
 
 const CATS={data:{l:'Data & Formats',i:'fa-database'},enc:{l:'Encoding & Crypto',i:'fa-lock'},time:{l:'Time & Scheduling',i:'fa-clock'},qual:{l:'Code Quality',i:'fa-wand-magic-sparkles'},http:{l:'HTTP & API',i:'fa-terminal'},fe:{l:'Frontend & SEO',i:'fa-palette'}};
@@ -407,6 +408,13 @@ P.opengraph=async(s)=>{
     return{html:'<div class="og-card">'+(og['og:image']?'<img src="'+H(og['og:image'])+'" onerror="this.style.display=\'none\'">':'')+'<div class="og-body"><div class="og-dm">'+H(og['og:site_name']||u)+'</div><div class="og-tt">'+H(og['og:title']||og.title||'No title')+'</div><div class="og-ds">'+H(og['og:description']||og.description||'No description')+'</div></div></div>'
     +'<div style="margin-top:14px"><div class="jl">All Meta Tags</div>'+Object.entries(og).map(([k,v])=>'<div><span style="color:var(--ac)">'+H(k)+'</span>: '+H(String(v))+'</div>').join('')+'</div>'
     +(d.seo?'<div style="margin-top:14px"><div class="jl">SEO Recommendations</div>'+d.seo.map(x=>'<div style="color:'+(x.type==='error'?'#f87171':x.type==='warning'?'#fbbf24':'#34d399')+'">'+(x.type==='error'?'\u2717':x.type==='warning'?'\u26a0':'\u2713')+' '+H(x.message)+'</div>').join('')+'</div>':'')};
+};
+
+P.read=async(s,m)=>{
+    const r=await fetch('/api/v1/tools/read/run',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify({input:{url:s.trim(),format:m==='Text'?'text':'markdown'}})});
+    const b=await r.json();if(b.state!=='succeeded'||!b.result)throw new Error((b.error&&(b.error.detail||b.error.title))||b.detail||'Failed to read the page');
+    const d=b.result.data;
+    return (d.title?d.title+'\n':'')+(d.description?d.description+'\n':'')+(d.title||d.description?'\n':'')+d.text+(d.truncated?'\n\n[truncated]':'')+(d.links.length?'\n\nLinks\n'+d.links.map(l=>'- '+l.text+' \u2192 '+l.href).join('\n'):'');
 };
 
 // ═══════════════ UTILITY ═══════════════
