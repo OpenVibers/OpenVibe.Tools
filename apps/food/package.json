@@ -20,6 +20,6 @@
     "express-rate-limit": "^7.1.5",
     "helmet": "^7.1.0",
     "openvibe-sdk": "https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.35.0",
-    "openvibe-shared": "https://codeload.github.com/OpenVibers/OpenVibe.Shared/tar.gz/refs/tags/v2.13.2"
+    "openvibe-shared": "https://codeload.github.com/OpenVibers/OpenVibe.Shared/tar.gz/refs/tags/v2.15.0"
   }
 }
