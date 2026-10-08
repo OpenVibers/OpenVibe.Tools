@@ -300,7 +300,7 @@ reload reattaches.
   once as `tools.usage.recorded` (`common.usage-recorded@1`, openvibe-contracts 0.63.0; subject the project,
   visibility `internal`, priority `low`) in the transaction that marks it sent. Sandbox jobs count under
   `env: sandbox`. No owner, session, address, input, file name or output leaves. OpenVibe.Network adds the rollups
-  up for the project's usage page on openvibe.codes. Off without `EVENTS_URL`, like the job events;
+  up for the project's usage page on openvibe.services. Off without `EVENTS_URL`, like the job events;
   `GET /api/health` shows `jobs.usage` (pending, invalid).
 - **Usage readings to OpenVibe.Billing** (`apps/_shared/billing.js`, `apps/_shared/jobs/usage.js`, plan T5 step 7):
   every job that succeeds or fails (anyone's, not only a project's; a cancelled one is not billed) gets one
