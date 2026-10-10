@@ -16,10 +16,16 @@ const tmpDir = path.resolve(config.dataDir, 'tmp');
 if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
 
 /**
- * Generate a temp file path with the given extension.
+ * Generate a temp file path with the given extension. The extension often comes from a request (an output `format`),
+ * so only a short alphanumeric one is accepted: anything with a path separator, a dot or `..` would write outside
+ * tmpDir. The resolved path is checked to stay inside tmpDir as well.
  */
 function tmpFile(ext) {
-    return path.join(tmpDir, `${crypto.randomBytes(16).toString('hex')}.${ext}`);
+    const e = String(ext == null ? '' : ext).toLowerCase();
+    if (!/^[a-z0-9]{1,8}$/.test(e)) throw Object.assign(new Error('unsupported output format'), { status: 400, code: 'tools.bad_format' });
+    const file = path.join(tmpDir, `${crypto.randomBytes(16).toString('hex')}.${e}`);
+    if (path.dirname(file) !== tmpDir) throw Object.assign(new Error('unsupported output format'), { status: 400, code: 'tools.bad_format' });
+    return file;
 }
 
 /**
