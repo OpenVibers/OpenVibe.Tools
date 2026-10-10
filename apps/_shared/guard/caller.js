@@ -141,6 +141,10 @@ function createCallerResolver(o) {
  */
 function jobOwnerResolver(callers) {
     return function resolveOwner(req, res, { create = false, action = 'read' } = {}) {
+        // Freeze the caller before a session cookie may be minted. The guard caches its caller on
+        // req._ovCaller, and its sessionRule (auth.anonymous false) must see whether a session existed
+        // when the request arrived — a session this submit is about to create does not count.
+        if (create && req && !req._ovCaller) req._ovCaller = callers.resolve(req, res);
         const c = callers.resolve(req, res, { create, action, jobs: true });
         if (c.error) return { error: c.error };
         if (!c.owner) return null;

@@ -5,7 +5,10 @@ const assert = require('assert');
 const path = require('path');
 const hr = require('../host-role');
 
-const req = (host, headers = {}, p = '/') => ({ headers: { host, ...headers }, path: p, originalUrl: p, method: 'GET' });
+// A request as the gateway/nginx makes it: from loopback, where X-OV-* are believed.
+const req = (host, headers = {}, p = '/') => ({ headers: { host, ...headers }, path: p, originalUrl: p, method: 'GET', socket: { remoteAddress: '127.0.0.1' } });
+// A request straight from a caller that reached the app without the gateway: its X-OV-* must be ignored.
+const direct = (host, headers = {}, p = '/') => ({ headers: { host, ...headers }, path: p, originalUrl: p, method: 'GET', socket: { remoteAddress: '203.0.113.9' } });
 function res() {
     const r = { headers: {}, statusCode: 200, body: null, redirected: null };
     r.setHeader = (k, v) => { r.headers[k.toLowerCase()] = v; };
@@ -40,6 +43,12 @@ g = run(req('elsewhere.example'));
 assert.strictEqual(g.out.redirected, hr.TOOLS_HOME, 'not ours → tools index');
 assert.ok(run(req('elsewhere.example', {}, '/api/health')).passed, 'APIs are never redirected');
 assert.ok(run(req('localhost:4012')).passed && run(req('png.openvibe.tools')).passed);
+
+// ── X-OV-* are believed only from the gateway over loopback ──
+assert.strictEqual(hr.canonicalHostFor(direct('png.openvibe.tools', via('png', 'evil.example.com')), 'png.openvibe.tools'), 'png.openvibe.tools', 'a non-loopback caller cannot name the canonical host');
+assert.strictEqual(hr.hostRole(direct('maps.openvibe.tools', via('maps', 'evil.example.com', 'alias', 'evil.example.com'))).tool, '', 'X-OV-Tool from a non-loopback caller is ignored');
+const evil = run(direct('pngs.openvibe.tools', via('png', 'png-converter.example.com', 'alias', 'evil.example.com'), '/x'));
+assert.strictEqual(evil.out.redirected, hr.TOOLS_HOME, "a spoofed alias header cannot redirect a direct request to the attacker's host");
 
 // ── stampedPage: maps and food ───────────────────────────────
 for (const [app, host] of [['maps', 'maps.openvibe.tools'], ['food', 'food.openvibe.tools']]) {

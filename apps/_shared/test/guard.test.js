@@ -199,6 +199,28 @@ async function serve(app) {
         } finally { await s.close(); g.close(); }
     }
 
+    // ── The session rule sees the caller as it arrived, not the cookie this submit mints ──
+    {
+        const g = makeGuard({ mode: 'enforce' });
+        const app = express();
+        app.set('trust proxy', TRUST_PROXY);
+        app.use(cookieParser());
+        const owner = g.ownerResolver();
+        app.post('/submit', async (req, res) => {
+            const w = owner(req, res, { create: true, action: 'create' });
+            if (!w) return res.status(401).json({ error: 'no owner' });
+            const ok = await g.admitJob(req, res, { type: 'audio.process', input: { tool: 'convert' }, files: [], toolId: 'mp3' });
+            if (!ok) return;   // admitJob wrote the problem (401 tools.session_required)
+            res.json({ ok: true, owner: w.owner });
+        });
+        const s = await serve(app);
+        try {
+            const r = await fetch(s.base + '/submit', { method: 'POST' });
+            assert.strictEqual(r.status, 401, 'a session-less submit is refused even though minting one is what the route does first');
+            assert.strictEqual((await r.json()).code, 'tools.session_required');
+        } finally { await s.close(); g.close(); }
+    }
+
     // ── Bucket math and cost weighting from the descriptors ──
     {
         let clock = now0;

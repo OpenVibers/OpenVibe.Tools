@@ -20,9 +20,15 @@ const guardLimits = require('../../../_shared/guard/limits');
 const { readHtml, decodeBody } = require('./reader');
 
 // ── In-memory webhook bin storage ────────────────────────────
-const webhookBins = new Map();                // binId → { created, requests, owner, ipKey }
+const webhookBins = new Map();                // binId → { created, requests, bytes, owner, ipKey }
 const WEBHOOK_BIN_TTL = 60 * 60 * 1000;       // 1 hour
 const WEBHOOK_MAX_REQUESTS = 200;
+// A bin holds a bounded amount of memory: a received body is kept up to WEBHOOK_MAX_BODY_BYTES (the
+// rest is cut, and the entry says so), and a bin keeps at most WEBHOOK_MAX_BIN_BYTES in all (oldest
+// entries go first). Without the caps, one address's ten bins × 200 entries × the 1 MB JSON body
+// limit could pin gigabytes of the gateway's heap.
+const WEBHOOK_MAX_BODY_BYTES = 64 * 1024;
+const WEBHOOK_MAX_BIN_BYTES = 1024 * 1024;
 
 function cleanupBins() {
     const now = Date.now();
@@ -91,7 +97,7 @@ function createWebhookRouter(opts = {}) {
         if (fromHere >= caps.perIp && refuse(req, res, { status: 429, code: 'tools.quota.exceeded', reason: 'webhook', tool: 'webhook', retryAfter: 300, detail: `At most ${caps.perIp} webhook bins from one address at a time.`, extra: { scope: 'address' } })) return undefined;
 
         const binId = crypto.randomBytes(12).toString('hex');
-        webhookBins.set(binId, { created: Date.now(), requests: [], owner: who.owner, ipKey: who.ipKey });
+        webhookBins.set(binId, { created: Date.now(), requests: [], bytes: 0, owner: who.owner, ipKey: who.ipKey });
 
         res.json({
             ok: true,
@@ -121,10 +127,6 @@ function createWebhookRouter(opts = {}) {
         const bin = webhookBins.get(req.params.binId);
         if (!bin) return res.status(404).json({ error: 'Bin not found or expired' });
 
-        if (bin.requests.length >= WEBHOOK_MAX_REQUESTS) {
-            bin.requests.shift(); // drop oldest
-        }
-
         const entry = {
             id: crypto.randomBytes(6).toString('hex'),
             timestamp: Date.now(),
@@ -142,7 +144,22 @@ function createWebhookRouter(opts = {}) {
         delete entry.headers['cookie'];
         delete entry.headers['authorization'];
 
+        // A large webhook (a GitHub push, a Stripe event) is still received: its body is kept as text up
+        // to the cap, marked truncated, so the bin shows what arrived without holding all of it.
+        const bodyText = entry.body == null ? '' : (typeof entry.body === 'string' ? entry.body : JSON.stringify(entry.body));
+        if (Buffer.byteLength(bodyText) > WEBHOOK_MAX_BODY_BYTES) {
+            entry.body = Buffer.from(bodyText).subarray(0, WEBHOOK_MAX_BODY_BYTES).toString('utf8');
+            entry.truncated = true;
+        }
+        const entryBytes = Buffer.byteLength(JSON.stringify(entry));
+
+        // Keep the bin within its count and byte bounds, dropping the oldest entries first.
+        while (bin.requests.length && (bin.requests.length >= WEBHOOK_MAX_REQUESTS || bin.bytes + entryBytes > WEBHOOK_MAX_BIN_BYTES)) {
+            bin.bytes -= Buffer.byteLength(JSON.stringify(bin.requests.shift()));
+        }
+
         bin.requests.push(entry);
+        bin.bytes += entryBytes;
 
         res.status(200).json({ ok: true, message: 'Received' });
     });
@@ -245,7 +262,8 @@ module.exports = function createDevRoutes(db, requireAuth, opts = {}) {
         } catch (err) {
             if (err instanceof TargetRefused) return res.status(403).json({ error: err.message, code: err.code });
             if (err && err.status === 400) return res.status(400).json({ error: err.message });
-            res.status(502).json({ error: `Failed to fetch: ${err.message}` });
+            console.error('[OpenGraph] fetch failed:', err.message);
+            res.status(502).json({ error: 'Failed to fetch the page.' });
         }
     });
 
@@ -317,7 +335,8 @@ module.exports = function createDevRoutes(db, requireAuth, opts = {}) {
         } catch (err) {
             if (err instanceof TargetRefused) return res.status(403).json({ error: err.message, code: err.code });
             if (err && err.status === 400) return res.status(400).json({ error: err.message });
-            res.status(502).json({ error: `Failed to fetch: ${err.message}` });
+            console.error('[Read] fetch failed:', err.message);
+            res.status(502).json({ error: 'Failed to fetch the page.' });
         }
     });
 

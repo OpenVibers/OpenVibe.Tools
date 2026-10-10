@@ -15,12 +15,25 @@
 // always has (each host is its own canonical). With them, the canonical host comes from the
 // gateway — which is how a custom domain becomes canonical without the satellite knowing it.
 //
+// The X-OV-* headers are only ever set by the Tools gateway (apps/gateway/server/registry/host-middleware.js),
+// which reaches a satellite over loopback. A request that arrives from anywhere else — a direct caller whose
+// packet nginx passed through with the client's own headers, or one bypassing nginx entirely — must not be
+// believed, or anyone could mint a canonical host or an alias redirect. nginx also strips the headers on every
+// satellite vhost (apps/<name>/deploy/nginx/); this check is the second line of defence for a direct connection.
+//
 // No dependencies: every satellite requires this file by relative path.
 // ═══════════════════════════════════════════════════════════════
 
 const TOOLS_HOME = 'https://openvibe.tools/';
 const HOST_RE = /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 const TOOL_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
+const LOOPBACK_RE = /^(::1|::ffff:127\.\d{1,3}\.\d{1,3}\.\d{1,3}|127\.\d{1,3}\.\d{1,3}\.\d{1,3})$/;
+
+/** Is this request's direct peer loopback (the gateway or the host's nginx)? */
+function isLoopbackPeer(req) {
+    const addr = String((req && req.socket && req.socket.remoteAddress) || '').replace(/^\[|\]$/g, '').toLowerCase();
+    return LOOPBACK_RE.test(addr);
+}
 
 function cleanHost(value) {
     const h = String(value || '').trim().toLowerCase().replace(/:\d+$/, '').replace(/\.$/, '');
@@ -46,6 +59,11 @@ function isLocalHost(host) {
  * @returns {{ viaGateway: boolean, tool: string, role: string, canonicalHost: string, shortHost: string }}
  */
 function hostRole(req) {
+    // Only the gateway (over loopback) may name a tool, a role or a canonical host: a client-supplied
+    // header is ignored, so it cannot redirect the host or poison the canonical/og:url/JSON-LD.
+    if (!isLoopbackPeer(req)) {
+        return { viaGateway: false, tool: '', role: '', canonicalHost: '', shortHost: '' };
+    }
     const h = req.headers || {};
     const toolRaw = String(h['x-ov-tool'] || '').trim().toLowerCase();
     const tool = TOOL_RE.test(toolRaw) ? toolRaw : '';

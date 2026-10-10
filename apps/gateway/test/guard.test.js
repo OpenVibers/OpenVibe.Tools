@@ -47,6 +47,7 @@ async function serve(app) {
     const app = express();
     app.set('trust proxy', TRUST_PROXY);
     app.use(cookieParser());
+    app.use(express.json({ limit: '1mb' }));   // the gateway's own body parser (webhook bodies)
     app.use(guard.identify);
     app.use('/api/net', createNetRoutes(null, null, { egress, guard }));
     app.use('/api/dev', createDevRoutes(null, null, { egress, guard }));
@@ -113,6 +114,22 @@ async function serve(app) {
         assert.strictEqual((await get(`/api/dev/webhook/bins/${made.binId}`, { cookie })).status, 200, 'still there');
         r = await fetch(`${s.base}/api/dev/webhook/bins/${made.binId}`, { method: 'DELETE', headers: { cookie } });
         assert.strictEqual((await r.json()).deleted, true, 'the maker can');
+
+        // A bin's memory is bounded: a large body is received but kept only up to 64 KB (marked
+        // truncated), and a bin keeps at most 1 MB (oldest dropped), so a flurry of large posts cannot
+        // pin the gateway's heap.
+        r = await fetch(`${s.base}/api/dev/webhook/bins`, { method: 'POST', headers: from('203.0.113.30') });
+        const capBin = await r.json();
+        const capCookie = String(r.headers.get('set-cookie')).split(';')[0];
+        const post = (body) => fetch(`${s.base}/api/dev/webhook/bins/${capBin.binId}/in`, { method: 'POST', headers: { 'content-type': 'application/json' }, body });
+        assert.strictEqual((await post(JSON.stringify({ x: 'a'.repeat(100 * 1024) }))).status, 200, 'a large webhook (a GitHub push) is still received');
+        const big = (await (await get(`/api/dev/webhook/bins/${capBin.binId}`, { cookie: capCookie })).json()).requests[0];
+        assert.ok(big.truncated && Buffer.byteLength(big.body) <= 64 * 1024, 'its body is kept up to 64 KB and marked truncated');
+        const payload = JSON.stringify({ y: 'b'.repeat(48 * 1024) });
+        for (let i = 0; i < 30; i++) assert.strictEqual((await post(payload)).status, 200);
+        const kept = await (await get(`/api/dev/webhook/bins/${capBin.binId}`, { cookie: capCookie })).json();
+        assert.ok(kept.requestCount < 30, `a bin drops the oldest requests rather than growing without bound (${kept.requestCount})`);
+        assert.ok(kept.requestCount <= Math.ceil((1024 * 1024) / (48 * 1024)) + 1, `kept within the bin byte cap (${kept.requestCount})`);
 
         // Caps: per owner and per address (report mode records; a guard in enforce mode refuses).
         const enforce = createGuard({ app: 'gateway', contracts, issuer: ISSUER, keys: { get: () => publicKey }, specs: require('../server/dev/descriptors').SPECS, env: { TOOLS_GUARD: 'enforce' }, log: { log() {}, warn() {}, error() {} }, pruneIntervalMs: 0 });

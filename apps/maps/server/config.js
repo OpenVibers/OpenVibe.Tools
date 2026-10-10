@@ -3,7 +3,9 @@ require('dotenv').config();
 
 module.exports = {
   port: parseInt(process.env.PORT, 10) || 4010,
-  host: process.env.HOST || '0.0.0.0',
+  // Loopback only, like the other satellites: nginx (and the food app) reach it on 127.0.0.1, so it
+  // cannot be bypassed through an open host firewall, skipping nginx's rate limits.
+  host: process.env.HOST || '127.0.0.1',
   baseUrl: process.env.BASE_URL || 'https://maps.openvibe.tools',
 
   // API Keys (optional — free tiers work without most of these)
