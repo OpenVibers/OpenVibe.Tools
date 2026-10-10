@@ -150,11 +150,14 @@ app.get('/api/health', (_req, res) => {
     res.set('Cache-Control', 'no-store').json({ status: 'ok', service: 'openvibe-yt', version: '1.0.0', stats, info: downloader.infoStats(), limits: { maxDuration: config.download.maxDuration, maxFilesizeMB: config.download.maxFilesize }, youtube: up.state, youtubeCheckedAt: up.checkedAt ? new Date(up.checkedAt).toISOString() : null });
 });
 
-// Get video info
-app.post('/api/info', async (req, res) => {
+// Get video info. Each lookup spawns yt-dlp, so it is counted like every other API call (the tools-api
+// quota above), takes the Origin check (a cookie-bearing cross-site post is refused) and the
+// descriptor's per-target throttle: one video cannot be looked up without bound.
+app.post('/api/info', guard.originCheck(), async (req, res) => {
     const { url } = req.body;
     if (!url) return res.status(400).json({ error: 'URL is required' });
     if (!downloader.isValidUrl(url)) return res.status(400).json({ error: 'Only YouTube URLs are supported (youtube.com, youtu.be)' });
+    if (!guard.target(req, res, { tool: 'yt', target: url })) return;
 
     try {
         // At most config.info.maxConcurrent yt-dlp lookups at once; the same video is looked up once
@@ -163,8 +166,9 @@ app.post('/api/info', async (req, res) => {
         res.json({ success: true, video: info });
     } catch (err) {
         if (err.status === 503) return res.status(503).set('Retry-After', '5').json({ error: err.message });
+        // yt-dlp's last stderr line can name filesystem paths or proxy/cookie config: log it, answer friendly.
         console.error('[Info] Error:', err.message);
-        res.status(422).json({ error: err.message });
+        res.status(422).json({ error: downloader.friendlyInfoError(err.message) });
     }
 });
 

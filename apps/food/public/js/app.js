@@ -8,6 +8,13 @@
   const $ = s => document.querySelector(s);
   const $$ = s => document.querySelectorAll(s);
 
+  // Names, addresses and websites come from OpenStreetMap and other third parties: never insert them as
+  // HTML. Escape every value put into a template, and only accept http(s) for a link.
+  const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  function httpUrl(u) {
+    try { const x = new URL(String(u), location.origin); return x.protocol === 'http:' || x.protocol === 'https:' ? x.href : ''; } catch { return ''; }
+  }
+
   const state = {
     location: null, // {lat, lon, name}
     foods: [],
@@ -52,20 +59,22 @@
       const data = await res.json();
       const banks = data?.locations || data || [];
       if (!banks.length) { c.innerHTML = '<div class="empty-state"><i class="fa-solid fa-hand-holding-heart fa-3x"></i><p>No food banks found within 10 miles. Try a different location.</p></div>'; return; }
-      c.innerHTML = banks.map(b => `<div class="card">
-        <div class="card-title"><i class="fa-solid fa-hand-holding-heart" style="color:var(--green)"></i> ${b.name || 'Food Bank'}</div>
+      c.innerHTML = banks.map(b => {
+        const site = httpUrl(b.website);
+        return `<div class="card">
+        <div class="card-title"><i class="fa-solid fa-hand-holding-heart" style="color:var(--green)"></i> ${esc(b.name || 'Food Bank')}</div>
         <div class="card-meta">
-          ${b.address ? `<span><i class="fa-solid fa-location-dot"></i> ${b.address}</span>` : ''}
-          ${b.phone ? `<span><i class="fa-solid fa-phone"></i> ${b.phone}</span>` : ''}
-          ${b.hours ? `<span><i class="fa-solid fa-clock"></i> ${b.hours}</span>` : ''}
-          ${b.distanceMiles ? `<span><i class="fa-solid fa-route"></i> ${b.distanceMiles.toFixed(1)} mi</span>` : ''}
+          ${b.address ? `<span><i class="fa-solid fa-location-dot"></i> ${esc(b.address)}</span>` : ''}
+          ${b.phone ? `<span><i class="fa-solid fa-phone"></i> ${esc(b.phone)}</span>` : ''}
+          ${b.hours ? `<span><i class="fa-solid fa-clock"></i> ${esc(b.hours)}</span>` : ''}
+          ${b.distanceMiles ? `<span><i class="fa-solid fa-route"></i> ${esc(b.distanceMiles.toFixed(1))} mi</span>` : ''}
         </div>
-        ${b.description ? `<div class="card-desc">${b.description}</div>` : ''}
+        ${b.description ? `<div class="card-desc">${esc(b.description)}</div>` : ''}
         <div class="card-actions">
-          ${b.lat && b.lon ? `<a class="card-btn" href="https://www.google.com/maps/dir/?api=1&destination=${b.lat},${b.lon}" target="_blank"><i class="fa-solid fa-diamond-turn-right"></i> Directions</a>` : ''}
-          ${b.website ? `<a class="card-btn" href="${b.website}" target="_blank"><i class="fa-solid fa-globe"></i> Website</a>` : ''}
+          ${b.lat && b.lon ? `<a class="card-btn" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(b.lat)},${encodeURIComponent(b.lon)}" target="_blank"><i class="fa-solid fa-diamond-turn-right"></i> Directions</a>` : ''}
+          ${site ? `<a class="card-btn" href="${esc(site)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-globe"></i> Website</a>` : ''}
         </div>
-      </div>`).join('');
+      </div>`; }).join('');
     } catch (e) { c.innerHTML = '<div class="empty-state"><p>Failed to load food banks.</p></div>'; }
   }
 
@@ -85,14 +94,14 @@
         const key = (s.chain || s.name || '').toLowerCase().replace(/\s+/g, '');
         const color = storeColors[key] || 'var(--text-muted)';
         return `<div class="card">
-          <div class="card-title"><i class="fa-solid fa-store" style="color:${color}"></i> ${s.name || 'Store'}</div>
+          <div class="card-title"><i class="fa-solid fa-store" style="color:${esc(color)}"></i> ${esc(s.name || 'Store')}</div>
           <div class="card-meta">
-            ${s.address ? `<span><i class="fa-solid fa-location-dot"></i> ${s.address}</span>` : ''}
-            ${s.distance ? `<span><i class="fa-solid fa-route"></i> ${s.distance}</span>` : ''}
-            ${s.phone ? `<span><i class="fa-solid fa-phone"></i> ${s.phone}</span>` : ''}
+            ${s.address ? `<span><i class="fa-solid fa-location-dot"></i> ${esc(s.address)}</span>` : ''}
+            ${s.distance ? `<span><i class="fa-solid fa-route"></i> ${esc(s.distance)}</span>` : ''}
+            ${s.phone ? `<span><i class="fa-solid fa-phone"></i> ${esc(s.phone)}</span>` : ''}
           </div>
           <div class="card-actions">
-            ${s.lat && s.lon ? `<a class="card-btn" href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lon}" target="_blank"><i class="fa-solid fa-diamond-turn-right"></i> Directions</a>` : ''}
+            ${s.lat && s.lon ? `<a class="card-btn" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(s.lat)},${encodeURIComponent(s.lon)}" target="_blank"><i class="fa-solid fa-diamond-turn-right"></i> Directions</a>` : ''}
           </div>
         </div>`;
       }).join('');
@@ -110,7 +119,7 @@
     try {
       const res = await fetch(`${API}/api/meal-plan?budget=${budget}&days=${days}&campFriendly=${camp}&shelfStable=${shelf}&randomize=true`);
       const plan = await res.json();
-      if (plan.error) { rc.innerHTML = `<div class="empty-state"><p>${plan.error}</p></div>`; return; }
+      if (plan.error) { rc.innerHTML = `<div class="empty-state"><p>${esc(plan.error)}</p></div>`; return; }
       let html = '';
       if (plan.plan) {
         plan.plan.forEach((day, i) => {
@@ -122,8 +131,8 @@
               const price = item?.price ? `$${item.price.toFixed(2)}` : '';
               const cal = item?.calories ? `${item.calories} cal` : '';
               html += `<div class="meal-row">
-                <span class="meal-name"><strong>${meal}:</strong> ${name}</span>
-                <span class="meal-meta"><span class="meal-price">${price}</span><span>${cal}</span></span>
+                <span class="meal-name"><strong>${esc(meal)}:</strong> ${esc(name)}</span>
+                <span class="meal-meta"><span class="meal-price">${esc(price)}</span><span>${esc(cal)}</span></span>
               </div>`;
             });
           }
@@ -182,11 +191,11 @@
       const bestPrice = validPrices.length ? Math.min(...validPrices) : null;
       const campStars = (f.campFriendly || 0);
       html += `<tr>
-        <td><strong>${f.name || '?'}</strong>${f.servingSize ? `<br><span style="color:var(--text-muted);font-size:10px">${f.servingSize}</span>` : ''}</td>
-        <td><span class="food-group-badge ${f.group || ''}">${f.group || '?'}</span></td>
-        <td>${f.calories || '-'}</td>
-        <td>${f.proteinG ? f.proteinG + 'g' : '-'}</td>
-        <td>${f.servings || '-'}</td>
+        <td><strong>${esc(f.name || '?')}</strong>${f.servingSize ? `<br><span style="color:var(--text-muted);font-size:10px">${esc(f.servingSize)}</span>` : ''}</td>
+        <td><span class="food-group-badge ${esc(f.group || '')}">${esc(f.group || '?')}</span></td>
+        <td>${esc(f.calories || '-')}</td>
+        <td>${f.proteinG ? esc(f.proteinG) + 'g' : '-'}</td>
+        <td>${esc(f.servings || '-')}</td>
         ${stores.map(s => {
           const p = prices[s];
           if (p == null) return '<td class="price-cell price-na">—</td>';
@@ -212,7 +221,7 @@
     if (state.location) {
       state.foodMap.setView([state.location.lat, state.location.lon], 12);
       // Add marker
-      L.marker([state.location.lat, state.location.lon]).addTo(state.foodMap).bindPopup(`<b>${state.location.name}</b>`).openPopup();
+      L.marker([state.location.lat, state.location.lon]).addTo(state.foodMap).bindPopup(`<b>${esc(state.location.name)}</b>`).openPopup();
     }
     setTimeout(() => state.foodMap.invalidateSize(), 200);
   }

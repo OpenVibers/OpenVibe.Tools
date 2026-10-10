@@ -181,9 +181,10 @@
 
     // --- Render Video Card ---
     function renderVideoCard(info) {
+        // The thumbnail URL comes from YouTube: only http(s) may go into src.
         videoThumb.innerHTML = `
-            <img src="${info.thumbnail || ''}" alt="" loading="lazy">
-            <span class="duration-badge">${formatDuration(info.duration)}</span>
+            <img src="${safeUrl(info.thumbnail)}" alt="" loading="lazy">
+            <span class="duration-badge">${escHtml(formatDuration(info.duration))}</span>
         `;
 
         const meta = [];
@@ -207,6 +208,14 @@
         const d = document.createElement('div');
         d.textContent = s;
         return d.innerHTML;
+    }
+
+    // External URLs (the thumbnail) go into src only when they are http(s).
+    function safeUrl(u) {
+        try {
+            const x = new URL(String(u), location.origin);
+            return x.protocol === 'http:' || x.protocol === 'https:' ? x.href : '';
+        } catch { return ''; }
     }
 
     // --- Upstream status ---

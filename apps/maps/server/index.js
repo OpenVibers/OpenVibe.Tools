@@ -69,8 +69,8 @@ const cache = new NodeCache({ stdTTL: config.cache.search, checkperiod: 60 });
 
 // ── Middleware ──────────────────────────────────────────────
 // X-Forwarded-For is believed from exactly one hop on loopback: the host's nginx, the gateway or the
-// food app (which forwards its visitor's address). Maps listens on 0.0.0.0 by default, so a direct
-// caller's own header must not count.
+// food app (which forwards its visitor's address). Maps binds loopback only (config.js), so a direct
+// caller cannot reach it around nginx, and a caller's own header must not count regardless.
 app.set('trust proxy', TRUST_PROXY);
 app.use(helmet({
   contentSecurityPolicy: {
@@ -373,11 +373,13 @@ app.get('/api/search/stream', async (req, res) => {
       }
     } catch (err) {
       completed++;
-      allResults.sourceMeta[s.name] = { count: 0, error: err.message };
+      console.warn(`[Search] ${s.name} failed`);   // the message can carry a key in a URL: never log it
+      // The upstream's error text can name hosts, keys or paths: the client gets a fixed line.
+      allResults.sourceMeta[s.name] = { count: 0, error: 'source unavailable' };
       if (!clientClosed) {
         send('source', {
           name: s.name, icon: s.icon, status: 'error',
-          error: err.message, count: 0,
+          error: 'source unavailable', count: 0,
           locations: [], bridges: [], crimeHeatmap: [],
           completed, total: sources.length,
           elapsed: Date.now() - t0,
@@ -418,7 +420,7 @@ app.get('/api/weather', async (req, res) => {
     const data = await weather.getWeather(lat, lon);
     cache.set(ck, data, config.cache.weather);
     res.json(data);
-  } catch (e) { res.status(502).json({ error: e.message }); }
+  } catch (e) { console.error('[Weather]', e.message); res.status(502).json({ error: 'Weather service is unavailable right now.' }); }
 });
 
 app.get('/api/terrain', async (req, res) => {
@@ -428,7 +430,7 @@ app.get('/api/terrain', async (req, res) => {
   try {
     const data = await terrain.getTerrainInfo(lat, lon);
     res.json(data);
-  } catch (e) { res.status(502).json({ error: e.message }); }
+  } catch (e) { console.error('[Terrain]', e.message); res.status(502).json({ error: 'Terrain data is unavailable right now.' }); }
 });
 
 app.get('/api/food-banks', async (req, res) => {
@@ -439,7 +441,7 @@ app.get('/api/food-banks', async (req, res) => {
   try {
     const data = await grocery.findFoodBanks(lat, lon, radius);
     res.json(data);
-  } catch (e) { res.status(502).json({ error: e.message }); }
+  } catch (e) { console.error('[Food banks]', e.message); res.status(502).json({ error: 'Food bank data is unavailable right now.' }); }
 });
 
 app.get('/api/stores', async (req, res) => {
@@ -449,7 +451,7 @@ app.get('/api/stores', async (req, res) => {
   try {
     const data = await grocery.findNearbyStores(lat, lon);
     res.json(data);
-  } catch (e) { res.status(502).json({ error: e.message }); }
+  } catch (e) { console.error('[Stores]', e.message); res.status(502).json({ error: 'Store data is unavailable right now.' }); }
 });
 
 app.get('/api/foods', (req, res) => {

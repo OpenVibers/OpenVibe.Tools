@@ -256,7 +256,21 @@ function friendlyDownloadError(line) {
     if (/ffmpeg|ffprobe|Postprocessing/i.test(t)) return `Conversion failed on the server (${t.slice(0, 120)})`;
     if (/Requested format is not available/i.test(t)) return 'That quality is not available for this video — try another';
     if (/HTTP Error 4\d\d/i.test(t)) return `YouTube refused the request (${t.match(/HTTP Error \d+/)[0]})`;
-    return t.replace(/^ERROR:\s*/i, '').slice(0, 160) || 'Download failed';
+    // Anything unrecognised: a fixed message. The raw line (filesystem paths, proxy or cookie config)
+    // stays in the server log, never in the answer.
+    return 'The download failed on the server; please try again.';
+}
+
+/** An /api/info failure: the same friendly mapping, with a fixed fallback, since yt-dlp's stderr can
+ *  name the server's own paths or proxy/cookies configuration (the raw line is logged by the route). */
+function friendlyInfoError(line) {
+    const t = String(line || '');
+    if (/Sign in to confirm|not a bot|cookies/i.test(t)) return 'YouTube is refusing requests from this server right now. This is on YouTube\'s side; please try again later.';
+    if (/Private video|members-only|login required/i.test(t)) return 'This video is private or members-only';
+    if (/Video unavailable|has been removed|not available/i.test(t)) return 'This video is unavailable';
+    if (/\bage[- ]restrict|confirm your age/i.test(t)) return 'Age-restricted videos cannot be downloaded';
+    if (/HTTP Error 4\d\d/i.test(t)) return 'YouTube refused the request';
+    return 'Could not read this video; it may be unavailable or blocked.';
 }
 
 // ── File names ───────────────────────────────────────────────
@@ -721,6 +735,6 @@ function noteUpstream(state) { if (state === 'ok' || state === 'blocked') upstre
 
 module.exports = {
     getInfo, getInfoLimited, cachedInfo, videoId, limitReason, infoStats, startDownload, cancelDownload, getStatus, getFile, removeFile,
-    sanitizeTitle, downloadFilename, contentDisposition, applyLine,
+    sanitizeTitle, downloadFilename, contentDisposition, applyLine, friendlyDownloadError, friendlyInfoError,
     cleanup, startCleanup, stopCleanup, getStats, isValidUrl, probeUpstream, startUpstreamProbe, getUpstream,
 };

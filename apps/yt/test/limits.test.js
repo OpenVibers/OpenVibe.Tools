@@ -62,7 +62,9 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const args = process.argv.slice(2);
 const url = args[args.length - 1];
 const long = url.includes('LONGLONG123');
+const errpath = url.includes('ERRPATH');
 if (args.includes('--dump-json')) {
+    if (errpath) { process.stderr.write('ERROR: /srv/private/proxy.conf: permission denied\\n'); process.exit(1); }
     process.stdout.write(JSON.stringify({ id: long ? 'LONGLONG123' : 'SHORTxx1234', title: 't', duration: long ? 4000 : 30, formats: [{ vcodec: 'avc1', acodec: 'mp4a' }] }));
     process.exit(0);
 }
@@ -80,6 +82,22 @@ process.exit(0);   // the match filter skipped it: no file
         assert.strictEqual(body.video.downloadable, false);
         assert.match(body.video.reason, /67 minutes long; downloads are limited to 10 minutes/);
         assert.deepStrictEqual(body.video.limits, { maxDuration: 600, maxFilesizeMB: 100 });
+
+        // The info route is guarded: a call carrying our cookie from another site is refused (Origin
+        // check), one video cannot be looked up without bound (the descriptor's per-target throttle),
+        // and yt-dlp's stderr (which can name the server's own paths) never reaches the client.
+        r = await fetch(`${app.base}/api/info`, { method: 'POST', headers: { 'content-type': 'application/json', cookie: `ov_tools_jobs=${'A'.repeat(43)}`, referer: 'https://evil.example/' }, body: JSON.stringify({ url: 'https://www.youtube.com/watch?v=LONGLONG123' }) });
+        assert.strictEqual(r.status, 403, 'a cookie-bearing call from another site is refused');
+        assert.strictEqual((await r.json()).code, 'tools.origin.refused');
+        // The throttle is per target host (targets.js): flood youtu.be so the www.youtube.com bucket
+        // the error check below uses is not spent.
+        let throttled = 0;
+        for (let i = 0; i < 12; i++) throttled += (await post('/api/info', { url: 'https://youtu.be/SHORTxx1234' })).status === 429 ? 1 : 0;
+        assert.ok(throttled >= 1, 'the per-target throttle stops a flood of lookups for one video host');
+        r = await post('/api/info', { url: 'https://www.youtube.com/watch?v=ERRPATH1234' });
+        assert.strictEqual(r.status, 422);
+        const errBody = await r.json();
+        assert.ok(!/srv\/private|proxy\.conf/.test(errBody.error), `yt-dlp stderr paths do not reach the client: ${errBody.error}`);
         r = await post('/api/download', { url: 'https://youtu.be/LONGLONG123', quality: 'best' });
         assert.strictEqual(r.status, 422, 'refused from the cached info, before yt-dlp starts');
         assert.match((await r.json()).error, /limited to 10 minutes/);

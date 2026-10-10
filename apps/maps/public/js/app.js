@@ -29,6 +29,15 @@
   const show = el => el && el.classList.remove('hidden');
   const hide = el => el && el.classList.add('hidden');
 
+  // Names, descriptions, amenities and tags come from OpenStreetMap and other third parties: never
+  // insert them as HTML. Escape every value put into a template, and only accept http(s) for a link.
+  const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  function httpUrl(u) {
+    try { const x = new URL(String(u), location.origin); return x.protocol === 'http:' || x.protocol === 'https:' ? x.href : ''; } catch { return ''; }
+  }
+  // Coordinates are numbers from the sources; coerce so nothing can break out of an href.
+  const num = v => (Number.isFinite(Number(v)) ? Number(v) : '');
+
   function toast(msg, type = 'info') {
     const bg = { info: '#22c55e', success: '#059669', error: '#ef4444', warn: '#f59e0b', warning: '#f59e0b' };
     Toastify({ text: msg, duration: 3500, gravity: 'bottom', position: 'right',
@@ -230,9 +239,9 @@
         <span class="sp-count" id="sp-count">0 / ${sources.length}</span>
       </div>
       <div class="sp-grid">${sources.map(s =>
-        `<div class="sp-item" data-source="${s.name}" id="sp-${s.name.replace(/[^a-zA-Z0-9]/g, '')}">
+        `<div class="sp-item" data-source="${esc(s.name)}" id="sp-${s.name.replace(/[^a-zA-Z0-9]/g, '')}">
           <i class="fa-solid fa-spinner fa-spin sp-icon"></i>
-          <span class="sp-name">${s.name}</span>
+          <span class="sp-name">${esc(s.name)}</span>
           <span class="sp-result"></span>
         </div>`
       ).join('')}</div>
@@ -291,7 +300,7 @@
     const btn = $('#btn-search');
     btn.classList.add('loading');
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Searching...</span>';
-    setStatus(`<i class="fa-solid fa-spinner fa-spin"></i> Searching "${query}"...`);
+    setStatus(`<i class="fa-solid fa-spinner fa-spin"></i> Searching "${esc(query)}"...`);
     hide($('#welcome-card'));
     $('#results-list').innerHTML = '<div class="search-progress"><div class="spinner"></div><p>Geocoding location...</p></div>';
 
@@ -316,7 +325,7 @@
       if (state.userMarker) state.map.removeLayer(state.userMarker);
       state.userMarker = L.marker([lat, lon], {
         icon: L.divIcon({ className: 'user-marker', iconSize: [20, 20], iconAnchor: [10, 10] }), zIndexOffset: 1000
-      }).addTo(state.map).bindPopup(`<b>Search Center</b><br>${displayName}`);
+      }).addTo(state.map).bindPopup(`<b>Search Center</b><br>${esc(displayName)}`);
       state.map.setView([lat, lon], 11, { animate: false });
 
       // Placeholder for source progress — will be replaced once sources manifest arrives
@@ -407,13 +416,13 @@
 
       fetchWeather(lat, lon);
 
-      setStatus(`<i class="fa-solid fa-check-circle"></i> ${state.locations.length} spots near "${query}" in ${state.queryTime}s`);
+      setStatus(`<i class="fa-solid fa-check-circle"></i> ${state.locations.length} spots near "${esc(query)}" in ${state.queryTime}s`);
       toast(`Found ${state.locations.length} locations near ${query}`);
 
     } catch (err) {
-      setStatus(`<i class="fa-solid fa-exclamation-triangle"></i> ${err.message}`);
+      setStatus(`<i class="fa-solid fa-exclamation-triangle"></i> ${esc(err.message)}`);
       toast(err.message, 'error');
-      $('#results-list').innerHTML = `<div class="muted-text"><i class="fa-solid fa-triangle-exclamation"></i> ${err.message}</div>`;
+      $('#results-list').innerHTML = `<div class="muted-text"><i class="fa-solid fa-triangle-exclamation"></i> ${esc(err.message)}</div>`;
     } finally {
       btn.classList.remove('loading');
       btn.innerHTML = '<i class="fa-solid fa-person-shelter"></i><span>Search</span>';
@@ -447,25 +456,25 @@
     const visible = state.filtered.slice(0, limit);
     c.innerHTML = visible.map((loc,i) => {
       const tc = loc._typeClass, isFav = state.favorites.includes(loc._id);
-      return `<div class="result-card" data-idx="${i}" data-id="${loc._id}">
-        <button class="result-fav-btn ${isFav?'favorited':''}" data-fav="${loc._id}"><i class="fa-${isFav?'solid':'regular'} fa-heart"></i></button>
+      return `<div class="result-card" data-idx="${i}" data-id="${esc(loc._id)}">
+        <button class="result-fav-btn ${isFav?'favorited':''}" data-fav="${esc(loc._id)}"><i class="fa-${isFav?'solid':'regular'} fa-heart"></i></button>
         <div class="result-card-header">
-          <div class="result-type-icon ${tc}"><i class="fa-solid ${typeIcon(tc)}"></i></div>
+          <div class="result-type-icon ${esc(tc)}"><i class="fa-solid ${esc(typeIcon(tc))}"></i></div>
           <div style="flex:1;min-width:0">
-            <div class="result-name">${loc.name||'Unknown'}</div>
+            <div class="result-name">${esc(loc.name||'Unknown')}</div>
             <div class="result-meta">
-              <span class="result-type-label">${loc.type||'Unknown'}</span>
-              <span><i class="fa-solid ${loc.sourceIcon||'fa-database'}"></i> ${loc.source||''}</span>
-              ${loc.fee&&loc.fee!=='Free'?`<span><i class="fa-solid fa-dollar-sign"></i> ${loc.fee}</span>`:''}
+              <span class="result-type-label">${esc(loc.type||'Unknown')}</span>
+              <span><i class="fa-solid ${esc(loc.sourceIcon||'fa-database')}"></i> ${esc(loc.source||'')}</span>
+              ${loc.fee&&loc.fee!=='Free'?`<span><i class="fa-solid fa-dollar-sign"></i> ${esc(loc.fee)}</span>`:''}
             </div>
           </div>
           <div style="text-align:right;flex-shrink:0">
-            ${loc.distanceMiles?`<div class="result-distance">${distText(loc.distanceMiles)}</div>`:''}
+            ${loc.distanceMiles?`<div class="result-distance">${esc(distText(loc.distanceMiles))}</div>`:''}
             <div class="stealth-rating">${stealthStars(loc.stealthRating)}</div>
           </div>
         </div>
-        ${loc.description?`<div class="result-description">${truncate(loc.description,100)}</div>`:''}
-        <div class="result-tags">${(loc.amenities||[]).slice(0,4).map(a=>`<span class="result-tag"><i class="fa-solid fa-check"></i> ${a}</span>`).join('')}</div>
+        ${loc.description?`<div class="result-description">${esc(truncate(loc.description,100))}</div>`:''}
+        <div class="result-tags">${(loc.amenities||[]).slice(0,4).map(a=>`<span class="result-tag"><i class="fa-solid fa-check"></i> ${esc(a)}</span>`).join('')}</div>
       </div>`;
     }).join('') + (state.filtered.length > limit ? `<div class="muted-text">${state.filtered.length-limit} more results hidden. Zoom in or filter.</div>` : '');
   }
@@ -486,8 +495,8 @@
           })
         });
         marker._typeClass = tc;
-        const dist = loc.distanceMiles ? `<br><span class="popup-distance">${distText(loc.distanceMiles)}</span>` : '';
-        marker.bindPopup(`<div class="popup-name">${loc.name||'Unknown'}</div><div class="popup-type">${loc.type||''} – ${loc.source||''}</div>${dist}<a href="#" class="popup-link" data-loc-id="${loc._id}">View details →</a>`);
+        const dist = loc.distanceMiles ? `<br><span class="popup-distance">${esc(distText(loc.distanceMiles))}</span>` : '';
+        marker.bindPopup(`<div class="popup-name">${esc(loc.name||'Unknown')}</div><div class="popup-type">${esc(loc.type||'')} – ${esc(loc.source||'')}</div>${dist}<a href="#" class="popup-link" data-loc-id="${esc(loc._id)}">View details →</a>`);
         marker.on('click', () => selectLocation(loc));
         state.markerCache.set(loc._id, marker);
       }
@@ -519,7 +528,7 @@
   function selectLocation(loc) {
     const panel = $('#detail-panel'), isFav = state.favorites.includes(loc._id);
     $('#detail-name').textContent = loc.name||'Unknown';
-    $('#detail-type').innerHTML = `<i class="fa-solid ${typeIcon(loc._typeClass)}"></i> ${loc.type||'Unknown'} – ${loc.source||''}`;
+    $('#detail-type').innerHTML = `<i class="fa-solid ${esc(typeIcon(loc._typeClass))}"></i> ${esc(loc.type||'Unknown')} – ${esc(loc.source||'')}`;
     const favBtn = $('#btn-favorite-detail');
     favBtn.className = `detail-fav-btn ${isFav?'favorited':''}`;
     favBtn.innerHTML = `<i class="fa-${isFav?'solid':'regular'} fa-heart"></i>`;
@@ -532,24 +541,24 @@
         <div class="stealth-meter">${stealthBars(loc.stealthRating)}<span style="margin-left:8px;font-size:13px;font-weight:700;color:var(--green)">${loc.stealthRating||'?'}/5</span></div>
       </div>
       <div class="detail-section"><h3><i class="fa-solid fa-circle-info"></i> Information</h3>
-        <div class="detail-info-row"><span class="label"><i class="fa-solid fa-route"></i> Distance</span><span class="value">${dist}</span></div>
-        <div class="detail-info-row"><span class="label"><i class="fa-solid fa-map-pin"></i> Coords</span><span class="value" style="font-family:var(--font-mono);font-size:11px">${loc.lat?.toFixed(5)}, ${loc.lon?.toFixed(5)}</span></div>
-        ${loc.fee?`<div class="detail-info-row"><span class="label"><i class="fa-solid fa-dollar-sign"></i> Fee</span><span class="value">${loc.fee}</span></div>`:''}
-        ${loc.elevation?`<div class="detail-info-row"><span class="label"><i class="fa-solid fa-mountain"></i> Elevation</span><span class="value">${loc.elevation}ft</span></div>`:''}
-        <div class="detail-info-row"><span class="label"><i class="fa-solid fa-database"></i> Source</span><span class="value">${loc.source||'Unknown'}</span></div>
+        <div class="detail-info-row"><span class="label"><i class="fa-solid fa-route"></i> Distance</span><span class="value">${esc(dist)}</span></div>
+        <div class="detail-info-row"><span class="label"><i class="fa-solid fa-map-pin"></i> Coords</span><span class="value" style="font-family:var(--font-mono);font-size:11px">${num(loc.lat)}, ${num(loc.lon)}</span></div>
+        ${loc.fee?`<div class="detail-info-row"><span class="label"><i class="fa-solid fa-dollar-sign"></i> Fee</span><span class="value">${esc(loc.fee)}</span></div>`:''}
+        ${loc.elevation?`<div class="detail-info-row"><span class="label"><i class="fa-solid fa-mountain"></i> Elevation</span><span class="value">${esc(loc.elevation)}ft</span></div>`:''}
+        <div class="detail-info-row"><span class="label"><i class="fa-solid fa-database"></i> Source</span><span class="value">${esc(loc.source||'Unknown')}</span></div>
       </div>
-      ${loc.description?`<div class="detail-section"><h3><i class="fa-solid fa-align-left"></i> Description</h3><p style="font-size:12px;line-height:1.6">${loc.description}</p></div>`:''}
-      ${loc.amenities?.length?`<div class="detail-section"><h3><i class="fa-solid fa-list-check"></i> Amenities</h3><div class="result-tags">${loc.amenities.map(a=>`<span class="result-tag"><i class="fa-solid fa-check"></i> ${a}</span>`).join('')}</div></div>`:''}
+      ${loc.description?`<div class="detail-section"><h3><i class="fa-solid fa-align-left"></i> Description</h3><p style="font-size:12px;line-height:1.6">${esc(loc.description)}</p></div>`:''}
+      ${loc.amenities?.length?`<div class="detail-section"><h3><i class="fa-solid fa-list-check"></i> Amenities</h3><div class="result-tags">${loc.amenities.map(a=>`<span class="result-tag"><i class="fa-solid fa-check"></i> ${esc(a)}</span>`).join('')}</div></div>`:''}
       <div class="detail-section"><h3><i class="fa-solid fa-link"></i> Actions</h3>
         <div class="detail-actions">
-          <a class="detail-btn" href="https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lon}" target="_blank"><i class="fa-solid fa-diamond-turn-right"></i> Directions</a>
-          <a class="detail-btn" href="https://www.google.com/maps/@${loc.lat},${loc.lon},15z" target="_blank"><i class="fa-solid fa-map"></i> Google Maps</a>
+          <a class="detail-btn" href="https://www.google.com/maps/dir/?api=1&destination=${num(loc.lat)},${num(loc.lon)}" target="_blank"><i class="fa-solid fa-diamond-turn-right"></i> Directions</a>
+          <a class="detail-btn" href="https://www.google.com/maps/@${num(loc.lat)},${num(loc.lon)},15z" target="_blank"><i class="fa-solid fa-map"></i> Google Maps</a>
           <button class="detail-btn" id="btn-copy-coords"><i class="fa-solid fa-copy"></i> Copy Coords</button>
         </div>
       </div>
       <div class="detail-section"><h3><i class="fa-solid fa-note-sticky"></i> Notes</h3>
         <div class="detail-note-area">
-          <textarea id="detail-note" placeholder="Your notes...">${noteText}</textarea>
+          <textarea id="detail-note" placeholder="Your notes...">${esc(noteText)}</textarea>
           <button class="detail-btn primary" id="btn-save-note"><i class="fa-solid fa-floppy-disk"></i> Save</button>
         </div>
       </div>`;
@@ -566,8 +575,7 @@
     });
 
     // Highlight card
-    $$('.result-card').forEach(c => c.classList.remove('active'));
-    document.querySelector(`.result-card[data-id="${loc._id}"]`)?.classList.add('active');
+    $$('.result-card').forEach(c => c.classList.toggle('active', c.dataset.id === loc._id));
     state.map.flyTo([loc.lat,loc.lon], 14, {animate:true});
 
     // Terrain
@@ -612,7 +620,7 @@
     if (w.current) {
       html += `<h3><i class="fa-solid fa-temperature-half"></i> Current Conditions</h3>`;
       if (w.current.temperature != null) html += `<div class="detail-info-row"><span class="label">Temperature</span><span class="value">${Math.round(w.current.temperature)}°F</span></div>`;
-      if (w.current.description) html += `<div class="detail-info-row"><span class="label">Conditions</span><span class="value">${w.current.description}</span></div>`;
+      if (w.current.description) html += `<div class="detail-info-row"><span class="label">Conditions</span><span class="value">${esc(w.current.description)}</span></div>`;
       if (w.current.windSpeed != null) html += `<div class="detail-info-row"><span class="label">Wind</span><span class="value">${w.current.windSpeed} mph</span></div>`;
       if (w.current.humidity != null) html += `<div class="detail-info-row"><span class="label">Humidity</span><span class="value">${w.current.humidity}%</span></div>`;
     }
@@ -620,10 +628,10 @@
       if (w.sun.sunrise) html += `<div class="detail-info-row"><span class="label"><i class="fa-solid fa-sun"></i> Sunrise</span><span class="value">${new Date(w.sun.sunrise).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</span></div>`;
       if (w.sun.sunset) html += `<div class="detail-info-row"><span class="label"><i class="fa-solid fa-moon"></i> Sunset</span><span class="value">${new Date(w.sun.sunset).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</span></div>`;
     }
-    if (w.moon) html += `<div class="detail-info-row"><span class="label">Moon</span><span class="value">${w.moon.emoji||''} ${w.moon.name||''} — ${w.moon.stealthRating||''}</span></div>`;
+    if (w.moon) html += `<div class="detail-info-row"><span class="label">Moon</span><span class="value">${esc(w.moon.emoji||'')} ${esc(w.moon.name||'')} — ${esc(w.moon.stealthRating||'')}</span></div>`;
     html += '</div>';
-    if (w.forecast?.detailedForecast) html += `<div class="detail-section"><h3><i class="fa-solid fa-calendar-days"></i> Forecast</h3><p style="font-size:12px;line-height:1.6">${w.forecast.detailedForecast}</p></div>`;
-    if (w.campingAdvice) html += `<div class="detail-section"><h3><i class="fa-solid fa-person-shelter"></i> Camping Advice</h3><p style="font-size:12px;line-height:1.6;color:var(--green)">${w.campingAdvice}</p></div>`;
+    if (w.forecast?.detailedForecast) html += `<div class="detail-section"><h3><i class="fa-solid fa-calendar-days"></i> Forecast</h3><p style="font-size:12px;line-height:1.6">${esc(w.forecast.detailedForecast)}</p></div>`;
+    if (w.campingAdvice) html += `<div class="detail-section"><h3><i class="fa-solid fa-person-shelter"></i> Camping Advice</h3><p style="font-size:12px;line-height:1.6;color:var(--green)">${esc(w.campingAdvice)}</p></div>`;
     c.innerHTML = html;
     show($('#weather-modal'));
   }
@@ -643,9 +651,9 @@
     if (!favLocs.length) { c.innerHTML = '<p class="muted-text"><i class="fa-regular fa-heart"></i> No favorites yet.</p>'; show($('#favorites-modal')); return; }
     c.innerHTML = favLocs.map(loc => {
       const tc = loc._typeClass;
-      return `<div class="food-card" style="cursor:pointer" data-fav-id="${loc._id}">
-        <div class="food-card-title"><i class="fa-solid ${typeIcon(tc)}" style="color:${markerColor(tc)}"></i> ${loc.name}</div>
-        <div class="food-card-meta"><span>${loc.type||''}</span><span>${loc.source||''}</span>${loc.distanceMiles?`<span>${distText(loc.distanceMiles)}</span>`:''}</div>
+      return `<div class="food-card" style="cursor:pointer" data-fav-id="${esc(loc._id)}">
+        <div class="food-card-title"><i class="fa-solid ${esc(typeIcon(tc))}" style="color:${esc(markerColor(tc))}"></i> ${esc(loc.name)}</div>
+        <div class="food-card-meta"><span>${esc(loc.type||'')}</span><span>${esc(loc.source||'')}</span>${loc.distanceMiles?`<span>${esc(distText(loc.distanceMiles))}</span>`:''}</div>
       </div>`;
     }).join('');
     c.querySelectorAll('[data-fav-id]').forEach(el => el.addEventListener('click', () => {
@@ -690,13 +698,13 @@
       if (!data?.length && !data?.locations?.length) { c.innerHTML = '<p class="muted-text">No food banks found nearby.</p>'; return; }
       const banks = data.locations || data;
       c.innerHTML = banks.map(b => `<div class="food-card">
-        <div class="food-card-title"><i class="fa-solid fa-hand-holding-heart" style="color:var(--green)"></i> ${b.name||'Food Bank'}</div>
+        <div class="food-card-title"><i class="fa-solid fa-hand-holding-heart" style="color:var(--green)"></i> ${esc(b.name||'Food Bank')}</div>
         <div class="food-card-meta">
-          ${b.address?`<span><i class="fa-solid fa-location-dot"></i> ${b.address}</span>`:''}
-          ${b.phone?`<span><i class="fa-solid fa-phone"></i> ${b.phone}</span>`:''}
-          ${b.hours?`<span><i class="fa-solid fa-clock"></i> ${b.hours}</span>`:''}
+          ${b.address?`<span><i class="fa-solid fa-location-dot"></i> ${esc(b.address)}</span>`:''}
+          ${b.phone?`<span><i class="fa-solid fa-phone"></i> ${esc(b.phone)}</span>`:''}
+          ${b.hours?`<span><i class="fa-solid fa-clock"></i> ${esc(b.hours)}</span>`:''}
         </div>
-        ${b.description?`<div style="font-size:11px;color:var(--text-muted);margin-top:6px">${truncate(b.description,200)}</div>`:''}
+        ${b.description?`<div style="font-size:11px;color:var(--text-muted);margin-top:6px">${esc(truncate(b.description,200))}</div>`:''}
       </div>`).join('');
     } catch(e) { c.innerHTML = '<p class="muted-text">Failed to load food banks.</p>'; }
   }
@@ -712,10 +720,10 @@
       if (!data?.length && !data?.stores?.length) { c.innerHTML = '<p class="muted-text">No stores found nearby.</p>'; return; }
       const stores = data.stores || data;
       c.innerHTML = stores.map(s => `<div class="food-card">
-        <div class="food-card-title"><i class="fa-solid fa-cart-shopping" style="color:var(--blue)"></i> ${s.name||'Store'}</div>
+        <div class="food-card-title"><i class="fa-solid fa-cart-shopping" style="color:var(--blue)"></i> ${esc(s.name||'Store')}</div>
         <div class="food-card-meta">
-          ${s.address?`<span><i class="fa-solid fa-location-dot"></i> ${s.address}</span>`:''}
-          ${s.distance?`<span><i class="fa-solid fa-route"></i> ${s.distance}</span>`:''}
+          ${s.address?`<span><i class="fa-solid fa-location-dot"></i> ${esc(s.address)}</span>`:''}
+          ${s.distance?`<span><i class="fa-solid fa-route"></i> ${esc(s.distance)}</span>`:''}
         </div>
       </div>`).join('');
     } catch(e) { c.innerHTML = '<p class="muted-text">Failed to load stores.</p>'; }
@@ -741,7 +749,7 @@
     try {
       const res = await fetch(`${API}/api/meal-plan?budget=${budget}&days=${days}&campFriendly=${camp}&randomize=true`);
       const plan = await res.json();
-      if (plan.error) { rc.innerHTML = `<p class="muted-text">${plan.error}</p>`; return; }
+      if (plan.error) { rc.innerHTML = `<p class="muted-text">${esc(plan.error)}</p>`; return; }
       let html = '';
       if (plan.plan) {
         plan.plan.forEach((day, i) => {
@@ -750,7 +758,7 @@
             if (day[meal]) {
               const items = Array.isArray(day[meal]) ? day[meal] : [day[meal]];
               items.forEach(item => {
-                html += `<div class="meal-item"><span>${item.name||item}</span><span style="color:var(--green)">${item.price?'$'+item.price.toFixed(2):''}</span></div>`;
+                html += `<div class="meal-item"><span>${esc(item.name||item)}</span><span style="color:var(--green)">${item.price?'$'+item.price.toFixed(2):''}</span></div>`;
               });
             }
           });
@@ -781,9 +789,9 @@
 
   function renderFoodList(foods) {
     return foods.map(f => `<div class="food-card">
-      <div class="food-card-title">${f.name||'?'}</div>
+      <div class="food-card-title">${esc(f.name||'?')}</div>
       <div class="food-card-meta">
-        ${f.group?`<span><i class="fa-solid fa-tag"></i> ${f.group}</span>`:''}
+        ${f.group?`<span><i class="fa-solid fa-tag"></i> ${esc(f.group)}</span>`:''}
         ${f.calories?`<span><i class="fa-solid fa-fire"></i> ${f.calories} cal</span>`:''}
         ${f.price?`<span><i class="fa-solid fa-dollar-sign"></i> $${f.price.toFixed(2)}</span>`:''}
         ${f.campFriendly?'<span><i class="fa-solid fa-campground"></i> Camp-friendly</span>':''}
