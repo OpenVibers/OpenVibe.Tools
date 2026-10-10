@@ -26,7 +26,7 @@ const { requireInternalAccess } = require('../../_shared/internal-token');
 
 // ── Guard (apps/_shared/guard) ───────────────────────────────
 // Who is asking (Network sign-in with aud openvibe.tools, the browser session, else the address),
-// the tools-download quota (a download costs 50, descriptor yt) and the abuse log (data/guard.db).
+// the tools-download quota (a download costs 50, descriptor yt) and the abuse log (PostgreSQL guard_abuse).
 // TOOLS_GUARD=enforce (default) refuses; report records what it would refuse.
 // The one `tools` database and the shared Valkey (plan T8, decisions 3 and 4).
 const toolsDb = require('../../_shared/db').openToolsDb({ createDb: require('openvibe-sdk/db').createDb, service: 'tools-yt' });

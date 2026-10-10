@@ -3,7 +3,7 @@
   "stage": "stable",
   "code": true,
   "plan": "OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026)",
-  "runtime": "node 22, express; PostgreSQL (openvibe-sdk/db, PGlite in development) + Valkey for the guard and analytics; the job store too (plan T8; better-sqlite3 only in scripts/ for the pre-cutover SQLite files); eight apps (gateway, maps, food, img, yt, audio, text, docs)",
+  "runtime": "node 22, express; PostgreSQL (openvibe-sdk/db, PGlite in development) + Valkey for the guard and analytics; the job store; eight apps (gateway, maps, food, img, yt, audio, text, docs)",
   "port": 4001,
   "ports": {
     "gateway": 4001,
@@ -28,7 +28,7 @@
   ],
   "capabilitiesRegistered": true,
   "deployed": true,
-  "deployment": "Public at https://openvibe.tools: deployed with `sudo ovhost deploy tools` (OpenVibe.Host strategy multi-app since the 2026-09-27 cutover; deploy/scripts/deploy.sh is the wrapper), /opt/openvibe.tools, units openvibe-tools (gateway, 127.0.0.1:4001) and openvibe-tools-<app> per satellite, env /etc/openvibe/tools.env.",
+  "deployment": "Public at https://openvibe.tools: deployed with `sudo ovhost deploy tools` (OpenVibe.Host strategy multi-app; deploy/scripts/deploy.sh is the wrapper), /opt/openvibe.tools, units openvibe-tools (gateway, 127.0.0.1:4001) and openvibe-tools-<app> per satellite, env /etc/openvibe/tools.env.",
   "features": [
     "tool registry with descriptors, canonical hosts, aliases and owner-attached custom domains",
     "server-rendered catalog and tool pages with full SEO",

@@ -8,7 +8,7 @@
 // image conversion, 10 an audio effect, 50 a video download). Each quota class × caller tier has
 //   perMinute  a token bucket refilled at this many units a minute (kept in memory)
 //   burst      the bucket's size: what may be spent at once after a quiet spell
-//   perDay     units per UTC day, persisted in the app's guard.db (0 = no day allowance)
+//   perDay     units per UTC day, persisted in the shared guard store (0 = no day allowance)
 // Tiers: anonymous (keyed by IP, IPv6 by /64) < session (the ov_tools_jobs browser cookie) < user
 // (a Network sign-in) < service (a first-party service or a developer app's production token).
 // sandbox is a developer app's sandbox token: the smallest allowance, keyed by the app.
@@ -95,7 +95,7 @@ function bounds(env = process.env) {
         },
         // Webhook request bins (in memory, one hour): per owner, per address, in all.
         webhook: { perOwner: 5, perIp: 10, total: 500 },
-        // The abuse log (guard.db) keeps rows this long.
+        // The abuse log (PostgreSQL guard_abuse) keeps rows this long.
         abuseRetentionDays: 30,
     };
 }

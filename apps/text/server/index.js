@@ -19,7 +19,7 @@ const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
 
 // ── Guard (apps/_shared/guard) ───────────────────────────────
 // Who is asking (Network sign-in with aud openvibe.tools, else the address), the tools-api quota on
-// /api/ and the abuse log (data/guard.db). TOOLS_GUARD=enforce (default) refuses; report records what
+// /api/ and the abuse log (PostgreSQL guard_abuse). TOOLS_GUARD=enforce (default) refuses; report records what
 // it would refuse.
 const NETWORK_URL = process.env.OV_NETWORK_URL || 'https://openvibe.network';
 // The one `tools` database and the shared Valkey (plan T8, decisions 3 and 4).

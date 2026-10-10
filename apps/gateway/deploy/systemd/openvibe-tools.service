@@ -22,7 +22,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-# guard.db (apps/_shared/guard): quotas' day counters and the abuse log
+# Writable gateway data directory for local runtime files
 ReadWritePaths=/opt/openvibe.tools/apps/gateway/data
 
 [Install]

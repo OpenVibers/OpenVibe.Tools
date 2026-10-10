@@ -3,7 +3,7 @@
 // stores no IP, user id, city, raw user agent, raw referer or query string anywhere in the analytics
 // tables; paths are route templates; uniques come from day-scoped hashes deleted after the day's rollup;
 // pruneRawEventsPg removes strictly-older raw rows and day hashes in bounded batches and never touches
-// rollups. (The SQLite tracker's scrub and file CLI are retired with better-sqlite3.)
+// rollups.
 const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
