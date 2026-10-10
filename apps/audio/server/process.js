@@ -129,6 +129,8 @@ function defineJobs(system) {
                 return `Tool "${id}" takes exactly one file`;
             }
             for (const [k, v] of Object.entries(input)) if (v != null && typeof v === 'object') return `Option ${k} must be a string or a number`;
+            // The output format becomes the file extension (ffmpeg-helper tmpFile): a short alphanumeric name only.
+            if (input.format != null && !/^[a-z0-9]{1,8}$/i.test(String(input.format))) return 'format must be a short audio format name such as mp3, wav or flac';
             return null;
         },
         async run({ input, files, progress, signal }) {

@@ -245,6 +245,8 @@ function createAuthRoutes(config, auth) {
      */
     function sanitizeNext(next) {
         if (!next || typeof next !== 'string') return '/';
+        // Browsers drop tabs and newlines and read \ as /, so "/\evil.com" or "/<TAB>/evil.com" would leave the site.
+        if (/[\u0000-\u001f\u007f\\]/.test(next)) return '/';
         if (/^\/(?!\/)/.test(next)) return next; // relative path, not protocol-relative
         try {
             const u = new URL(next);
