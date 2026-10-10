@@ -11,7 +11,8 @@ const path = require('path');
 const { dep } = require('./deps');
 const { testDb, closeAllTestDbs } = require('./testdb');
 const { AnalyticsTrackerPg, privacy, pruneRawEventsPg } = dep('openvibe-shared/analytics/pg');
-const { sqlTime } = dep('openvibe-shared/analytics/tracker');
+// UTC 'YYYY-MM-DD HH:MM:SS', the analytics rows' time shape (openvibe-shared 3.0 keeps its helper private).
+const sqlTime = (ms) => new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
 
 const express = dep('express');
 
