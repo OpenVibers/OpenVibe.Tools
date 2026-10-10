@@ -29,7 +29,7 @@ const { createPacer, Busy } = require('../../_shared/guard/semaphore');
 // ── Guard (apps/_shared/guard) ───────────────────────────────
 // Who is asking (Network sign-in with aud openvibe.tools, else the address — the food app forwards its
 // visitor's), the tools-map quota on the data routes (descriptor maps: cost 2 a call) and the abuse log
-// (data/guard.db). TOOLS_GUARD=enforce (default) refuses; report records what it would refuse.
+// (PostgreSQL guard_abuse). TOOLS_GUARD=enforce (default) refuses; report records what it would refuse.
 const NETWORK_URL = process.env.OV_NETWORK_URL || 'https://openvibe.network';
 // The one `tools` database and the shared Valkey (plan T8, decisions 3 and 4).
 const toolsDb = require('../../_shared/db').openToolsDb({ createDb: require('openvibe-sdk/db').createDb, service: 'tools-maps' });

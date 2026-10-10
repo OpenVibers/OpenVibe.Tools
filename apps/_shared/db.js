@@ -55,7 +55,7 @@ function openToolsDb({ createDb, service = 'tools', log = console, registry, pgl
     if (typeof createDb !== 'function') throw new TypeError('openToolsDb needs createDb (require(\'openvibe-sdk/db\').createDb)');
     const url = String(process.env.DATABASE_URL || '').trim();
     if (!url) {
-        if (String(process.env.NODE_ENV || '') === 'production') throw new Error('DATABASE_URL is not set: Tools serves from PostgreSQL (plan T8)');
+        if (String(process.env.NODE_ENV || '') === 'production') throw new Error('DATABASE_URL is required in production');
         // A directory keeps development data across restarts; without one (tests) the database is in memory,
         // so every run starts from the empty, migrated schema.
         const dir = pgliteDir || process.env.TOOLS_PGLITE_DIR || '';

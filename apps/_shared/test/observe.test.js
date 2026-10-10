@@ -41,7 +41,7 @@ function assertShape(body, service) {
             const obs = observe({
                 app, metrics, ready, service: 'tools-test', release: 'abc1234567',
                 checks: [
-                    { name: 'db', required: true, check: () => (dbOk ? true : 'SQLITE_IOERR') },
+                    { name: 'db', required: true, check: () => (dbOk ? true : 'database unavailable') },
                     checks.upstream('satellite_dead', `http://127.0.0.1:${await freePort()}/api/ready`),
                     checks.binary('nope', 'definitely-not-a-binary-ov'),
                 ],
@@ -58,7 +58,7 @@ function assertShape(body, service) {
             r = await json(`${base}/api/ready`);
             assert.strictEqual(r.status, 503);
             assert.deepStrictEqual(r.body.failed, ['db']);
-            assert.strictEqual(r.body.checks.db.error, 'SQLITE_IOERR');
+            assert.strictEqual(r.body.checks.db.error, 'database unavailable');
             obs.stop();
             server.close();
             assert.ok(which('node') || which(process.execPath), 'which() finds executables');

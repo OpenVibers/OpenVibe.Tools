@@ -39,7 +39,7 @@ const { requireInternalAccess } = require('../../_shared/internal-token');
 // ── Guard (apps/_shared/guard) ───────────────────────────────
 // Who is asking (Network sign-in with aud openvibe.tools, service tokens, the browser session, else
 // the address), tiered quotas by each tool's descriptor, upload sniffing, the sync semaphore and the
-// abuse log (data/guard.db). TOOLS_GUARD=enforce (default) refuses; report records what it would refuse.
+// abuse log (PostgreSQL guard_abuse). TOOLS_GUARD=enforce (default) refuses; report records what it would refuse.
 const SPECS = require('./descriptors').SPECS;
 // The one `tools` database and the shared Valkey (plan T8, decisions 3 and 4): guard_abuse in
 // PostgreSQL, guard_salt/guard_day and the quota buckets in Valkey. `ready` resolves when the schema is in.

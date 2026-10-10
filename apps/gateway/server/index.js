@@ -56,7 +56,7 @@ let auth = null;   // created below; the key check reads it at request time
 // ── Guard (apps/_shared/guard) ───────────────────────────────
 // Who is asking (Network sign-in with aud openvibe.tools, service tokens, the browser session, else
 // the address), the tools-api quota, the net and dev tools' quotas by descriptor, the per-target
-// throttle, the port-scan cap, webhook bin caps and the abuse log (data/guard.db). The Network key is
+// throttle, the port-scan cap, webhook bin caps and the abuse log (PostgreSQL guard_abuse). The Network key is
 // the OAuth client's (loaded and retried by it). TOOLS_GUARD=enforce (default) refuses; report records
 // what it would refuse.
 // The one `tools` database and the shared Valkey (plan T8, decisions 3 and 4).

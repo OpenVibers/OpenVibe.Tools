@@ -6,7 +6,7 @@
 // (lifecycle), http.js (routes), media.js (results in Media), events.js (tools.job.* to OpenVibe.Events),
 // usage.js (tools.usage.recorded, a developer project's jobs per hour), client.js (browser helper).
 //
-// The job store is part of every app's one `tools` database: no per-satellite jobs.db.
+// The job store is part of every app's one `tools` database: shared across apps.
 //
 // Environment (one /etc/openvibe/tools.env for every unit):
 //   TOOLS_JOBS_CONCURRENCY           jobs running at once per satellite (default 2)

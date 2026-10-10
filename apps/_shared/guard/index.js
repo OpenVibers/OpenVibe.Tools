@@ -15,13 +15,13 @@
 //   callers    one resolver (./caller.js): anonymous (address, IPv6 /64) < session < user < service;
 //              sandbox tokens keep their small allowance
 //   quotas     token buckets per class × tier weighted by the tool's cost (./quota.js), day allowances
-//              in guard.db; RateLimit-Limit/Remaining/Reset on every counted answer, and on refusal
+//              in Valkey when configured; RateLimit-Limit/Remaining/Reset on every counted answer, and on refusal
 //              429 problem+json tools.quota.exceeded with Retry-After
 //   heavy      a semaphore for synchronous heavy calls (503 tools.busy + Retry-After when it is full)
 //   uploads    the bytes are checked against the descriptor's files.accept (415 tools.file.unsupported_type);
 //              heavy tools (auth.anonymous false) need a session cookie, a sign-in or a token
 //   egress     a per-target throttle across all callers (limits.perTargetPerMinute) and the port-scan cap
-//   log        every refusal (and every would-be refusal in report mode) in guard.db's abuse log:
+//   log        every refusal (and every would-be refusal in report mode) in PostgreSQL guard_abuse:
 //              HMAC(address, today's salt), principal or user id, tool, reason — 30 days, no raw
 //              address anywhere; metric tools_guard_refused_total{reason,tool}
 //   challenge  a hook for a person-check (Turnstile later; ./challenge.js, a no-op now)

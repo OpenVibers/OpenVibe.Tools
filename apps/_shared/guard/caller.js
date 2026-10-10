@@ -35,7 +35,7 @@ const COOKIE = 'ov_tools_jobs';
  * @param {string} o.issuer
  * @param {string} [o.audience='openvibe.tools']
  * @param {object} [o.contracts]            openvibe-contracts, when the app has it
- * @param {() => string} [o.salt]           today's salt (guard.db); a process-local one otherwise
+ * @param {() => string} [o.salt]           today's salt (Valkey when configured); a process-local one otherwise
  * @param {string} [o.cookieName='ov_tools_jobs']
  * @param {boolean} [o.secureCookie]
  */

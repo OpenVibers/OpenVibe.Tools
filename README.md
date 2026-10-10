@@ -16,7 +16,7 @@ offline against the Network's public key (JWKS).
 - the tool registry (families, tools, descriptors `tools.tool@1`, canonical, short and alias hosts),
   the catalog and every tool page on `openvibe.tools` and `*.openvibe.tools`
 - the run API and the jobs runtime (img, audio, docs jobs with their files and SSE progress), the
-  guard (callers, quotas, sniffing, egress throttles, abuse log) and each app's `data/guard.db`
+  guard (callers, quotas, sniffing, egress throttles, PostgreSQL abuse log)
 - the `tools.*` events, Tools' Search documents and the `tools.usage` user module
 
 ## Does not own
@@ -69,7 +69,7 @@ apps/_shared   # openvibe-tools-shared, a versioned package (package.json, CHANG
                # the SSRF guard (egress.js) that every tool reaching a visitor-chosen host or URL goes
                # through (public addresses only, checked after DNS and dialled as checked, redirect hops
                # re-checked). Visit analytics come from openvibe-shared/analytics.
-scripts/analytics-prune.js   # operator CLI: raw analytics retention + one-time scrub (dry run by default)
+scripts/analytics-prune.js   # operator CLI: PostgreSQL raw analytics retention (dry run by default)
 (openvibe-shared is a pinned OpenVibe.Shared release in each app's package.json; no vendor/ copy)
 ```
 
@@ -109,9 +109,7 @@ as the checkout owner, installs in each app whose dependencies changed (apps/_* 
 checks every dependency resolves and that the jobs runtime and the guard load, restarts every
 `openvibe-tools*` unit, waits for the gateway's `/api/ready` and its `/release.json` to name the new sha
 with every unit active, rolls back if they do not, and announces the release (`host.release.published`
-to OpenVibe.Events, so open tabs check `/release.json` within seconds). When ovhost is missing, too old or
-does not deploy Tools with that strategy, the wrapper runs `deploy/scripts/deploy-legacy.sh`, the previous
-script, unchanged (`OVHOST_LEGACY=1` forces it).
+to OpenVibe.Events, so open tabs check `/release.json` within seconds). If ovhost is missing, the wrapper exits with an error.
 
 ## Tool registry API (ADR-027)
 
@@ -281,8 +279,8 @@ reload reattaches.
   `tools.job.created` (submit or retry; actor the owner), `tools.job.started` (a worker claimed it; a job
   re-queued after a restart is announced again when it starts), `tools.job.succeeded` and `tools.job.failed`
   (payloads `openvibe-contracts` `tools.job.*@1`, validated before they are queued; subject `job <id>`, visibility
-  `internal`, source `tools`). Each is written to an `event_outbox` table in the satellite's `jobs.db` (openvibe-sdk
-  `createOutbox`) in the same SQLite transaction as the state change, so an event exists exactly when its
+  `internal`, source `tools`). Each is written to the shared PostgreSQL `event_outbox` table (openvibe-sdk
+  `createPgOutbox`) in the same transaction as the state change, so an event exists exactly when its
   transition committed, and relayed to `EVENTS_URL/api/v1/events` (at least once; Events dedupes on `event_id`).
   Payloads carry ids, type, owner, state, attempts, times, where result files are (index, mime, size, sha256,
   `local` or a Media `media_id`) and the error (`status`, `code`, `detail` with server paths and the job's file
@@ -344,8 +342,8 @@ One module used by the gateway and every satellite, driven by each tool's descri
   address anything reads. The gateway's proxy to a satellite passes its own `req.ip` as that one hop; food passes its
   visitor's to maps. A first-party service calling on loopback is identified by its service token (each has its own
   bucket at the service tier); without one it is anonymous, counted by the address it forwarded or its own.
-- **Quotas.** A token bucket per quota class × tier in memory (`perMinute`, `burst`) and a UTC-day allowance in the
-  app's `data/guard.db` (survives restarts), both counting the tool's `cost`. Browser sessions from one address share
+- **Quotas.** A token bucket per quota class × tier (`perMinute`, `burst`) and a UTC-day allowance in
+  Valkey when configured (process-local otherwise), both counting the tool's `cost`. Browser sessions from one address share
   3 × one session's allowance, so dropping the cookie never resets anything. Counted answers carry
   `RateLimit-Limit`/`-Remaining`/`-Reset`; a refusal is `429` problem+json `tools.quota.exceeded` with `Retry-After`
   and `quota_class`, `scope`, `tier`.
@@ -367,7 +365,7 @@ One module used by the gateway and every satellite, driven by each tool's descri
   belong to their maker (session, sign-in or token; anyone else gets 404), at most 5 per owner and 10 per address.
   YouTube downloads belong to whoever started them. Nominatim is paced to one request a second; Overpass waits are
   capped.
-- **Abuse log.** Every refusal, and every would-be refusal in report mode, goes to `guard.db`: time, `HMAC-SHA256`
+- **Abuse log.** Every refusal, and every would-be refusal in report mode, goes to PostgreSQL `guard_abuse`: time, `HMAC-SHA256`
   of the address (or /64) with a random daily salt (only today's is kept, so older hashes cannot be tied to
   anything), principal or user id, tool, reason, enforced or not; repeats within a minute are one row with a count;
   kept 30 days. No raw address is stored anywhere (pseudonymous, ADR-021). Metrics: `tools_guard_refused_total{reason,tool}`,
@@ -450,7 +448,7 @@ Every server (gateway and satellites) mounts `apps/_shared/observe.js` with `ope
   also answers `location = /metrics` with 404. HTTP golden signals are labelled by route template
   (`/api/v1/jobs/:id`), proxied satellite traffic on the gateway by satellite (`proxy:img`), SPA pages and
   static files by a fixed label — never the raw URL. `release_info{service="tools"|"tools-<app>"}`, process
-  metrics, and on img/audio/docs `tools_jobs{app,state}` (a group-by on jobs.db) and
+  metrics, and on img/audio/docs `tools_jobs{app,state}` (a group-by on the shared job store) and
   `tools_jobs_executing{app,kind="executing"|"limit"}`.
 - `GET /api/ready` — named checks with `status`, `required`, `latency_ms`, `checked_at`; HTTP 503 only when a
   required check fails, otherwise 200 with failed optional checks listed in `degraded`. `/api/health` is
@@ -458,12 +456,12 @@ Every server (gateway and satellites) mounts `apps/_shared/observe.js` with `ope
 
 | Server | Required | Optional (degraded when failing) |
 |---|---|---|
-| gateway (4001) | `catalog` | `network_key`, `service_directory` (Network registry vs fallback list), `community` (`/api/ready`), `satellite_<app>` for all seven (`/api/ready`, cached 15 s), `tool_registry` (every catalogue tool has a descriptor that meets the contracts) |
-| img, docs (4012, 4016) | `jobs_db` (query), `job_runtime` (worker started), `data_dir`, `uploads_dir`, `output_dir` (write test) | `analytics_db`, `network_key`, `media_results` (only with `TOOLS_JOB_RESULTS=media`); img: `heif_decoder`; docs: `qpdf`, `pdftoppm`, `pdfinfo` |
-| audio (4014) | same as img | same as img, plus `ffmpeg` on PATH |
-| yt (4013) | `downloads_dir` | `analytics_db`, `yt_dlp`, `ffmpeg`, `yt_cookies` (when `YT_COOKIES_FILE` is set), `network_key` |
-| food (4011) | `maps` (every food API is proxied to it) | `analytics_db` |
-| maps, text (4010, 4015) | — | `analytics_db` (maps' external data sources are not probed) |
+| gateway (4001) | `catalog`, `tools_db` | `network_key`, `service_directory`, `community`, `satellite_<app>`, `tool_registry` |
+| img, docs (4012, 4016) | `tools_db`, `job_runtime`, `data_dir`, `uploads_dir`, `output_dir` | `network_key`, `media_results` (when enabled); img: `heif_decoder`; docs: `qpdf`, `pdftoppm`, `pdfinfo` |
+| audio (4014) | same as img | same as img, plus `ffmpeg` |
+| yt (4013) | `tools_db`, `downloads_dir` | `yt_dlp`, `ffmpeg`, `yt_cookies` (when set), `network_key` |
+| food (4011) | `tools_db`, `maps` | — |
+| maps, text (4010, 4015) | `tools_db` | — |
 
 `TOOLS_SATELLITE_PORTS="img=5012,…"` overrides the gateway's satellite ports (tests, a moved unit); every app reads
 it (`apps/_shared/tools/satellites.js`), so set it for all units if a port moves.
@@ -498,31 +496,14 @@ are installed (or `QPDF_PATH` / `HEIF_DEC_PATH` point at them). Install first wi
 
 ## Analytics (ADR-021)
 
-Every satellite except the gateway keeps visit analytics in its own `data/analytics.db` through
-`openvibe-shared/analytics` (since openvibe-shared v1.4.0; the one module Live, Tools and Network use).
-Bound by ADR-021 (OpenVibe.Contracts `docs/adr/ADR-021-analytics.md`):
+All eight apps store visit analytics in the shared PostgreSQL database through
+`openvibe-shared/analytics/pg` (ADR-021). Raw events include the service, route template,
+method, status, response time, session identifier and coarse visitor metadata. GPC and DNT opt-outs
+are excluded. Daily and hourly rollups remain after raw events expire.
 
-- **A raw row carries** event type, service, route template (matched Express route, else a normaliser: no
-  query string, ids/hashes → `:id`, the segment after `watch`, `jobs`, `recipe`, `place`, … → `:param`,
-  `/@x` → `/@:user`), method, status, response time, a rotating session id, country (CDN header),
-  user-agent class (`chrome/windows/desktop`, `bot:googlebot`) + browser/os/device, referer origin, bot
-  flags, a signed-in flag, timestamp. **Never** an IP, a user id, a city, the UA string or a full referer
-  (`ip`/`user_id`/`city` stay as always-NULL columns for compatibility).
-- **Opt-out:** a request with `Sec-GPC: 1` or `DNT: 1` is not recorded at all (no raw row, visitor hash,
-  session id or rate counter), so it is also missing from the rollups.
-- **Session id:** random, in memory against the visitor hash, new after 30 idle minutes and at UTC midnight.
-- **Bot rate check:** per-IP counters in memory only (current + previous minute); `analytics_rate_tracking`
-  is emptied at boot and no longer written.
-- **Unique visitors:** `HMAC-SHA256(day salt, ip + "\n" + ua)` (16 hex chars), random salt per UTC day. Hashes
-  and the salt are kept only until the first hourly aggregation after their day ends (right after the
-  day's final rollup), never in raw rows. Rollups keep counts; sub-48 h raw summaries count sessions.
-- **Retention:** each satellite prunes raw rows older than 30 days in batches of 5000, 5 minutes after boot
-  and every 24 h after; rollups stay.
-- **CLI:** `node scripts/analytics-prune.js`, a wrapper over `openvibe-shared/analytics/prune-cli` (dry run
-  over every `apps/*/data/analytics.db`; `--app`, `--db` to narrow). `--apply` needs `--backup <file|dir>`
-  (verified owner-only online backup; a directory when several databases are targeted) or `--no-backup`;
-  `--scrub` also rewrites rows written before ADR-021 and the rollups' top lists (counts unchanged). Ends
-  with VACUUM unless `--no-vacuum`.
+- **Retention:** the application prunes raw rows older than 30 days; rollups stay.
+- **CLI:** `node scripts/analytics-prune.js` counts old rows by service. Pass `--days N` to choose
+  retention and `--apply` to delete them. It requires `DATABASE_URL` and applies to every service.
 
 ## Host packages some tools need
 
@@ -635,36 +616,15 @@ when the gateway's `/api/ready` or `/release.json` does not come up with every u
   `openvibe-tools-<name>.service` per satellite
   (`apps/<name>/deploy/systemd/`). Resource bounds: `MemoryMax=2G` (img, audio,
   docs), `1G` (yt), `768M` (gateway, text, maps, food); `TasksMax=256`; `Nice=5`
-  for img, audio, docs and yt. Every app writes `data/guard.db` (the gateway
-  too: `ReadWritePaths=/opt/openvibe.tools/apps/gateway/data`; the deploy
-  (`ovhost deploy tools`, or `deploy-legacy.sh`) creates each `data/` before restarting).
+  for img, audio, docs and yt. The gateway data directory remains writable for local runtime files.
 - Nginx: satellites have specific `server_name` blocks; the gateway's
   wildcard `*.openvibe.tools` block catches everything else. TLS via
   `/etc/letsencrypt/live/openvibe.tools/`.
 
-## Migration to PostgreSQL + Valkey (plan T8)
+## Database and guard state
 
-All eight apps move from `better-sqlite3` to **one `tools` PostgreSQL database** and to **Valkey** for the
-guard's throttle state. The schema is in `migrations/0001_tools.sql` (job store, `guard_abuse`) and
-`migrations/0002_analytics.sql` (request analytics, the DDL of `openvibe-shared/analytics/pg.js`),
-`migrations/0003_token_revocations.sql` and `migrations/0004_event_outbox.sql` (the tools.job.* outbox,
-`openvibe-sdk` createPgOutbox's table). All of them run as the owner (`DATABASE_DIRECT_URL`); nothing creates a
-table at runtime, so the runtime role needs no DDL rights. `scripts/migrate-to-postgres.js` imports
-every `apps/*/data/{guard,jobs,analytics}.db` into that one database (each file's rows tagged with its app):
-run it with `--pglite` for an in-memory rehearsal, `--dry-run --url <scratch>` for a scratch database, or
-with `DATABASE_DIRECT_URL` set for the cutover; it prints a per-table count and checksum report.
-
-After the move the apps read `DATABASE_URL` / `DATABASE_DIRECT_URL` (PostgreSQL, via PgBouncer) and
-`VALKEY_URL` (Valkey); `guard_salt`, `guard_day` and the minute/burst buckets live in Valkey (a throttle,
-never authoritative), while `guard_abuse`, the job store and the analytics tables stay in PostgreSQL.
-`TOOLS_GUARD` (default `enforce`) and its meaning are unchanged.
-
-State (plan T8 landed 2026-10-02; production serves the PostgreSQL-only release): every app opens the one `tools`
-database (`apps/_shared/db.js`, `DATABASE_URL` else an embedded PGlite database in development;
-`DATABASE_DIRECT_URL` runs the migrations as owner) and the shared Valkey (`VALKEY_URL`, else the guard's
-counters and salt stay in this process); the job store, `guard_abuse`, `token_revocations` and the request
-analytics are on PostgreSQL, the net and dev pages call the run API, and the `/api/process`, `/api/net/*` and
-`/api/dev/*` routes are removed (above). No app depends on `better-sqlite3` any more; the operational scripts
-that still read the old SQLite files (the importer, `scripts/analytics-prune.js`, `scripts/guard-abuse-report.js`)
-have it in `scripts/package.json`: run `npm --prefix scripts install` on the host only to read the archived SQLite
-files (the importer has run; production writes PostgreSQL). The cutover evidence is in `docs/cutover-evidence-t8.md`.
+All eight apps use one PostgreSQL database through `openvibe-sdk/db`. Production requires
+`DATABASE_URL`; `DATABASE_DIRECT_URL` lets the owner apply the immutable SQL files in `migrations/`
+at boot. Development and tests use embedded PGlite through the same API. Job records, abuse logs,
+revocations, analytics, and the event outbox live in PostgreSQL. The guard's transient throttle
+counters and salt use Valkey through `VALKEY_URL`, with process-local state when it is unset.

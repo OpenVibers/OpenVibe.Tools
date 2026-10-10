@@ -39,4 +39,19 @@ for (const m of manifests) {
     assert.ok(!(pkg.dependencies && pkg.dependencies['better-sqlite3']), `${path.relative(APPS, m)} still depends on better-sqlite3`);
 }
 
+// Migration tooling and legacy deployment must stay removed.
+const ROOT = path.resolve(APPS, '..');
+for (const name of [
+    'scripts/migrate-to-postgres.js', 'scripts/sqlite.js', 'scripts/package.json',
+    'scripts/package-lock.json', 'deploy/scripts/deploy-legacy.sh',
+    'docs/cutover-evidence-t8.md',
+]) assert.ok(!fs.existsSync(path.join(ROOT, name)), `${name} must be removed`);
+for (const name of ['deploy/scripts/deploy.sh', 'scripts/analytics-prune.js', 'scripts/guard-abuse-report.js']) {
+    const source = fs.readFileSync(path.join(ROOT, name), 'utf8');
+    assert.doesNotMatch(source, /DEPLOY_LEGACY|OVHOST_LEGACY|\.\/sqlite|analytics\.db|guard\.db|deploy-legacy/);
+}
+for (const m of manifests) {
+    const pkg = JSON.parse(fs.readFileSync(m, 'utf8'));
+    for (const dep of ['better-sqlite3', 'sqlite3']) assert.ok(!pkg.dependencies?.[dep], `${m} depends on ${dep}`);
+}
 console.log(`no sqlite (nothing under apps/ requires better-sqlite3): all checks passed (${files.length} files scanned)`);

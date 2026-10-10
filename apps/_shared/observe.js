@@ -8,7 +8,7 @@
 //   const obs = require('../../_shared/observe').observe({
 //       app, metrics: require('openvibe-shared/metrics'), ready: require('openvibe-shared/ready'),
 //       service: 'tools-img', release: release.release,
-//       checks: [ checks.sqlite('analytics_db', analyticsDb, { required: false }), … ],
+//       checks: [ checks.postgres('tools_db', db), … ],
 //       jobs: () => jobs,          // the satellite's job system, once it exists (tools_jobs{app,state})
 //   });
 //
@@ -77,19 +77,6 @@ function observe(o) {
 // ── Check builders ──────────────────────────────────────────────
 
 const checks = {
-    /** A real query on a better-sqlite3 handle (or a function returning one). */
-    sqlite(name, db, { required = true, sql = 'SELECT 1 AS ok', description } = {}) {
-        return {
-            name, required, description,
-            check: () => {
-                const h = typeof db === 'function' ? db() : db;
-                if (!h) return 'database not open';
-                const row = h.prepare(sql).get();
-                return row ? true : 'query returned no row';
-            },
-        };
-    },
-
     /** A real round trip on the one `tools` database (an openvibe-sdk/db handle, or a function
      *  returning one); the detail names the store it answered from (postgresql / pglite). */
     postgres(name, db, { required = true, description } = {}) {

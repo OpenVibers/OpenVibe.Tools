@@ -39,7 +39,7 @@ const { requireInternalAccess } = require('../../_shared/internal-token');
 // ── Guard (apps/_shared/guard) ───────────────────────────────
 // Who is asking (Network sign-in with aud openvibe.tools, service tokens, the browser session, else
 // the address), tiered quotas by each tool's descriptor, upload sniffing, the sync semaphore and the
-// abuse log (data/guard.db). TOOLS_GUARD=enforce (default) refuses; report records what it would
+// abuse log (PostgreSQL guard_abuse). TOOLS_GUARD=enforce (default) refuses; report records what it would
 // refuse. Every PDF tool needs a browser session, a sign-in or a token (descriptor auth.anonymous false).
 const SPECS = require('./descriptors').SPECS;
 // The one `tools` database and the shared Valkey (plan T8, decisions 3 and 4).
