@@ -131,8 +131,8 @@ a:hover { text-decoration: underline; }
 }
 .btn:active { transform: scale(0.97); }
 .btn-primary {
-    background: var(--accent);
-    color: #fff;
+    background: var(--accent-strong, var(--accent, #3472d8));
+    color: var(--on-accent-strong, var(--on-accent, #fff));
 }
 .btn-primary:hover {
     background: var(--accent-hover);

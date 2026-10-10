@@ -97,9 +97,9 @@ body {
     border-color: var(--accent-dark);
 }
 .tool-tab.active {
-    background: var(--accent);
-    color: #fff;
-    border-color: var(--accent);
+    background: var(--accent-strong, var(--accent, #3472d8));
+    color: var(--on-accent-strong, var(--on-accent, #fff));
+    border-color: var(--accent-strong, var(--accent, #3472d8));
 }
 
 /* ── Upload Zone ────────────────────────────────────────────── */
@@ -216,9 +216,9 @@ body {
     color: var(--text-primary);
 }
 .format-btn.active, .aspect-btn.active {
-    background: var(--accent);
-    color: #fff;
-    border-color: var(--accent);
+    background: var(--accent-strong, var(--accent, #3472d8));
+    color: var(--on-accent-strong, var(--on-accent, #fff));
+    border-color: var(--accent-strong, var(--accent, #3472d8));
 }
 
 /* Slider */
@@ -303,8 +303,8 @@ body {
     text-decoration: none;
 }
 .btn-primary {
-    background: var(--accent);
-    color: #fff;
+    background: var(--accent-strong, var(--accent, #3472d8));
+    color: var(--on-accent-strong, var(--on-accent, #fff));
 }
 .btn-primary:hover:not(:disabled) { background: var(--accent-dark); }
 .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
