@@ -14,8 +14,9 @@ service is an OAuth2 **client** (`client_id: tools`), not a provider.
   plus one subdomain per tool: `dns.`, `ping.`, `ssl.`, `whois.`, …).
 - **Dev.OpenVibe** — 26 developer & SEO tools (`dev.openvibe.tools` plus
   `json.`, `base64.`, `jwt.`, `regex.`, …).
-- **Paste.OpenVibe** — `pastes.openvibe.tools` front-end; pastes are stored in
-  OpenVibe.Media under app_id `live` and proxied server-side via `MEDIA_URL`.
+- **Paste.OpenVibe** — `pastes.openvibe.tools` redirects to OpenVibe.Community;
+  `/api/pastes/*` is forwarded to OpenVibe.Community (`OV_COMMUNITY_INTERNAL_URL`)
+  with the visitor's `ov_token`.
 - **Session layer** — `/auth/login`, `/auth/callback`, `/auth/logout`,
   `/auth/me`, `/auth/refresh`. Sets the shared `ov_token` cookie on
   `.openvibe.tools` so every satellite subdomain can read it and verify it
@@ -27,7 +28,7 @@ service is an OAuth2 **client** (`client_id: tools`), not a provider.
 apps/gateway (port 4001)
 ├── server/
 │   ├── index.js       # Express app, CORS, Host routing, paste proxy
-│   ├── config.js      # Port, Network URLs, OAuth client, Media URL
+│   ├── config.js      # Port, Network URLs, OAuth client, Community URL
 │   ├── auth/routes.js # OAuth2 client session layer (+ offline JWT verify)
 │   ├── net/           # Net.OpenVibe API + tool/alias definitions
 │   └── dev/           # Dev.OpenVibe API + tool/alias definitions
@@ -56,7 +57,7 @@ curl -H 'Host: net.openvibe.tools' http://localhost:4001/
 
 See `.env.example`. Key variables: `PORT` (4001), `OV_NETWORK_URL`,
 `OV_NETWORK_INTERNAL_URL`, `OV_OAUTH_CLIENT_ID`, `OV_OAUTH_CLIENT_SECRET`,
-`OV_OAUTH_REDIRECT_URI`, `MEDIA_URL`, `COOKIE_DOMAIN`.
+`OV_OAUTH_REDIRECT_URI`, `OV_COMMUNITY_INTERNAL_URL`, `COOKIE_DOMAIN`.
 
 ## Deploy
 

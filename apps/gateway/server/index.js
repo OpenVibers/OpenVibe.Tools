@@ -5,7 +5,7 @@
 //
 // Serves the apex directory page plus the Host-header-routed tool
 // subdomains: Net.OpenVibe (38 network tools), Dev.OpenVibe
-// (26 developer tools), and Paste.OpenVibe (backed by OpenVibe.Media).
+// (26 developer tools), and Paste.OpenVibe (backed by OpenVibe.Community).
 //
 // Identity lives on OpenVibe.Network — this service is an OAuth2
 // CLIENT (`tools`). See server/auth/routes.js for the session layer.
@@ -511,7 +511,7 @@ const server = app.listen(config.port, config.host, () => {
     console.log(`║  Port:    ${String(config.port).padEnd(32)}║`);
     console.log(`║  URL:     ${config.baseUrl.padEnd(32)}║`);
     console.log(`║  SSO:     ${config.networkUrl.padEnd(32)}║`);
-    console.log(`║  Live:    ${config.liveUrl.padEnd(32)}║`);
+    console.log(`║  Pastes:  ${config.communityUrl.padEnd(32)}║`);
     console.log(`╚════════════════════════════════════════════╝\n`);
 });
 
