@@ -17,6 +17,10 @@ const site = require('../server/pages/site');
         assert.ok(home.includes('data-ov-shipped="latest" data-service="tools" href="/updates"'), 'home pill');
         assert.ok(home.includes('data-ov-shipped="list" data-service="tools"'), 'home recent list');
         assert.ok(home.includes('data-service="tools" href="/updates"') && home.includes('>Updates</a>'), 'the footer line and Updates link');
+        // The shared navbar's deferred script lands in a mount that already holds its height (no layout shift);
+        // without JavaScript the mount goes away and the plain topbar shows.
+        assert.ok(home.includes('<div id="navbar-mount"></div><noscript><style>#navbar-mount{display:none}</style><header class="topbar">') && home.indexOf('id="navbar-mount"') < home.indexOf('<main'), 'navbar mount before the noscript topbar and the page');
+        assert.ok(home.includes('#navbar-mount{min-height:52px}'), 'the mount holds the navbar height');
         const r = await fetch(`${base}/updates`);
         assert.strictEqual(r.status, 200);
         const up = await r.text();
