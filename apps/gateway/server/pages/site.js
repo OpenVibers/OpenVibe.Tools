@@ -43,6 +43,8 @@ body{margin:0;background:var(--bg-primary,#0a0f18);color:var(--text-primary,#e6e
 a{color:var(--accent-light,var(--accent,#60a5fa))}
 .wrap{max-width:1180px;margin:0 auto;padding:0 20px}
 pre{max-width:100%;overflow-x:auto}pre:focus-visible{outline:2px solid var(--accent,#3b82f6);outline-offset:2px}
+/* The shared navbar lands in #navbar-mount after its deferred script: the mount holds its 52px from the first paint, so the page below does not drop when it arrives. */
+#navbar-mount{min-height:52px}
 .topbar{display:flex;align-items:center;gap:14px;padding:12px 20px;border-bottom:1px solid var(--border,rgba(255,255,255,.08))}
 .topbar a{color:inherit;text-decoration:none;font-weight:700}.topbar nav{display:flex;gap:14px;margin-left:auto;font-size:14px;flex-wrap:wrap}.topbar nav a{font-weight:500;color:var(--text-secondary,#a8b3c4)}
 .hero{padding:clamp(28px,6vw,64px) 0 8px;text-align:center}
@@ -124,7 +126,7 @@ ${appIcon.headTags({ site: 'tools', iconBase: '/assets' })}
 <link rel="preconnect" href="https://openvibe.network">
 <script src="${ovServe.url('theme-loader.js')}" defer></script>
 <style>${CSS}</style></head><body>${spriteSvg}
-<noscript><header class="topbar"><a href="${SITE}/">${NAME}</a><nav>${families.filter(f => f.path).map(f => `<a href="${esc(f.path)}">${esc(f.name)}</a>`).join('')}<a href="/all-tools">All tools</a></nav></header></noscript>
+<div id="navbar-mount"></div><noscript><style>#navbar-mount{display:none}</style><header class="topbar"><a href="${SITE}/">${NAME}</a><nav>${families.filter(f => f.path).map(f => `<a href="${esc(f.path)}">${esc(f.name)}</a>`).join('')}<a href="/all-tools">All tools</a></nav></header></noscript>
 <main class="wrap">${body}
 <section aria-labelledby="net-h"><div class="sec-h"><h2 id="net-h">The rest of OpenVibe</h2></div><p class="sec-p">One account works on every site. Open source and community-run.</p>
 <div class="net">${NETWORK.map(([ic, n, d, u]) => `<a class="tool" href="${u}">${icon(ic, 36)}<span class="tool-t"><b>${n}</b><small>${d}</small></span></a>`).join('')}</div></section>
