@@ -332,7 +332,7 @@ async function fakeFetch(url) {
             const probe = await fetch(`${base}/api/net${t.endpoint}?target=`);
             assert.notStrictEqual(probe.status, 404, `${t.id} → ${t.endpoint} exists`);
         }
-        assert.deepStrictEqual(NET_TOOLS.filter(t => t.status === 'unavailable').map(t => t.id), ['traceroute', 'mtr', 'reputation']);
+        assert.deepStrictEqual(NET_TOOLS.filter(t => t.status === 'unavailable').map(t => t.id), ['reputation']);
     } finally {
         srv.closeAllConnections(); srv.close();
     }

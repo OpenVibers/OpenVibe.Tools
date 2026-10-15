@@ -17,7 +17,7 @@ const FAMILIES = [
         intro: 'These tools answer the questions that come up when something on the internet does not work: where does this domain point, why is mail bouncing, is the certificate about to expire, is the site down for everyone. Each one takes a domain, an IP address or a URL and gives a readable answer in a few seconds.',
         faq: [
             ['Do I need to install anything?', 'No. Every lookup runs from our servers and the result appears in your browser, so the tools work on a phone, a locked-down work laptop or a Chromebook.'],
-            ['Where do the lookups run from?', 'Every check runs from the OpenVibe server, outside your own network. Ping and latency are timed TCP connections; traceroute and MTR are not available because they need raw network access the server does not give the tools.'],
+            ['Where do the lookups run from?', 'Every check runs from the OpenVibe server, outside your own network. Ping and latency are timed TCP connections; traceroute and MTR send ICMP echo hop by hop (mtr).'],
             ['Can I check a server inside my own network?', 'No. The checks come from the public internet, so the target has to be reachable from outside your network.'],
         ],
     },

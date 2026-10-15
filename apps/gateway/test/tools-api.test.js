@@ -190,7 +190,7 @@ const get = async (url, headers = {}, method = 'GET') => {
         for (const id of ['protectpdf', 'unlockpdf', 'pdf2jpg', 'heic', 'mp3', 'merge', 'yt']) assert.strictEqual((await status(G, id)).status, 'unavailable', `gateway: ${id}`);
         for (const id of ['png', 'mergepdf', 'fancy', 'dns']) assert.strictEqual((await status(G, id)).status, 'stable', `gateway: ${id}`);
         l = await count('status=unavailable');
-        assert.ok(l.tools.length >= 3 + 36 + 5 && contracts.tools.checkList(l).valid, 'status filter');
+        assert.ok(l.tools.length >= 1 + 36 + 5 && contracts.tools.checkList(l).valid, 'status filter');   // reputation (net), then the tools without binaries here
 
         // Readiness: the registry is checked, and it passes.
         const ready = (await get(`${G}/api/ready`)).body;

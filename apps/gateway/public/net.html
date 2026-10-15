@@ -677,8 +677,8 @@
         dmarc:            { name: 'DMARC Checker',          icon: 'fa-user-shield',       cat: 'dns',   endpoint: '/dns',      placeholder: 'Domain for DMARC',          defaultTypes: 'TXT' },
         // Active diagnostics
         ping:             { name: 'Ping Test (TCP)',           icon: 'fa-satellite-dish',    cat: 'diag',  endpoint: '/ping',     placeholder: 'Host to ping (TCP port 443, from our server)' },
-        traceroute:       { name: 'Traceroute',     icon: 'fa-route',             cat: 'diag',  endpoint: null, unavailable: 'Traceroute needs raw network access that this server does not give the tools, so it is not available. The TCP ping test shows whether a host answers and how fast.', instead: 'ping' },
-        mtr:              { name: 'MTR Report',            icon: 'fa-chart-line',        cat: 'diag',  endpoint: null, unavailable: 'MTR needs raw network access that this server does not give the tools, so it is not available. The TCP ping test shows latency and loss to the host.', instead: 'ping' },
+        traceroute:       { name: 'Traceroute',     icon: 'fa-route',             cat: 'diag',  endpoint: '/trace',    placeholder: 'Host to trace (the path from our server)', wait: 'about 10 seconds' },
+        mtr:              { name: 'MTR Report',            icon: 'fa-chart-line',        cat: 'diag',  endpoint: '/mtr',      placeholder: 'Host for an MTR report (10 probes a hop, from our server)', wait: 'about 15 seconds' },
         port:             { name: 'Port Checker',      icon: 'fa-door-open',         cat: 'diag',  endpoint: '/port',     placeholder: 'Host to scan ports' },
         headers:          { name: 'HTTP Header Checker',        icon: 'fa-list',              cat: 'diag',  endpoint: '/headers',  placeholder: 'URL or domain' },
         redirects:        { name: 'Redirect Checker',      icon: 'fa-share',             cat: 'diag',  endpoint: '/redirects', placeholder: 'URL to follow redirects' },
@@ -975,7 +975,7 @@
         if (!target && !tool.auto) { toast('Please enter a domain, IP, or URL', 'error'); return; }
 
         // Show loading
-        resultsEl.innerHTML = `<div class="loading"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Running ${tool.name}…</p></div>`;
+        resultsEl.innerHTML = `<div class="loading"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Running ${tool.name}…${tool.wait ? ` (${tool.wait})` : ''}</p></div>`;
 
         try {
             // The tool's run API (plan T8, Phase 1): the fields the page collected, kept only where the
@@ -1036,6 +1036,8 @@
         if (tool.endpoint === '/redirects') return renderRedirects(el, data);
         if (tool.endpoint === '/port') return renderPort(el, data);
         if (tool.endpoint === '/ping') return renderPing(el, data);
+        if (tool.endpoint === '/trace') return renderTrace(el, data, false);
+        if (tool.endpoint === '/mtr') return renderTrace(el, data, true);
         if (tool.endpoint === '/dnsprop') return renderDnsProp(el, data);
         if (tool.endpoint === '/blacklist') return renderBlacklist(el, data);
         if (tool.endpoint === '/smtp') return renderSMTP(el, data);
@@ -1330,6 +1332,34 @@
                     <tr><td class="key">Avg</td><td class="val">${stats.avg}ms</td><td class="key">Loss</td><td class="val">${stats.loss}%</td></tr>
                 </table>
             </div>
+        </div>`;
+        el.innerHTML = html;
+    }
+
+    // ── Traceroute and MTR: the path from our server, hop by hop (mtr's report; no reply = a router that stays quiet) ──
+    function renderTrace(el, data, full) {
+        const hops = data.hops || [];
+        const ms = (v) => v === null || v === undefined ? '—' : `${v}ms`;
+        const lossBadge = (l) => l === null || l === undefined ? '' : `<span class="badge ${l === 0 ? 'badge-green' : l < 100 ? 'badge-yellow' : 'badge-red'}">${l}%</span>`;
+        let html = `<div class="badges">
+            <span class="badge badge-cyan">${esc(data.target)} (${esc(data.ip)})</span>
+            <span class="badge">${hops.length} ${hops.length === 1 ? 'hop' : 'hops'}</span>
+            <span class="badge ${data.reached ? 'badge-green' : 'badge-yellow'}">${data.reached ? 'Reached' : 'Not reached'}</span>
+            <span class="badge">${data.probes} probes a hop</span>
+        </div>`;
+        html += `<div class="card"><div class="card-head"><i class="fa-solid ${full ? 'fa-chart-line' : 'fa-route'}"></i> ${full ? 'MTR report' : 'Route'} from OpenVibe's server</div>
+            <div style="overflow-x:auto"><table class="res-table"><tr><th>#</th><th>Host</th><th>Network</th><th>Loss</th>${full ? '<th>Sent</th><th>Last</th>' : ''}<th>Best</th><th>Avg</th><th>Worst</th>${full ? '<th>StDev</th>' : ''}</tr>
+            ${hops.map(h => `<tr>
+                <td class="val">${h.hop}</td>
+                <td class="val">${h.ip ? `${h.host ? `${esc(h.host)}<br><span style="color:var(--text-muted);font-size:11px">${esc(h.ip)}</span>` : esc(h.ip)}` : '<span style="color:var(--text-muted)">no reply</span>'}</td>
+                <td class="val">${h.asn ? esc(h.asn) : '—'}</td>
+                <td>${h.ip ? lossBadge(h.loss) : ''}</td>
+                ${full ? `<td class="val">${h.sent}</td><td class="val">${ms(h.last)}</td>` : ''}
+                <td class="val">${ms(h.best)}</td><td class="val">${ms(h.avg)}</td><td class="val">${ms(h.worst)}</td>
+                ${full ? `<td class="val">${h.stdev === null || h.stdev === undefined ? '—' : h.stdev}</td>` : ''}
+            </tr>`).join('')}
+            </table></div>
+            <p style="color:var(--text-muted);font-size:12px;margin:10px 0 0">Probes are ICMP echo from OpenVibe's server (mtr). A router that does not answer is shown as no reply; loss at one hop that does not carry on to the next is usually that router rate-limiting replies, not lost traffic.</p>
         </div>`;
         el.innerHTML = html;
     }

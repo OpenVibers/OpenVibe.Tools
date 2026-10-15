@@ -33,6 +33,7 @@ const IPAPI_FIELDS = 'status,message,country,countryCode,region,regionName,city,
  * report mode too. The pages call these routes without a session: people are counted by address.
  */
 const { SPECS: NET_SPECS } = require('./descriptors');
+const { createTracer } = require('./trace');
 
 // endpoint ('/dns') → the descriptors served by it (dns, dig, nslookup, mx, txt, …)
 const BY_ENDPOINT = new Map();
@@ -151,6 +152,8 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
     const checks = createChecks({ egress, cache, ...(opts.resolverFor && { resolverFor: opts.resolverFor }), ...(opts.tlsUpgrade && { tlsUpgrade: opts.tlsUpgrade }) });
     const reverseDns = opts.reverse || ((ip) => dns.reverse(ip));
     const guard = opts.guard || null;
+    // Traceroute and MTR (net/trace.js): mtr on the checked address; tests pass a tracer with a fake mtr.
+    const tracer = opts.tracer || createTracer({ reverse: reverseDns });
 
     // ── Helpers ──────────────────────────────────────────────
 
@@ -819,6 +822,27 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
             failFrom(res, err, 'Ping failed');
         }
     });
+
+    // ═══════════════════════════════════════════════════════════
+    // Traceroute and MTR (from this server; net/trace.js)
+    // ═══════════════════════════════════════════════════════════
+
+    for (const [endpoint, mode, what] of [['/trace', 'trace', 'Traceroute'], ['/mtr', 'mtr', 'MTR']]) {
+        router.get(`${endpoint}/:target?`, async (req, res) => {
+            try {
+                const target = parseTarget(req.params.target || req.query.target);
+                if (!target) return fail(res, 'Please provide a host');
+                // Resolve + check; mtr is given the checked address, never the name.
+                const dest = await egress.resolve(target, { prefer: req.query.v === '6' ? 6 : 4 });
+                const run = await tracer.run(mode, dest);
+                ok(res, { target, ip: dest.address, family: net.isIP(dest.address), ...run });
+            } catch (err) {
+                if (err && err.code === 'busy') { res.set('Retry-After', '10'); return fail(res, err.message, 503, 'busy'); }
+                if (err && (err.code === 'trace_timeout' || err.code === 'trace_failed' || err.code === 'trace_unavailable')) return fail(res, err.message, 502, err.code);
+                failFrom(res, err, `${what} failed`);
+            }
+        });
+    }
 
     // ═══════════════════════════════════════════════════════════
     // Supertool Lookup (combines multiple tools)
