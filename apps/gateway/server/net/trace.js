@@ -76,6 +76,9 @@ function createTracer({ exec = execMtr, reverse = null, max = RUNNING_MAX } = {}
         try {
             const got = await Promise.race([reverse(ip), new Promise((r) => setTimeout(() => r([]), 1500).unref())]);
             name = Array.isArray(got) && typeof got[0] === 'string' ? got[0].slice(0, 253) : '';
+            // The host's own resolver answers synthetic names (systemd-resolved: "_gateway" for the default gateway):
+            // not public DNS, so not a hop's name.
+            if (name.startsWith('_') || !name.includes('.')) name = '';
         } catch { name = ''; }
         if (names.size > 2000) names.delete(names.keys().next().value);
         names.set(ip, name);
