@@ -32,6 +32,8 @@ const path = require('path');
  * @param {Function} [o.skip]           requests never recorded (long-lived streams)
  * @param {Function} [o.details]        extra readiness fields
  * @param {boolean} [o.mountReady]      false: the caller mounts readiness.handler where it belongs
+ * @param {object} [o.telemetry]       openvibe-sdk/service's `telemetry` (request telemetry, plan T1): its middleware is
+ *                                     mounted here, a no-op until the app's index.js calls telemetry.init()
  */
 function observe(o) {
     const app = o.app;
@@ -48,6 +50,7 @@ function observe(o) {
         // Job progress streams (SSE) last as long as the job; their duration is not a latency.
         skip: (req) => /^\/api\/v1\/jobs\/[^/]+\/events$/.test(req.path) || (o.skip ? o.skip(req) : false),
     });
+    if (o.telemetry) app.use(o.telemetry.middleware);
     const appName = o.service.replace(/^tools-?/, '') || 'gateway';
     if (o.jobs) {
         inst.registry.gauge({
