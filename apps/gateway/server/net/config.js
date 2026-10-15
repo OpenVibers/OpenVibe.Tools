@@ -129,7 +129,7 @@ const NET_TOOLS = [
     { id: 'latency',          subdomain: 'latency',          name: 'OpenVibeLatency',       icon: 'fa-gauge-high',        desc: 'Latency tester — measure response times', endpoint: '/ping' },
     // Reputation / mail / infra
     { id: 'blacklist',        subdomain: 'blacklist',        name: 'OpenVibeBlacklist',     icon: 'fa-ban',               desc: 'Blacklist / RBL check for IP & domain', endpoint: '/blacklist' },
-    { id: 'reputation',       subdomain: 'reputation',       name: 'OpenVibeReputation',    icon: 'fa-star',              desc: 'Domain & IP reputation score', status: 'unavailable', unavailable: 'A combined reputation report is not available yet. The blacklist, SPF, DKIM and DMARC checkers cover its parts.' },
+    { id: 'reputation',       subdomain: 'reputation',       name: 'OpenVibeReputation',    icon: 'fa-star',              desc: 'Domain & IP reputation score', endpoint: '/reputation' },
     { id: 'smtp',             subdomain: 'smtp',             name: 'OpenVibeSMTP',          icon: 'fa-paper-plane',       desc: 'SMTP server connectivity tester', endpoint: '/smtp' },
     { id: 'uptime',           subdomain: 'uptime',           name: 'OpenVibeUptime',        icon: 'fa-heart-pulse',       desc: 'Uptime & availability monitor', endpoint: '/uptime' },
     { id: 'robots',           subdomain: 'robots',           name: 'OpenVibeRobots',        icon: 'fa-robot',             desc: 'robots.txt analyzer', endpoint: '/robots' },

@@ -109,9 +109,6 @@ function checkProblem(r, status, code, where) {
         checkProblem(await run('nosuchtool', {}), 404, 'tools.tool.not_found', 'unknown');
         checkProblem(await run('yt', {}), 404, 'tools.tool.not_runnable', 'yt: api false');
         checkProblem(await run('regex', { input: {} }), 404, 'tools.tool.not_runnable', 'regex: page only');
-        r = await run('reputation', {});
-        checkProblem(r, 503, 'tools.tool.unavailable', 'descriptor status unavailable');
-        assert.match(r.body.detail, /not available yet/);
         checkProblem(await run('protectpdf', { input: { password: 'x' } }), 503, 'tools.tool.unavailable', 'qpdf missing on docs');
         checkProblem(await call('/api/v1/tools/jsonminify/run', { method: 'GET' }), 405, 'method_not_allowed', 'GET');
 

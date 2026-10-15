@@ -40,7 +40,7 @@ const REPORT = (dst) => JSON.stringify({ report: { mtr: { dst, tests: 3 }, hubs:
         if (release) await new Promise(r => { release.push(r); });
         return { stdout: REPORT(args[args.length - 1]) };
     };
-    const names = { '15.204.72.1': ['vl1.example-provider.net'] };
+    const names = { '15.204.72.1': ['vl1.example-provider.net'], '93.184.216.34': ['_gateway'] };
     const tracer = createTracer({ exec, reverse: async (ip) => names[ip] || [] });
     let run = await tracer.run('trace', { address: '93.184.216.34', family: 4 });
     assert.deepStrictEqual(calls[0].args, ['-4', '-n', '-z', '-j', '-c', '3', '-m', '30', '-U', '5', '--', '93.184.216.34']);
@@ -48,7 +48,7 @@ const REPORT = (dst) => JSON.stringify({ report: { mtr: { dst, tests: 3 }, hubs:
     assert.strictEqual(run.reached, true);
     assert.strictEqual(run.probes, 3);
     assert.strictEqual(run.hops[0].host, 'vl1.example-provider.net', 'a hop with a PTR name is named');
-    assert.strictEqual(run.hops[2].host, null);
+    assert.strictEqual(run.hops[2].host, null, 'a synthetic local name (_gateway) is not a hop name');
     run = await tracer.run('mtr', { address: '2606:4700:4700::1111', family: 6 });
     assert.deepStrictEqual(calls[1].args.slice(0, 6), ['-6', '-n', '-z', '-j', '-c', '10']);
     assert.strictEqual(calls[1].args[calls[1].args.length - 1], '2606:4700:4700::1111');

@@ -12,7 +12,7 @@ const NET = [
     '/ssl/:target?', '/headers/:target?', '/redirects/:target?',
     '/port/:target?', '/ping/:target?', '/lookup/:target?',
     '/robots/:target?', '/sitemap/:target?', '/uptime/:target?',
-    '/smtp/:target?', '/blacklist/:target?', '/dnsprop/:target?',
+    '/smtp/:target?', '/blacklist/:target?', '/dnsprop/:target?', '/reputation/:target?',
 ];
 const DEV = ['/tools', '/opengraph', '/read'];
 const PROCESS = ['/api/process', '/api/process/direct', '/api/process/multi', '/api/process/anything', '/api/process/anything/nested'];
