@@ -453,6 +453,12 @@ Every server (gateway and satellites) mounts `apps/_shared/observe.js` with `ope
 - `GET /api/ready` — named checks with `status`, `required`, `latency_ms`, `checked_at`; HTTP 503 only when a
   required check fails, otherwise 200 with failed optional checks listed in `degraded`. `/api/health` is
   unchanged.
+- **Request telemetry** — counted by route template, method and status class, not raw URL; `/shared`, static assets,
+  health, readiness and `/metrics` do not count. Once a minute one `http.request` sample per key plus the active-
+  requests, p95 latency and event-loop-lag gauges goes to `telemetry_samples` (openvibe-sdk 0.46,
+  `platform.telemetry-sample@1`, `migrations/0006_telemetry.sql`); the gateway alone deletes rows older than 14 days
+  daily. Wired by `apps/_shared/observe.js`; each `server/index.js` calls `telemetry.init()` with its service id
+  (`tools`, `tools-img`, …) into the one `tools` database.
 
 | Server | Required | Optional (degraded when failing) |
 |---|---|---|
