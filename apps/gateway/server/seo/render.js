@@ -17,6 +17,7 @@
 const fs = require('fs');
 const path = require('path');
 const { seoFor, relatedTo, BRAND } = require('./catalog');
+const social = require('openvibe-shared/social');
 
 const SITE = 'https://openvibe.tools';
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -118,7 +119,15 @@ function renderTool(file, sub, canonicalHost) {
     html = html.replace(/<meta\s+property=["']og:url["'][^>]*>/i, `<meta property="og:url" content="${url}">`);
     html = html.replace(/<link\s+rel=["']canonical["'][^>]*>/i, `<link rel="canonical" href="${url}">`);
 
+    // A tool page whose own HTML names no share image gets the Tools card (its large-image Twitter card had nothing to
+    // show: dev, dns, fancy, logo, net, regex, ssl and whois, 2026-10-15). A page with its own image keeps it.
+    const card = `https://openvibe.tools${social.url('tools')}`;
+    const image = /<meta\s+property=["']og:image["']/i.test(html) ? [] : [
+        `<meta property="og:image" content="${card}">`, '<meta property="og:image:width" content="1200">', '<meta property="og:image:height" content="630">',
+        `<meta name="twitter:image" content="${card}">`,
+    ];
     const extraHead = [
+        ...image,
         `<meta name="ov-tool" content="${esc(sub)}">`,   // the page script reads this: the host may be descriptive, a mirror or a custom domain
         `<meta name="keywords" content="${esc(rec.kw || '')}">`,
         '<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">',
