@@ -13,6 +13,7 @@
 const crypto = require('crypto');
 const frame = require('openvibe-shared/frame');
 const ovServe = require('openvibe-shared/serve');
+const social = require('openvibe-shared/social');
 const express = require('express');
 const seo = require('openvibe-shared/seo');
 const icons = require('openvibe-shared/icons');
@@ -135,7 +136,9 @@ ${appIcon.headTags({ site: 'tools', iconBase: '/assets' })}
 }
 
 function head(o) {
-    return seo.headTags(Object.assign({ siteName: NAME, image: 'https://openvibe.network/assets/og-tools.png', type: 'website', locale: 'en_US' }, o));
+    // The site's own social card from its pinned Frame files (openvibe-shared social/tools.jpg), like every other site;
+    // the old openvibe.network/assets/og-tools.png no longer exists (404).
+    return seo.headTags(Object.assign({ siteName: NAME, image: `${SITE}${social.url('tools')}`, type: 'website', locale: 'en_US' }, o));
 }
 
 const searchForm = (q) => `<form class="search" action="/search" method="get" role="search"><input type="search" name="q" id="q" value="${esc(q || '')}" placeholder="What do you need to do? Try “merge pdf” or “dns lookup”" aria-label="Search tools" autocomplete="off"><button type="submit">Search</button></form>`;

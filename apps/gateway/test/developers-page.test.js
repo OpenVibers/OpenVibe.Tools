@@ -25,6 +25,9 @@ const site = require('../server/pages/site');
         assert.ok(html.includes('.cta{display:inline-flex;align-items:center;gap:8px;background:var(--accent-strong,#1d4ed8);color:var(--on-accent-strong,#fff);'));
         // A tool page's "Primary" address tag sits on the accent glow: muted text there read 3.16:1 (axe, /tool/yaml).
         assert.ok(html.includes('.hosts li.primary .tag{color:var(--text-primary,#e6e9ef)}'));
+        // The share card is the site's own pinned copy (openvibe.network/assets/og-tools.png was a 404, 2026-10-15).
+        const og = (/<meta property="og:image" content="([^"]+)"/.exec(html) || [])[1];
+        assert.match(String(og), /^https:\/\/openvibe\.tools\/shared\/social\/tools\.jpg\?v=[0-9a-f]+$/, `og:image ${og}`);
         console.log('developers page: all checks passed');
     } finally { srv.close(); }
 })().catch((e) => { console.error(e); process.exit(1); });
