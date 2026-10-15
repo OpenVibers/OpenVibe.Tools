@@ -15,7 +15,7 @@ const TXT = {
     '_dmarc.good.example': [['v=DMARC1; p=reject; rua=mailto:d@good.example']],
     'bad.example': [['v=spf1 +all']],
 };
-const MX = { 'good.example': [{ exchange: 'mail.good.example', priority: 10 }] };
+const MX = { 'good.example': [{ exchange: 'mail.good.example', priority: 10 }], 'nomail.example': [{ exchange: '', priority: 0 }] };
 const fail = (code) => Promise.reject(Object.assign(new Error(code), { code }));
 const resolverFor = () => ({
     resolve4: (q) => (LISTED[q] ? Promise.resolve(LISTED[q]) : A[q] ? Promise.resolve(A[q]) : fail('ENOTFOUND')),
@@ -70,6 +70,12 @@ const reverse = async (ip) => ({ '93.184.216.31': ['host.isp.example'], '93.184.
     assert.strictEqual(r.score, 0, 'never below zero');
     assert.strictEqual(r.grade, 'poor');
     assert.strictEqual(r.score, Math.max(0, 100 - r.findings.reduce((s, x) => s + x.cost, 0)));
+
+    // A null MX (RFC 7505: "0 ." comes back as an empty exchange) says the domain takes no mail.
+    A['nomail.example'] = ['93.184.216.40'];
+    f = byCheck(await checks.reputation('nomail.example', { rdap, reverse }));
+    assert.strictEqual(f['Mail servers (MX)'].status, 'good');
+    assert.match(f['Mail servers (MX)'].detail, /null MX/);
 
     // An address: blacklists and reverse DNS.
     r = await checks.reputation('93.184.216.31', { rdap, reverse });
