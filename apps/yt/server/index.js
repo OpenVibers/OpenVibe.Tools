@@ -46,7 +46,9 @@ const { observe, checks: ready, which } = require('../../_shared/observe');
 // Serve only once the schema is in: the first PGlite migration must not run inside a request (it
 // would block the event loop and time out a satellite's readiness check).
 app.use((req, res, next) => toolsDb.ready.then(() => next(), next));
-const obs = observe({
+const { telemetry } = require('openvibe-sdk/service');   // request telemetry (apps/_shared/observe.js, plan T1)
+const { createPgTelemetrySink } = require('openvibe-sdk/telemetry');
+const obs = observe({ telemetry,
     app, metrics: require('openvibe-shared/metrics'), ready: require('openvibe-shared/ready'),
     service: 'tools-yt', release: release.release,
     checks: [
@@ -331,6 +333,9 @@ const server = app.listen(config.port, config.host, () => {
 // in flight finish (4 s at most; progress streams are closed and reconnect); then recent-tool writes
 // are flushed (1 s at most), the analytics and the guard close, and the process exits 0, within the
 // manifest's 5 s.
+// Request telemetry (openvibe-sdk/service, plan T1): one aggregated sample per route template, method and status class
+// each minute, into the tools database's telemetry_samples table (the gateway prunes it).
+telemetry.init({ service: 'tools-yt', sink: createPgTelemetrySink({ db: toolsDb.db, log: console }), skipPrefixes: ['/shared'], intervalMs: 60_000 });
 require('../../_shared/graceful').gracefulStop({
     name: 'YT.OpenVibe', server,
     stop: [
@@ -340,6 +345,7 @@ require('../../_shared/graceful').gracefulStop({
         () => require('../../_shared/usage').stopRecorder(800),
         () => analytics.destroy(),
         () => guard.close(),
+        () => telemetry.stop(),
         () => toolsDb.db.close(),
         () => toolsValkey && toolsValkey.close(),
     ],
