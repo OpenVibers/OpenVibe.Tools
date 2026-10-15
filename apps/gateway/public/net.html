@@ -688,7 +688,7 @@
         latency:          { name: 'TCP Latency Test',        icon: 'fa-gauge-high',        cat: 'diag',  endpoint: '/ping',     placeholder: 'Host (10 timed TCP connections to port 443)', count: 10 },
         // Email & reputation
         blacklist:        { name: 'Blacklist Checker',     icon: 'fa-ban',               cat: 'mail',  endpoint: '/blacklist', placeholder: 'IPv4 address or domain' },
-        reputation:       { name: 'Domain Reputation Checker', icon: 'fa-star',          cat: 'mail',  endpoint: null, unavailable: 'A combined reputation report is not available yet. The blacklist, SPF, DKIM and DMARC checkers cover its parts.', instead: 'blacklist' },
+        reputation:       { name: 'Domain Reputation Checker', icon: 'fa-star',          cat: 'mail',  endpoint: '/reputation', placeholder: 'Domain or IPv4 address' },
         smtp:             { name: 'SMTP Server Test',      icon: 'fa-paper-plane',       cat: 'mail',  endpoint: '/smtp',     placeholder: 'Mail server or domain (its MX is used)', smtpPorts: true },
         // Website checks
         uptime:           { name: 'Website Uptime Checker', icon: 'fa-heart-pulse',      cat: 'web',   endpoint: '/uptime',   placeholder: 'URL or domain' },
@@ -1040,6 +1040,7 @@
         if (tool.endpoint === '/mtr') return renderTrace(el, data, true);
         if (tool.endpoint === '/dnsprop') return renderDnsProp(el, data);
         if (tool.endpoint === '/blacklist') return renderBlacklist(el, data);
+        if (tool.endpoint === '/reputation') return renderReputation(el, data);
         if (tool.endpoint === '/smtp') return renderSMTP(el, data);
         if (tool.endpoint === '/uptime') return renderUptime(el, data);
         if (tool.endpoint === '/robots') return renderRobots(el, data);
@@ -1361,6 +1362,28 @@
             </table></div>
             <p style="color:var(--text-muted);font-size:12px;margin:10px 0 0">Probes are ICMP echo from OpenVibe's server (mtr). A router that does not answer is shown as no reply; loss at one hop that does not carry on to the next is usually that router rate-limiting replies, not lost traffic.</p>
         </div>`;
+        el.innerHTML = html;
+    }
+
+    // ── Reputation: the public signals, each with what it saw and what it cost ──
+    function renderReputation(el, data) {
+        const findings = data.findings || [];
+        const tone = { good: 'badge-green', warn: 'badge-yellow', bad: 'badge-red', info: '' };
+        const word = { good: 'Good', warn: 'Check', bad: 'Problem', info: 'Note' };
+        let html = `<div class="badges">
+            <span class="badge badge-cyan">${esc(data.domain || data.target)}</span>
+            <span class="badge ${data.grade === 'good' ? 'badge-green' : data.grade === 'fair' ? 'badge-yellow' : 'badge-red'}">Score ${data.score} / 100 (${esc(data.grade)})</span>
+        </div>`;
+        html += `<div class="card"><div class="card-head"><i class="fa-solid fa-star"></i> What the score is made of</div>
+            <table class="res-table"><tr><th>Check</th><th>Result</th><th>Finding</th><th>Cost</th></tr>
+            ${findings.map(f => `<tr>
+                <td class="key">${esc(f.check)}</td>
+                <td><span class="badge ${tone[f.status] || ''}">${word[f.status] || esc(f.status)}</span></td>
+                <td class="val" style="white-space:normal">${esc(f.detail)}</td>
+                <td class="val">${f.cost ? `−${f.cost}` : '—'}</td>
+            </tr>`).join('')}
+            </table>
+            <p style="color:var(--text-muted);font-size:12px;margin:10px 0 0">Public signals only: mail providers keep their own private scores. The blacklist checker shows every list, and the DKIM lookup checks a selector.</p>${from(data)}</div>`;
         el.innerHTML = html;
     }
 

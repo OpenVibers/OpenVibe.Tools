@@ -35,7 +35,7 @@ const CACHE_TTL = {
     dns: MIN, dig: MIN, nslookup: MIN, mx: MIN, txt: MIN, ns: MIN, spf: MIN, dkim: MIN, dmarc: MIN, dnspropagation: MIN,
     ip: 10 * MIN, geoip: 10 * MIN, isp: 10 * MIN, asn: 10 * MIN, ipv4: 10 * MIN, ipv6: 10 * MIN,
     hostname: 5 * MIN, rdns: 5 * MIN, whois: 60 * MIN, rdap: 60 * MIN,
-    blacklist: 5 * MIN, ssl: 5 * MIN, robots: 5 * MIN, sitemap: 5 * MIN, lookup: 5 * MIN,
+    blacklist: 5 * MIN, reputation: 5 * MIN, ssl: 5 * MIN, robots: 5 * MIN, sitemap: 5 * MIN, lookup: 5 * MIN,
 };
 const target = (description) => ({ type: 'string', minLength: 1, maxLength: 253 + 2048, description });
 const HOST = 'A domain or an IP address';
@@ -59,6 +59,7 @@ const OUTPUT = {
     '/ping': out({ target: S, ip: S, count: I, results: A, stats: out({ min: { type: 'number' }, max: { type: 'number' }, avg: { type: 'number' }, loss: { type: 'number' } }) }, ['target', 'stats']),
     '/trace': out({ target: S, ip: S, family: I, reached: B, probes: I, hops: { type: 'array', items: out({ hop: I, ip: nul(S), host: nul(S), asn: nul(S), loss: nul({ type: 'number' }), sent: I, last: nul({ type: 'number' }), avg: nul({ type: 'number' }), best: nul({ type: 'number' }), worst: nul({ type: 'number' }), stdev: nul({ type: 'number' }) }) } }, ['target', 'ip', 'hops']),
     '/mtr': out({ target: S, ip: S, family: I, reached: B, probes: I, hops: A }, ['target', 'ip', 'hops']),
+    '/reputation': out({ target: S, kind: { enum: ['ip', 'domain'] }, domain: S, score: I, grade: { enum: ['good', 'fair', 'poor'] }, findings: { type: 'array', items: out({ check: S, status: { enum: ['good', 'warn', 'bad', 'info'] }, detail: S, cost: I }) }, blacklist: nul(O) }, ['target', 'score', 'findings']),
     '/port': out({ target: S, ip: S, ports: { type: 'array', items: out({ port: I, status: S, ms: { type: ['number', 'null'] } }) } }, ['target', 'ports']),
     '/headers': out({ url: S, status: I, statusText: S, headers: O, timing: O, security: O, securityScore: S, server: nul(S), poweredBy: nul(S), contentType: nul(S) }, ['url', 'status', 'headers']),
     '/redirects': out({ originalUrl: S, finalUrl: S, hops: I, chain: A, stopped: S }, ['originalUrl', 'finalUrl', 'chain']),
@@ -100,7 +101,7 @@ const TOOLS = {
     redirects: { input: obj({ target: target(URL_OR_DOMAIN) }), timeoutMs: 60000, perTarget: 10, cost: 3 },
     ssl: { input: obj({ target: target('A domain or an IP address'), port: { enum: TLS_PORTS, default: 443 } }), perTarget: 10, cost: 2 },
     blacklist: { input: obj({ target: target('An IPv4 address or a domain') }), timeoutMs: 20000, perTarget: 10, cost: 3 },
-    reputation: {},
+    reputation: { input: obj({ target: target('A domain or a public IP address') }), timeoutMs: 30000, perTarget: 6, cost: 4 },
     smtp: { input: obj({ target: target('A mail server, or a domain (its first MX is tested)'), port: { enum: SMTP_PORTS, default: 25 } }), timeoutMs: 40000, perTarget: 3, cost: 5, anonymous: false },
     uptime: { input: obj({ target: target(URL_OR_DOMAIN) }), timeoutMs: 20000, perTarget: 10, cost: 2 },
     robots: { input: obj({ target: target(URL_OR_DOMAIN), path: { type: 'string', maxLength: 2048, description: 'A path (or URL) to test against the rules' }, ua: { type: 'string', maxLength: 100, default: '*', description: 'The crawler to test as' } }), perTarget: 10, cost: 2 },

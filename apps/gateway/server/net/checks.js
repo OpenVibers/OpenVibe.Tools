@@ -8,6 +8,7 @@
 //   blacklist  DNSBL lookups for an IPv4 address or a domain
 //   uptime   is a site up right now, from this server (status, redirects, time)
 //   dnsprop  the same record from ten public resolvers, compared
+//   reputation  public signals in one report: blacklists, SPF, DMARC, MX, HTTPS, domain age; reverse DNS for an address
 // Everything that connects to a visitor's target (robots, sitemap, smtp, uptime) goes through the SSRF
 // guard (_shared/egress): public addresses only, checked after DNS, dialled as checked, redirects
 // re-checked. blacklist and dnsprop only ask DNS servers questions; the target is never contacted.
@@ -535,7 +536,120 @@ function createChecks({ egress, resolverFor = defaultResolver, tlsUpgrade = tls.
         }, 20_000);
     }
 
-    return { robots, sitemap, smtp, blacklist, uptime, dnsprop };
+    // ── reputation ──
+    // One report from public signals, never a private list: the DNSBLs above, how the domain protects its mail (SPF,
+    // DMARC, MX), its HTTPS certificate (one TLS handshake through the guard), how long it has been registered (RDAP,
+    // `rdap(type, name)` from the routes), and for an address its reverse DNS and whether that name points back. Each
+    // finding says what was seen and what it costs; the score is 100 minus the costs (never below 0).
+    const txtOf = async (name) => { try { return (await system().resolveTxt(name)).map(t => t.join('')); } catch { return []; } };
+    const DAY = 86400000;
+
+    async function reputation(target, { rdap = null, reverse = null } = {}) {
+        const findings = [];
+        const add = (check, status, detail, cost = 0) => { findings.push({ check, status, detail, cost }); };
+        const isIp = net.isIP(target) !== 0;
+        if (isIp && !egress.isAllowed(target)) throw new TargetRefused(`${target} is a private or reserved address; it has no public reputation`);
+        const domain = isIp ? null : target.replace(/^www\./, '');
+
+        const [bl, mx, spf, dmarc, https, reg, ptr] = await Promise.all([
+            net.isIPv6(target) ? null : blacklist(target).catch((err) => { if (err instanceof TargetRefused) throw err; return { error: err.message }; }),
+            domain ? system().resolveMx(domain).catch(() => []) : null,
+            domain ? txtOf(domain).then(t => t.filter(v => /^v=spf1(\s|$)/i.test(v))) : null,
+            domain ? txtOf(`_dmarc.${domain}`).then(t => t.filter(v => /^v=DMARC1(\s*;|$)/i.test(v))) : null,
+            domain ? (async () => {
+                let dest;
+                try { dest = await egress.resolve(target, { prefer: 4 }); } catch (err) { if (err instanceof TargetRefused) throw err; return { none: 'The name has no address' }; }
+                try {
+                    const { cert } = await egress.tlsHandshake(dest, 443, { timeoutMs: 8000, detailed: false });
+                    const validTo = cert && cert.valid_to ? new Date(cert.valid_to) : null;
+                    return { daysLeft: validTo ? Math.ceil((validTo - Date.now()) / DAY) : null, issuer: (cert && cert.issuer && (cert.issuer.O || cert.issuer.CN)) || null };
+                } catch (err) {
+                    const code = String((err && (err.code || err.message)) || '');
+                    if (/ECONNREFUSED|ETIMEDOUT|timeout|EHOSTUNREACH|ECONNRESET/i.test(code)) return { none: 'Nothing answers HTTPS on port 443' };
+                    return { error: code.slice(0, 160) };
+                }
+            })() : null,
+            domain && rdap ? (async () => {
+                const labels = domain.split('.');
+                const names = [domain, ...(labels.length > 2 ? [labels.slice(-2).join('.')] : [])];
+                for (const n of names) {
+                    try {
+                        const r = await rdap('domain', n);
+                        const ev = r && r.ok && r.data && Array.isArray(r.data.events) ? r.data.events.find(e => e.eventAction === 'registration') : null;
+                        if (ev && ev.eventDate) return { name: n, registered: ev.eventDate };
+                    } catch { /* the next name, or unknown */ }
+                }
+                return null;
+            })() : null,
+            isIp && reverse ? (async () => {
+                let names = [];
+                try { names = await reverse(target); } catch { names = []; }
+                const name = names[0] || null;
+                if (!name) return { name: null };
+                let back = [];
+                try { back = net.isIPv6(target) ? await system().resolve6(name) : await system().resolve4(name); } catch { back = []; }
+                return { name, confirmed: back.includes(target) };
+            })() : null,
+        ]);
+
+        // Blacklists
+        if (!bl) add('Blacklists', 'info', 'Not checked: the public blacklists list IPv4 addresses and domains, not IPv6 addresses.');
+        else if (bl.error) add('Blacklists', 'info', `Not checked: ${bl.error}`);
+        else if (bl.listedCount) add('Blacklists', 'bad', `Listed on ${bl.listedCount} of ${bl.lists.length}: ${bl.lists.filter(l => l.listed === true).map(l => l.name).join(', ')}.`, Math.min(75, 25 * bl.listedCount));
+        else add('Blacklists', 'good', `Not listed on any of the ${bl.cleanCount} lists that answered${bl.unknownCount ? ` (${bl.unknownCount} could not be checked)` : ''}.`);
+
+        if (domain) {
+            // Mail: MX, SPF, DMARC
+            if (mx.length) add('Mail servers (MX)', 'good', `${mx.length} mail ${mx.length === 1 ? 'server' : 'servers'}: ${mx.sort((a, b) => a.priority - b.priority).slice(0, 3).map(m => m.exchange).join(', ')}.`);
+            else add('Mail servers (MX)', 'info', 'No MX record: this domain does not receive mail. If it never sends mail either, SPF "v=spf1 -all" and DMARC p=reject stop others sending as it.');
+            if (!spf.length) add('SPF', 'warn', 'No SPF record: anyone can send mail claiming to be from this domain, and receivers trust its mail less.', 15);
+            else if (spf.length > 1) add('SPF', 'bad', `${spf.length} SPF records: receivers treat more than one as a permanent error, as if there were none.`, 15);
+            else {
+                const all = (/(^|\s)([+?~-]?)all(\s|$)/i.exec(spf[0]) || [])[2];
+                if (all === '+' || all === '') add('SPF', 'bad', `SPF ends in "${all}all": it allows every server on the internet to send as this domain.`, 25);
+                else if (all === '?') add('SPF', 'warn', 'SPF ends in "?all" (neutral): it lists the senders but asks receivers to ignore the rest.', 5);
+                else if (all === undefined) add('SPF', 'warn', 'SPF has no "all" at the end, so mail from any other server is neither passed nor failed.', 5);
+                else add('SPF', 'good', `SPF ends in "${all}all": mail from servers it does not list ${all === '-' ? 'fails' : 'soft-fails'}.`);
+            }
+            if (!dmarc.length) add('DMARC', 'warn', 'No DMARC policy: receivers are not told what to do with mail that fails SPF and DKIM, and the owner gets no reports.', 15);
+            else {
+                const p = ((/(?:^|;)\s*p\s*=\s*(none|quarantine|reject)/i.exec(dmarc[0]) || [])[1] || '').toLowerCase();
+                if (p === 'reject' || p === 'quarantine') add('DMARC', 'good', `DMARC policy p=${p}: mail that fails is ${p === 'reject' ? 'refused' : 'sent to spam'}.`);
+                else if (p === 'none') add('DMARC', 'warn', 'DMARC policy p=none: failures are reported, not stopped (a fine first step, not an end state).', 5);
+                else add('DMARC', 'warn', 'The DMARC record has no valid p= policy, so receivers ignore it.', 10);
+            }
+            // HTTPS
+            if (https.none) add('HTTPS', 'info', `${https.none}: no website to check.`);
+            else if (https.error) add('HTTPS', 'bad', `The HTTPS certificate is not accepted: ${https.error}.`, 15);
+            else if (https.daysLeft !== null && https.daysLeft < 0) add('HTTPS', 'bad', 'The HTTPS certificate has expired.', 15);
+            else if (https.daysLeft !== null && https.daysLeft < 14) add('HTTPS', 'warn', `The HTTPS certificate expires in ${https.daysLeft} ${https.daysLeft === 1 ? 'day' : 'days'}.`, 5);
+            else add('HTTPS', 'good', `A valid HTTPS certificate${https.issuer ? ` from ${https.issuer}` : ''}${https.daysLeft !== null ? `, ${https.daysLeft} days left` : ''}.`);
+            // Age
+            if (!reg) add('Domain age', 'info', 'The registration date is not published (RDAP), so the age is unknown.');
+            else {
+                const days = Math.floor((Date.now() - Date.parse(reg.registered)) / DAY);
+                const when = new Date(reg.registered).toISOString().slice(0, 10);
+                if (!Number.isFinite(days)) add('Domain age', 'info', 'The registration date could not be read.');
+                else if (days < 30) add('Domain age', 'bad', `${reg.name} was registered ${days} ${days === 1 ? 'day' : 'days'} ago (${when}): mail filters and browsers treat new domains with suspicion.`, 20);
+                else if (days < 180) add('Domain age', 'warn', `${reg.name} was registered ${Math.round(days / 30)} months ago (${when}).`, 5);
+                else add('Domain age', 'good', `${reg.name} was registered on ${when} (${Math.floor(days / 365) >= 1 ? `${Math.floor(days / 365)} ${Math.floor(days / 365) === 1 ? 'year' : 'years'}` : `${Math.round(days / 30)} months`}).`);
+            }
+        } else if (ptr) {
+            if (!ptr.name) add('Reverse DNS', 'warn', 'No reverse DNS (PTR) name: many mail servers reject mail from addresses without one.', 10);
+            else if (!ptr.confirmed) add('Reverse DNS', 'warn', `The reverse name ${ptr.name} does not point back to ${target}, so it is not forward-confirmed.`, 5);
+            else add('Reverse DNS', 'good', `${ptr.name}, and it points back to ${target} (forward-confirmed).`);
+        }
+
+        const cost = findings.reduce((s, f) => s + f.cost, 0);
+        const score = Math.max(0, 100 - cost);
+        return {
+            target, kind: isIp ? 'ip' : 'domain', ...(domain && { domain }), score, grade: score >= 90 ? 'good' : score >= 70 ? 'fair' : 'poor',
+            findings, blacklist: bl && !bl.error ? { listedCount: bl.listedCount, cleanCount: bl.cleanCount, unknownCount: bl.unknownCount, lists: bl.lists } : null,
+            checkedFrom: FROM,
+        };
+    }
+
+    return { robots, sitemap, smtp, blacklist, uptime, dnsprop, reputation };
 }
 
 module.exports = { createChecks, parseRobots, testRobots, analyseSitemap, smtpReader, IP_LISTS, DOMAIN_LISTS, RESOLVERS, PROP_TYPES, SMTP_PORTS };

@@ -1000,6 +1000,7 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
     router.get('/smtp/:target?', run('SMTP test', (req) => checks.smtp(host(req), { port: req.query.port })));
     router.get('/blacklist/:target?', run('Blacklist check', (req) => checks.blacklist(host(req))));
     router.get('/dnsprop/:target?', run('DNS propagation check', (req) => checks.dnsprop(host(req), { type: req.query.type })));
+    router.get('/reputation/:target?', run('Reputation check', (req) => checks.reputation(host(req), { rdap: rdapLookup, reverse: reverseDns })));
 
     return router;
 };
