@@ -600,7 +600,9 @@ function createChecks({ egress, resolverFor = defaultResolver, tlsUpgrade = tls.
 
         if (domain) {
             // Mail: MX, SPF, DMARC
-            if (mx.length) add('Mail servers (MX)', 'good', `${mx.length} mail ${mx.length === 1 ? 'server' : 'servers'}: ${mx.sort((a, b) => a.priority - b.priority).slice(0, 3).map(m => m.exchange).join(', ')}.`);
+            const real = mx.filter(m => m.exchange && m.exchange !== '.');
+            if (real.length) add('Mail servers (MX)', 'good', `${real.length} mail ${real.length === 1 ? 'server' : 'servers'}: ${real.sort((a, b) => a.priority - b.priority).slice(0, 3).map(m => m.exchange).join(', ')}.`);
+            else if (mx.length) add('Mail servers (MX)', 'good', 'A null MX (RFC 7505): the domain says it accepts no mail, so nobody waits on a mail server that is not there.');
             else add('Mail servers (MX)', 'info', 'No MX record: this domain does not receive mail. If it never sends mail either, SPF "v=spf1 -all" and DMARC p=reject stop others sending as it.');
             if (!spf.length) add('SPF', 'warn', 'No SPF record: anyone can send mail claiming to be from this domain, and receivers trust its mail less.', 15);
             else if (spf.length > 1) add('SPF', 'bad', `${spf.length} SPF records: receivers treat more than one as a permanent error, as if there were none.`, 15);
