@@ -118,8 +118,8 @@ const NET_TOOLS = [
     { id: 'dmarc',            subdomain: 'dmarc',            name: 'OpenVibeDMARC',         icon: 'fa-user-shield',       desc: 'DMARC policy checker', endpoint: '/dns' },
     // Active diagnostics
     { id: 'ping',             subdomain: 'ping',             name: 'OpenVibePing',          icon: 'fa-satellite-dish',    desc: 'Ping from multiple global regions', endpoint: '/ping' },
-    { id: 'traceroute',       subdomain: 'traceroute',       name: 'OpenVibeTraceroute',    icon: 'fa-route',             desc: 'Traceroute — visualize network path & hops', status: 'unavailable', unavailable: 'Traceroute needs raw network access that this server does not give the tools. The TCP ping test shows reachability and latency.' },
-    { id: 'mtr',              subdomain: 'mtr',              name: 'OpenVibeMTR',           icon: 'fa-chart-line',        desc: 'MTR — combined ping + traceroute analysis', status: 'unavailable', unavailable: 'MTR needs raw network access that this server does not give the tools. The TCP ping test shows latency and loss to the host.' },
+    { id: 'traceroute',       subdomain: 'traceroute',       name: 'OpenVibeTraceroute',    icon: 'fa-route',             desc: 'Traceroute — visualize network path & hops', endpoint: '/trace' },
+    { id: 'mtr',              subdomain: 'mtr',              name: 'OpenVibeMTR',           icon: 'fa-chart-line',        desc: 'MTR — combined ping + traceroute analysis', endpoint: '/mtr' },
     { id: 'port',             subdomain: 'port',             name: 'OpenVibePortCheck',     icon: 'fa-door-open',         desc: 'Port scanner — check if ports are open', endpoint: '/port' },
     { id: 'headers',          subdomain: 'headers',          name: 'OpenVibeHeaders',       icon: 'fa-list',              desc: 'HTTP headers checker — security & cache analysis', endpoint: '/headers' },
     { id: 'redirects',        subdomain: 'redirects',        name: 'OpenVibeRedirects',     icon: 'fa-share',             desc: 'Redirect chain tracer — follow all hops', endpoint: '/redirects' },
