@@ -90,7 +90,7 @@ const FAMILIES = [
     {
         id: 'places', name: 'Maps & Food', icon: 'map', path: '/maps-and-food', hub: null, hubAliases: [], port: null,
         tagline: 'Find water, shelter, supplies and somewhere to eat',
-        description: 'Two practical maps. The survival map shows drinking water, public toilets, shelters, hospitals, fuel and other essentials near any place on earth. The food finder shows restaurants, cafes, markets and food banks around you.',
+        description: 'Two practical maps. The survival map shows drinking water, public toilets, shelters, hospitals, fuel and other essentials near any place on earth. The food finder (now OpenVibe.Food, at openvibe.food) shows food banks, budget grocers and markets around you, with meal plans and a pantry.',
         intro: 'Both tools use open map data. Allow location access or search for a town, then filter the map to the kind of place you need.',
         faq: [
             ['Where does the map data come from?', 'OpenStreetMap and other open datasets, maintained by volunteers around the world. Coverage is best in towns and cities.'],

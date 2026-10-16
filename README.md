@@ -56,7 +56,7 @@ apps/
 ├── gateway   # apex (server-rendered index, family + tool pages, catalog.json), the tool registry
 │             # and host roles, Net.OpenVibe + Dev.OpenVibe tools, proxy to the satellites
 ├── maps      # Maps.OpenVibe  — survival map for North America
-├── food      # Food.OpenVibe  — grocery / food bank finder (proxies maps backend)
+├── food      # the food finder API (proxies maps backend); its page moved to OpenVibe.Food (301 to openvibe.food)
 ├── img       # Img.OpenVibe   — image converter & processing tools
 ├── yt        # YT.OpenVibe    — YouTube downloader
 ├── audio     # Audio.OpenVibe — audio converter & effects

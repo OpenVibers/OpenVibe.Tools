@@ -1,6 +1,9 @@
 /**
- * food.openvibe.tools — Lightweight frontend server
- * Proxies food API calls to openvibe-maps backend (port 4010)
+ * food.openvibe.tools — the food finder's API (proxied to the openvibe-maps backend, port 4010).
+ *
+ * The page moved to OpenVibe.Food (openvibe.food: food banks and budget grocers near you, the food list, meal plans,
+ * pantry, recipes): a person opening food.openvibe.tools is sent there with a 301. The JSON routes stay, as every
+ * tool's do (the open tools registry, ADR-027).
  */
 require('dotenv').config();
 const express = require('express');
@@ -14,7 +17,7 @@ const cookieParser = require('cookie-parser');
 // ── Analytics ────────────────────────────────────────────────
 const { AnalyticsTrackerPg } = require('openvibe-shared/analytics/pg'); // ADR-021: no IP/user id, route templates, raw rows pruned after 30 days, Sec-GPC/DNT not recorded
 const { requireInternalAccess } = require('../../_shared/internal-token');
-const { hostGuard, stampedPage } = require('../../_shared/host-role');
+const { hostGuard } = require('../../_shared/host-role');
 const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
 const { createLocalRegistry, requiresStatus } = require('../../_shared/tools/local');
 const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
@@ -116,8 +119,10 @@ app.use(analytics.middleware());
 // page's canonical / og:url / JSON-LD follow it; aliases are redirected; other hosts go to the tools index.
 const HOST = 'food.openvibe.tools';
 app.use(hostGuard({ knows: (h) => h === HOST }));
-const sendIndex = stampedPage(path.join(__dirname, '..', 'public', 'index.html'), HOST);
-app.get(['/', '/index.html'], sendIndex);
+// The page is OpenVibe.Food's now; the JSON routes below stay for whoever calls them.
+const FOOD_URL = (process.env.OV_FOOD_PUBLIC_URL || 'https://openvibe.food').replace(/\/+$/, '');
+const toFood = (req, res) => res.redirect(301, `${FOOD_URL}/`);
+app.get(['/', '/index.html'], toFood);
 
 // Static files
 app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: '1d', index: false }));
@@ -163,8 +168,8 @@ app.get('/api/internal/analytics/bots', internalAccess, async (req, res) => {
     catch (err) { res.status(500).json({ ok: false, error: err.message }); }
 });
 
-// SPA fallback
-app.get('*', (req, res) => sendIndex(req, res));
+// What used to be the page's own paths go to OpenVibe.Food as well (the API answers JSON 404s).
+app.get('*', (req, res) => (req.path.startsWith('/api/') ? res.status(404).json({ error: 'Not found' }) : toFood(req, res)));
 
 const server = app.listen(PORT, '127.0.0.1', () => {
   console.log(`[Food.OpenVibe] 🍽️  food.openvibe.tools listening on 127.0.0.1:${PORT}`);

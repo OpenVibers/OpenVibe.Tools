@@ -20,6 +20,14 @@ const { startApp } = require('../../_shared/test/spawn');
         const other = await ask('203.0.113.2');
         assert.strictEqual(other.status, 200, 'a second visitor has their own bucket');
 
+        // The page moved to OpenVibe.Food: a person is sent there; the JSON routes stay.
+        for (const p of ['/', '/index.html', '/food-banks']) {
+            const r = await fetch(`${food.base}${p}`, { redirect: 'manual', headers: { Host: 'food.openvibe.tools' } });
+            assert.strictEqual(r.status, 301, p);
+            assert.strictEqual(r.headers.get('location'), 'https://openvibe.food/', p);
+        }
+        assert.strictEqual((await fetch(`${food.base}/api/nothing-here`)).status, 404, 'an unknown API path is a JSON 404, not a redirect');
+
         const src = (app) => fs.readFileSync(path.join(__dirname, '..', '..', app, 'server', 'index.js'), 'utf8');
         assert.match(src('maps'), /app\.set\('trust proxy', TRUST_PROXY\)/, 'maps trusts one forwarded hop, on loopback only');
         assert.match(src('food'), /app\.set\('trust proxy', TRUST_PROXY\)/);
@@ -28,5 +36,5 @@ const { startApp } = require('../../_shared/test/spawn');
         await food.kill();
         await maps.kill();
     }
-    console.log('food → maps forwards the visitor address; maps limits per person: all checks passed');
+    console.log('food → maps forwards the visitor address; maps limits per person; the page redirects to openvibe.food: all checks passed');
 })().catch((err) => { console.error(err); process.exit(1); });
