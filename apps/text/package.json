@@ -19,7 +19,7 @@
     "pg": "^8.23.0",
     "express-rate-limit": "^7.1.5",
     "dotenv": "^16.3.1",
-    "openvibe-sdk": "https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.46.0",
+    "openvibe-sdk": "https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.50.1",
     "openvibe-shared": "https://codeload.github.com/OpenVibers/OpenVibe.Shared/tar.gz/refs/tags/v4.2.1"
   },
   "license": "MIT"
