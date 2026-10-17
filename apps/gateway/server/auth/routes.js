@@ -459,9 +459,9 @@ function createAuthRoutes(config, auth) {
     // ── GET /auth/me ─────────────────────────────────────────
     router.get('/me', async (req, res) => {
         const token = extractToken(req);
-        if (!token) return res.status(401).json({ error: 'Not authenticated' });
+        if (!token) return res.json({ user: null });   // signed out: 200 with no user (as Blog, Community, Wiki), not a 401 in every signed-out visitor's console
         const claims = await auth.verify(token);
-        if (!claims) return res.status(401).json({ error: 'Invalid or expired token' });
+        if (!claims) return res.json({ user: null });   // an expired token is signed out too; the navbar refreshes through /auth/refresh
         const { iat, exp, aud, iss, ...user } = claims;
         res.json({ user, expires_at: exp ? exp * 1000 : null });
     });
