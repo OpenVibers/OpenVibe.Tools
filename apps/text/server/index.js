@@ -168,7 +168,10 @@ app.get('*', (req, res) => {
 });
 
 // ── Start ────────────────────────────────────────────────────
-const server = app.listen(config.port, config.host, () => {
+// systemd hands this process the listener when deploy/systemd/openvibe-tools-text.socket is installed: a restart then
+// queues the gateway's requests in the kernel instead of refusing them. Otherwise it listens on the port itself.
+const socketActivated = process.env.LISTEN_FDS === '1' && Number(process.env.LISTEN_PID) === process.pid;
+const server = app.listen(...(socketActivated ? [{ fd: 3 }] : [config.port, config.host]), () => {
     const toolCount = new Set(Object.values(HOSTNAME_MAP)).size;
     const domainCount = Object.keys(HOSTNAME_MAP).length;
     console.log(`\n╔═══════════════════════════════════════╗`);
