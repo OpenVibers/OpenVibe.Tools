@@ -171,7 +171,10 @@ app.get('/api/internal/analytics/bots', internalAccess, async (req, res) => {
 // What used to be the page's own paths go to OpenVibe.Food as well (the API answers JSON 404s).
 app.get('*', (req, res) => (req.path.startsWith('/api/') ? res.status(404).json({ error: 'Not found' }) : toFood(req, res)));
 
-const server = app.listen(PORT, '127.0.0.1', () => {
+// systemd hands this process the listener when deploy/systemd/openvibe-tools-food.socket is installed: a restart then
+// queues the gateway's requests in the kernel instead of refusing them. Otherwise it listens on the port itself.
+const socketActivated = process.env.LISTEN_FDS === '1' && Number(process.env.LISTEN_PID) === process.pid;
+const server = app.listen(...(socketActivated ? [{ fd: 3 }] : [PORT, '127.0.0.1']), () => {
   console.log(`[Food.OpenVibe] 🍽️  food.openvibe.tools listening on 127.0.0.1:${PORT}`);
 });
 

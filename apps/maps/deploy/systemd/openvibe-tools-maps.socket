@@ -1,0 +1,17 @@
+# OpenVibe.Tools maps app — listening socket, owned by systemd rather than by the process (as the gateway's).
+#
+# The gateway (openvibe-tools.service) proxies this app's pages and API to 127.0.0.1:4010. Without this, each restart
+# closed the listener for the whole boot and the gateway got ECONNREFUSED; with it, requests that arrive mid-restart
+# wait in the kernel's accept queue and are served as soon as the new process calls accept().
+[Unit]
+Description=OpenVibe.Tools maps HTTP socket
+# No PartOf=openvibe-tools-maps.service: the socket must outlive every restart.
+
+[Socket]
+# Loopback only: the gateway is the only client (the host firewall is off, so 0.0.0.0 would be public).
+ListenStream=127.0.0.1:4010
+NoDelay=true
+Backlog=511
+
+[Install]
+WantedBy=sockets.target

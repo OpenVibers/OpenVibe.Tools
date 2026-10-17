@@ -31,4 +31,22 @@ const index = fs.readFileSync(path.join(__dirname, '..', 'server', 'index.js'), 
 assert.match(index, /process\.env\.LISTEN_FDS === '1' && Number\(process\.env\.LISTEN_PID\) === process\.pid/, 'fd 3 only when handed to this process');
 assert.ok(index.includes('const server = app.listen(...(socketActivated ? [{ fd: 3 }] : [config.port, config.host]), () => {'.trim()), 'otherwise the configured port');
 
+// The apps behind the gateway: the same rules, each on its own port.
+const APPS = { audio: 4014, docs: 4016, food: 4011, img: 4012, maps: 4010, text: 4015, yt: 4013 };
+for (const [app, port] of Object.entries(APPS)) {
+    const dir = path.join(__dirname, '..', '..', app, 'deploy', 'systemd');
+    const rd = (...p) => fs.readFileSync(path.join(dir, ...p), 'utf8');
+    const sock = rd(`openvibe-tools-${app}.socket`);
+    assert.deepStrictEqual([...section(sock, 'Socket').matchAll(/^ListenStream=(.+)$/gm)].map((m) => m[1].trim()), [`127.0.0.1:${port}`], `${app}: loopback, its port`);
+    assert.ok(!/^NonBlocking=/m.test(section(sock, 'Socket')) && !/^PartOf=/m.test(section(sock, 'Unit')), `${app}: no NonBlocking/PartOf in the socket`);
+    const drop = rd(`openvibe-tools-${app}.service.d`, 'socket.conf');
+    assert.match(section(drop, 'Unit'), new RegExp(`^Requires=openvibe-tools-${app}\\.socket$`, 'm'), app);
+    assert.match(section(drop, 'Unit'), new RegExp(`^After=openvibe-tools-${app}\\.socket$`, 'm'), app);
+    assert.match(section(drop, 'Service'), /^NonBlocking=true$/m, app);
+    assert.match(rd(`openvibe-tools-${app}.service`), new RegExp(`^Environment=PORT=${port}$`, 'm'), `${app}: the unit's PORT is the socket's`);
+    const src = fs.readFileSync(path.join(__dirname, '..', '..', app, 'server', 'index.js'), 'utf8');
+    assert.match(src, /process\.env\.LISTEN_FDS === '1' && Number\(process\.env\.LISTEN_PID\) === process\.pid/, `${app}: fd 3 only when handed to this process`);
+    assert.match(src, /app\.listen\(\.\.\.\(socketActivated \? \[\{ fd: 3 \}\] : \[/, `${app}: otherwise its port`);
+}
+
 console.log('systemd units: all checks passed');

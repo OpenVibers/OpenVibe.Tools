@@ -278,7 +278,10 @@ app.get('*', (req, res) => {
 });
 
 // ── Start ────────────────────────────────────────────────────
-const server = app.listen(config.port, config.host, () => {
+// systemd hands this process the listener when deploy/systemd/openvibe-tools-img.socket is installed: a restart then
+// queues the gateway's requests in the kernel instead of refusing them. Otherwise it listens on the port itself.
+const socketActivated = process.env.LISTEN_FDS === '1' && Number(process.env.LISTEN_PID) === process.pid;
+const server = app.listen(...(socketActivated ? [{ fd: 3 }] : [config.port, config.host]), () => {
     retention.startCleanup();
     console.log(`\n╔═══════════════════════════════════════╗`);
     console.log(`║   🖼️  Img.OpenVibe — Image Conversion Hub   ║`);
