@@ -64,5 +64,7 @@ See `.env.example`. Key variables: `PORT` (4001), `OV_NETWORK_URL`,
 - Path: `/opt/openvibe.tools/apps/gateway`
 - Env: `/etc/openvibe/tools.env`
 - Unit: `deploy/systemd/openvibe-tools.service`
+- Socket: `deploy/systemd/openvibe-tools.socket` (127.0.0.1:4001) with the `openvibe-tools.service.d/socket.conf`
+  drop-in: requests that arrive during a restart wait for the new process instead of getting 502s.
 - Nginx: `deploy/nginx/openvibe.tools.conf` (apex + wildcard; satellites have
   their own more-specific server blocks)
