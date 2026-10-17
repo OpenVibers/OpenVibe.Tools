@@ -500,7 +500,13 @@ const satellitePolling = toolRegistry.startSatellitePolling(SATELLITES);
 const searchIndex = require('./search-index').searchIndexerFromEnv({ snapshot: toolRegistry.snapshot, dataDir: require('path').resolve(__dirname, '..', process.env.DATA_DIR || 'data') });
 if (searchIndex.indexer) searchIndex.indexer.start(); else console.log(`[SearchIndex] off: ${searchIndex.reason}`);
 
-const server = app.listen(config.port, config.host, () => {
+// Zero-downtime restarts (as OpenVibe.Live): when systemd owns the listener (deploy/systemd/openvibe-tools.socket) it
+// hands it over as file descriptor 3, and connections that arrive during a restart wait in the kernel's accept queue
+// instead of being refused (11 refused connections on 2026-10-17 on openvibe.tools). Without the socket unit this is the
+// usual listen.
+const socketActivated = process.env.LISTEN_FDS === '1' && Number(process.env.LISTEN_PID) === process.pid;
+if (socketActivated) console.log('[Server] socket-activated: listening on the socket systemd handed over (fd 3)');
+const server = app.listen(...(socketActivated ? [{ fd: 3 }] : [config.port, config.host]), () => {
     // Subscribe to Network's token cutoffs (retried a few times; off without EVENTS_URL / TOOLS_EVENTS_SECRET).
     const subscribe = (n) => require('./revocation-events').ensureSubscription({ port: config.port }).catch((e) => {
         console.warn('[Events] token cutoff subscription not ready:', e.message);
