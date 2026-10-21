@@ -172,7 +172,7 @@ audio and docs answer the same route for their own tools. `openvibe-sdk/tools` (
   `413 tools.file.too_large | tools.input.too_large` (over `limits.maxInputBytes`), `415
   tools.file.unsupported_type` (the bytes are checked), `422 tools.input.invalid` (`errors[]` with JSON
   pointers, against the descriptor's input schema), `429 tools.quota.exceeded` (`Retry-After`), `503
-  tools.tool.unavailable` (the descriptor's status is `unavailable`: traceroute, or Protect PDF while qpdf is
+  tools.tool.unavailable` (the descriptor's status is `unavailable`: Protect PDF while qpdf is
   missing), `503 tools.unavailable` (the engine found a program it needs missing: e.g. an HEIC upload without
   libheif), `503 tools.busy` (`Retry-After`).
 - **Who.** Always enforced (authorization, not a quota): an app or service token needs the descriptor's
@@ -525,6 +525,7 @@ lists it under `degraded`. Nothing pretends to work.
 | `poppler-utils` | `pdftoppm`, `pdfinfo` | PDF to image | `PDFTOPPM_PATH`, `PDFINFO_PATH` |
 | `libheif-examples` + `libheif-plugin-libde265` | `heif-dec` (or `heif-convert`) with an HEVC decoder | HEIC (iPhone) photos on every image tool | `HEIF_DEC_PATH` |
 | `ffmpeg` | `ffmpeg`, `ffprobe` | every audio tool | `FFMPEG_PATH` |
+| `mtr-tiny` (0.95+) | `mtr` | Traceroute, MTR (on the gateway, which answers 502 `trace_unavailable` without it) | `NET_MTR_BIN` |
 
 sharp's prebuilt libvips cannot decode HEIC (HEVC) at all, and it cannot read or write BMP or read ICO:
 BMP and ICO are handled in JavaScript (`apps/img/server/tools/codec.js`), HEIC by libheif's CLI.
@@ -535,8 +536,11 @@ Limits (all in `/etc/openvibe/tools.env`): `PDF_MAX_PAGES` (500 pages per docume
 `YT_INFO_CONCURRENCY` (yt-dlp lookups at once for `/api/info`, default 3; 20 more wait, then 503).
 Net tools: `NET_IPINFO_TOKEN` makes IP lookups use ipinfo.io over HTTPS instead of ip-api.com's free tier
 (HTTP only); ip-api/ipinfo, RDAP and DNS-over-HTTPS answers are cached either way. `NET_GLOBALPING_TOKEN`
-is read but not used yet. Traceroute, MTR and the reputation report are marked unavailable (the first
-two need raw sockets); ping and latency are timed TCP connections to port 443 from this server.
+is read but not used yet. Traceroute and MTR run `mtr` in report mode without raw sockets: its `mtr-packet`
+sends ICMP echo through Linux's unprivileged ICMP sockets (`net.ipv4.ping_group_range`), on the address the SSRF guard
+checked, at most two runs at once (`apps/gateway/server/net/trace.js`, `NET_MTR_BIN`). Domain Reputation is one report
+from public signals (blacklists, SPF, DMARC, MX, HTTPS, domain age, reverse DNS), each finding with its cost. Ping and
+latency are timed TCP connections to port 443 from this server.
 
 ## YouTube downloader: when YouTube refuses the server
 
