@@ -135,7 +135,11 @@ app.use(helmet({
 // ── Host roles: aliases redirect, unknown hosts leave, satellite hosts are proxied ──
 const { hostRoles } = require('./registry/host-middleware');
 const registryTimer = registry.start();
+// Tool opens (registry/opens.js): one count per tool per day for the home page's "Most opened this week".
+const toolOpens = require('./registry/opens').createOpens({ db: toolsDb.db });
+toolOpens.start();
 app.use(hostRoles({
+    onOpen: (tool, req) => toolOpens.record(tool, req.ip),
     hostOf: getRequestHost,
     enforce: config.isProduction || process.env.OV_ENFORCE_HOSTS === '1',
     // Gateway-served subdomains that predate the catalog (tool aliases, the pastes hand-off).
@@ -427,7 +431,7 @@ function sendTool(req, res, file) {
 // sitemap.xml, robots.txt, llms.txt and /api/catalog.json (server/pages/site.js).
 // This site's own pinned copy of the OpenVibe Frame's browser files (/shared, openvibe-shared/serve) is
 // mounted with the release routes: apps/_shared/release.js.
-app.use(require('./pages/site').createSiteRouter());
+app.use(require('./pages/site').createSiteRouter({ opens: toolOpens }));
 
 // Net tool subdomains → net.html SPA
 app.use((req, res, next) => {
@@ -545,6 +549,7 @@ require('../../_shared/graceful').gracefulStop({
         () => runApi.pool.close(),
         () => guard.close(),
         async () => { await telemetryRetention.stop(); await telemetry.stop(); },
+        () => toolOpens.stop(),
         () => toolsDb.db.close(),
         () => toolsValkey && toolsValkey.close(),
         () => require('./revocation-events').close(),
