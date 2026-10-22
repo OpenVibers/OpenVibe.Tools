@@ -54,6 +54,7 @@ function proxyTo(port, info, req, res) {
  * @param {(host: string) => string} opts.hostOf      request → hostname
  * @param {(sub: string) => boolean} opts.isLegacyHost gateway-served subdomains that are not catalog tools (aliases, pastes…)
  * @param {boolean} opts.enforce                        false in development: unknown hosts fall through
+ * @param {(tool: string, req) => void} [opts.onOpen]   a person opened a tool's page on its own host (registry/opens.js)
  */
 function hostRoles(opts) {
     return function ovHostRoles(req, res, next) {
@@ -79,6 +80,10 @@ function hostRoles(opts) {
         if (info.role === 'canonical' && info.shortHost && info.shortHost !== info.host && isPersonNavigating(req)) {
             res.set('Cache-Control', 'private, no-store'); res.set('Vary', 'User-Agent, Accept');
             return res.redirect(302, `https://${info.shortHost}${req.originalUrl || '/'}`);
+        }
+        // A person opening a tool's page (not an asset, an API call or a crawler): the home's "Most opened" count.
+        if (opts.onOpen && info.kind === 'tool' && isPersonNavigating(req)) {
+            try { opts.onOpen(info.primary || info.tool, req); } catch { /* a count never blocks the tool */ }
         }
         if (info.port) return proxyTo(info.port, info, req, res);
         next();

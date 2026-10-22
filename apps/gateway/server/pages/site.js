@@ -96,6 +96,11 @@ details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px
 .perks{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}.perks div{padding:16px;border-radius:14px;border:1px solid var(--border,rgba(255,255,255,.08));background:var(--bg-secondary,#111826)}.perks p{margin:6px 0 0;color:var(--text-secondary,#a8b3c4);font-size:14px}
 @media (max-width:560px){.tiles{grid-template-columns:1fr 1fr}.tile small{display:none}.jump{top:52px}}
 #ov-footer{margin-top:56px}
+.tool .opens{color:var(--text-secondary,#a8b3c4);font-weight:600}
+.api-box{max-width:820px}.api-box pre{background:var(--bg-secondary,#111826);border:1px solid var(--border,rgba(255,255,255,.08));border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.5}
+.api-facts{list-style:none;padding:0;margin:0 0 12px;display:flex;flex-direction:column;gap:6px;color:var(--text-secondary,#a8b3c4)}.api-facts code{overflow-wrap:anywhere}
+.dev{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:14px;align-items:start}.dev pre{margin:0;background:var(--bg-secondary,#111826);border:1px solid var(--border,rgba(255,255,255,.08));border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.5}
+.dev ul{margin:0;padding-left:18px;color:var(--text-secondary,#a8b3c4)}.dev li{margin:4px 0}
 @media (max-width:560px){.grid{grid-template-columns:1fr}.search button{padding:0 14px}}
 @media (prefers-reduced-motion:reduce){.tool{transition:none}}
 ${icons.CSS}`;
@@ -154,33 +159,85 @@ function search(q) {
     return registry.get().tools.map(t => [score(t, terms), t]).filter(x => x[0] > 0).sort((a, b) => b[0] - a[0] || a[1].name.localeCompare(b[1].name)).slice(0, 60).map(x => x[1]);
 }
 
+// ── The API, per tool (descriptors: run path, inputs, files, auth, an example) ──
+const descriptorOf = (id) => require('../registry/descriptors').snapshot().tools.find((d) => d.id === id) || null;
+const shq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
+const mb = (bytes) => `${Math.round(bytes / 1048576)} MB`;
+/** "Use it from code" on a tool's page: the one request that runs it, who may call it, what it takes. */
+function apiSection(t) {
+    const d = descriptorOf(t.id);
+    if (!d) return '';
+    if (!d.api) return `<section aria-labelledby="api-h"><div class="sec-h"><h2 id="api-h">Use it from code</h2></div><p class="sec-p">${esc(t.name)} runs on its page only and has no API. <a href="/developers">The Tools API</a> covers the tools you can call from code.</p></section>`;
+    const ex = (d.examples || [])[0] || {};
+    const token = !(d.auth && d.auth.anonymous);
+    const lines = [`curl -X POST ${SITE}${d.run.path}`];
+    if (token) lines.push(`-H 'Authorization: Bearer $OPENVIBE_TOKEN'`);
+    if (d.files) {
+        for (const f of ex.files || [{ name: 'file' }]) lines.push(`-F ${shq(`file=@${f.name}`)}`);
+        if (ex.input && Object.keys(ex.input).length) lines.push(`-F ${shq(`input=${JSON.stringify(ex.input)}`)}`);
+    } else {
+        lines.push(`-H 'Content-Type: application/json'`, `-d ${shq(JSON.stringify({ input: ex.input || {} }))}`);
+    }
+    const who = d.auth && d.auth.capability === 'tools.net.probe'
+        ? 'Needs a token with <code>tools.net.probe</code>, granted to partners only; people use the page.'
+        : token ? 'Needs a signed-in browser session or a token with <code>tools.tool.run</code>.'
+            : 'No account needed: anonymous calls run on the lowest quota tier; a token with <code>tools.tool.run</code> raises it.';
+    const files = d.files ? `Takes ${d.files.min === d.files.max ? d.files.min : `${d.files.min} to ${d.files.max}`} file${d.files.max === 1 ? '' : 's'}${d.files.maxBytes ? `, up to ${mb(d.files.maxBytes)} each` : ''}.` : '';
+    const how = d.execution === 'job' ? 'Long work answers 202 with a job to follow; short work answers with the result.' : 'It answers with the result.';
+    return `<section class="api-box" aria-labelledby="api-h"><div class="sec-h"><h2 id="api-h">Use it from code</h2></div>
+<ul class="api-facts"><li><code>${esc(d.run.method)} ${esc(SITE + d.run.path)}</code></li><li>${who}</li><li>${esc([how, files].filter(Boolean).join(' '))}</li></ul>
+<pre tabindex="0"><code>${esc(lines.join(' \\\n  '))}</code></pre>
+<p class="sec-p">Inputs: <a href="/api/v1/tools/${esc(d.id)}/schema">JSON Schema</a> · <a href="/api/v1/openapi.json">OpenAPI</a> · from JavaScript: <code>tools.run(${esc(JSON.stringify(d.id))}, …)</code> in <a href="https://github.com/OpenVibers/OpenVibe.SDK">openvibe-sdk</a> · <a href="/developers">How the API works</a></p></section>`;
+}
+
+/** The home's questions: shown on the page and published as its FAQPage, from this one list. */
+const HOME_FAQ = [
+    ['Are the tools free?', 'Yes. Every tool on OpenVibe.Tools is free to use, with fair-use limits per address so the shared servers stay fast for everyone.'],
+    ['Do I need an account?', 'No. Every tool works without signing in, and anonymous results stay available for an hour. Signed in, results keep for 24 hours and your recent tools follow you across devices.'],
+    ['What happens to the files I upload?', 'Many tools run in your browser, so the file never leaves your device. The rest process files on OpenVibe\'s own servers and delete them with their results when they expire: after an hour without an account, after 24 hours with one.'],
+    ['Can I use the tools from my own code?', 'Yes. Most tools have an API: one POST request per tool, jobs for long work, an OpenAPI document and the openvibe-sdk client for JavaScript.'],
+    ['Is OpenVibe.Tools open source?', 'Yes. The code is on GitHub under OpenVibers and the site is community-run.'],
+];
+
 // ── Pages ────────────────────────────────────────────────────
-function pageIndex() {
+function pageIndex(top = []) {
     // Only built tools: a home never shows what is planned (plan §1 "no placeholders").
     const { tools, families } = registry.get();
     const byId = new Map(tools.map(t => [t.id, t]));
     const popular = POPULAR.map(id => byId.get(id)).filter(Boolean);
     const fams = families.filter(f => f.path);
+    const withApi = require('../registry/descriptors').snapshot().tools.filter((d) => d.api && d.status !== 'unavailable').length;
+    // Most opened this week (registry/opens.js): real counts, shown once at least four tools have some.
+    const opened = top.map((r) => [byId.get(r.tool), r.opens]).filter(([t, n]) => t && n > 0).slice(0, 8);
+    const openedCard = ([t, n]) => toolCard(t).replace('</small><i>', `</small><i><span class="opens">${n.toLocaleString('en-US')} ${n === 1 ? 'person' : 'people'} this week</span> · `);
     const tile = (t) => `<a class="tile" href="${esc(t.url)}"${go(t)} title="${esc(t.tagline)}">${icon(t.icon, 28)}<span><b>${esc(t.name)}</b><small>${esc(t.tagline)}</small></span></a>`;
     const body = `<div class="hero"><p class="kicker">Open source · community-run · no account needed to start</p><h1>The toolbox for <span>everything you do online</span></h1>
 <p>Convert a video, squeeze an image, merge a PDF, debug DNS, format JSON. ${tools.length} tools that open instantly, each on an address you can remember, like <a href="https://yt.openvibe.tools/">yt.openvibe.tools</a>.</p>
 ${searchForm('')}
-<ul class="stats"><li><b>${tools.length}</b> tools</li><li><b>${fams.length}</b> families</li><li><b>0</b> installs</li><li><b>1</b> account for all of OpenVibe</li></ul></div>
+<ul class="stats"><li><b>${tools.length}</b> tools</li><li><b>${fams.length}</b> families</li><li><b>${withApi}</b> with an API</li><li><b>0</b> installs</li></ul></div>
 <nav class="jump" aria-label="Tool families">${fams.map(f => `<a href="#f-${f.id}">${icon(f.icon, 22)}${esc(f.name)}<i>${tools.filter(t => t.family === f.id).length}</i></a>`).join('')}</nav>
 <section id="results" hidden aria-live="polite"><div class="sec-h"><h2>Results</h2></div><div class="grid" id="results-grid"></div><p class="empty" id="results-empty" hidden>No tool matches that yet. <a href="/all-tools">Browse every tool</a>.</p></section>
 <section id="recent" hidden aria-labelledby="recent-h"><div class="sec-h"><h2 id="recent-h">Your tools</h2><span class="more" id="recent-note"></span></div><div class="grid" id="recent-grid"></div></section>
-<section aria-labelledby="pop-h"><div class="sec-h"><h2 id="pop-h">What people reach for</h2><a class="more" href="/all-tools">A to Z list</a></div><div class="grid">${popular.slice(0, 8).map(toolCard).join('')}</div></section>
-${fams.map(f => { const list = tools.filter(t => t.family === f.id); return `<section class="fam" aria-labelledby="f-${f.id}"><div class="sec-h">${icon(f.icon, 40)}<div><h2 id="f-${f.id}"><a href="${esc(f.path)}">${esc(f.name)}</a></h2><p class="fam-tag">${esc(f.tagline)}</p></div><a class="more" href="${esc(f.path)}">About these ${list.length}</a></div><div class="tiles">${list.map(tile).join('')}</div></section>`; }).join('')}
+${opened.length >= 4 ? `<section aria-labelledby="top-h"><div class="sec-h"><h2 id="top-h">Most opened this week</h2></div><p class="sec-p">How many people opened each tool in the last seven days, counted once per person a day.</p><div class="grid">${opened.map(openedCard).join('')}</div></section>` : ''}
+<section aria-labelledby="pop-h"><div class="sec-h"><h2 id="pop-h">Good places to start</h2><a class="more" href="/all-tools">A to Z list</a></div><div class="grid">${popular.slice(0, 8).map(toolCard).join('')}</div></section>
+${fams.map(f => { const list = tools.filter(t => t.family === f.id); return `<section class="fam" aria-labelledby="f-${f.id}"><div class="sec-h">${icon(f.icon, 40)}<div><h2 id="f-${f.id}"><a href="${esc(f.path)}">${esc(f.name)}</a></h2><p class="fam-tag">${esc(f.tagline)}</p></div><a class="more" href="${esc(f.path)}">${list.length === 1 ? 'About this one' : `About these ${list.length}`}</a></div><div class="tiles">${list.map(tile).join('')}</div></section>`; }).join('')}
+<section aria-labelledby="dev-h"><div class="sec-h"><h2 id="dev-h">Use any tool from code</h2><a class="more" href="/developers">Developer guide</a></div><p class="sec-p">${withApi} of the ${tools.length} tools take one request each, the same engines the pages use. Each tool's page shows its own request.</p>
+<div class="dev"><pre tabindex="0"><code>curl -X POST ${SITE}/api/v1/tools/jsonminify/run \\
+  -H 'Content-Type: application/json' \\
+  -d '{"input":{"text":"{ \\"a\\": 1 }"}}'</code></pre>
+<ul><li><a href="/api/v1/openapi.json">OpenAPI 3.1</a>, generated from the tool descriptors</li><li><a href="/api/v1/tools">/api/v1/tools</a>: every tool's inputs, limits and access</li><li>Long work runs as a job you can follow over server-sent events</li><li><a href="https://github.com/OpenVibers/OpenVibe.SDK">openvibe-sdk</a>: <code>tools.run(id, input)</code> from JavaScript</li></ul></div></section>
 ${frame.shipped({ service: 'tools', title: 'Recently shipped on OpenVibe.Tools' })}
 <section aria-labelledby="acct-h"><div class="sec-h"><h2 id="acct-h">Better with an account, fine without</h2></div><div class="perks">
 <div><b>Without signing in</b><p>Every tool works. Results stay available for an hour, then they are deleted.</p></div>
 <div><b>Signed in</b><p>Results keep for 24 hours, your recent tools follow you across devices, and your theme and notifications come along from the rest of OpenVibe.</p></div>
-<div><b>For developers</b><p>Run any tool from code: see <a href="/developers">the Tools API</a> (<a href="/api/v1/openapi.json">OpenAPI</a>). The catalog is public JSON at <a href="/api/catalog.json">/api/catalog.json</a>, with a plain-text map at <a href="/llms.txt">/llms.txt</a>.</p></div></div></section>`;
+<div><b>For developers</b><p>Run any tool from code: see <a href="/developers">the Tools API</a> (<a href="/api/v1/openapi.json">OpenAPI</a>). The catalog is public JSON at <a href="/api/catalog.json">/api/catalog.json</a>, with a plain-text map at <a href="/llms.txt">/llms.txt</a>.</p></div></div></section>
+<section aria-labelledby="faq-h"><div class="sec-h"><h2 id="faq-h">Questions</h2></div>${HOME_FAQ.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</section>`;
     return shell({ families, body, head: head({
         title: 'Online Tools for Files, Text, Code & Networks', description: `${tools.length} online tools in one place: video and audio converters, image and PDF tools, developer utilities and network diagnostics. Open source and community-run.`,
         canonical: SITE + '/', keywords: 'online tools, converter, pdf tools, image converter, developer tools, network tools, youtube downloader',
         jsonLd: [seo.jsonLd.organization(), seo.jsonLd.website({ name: NAME, url: SITE + '/', description: 'Online tools for files, text, code and networks.', searchUrl: SITE + '/search?q={search_term_string}' }),
-            seo.jsonLd.itemList('Tool families', fams.map(f => ({ name: f.name, url: SITE + f.path, description: f.tagline })))] }) });
+            seo.jsonLd.itemList('Tool families', fams.map(f => ({ name: f.name, url: SITE + f.path, description: f.tagline }))),
+            seo.jsonLd.faq(HOME_FAQ.map(([q, a]) => ({ q, a })))] }) });
 }
 
 function pageFamily(f) {
@@ -209,6 +266,7 @@ ${t.status === 'unavailable' ? `<p class="lead"><strong>Not available yet.</stro
 <section><div class="sec-h"><h2>Where to find it</h2></div><p class="sec-p">Every address below opens the same tool. The first address is the one to bookmark and share.</p>
 <ul class="hosts">${hosts.map(([h, tag], i) => `<li${i === 0 ? ' class="primary"' : ''}><a href="https://${esc(h)}/"${i === 0 ? '' : ' rel="nofollow"'}>${esc(h)}</a><span class="tag">${tag}</span></li>`).join('')}</ul></section>
 ${t.keywords && t.keywords.length ? `<section><div class="sec-h"><h2>People also call this</h2></div><ul class="kw">${t.keywords.map(k => `<li>${esc(k)}</li>`).join('')}</ul></section>` : ''}
+${apiSection(t)}
 ${related.length ? `<section><div class="sec-h"><h2>Related tools</h2>${f && f.path ? `<a class="more" href="${esc(f.path)}">All ${esc(f.name)}</a>` : ''}</div><div class="grid">${related.map(toolCard).join('')}</div></section>` : ''}`;
     return shell({ families, body, head: head({ title: `${t.name}: ${t.tagline}`, description: t.description, canonical: url, keywords: (t.keywords || []).join(', '),
         jsonLd: [seo.jsonLd.breadcrumbs([{ name: 'Tools', url: SITE + '/' }, ...(f && f.path ? [{ name: f.name, url: SITE + f.path }] : []), { name: t.name, url }]),
@@ -234,8 +292,8 @@ function pageSearch(q) {
 
 // ── Cache + router ───────────────────────────────────────────
 const cache = new Map();
-function cached(key, render) {
-    const ver = registry.get().updated;
+function cached(key, render, extra = '') {
+    const ver = `${registry.get().updated}|${extra}`;
     let e = cache.get(key);
     if (!e || e.ver !== ver) { const html = render(); e = { ver, html, etag: '"' + crypto.createHash('sha1').update(html).digest('base64url').slice(0, 20) + '"' }; cache.set(key, e); }
     return e;
@@ -282,8 +340,8 @@ const done = await job.wait();   // any tool, sync or job`)}
         jsonLd: [seo.jsonLd.breadcrumbs([{ name: 'Tools', url: SITE + '/' }, { name: 'Developers', url: SITE + '/developers' }])] }) });
 }
 
-function send(req, res, key, render, type) {
-    const e = cached(key, render);
+function send(req, res, key, render, type, extra) {
+    const e = cached(key, render, extra);
     res.set('Content-Type', type || 'text/html; charset=utf-8');
     res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=86400');
     res.set('ETag', e.etag);
@@ -330,7 +388,7 @@ function llmsFullBody() {
         sections: llmsSections().map(s => ({ title: s.title, pages: s.links.map(l => ({ title: l.title, url: l.url, text: l.text })) })) });
 }
 
-function createSiteRouter() {
+function createSiteRouter({ opens = null } = {}) {
     const router = express.Router();
     const apexOnly = (req, res, next) => (!req.ovHost || req.ovHost.kind === 'apex' || (req.ovHost.kind === 'unknown' && !req.ovHost.inZone) ? next() : next('router'));
     router.use(apexOnly);
@@ -339,7 +397,12 @@ function createSiteRouter() {
     // What shipped on OpenVibe.Tools: the shared update log every OpenVibe site has.
     router.get('/updates', (req, res) => send(req, res, 'updates', pageUpdates));
     router.get('/api/catalog.json', (req, res) => { res.set('Access-Control-Allow-Origin', '*'); send(req, res, 'catalog', () => JSON.stringify(registry.catalog()), 'application/json; charset=utf-8'); });
-    router.get('/', (req, res) => send(req, res, '/', pageIndex));
+    // The home carries the week's most opened tools (registry/opens.js, read at most every 5 minutes); a read that
+    // fails leaves that section out, never the page.
+    router.get('/', async (req, res) => {
+        const top = opens ? await opens.top(7, 12).catch(() => []) : [];
+        send(req, res, '/', () => pageIndex(top), undefined, opens ? opens.version() : '');
+    });
     router.get('/all-tools', (req, res) => send(req, res, '/all-tools', pageAll));
     router.get('/search', (req, res) => { res.set('Cache-Control', 'no-store'); res.type('html').send(pageSearch(String(req.query.q || '').slice(0, 80))); });
     router.get('/tool/:id', (req, res, next) => { const t = registry.get().tools.find(x => x.id === req.params.id); return t ? send(req, res, '/tool/' + t.id, () => pageTool(t)) : next(); });
