@@ -172,7 +172,7 @@ body {
     white-space: nowrap;
 }
 .file-list li .remove-file {
-    color: var(--danger);
+    color: var(--danger-text, var(--danger));
     cursor: pointer;
     margin-left: 8px;
     padding: 2px 6px;
@@ -352,7 +352,7 @@ body {
 }
 .result-panel h2 {
     font-size: 24px;
-    color: var(--success);
+    color: var(--success-text, var(--success));
     margin-bottom: 16px;
 }
 .result-panel h2 i { margin-right: 8px; }
@@ -363,7 +363,7 @@ body {
 }
 .result-info strong { color: var(--text-primary); }
 .result-info .savings {
-    color: var(--success);
+    color: var(--success-text, var(--success));
     font-weight: 600;
 }
 .result-actions {
