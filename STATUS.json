@@ -17,8 +17,8 @@
   },
   "domain": "openvibe.tools and *.openvibe.tools",
   "contracts": "openvibe-contracts v0.209.0 (the gateway, img, audio and docs apps' package.json; the root package.json pins none)",
-  "sdk": "openvibe-sdk v0.60.0 (each app's package.json)",
-  "shared": "openvibe-shared v4.4.0 (each app's package.json; the root package.json pins none)",
+  "sdk": "openvibe-sdk v0.62.0 (each app's package.json)",
+  "shared": "openvibe-shared v4.9.0 (each app's package.json; the root package.json pins none)",
   "capabilities": [
     "tools.job.create",
     "tools.job.read",
@@ -41,5 +41,5 @@
     "analytics within ADR-021",
     "per-actor limits (openvibe-sdk/limits)"
   ],
-  "updated": "2026-10-22"
+  "updated": "2026-10-23"
 }
