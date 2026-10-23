@@ -319,7 +319,7 @@ body {
     color: var(--text-muted);
     padding: 6px 12px;
 }
-.btn-ghost:hover { color: var(--danger); }
+.btn-ghost:hover { color: var(--danger-text, var(--danger)); }
 .btn-lg { padding: 14px 32px; font-size: 16px; }
 
 /* ── Processing Spinner ─────────────────────────────────────── */
@@ -348,7 +348,7 @@ body {
     margin-bottom: 24px;
 }
 .result-panel h2 {
-    color: var(--success);
+    color: var(--success-text, var(--success));
     margin-bottom: 20px;
     font-size: 24px;
 }
@@ -368,7 +368,7 @@ body {
     color: var(--text-secondary);
 }
 .result-info .savings {
-    color: var(--success);
+    color: var(--success-text, var(--success));
     font-weight: 600;
 }
 .result-actions {
