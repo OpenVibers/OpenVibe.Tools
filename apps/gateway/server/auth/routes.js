@@ -132,10 +132,11 @@ function createAuthClient(config) {
     });
 
     let lastFetch = 0;
+    const gapMs = config.keyRetryMs || 30_000;
     async function ensureKey() {
         if (client.publicKey) return client.publicKey;
         // Don't hammer the Network if it's down — retry at most every 30s
-        if (Date.now() - lastFetch < 30_000) return null;
+        if (Date.now() - lastFetch < gapMs) return null;
         lastFetch = Date.now();
         for (const base of [config.networkInternalUrl, config.networkUrl]) {
             if (!base) continue;
@@ -162,10 +163,18 @@ function createAuthClient(config) {
         return client.verifyToken(token);
     }
 
-    // Warm the key cache at boot (non-fatal if Network is down)
-    ensureKey().catch(() => {});
+    // Warm the key cache at boot, and keep trying every 30 s until it loads (non-fatal if Network is down). After the
+    // 2026-10-23 reboot the gateway started before Network, its one boot fetch failed, and /status showed it without a
+    // key for six hours: only a signed-in request would have fetched it again.
+    let retry = null;
+    const warm = () => ensureKey().catch(() => null).then((key) => {
+        if (key) return;
+        retry = setTimeout(warm, gapMs);
+        if (retry.unref) retry.unref();
+    });
+    warm();
 
-    return { client, ensureKey, verify };
+    return { client, ensureKey, verify, stop: () => { if (retry) clearTimeout(retry); retry = null; } };
 }
 
 /** Token from Authorization header or the shared ov_token cookie. */
