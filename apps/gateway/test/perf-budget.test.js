@@ -14,7 +14,7 @@ const BUDGETS = {
     htmlBrotliKB: 23,     // 19.5
     jsFiles: 6,           // 5
     jsRawKB: 240,         // 207.9
-    jsBrotliKB: 56,       // 48.5
+    jsBrotliKB: 60,       // 58.0 with openvibe-shared 4.12.0 (light/dark switch, seasonal mark, theme pairs); 48.5 before
     cssFiles: 1,          // 0
     externalFiles: 3,     // 1 in production
 };
