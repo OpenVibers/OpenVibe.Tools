@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Barcode & QR Tools — OpenVibe</title>
+<link rel="icon" type="image/svg+xml" data-ov-icon="tools" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%22-32%20-32%2064%2064%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22ring%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%2338bdf8%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%232563eb%22%2F%3E%3C%2FlinearGradient%3E%0A%3CradialGradient%20id%3D%22glow%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%2338bdf8%22%20stop-opacity%3D%22.34%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%2338bdf8%22%20stop-opacity%3D%220%22%2F%3E%3C%2FradialGradient%3E%0A%3CradialGradient%20id%3D%22bg%22%20cx%3D%22.5%22%20cy%3D%22.38%22%20r%3D%22.8%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%2316223a%22%2F%3E%3Cstop%20offset%3D%22.6%22%20stop-color%3D%22%230a0f1c%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23060912%22%2F%3E%3C%2FradialGradient%3E%3C%2Fdefs%3E%3Crect%20x%3D%22-32%22%20y%3D%22-32%22%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2215%22%20fill%3D%22url(%23bg)%22%2F%3E%3Cg%20transform%3D%22scale(1.22)%22%3E%0A%3Ccircle%20r%3D%2221%22%20fill%3D%22url(%23glow)%22%2F%3E%0A%3Ccircle%20r%3D%2218%22%20fill%3D%22none%22%20stroke%3D%22url(%23ring)%22%20stroke-width%3D%224%22%20opacity%3D%22.38%22%2F%3E%0A%3Cpath%20d%3D%22M0%2C-18%20A18%2C18%200%200%2C1%2017.4%2C4.6%22%20fill%3D%22none%22%20stroke%3D%22url(%23ring)%22%20stroke-width%3D%224.4%22%20stroke-linecap%3D%22round%22%2F%3E%0A%3Cpath%20d%3D%22M-9.5%2C-7%20L0%2C10%20L9.5%2C-7%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%224.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%0A%3Ccircle%20cx%3D%2217.4%22%20cy%3D%224.6%22%20r%3D%223.2%22%20fill%3D%22%23ffffff%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<meta name="theme-color" content="#0a0f1c">
+<meta name="color-scheme" content="dark light">
+<link rel="apple-touch-icon" href="/assets/logo-192.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="description" content="Make QR codes, barcodes and Data Matrix, scan them with your camera or a picture, and check GTIN, ISBN and GS1 numbers. Free, in your browser.">
+<meta property="og:title" content="Barcode & QR Tools">
+<meta property="og:description" content="Make, scan and check QR codes, barcodes and Data Matrix, in your browser.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://barcodes.openvibe.tools">
+<link rel="canonical" href="https://barcodes.openvibe.tools">
+<!-- Critical theme bootstrap (ov-theme-boot) — MUST stay inline and above the stylesheets.
+     Paints the cached theme synchronously so the default palette never flashes. Reads
+     localStorage only: no network, nothing to block on. theme-loader.js still runs after
+     and reconciles with the account. -->
+<script>
+(function(){try{var raw=localStorage.getItem('ov_theme');if(!raw)return;var t=JSON.parse(raw),v=t&&t.variables;if(!v)return;var el=document.documentElement;for(var k in v)if(k.charAt(0)==='-')el.style.setProperty(k,v[k]);if(t.id)el.setAttribute('data-theme',t.id);}catch(_){}})();
+</script>
+<style>
+/* Barcode & QR tools. Every colour comes from the OpenVibe theme tokens (theme-loader.js sets them on :root), so the
+   page follows the visitor's theme, light or dark; the fallbacks are the default Vibe theme. */
+:root{
+  --c-bg:var(--bg-primary,#0a0f1c);--c-panel:var(--bg-secondary,#101828);--c-raised:var(--bg-tertiary,#172238);--c-card:var(--bg-card,#131c2e);--c-hover:var(--bg-hover,#1c2a44);--c-input:var(--bg-input,#0d1424);
+  --c-tx:var(--text-primary,#e6edf7);--c-tx2:var(--text-secondary,#96a7c2);--c-tx3:var(--text-muted,#8192ac);
+  --c-ac:var(--accent,#3b82f6);--c-acl:var(--accent-light,#60a5fa);--c-acs:var(--accent-strong,#3472d8);--c-onac:var(--on-accent-strong,#fff);--c-glow:var(--accent-glow,rgba(59,130,246,.35));
+  --c-brd:var(--border,#1f2d47);--c-brd2:var(--border-light,#2c3d5c);
+  --c-ok:var(--success-text,#22c55e);--c-warn:var(--warning-text,#f59e0b);--c-bad:var(--danger-text,#f26262);
+  --c-shadow:var(--shadow,0 2px 12px rgba(0,0,0,.45));--c-shadow-lg:var(--shadow-lg,0 8px 32px rgba(0,0,0,.6));
+  --r:14px;--r-s:10px;--mono:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;
+  /* the SEO block under the tool (server/seo/render.js) */
+  --tx:var(--c-tx);--tx2:var(--c-tx2);--tx3:var(--c-tx3);--bg2:var(--c-panel);--brd:var(--c-brd);--ac:var(--c-ac);
+}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--c-bg);-webkit-text-size-adjust:100%}
+body{margin:0;min-height:100vh;font:15px/1.5 Inter,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;font-size:calc(15px * var(--ov-text-scale,1));background:var(--c-bg);color:var(--c-tx);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:var(--c-acl)}
+button,input,select,textarea{font:inherit;color:inherit}
+[hidden]{display:none!important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+#navbar-mount{min-height:52px}
+.ic{width:1em;height:1em;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.125em}
+
+/* ── Frame: family bar, tabs, title ── */
+.cx{max-width:1180px;margin:0 auto;padding:18px max(16px,env(safe-area-inset-left)) 40px max(16px,env(safe-area-inset-right))}
+.cx-bar{display:flex;align-items:center;gap:14px;margin-bottom:14px;min-width:0}
+.cx-fam{display:inline-flex;align-items:center;gap:8px;flex:none;color:var(--c-tx);text-decoration:none;font-weight:750;font-size:.95rem;letter-spacing:-.01em}
+.cx-fam .mark{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:var(--c-acs);color:var(--c-onac);font-size:16px}
+.cx-tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;padding:3px;border-radius:12px;background:var(--c-panel);border:1px solid var(--c-brd);min-width:0;margin-left:auto}
+.cx-tabs::-webkit-scrollbar{display:none}
+.cx-tabs a{display:inline-flex;align-items:center;gap:6px;flex:none;padding:7px 12px;border-radius:9px;color:var(--c-tx2);text-decoration:none;font-size:.86rem;font-weight:620;white-space:nowrap;transition:background .15s,color .15s}
+.cx-tabs a:hover{color:var(--c-tx);background:var(--c-hover)}
+.cx-tabs a[aria-current="page"]{background:var(--c-acs);color:var(--c-onac)}
+.cx-tabs a:focus-visible,.seg button:focus-visible,.btn:focus-visible,.chip:focus-visible{outline:2px solid var(--c-ac);outline-offset:2px}
+.cx-head{margin:10px 0 18px}
+.cx-head h1{margin:0;font-size:clamp(1.5rem,3.4vw,2.1rem);line-height:1.15;font-weight:800;letter-spacing:-.025em;text-wrap:balance}
+.cx-head p{margin:6px 0 0;color:var(--c-tx2);max-width:70ch}
+@media (max-width:760px){.cx-bar{flex-direction:column;align-items:stretch;gap:10px}.cx-tabs{margin-left:0}}
+
+/* ── Panels and controls ── */
+.panel{background:var(--c-card);border:1px solid var(--c-brd);border-radius:var(--r);padding:16px;min-width:0}
+.panel+.panel{margin-top:12px}
+.panel>h2,.panel>summary{margin:0 0 12px;font-size:.78rem;font-weight:750;letter-spacing:.07em;text-transform:uppercase;color:var(--c-tx3)}
+details.panel>summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;margin:0}
+details.panel>summary::-webkit-details-marker{display:none}
+details.panel>summary::after{content:'';width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);transition:transform .15s;margin-right:4px}
+details.panel[open]>summary{margin-bottom:12px}
+details.panel[open]>summary::after{transform:rotate(-135deg)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.row>*{min-width:0}
+.grow{flex:1 1 180px}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:10px;min-width:0}
+.field>span,.lbl{font-size:.8rem;font-weight:650;color:var(--c-tx2)}
+.field small{color:var(--c-tx3);font-size:.76rem}
+input[type=text],input[type=url],input[type=email],input[type=tel],input[type=number],input[type=password],input[type=datetime-local],input[type=search],select,textarea{width:100%;min-width:0;padding:9px 11px;border-radius:var(--r-s);border:1px solid var(--c-brd2);background:var(--c-input);color:var(--c-tx);outline:none;transition:border-color .15s,box-shadow .15s}
+textarea{resize:vertical;min-height:84px;line-height:1.45}
+.mono{font-family:var(--mono);font-size:.88em}
+input:focus,select:focus,textarea:focus{border-color:var(--c-ac);box-shadow:0 0 0 3px var(--c-glow)}
+input::placeholder,textarea::placeholder{color:var(--c-tx3)}
+select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--c-tx2) 50%),linear-gradient(135deg,var(--c-tx2) 50%,transparent 50%);background-position:calc(100% - 16px) 55%,calc(100% - 11px) 55%;background-size:5px 5px;background-repeat:no-repeat;padding-right:30px}
+.seg{display:inline-flex;flex-wrap:wrap;gap:3px;padding:3px;border-radius:11px;background:var(--c-raised);border:1px solid var(--c-brd);max-width:100%}
+.field>.seg{align-self:flex-start}
+.seg button{border:0;background:none;padding:6px 11px;border-radius:8px;font-size:.84rem;font-weight:620;color:var(--c-tx2);cursor:pointer;white-space:nowrap}
+.seg button:hover{color:var(--c-tx)}
+.seg button[aria-pressed="true"]{background:var(--c-acs);color:var(--c-onac)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:8px 12px;border-radius:999px;border:1px solid var(--c-brd2);background:var(--c-raised);color:var(--c-tx2);font-size:.85rem;font-weight:620;cursor:pointer}
+.chip:hover{color:var(--c-tx);border-color:var(--c-ac)}
+.chip[aria-pressed="true"]{background:var(--c-acs);border-color:var(--c-acs);color:var(--c-onac)}
+.range{display:flex;align-items:center;gap:10px}
+.range input[type=range]{flex:1;accent-color:var(--c-ac);min-width:0}
+.range output{min-width:4.2em;text-align:right;font-variant-numeric:tabular-nums;font-size:.84rem;color:var(--c-tx2)}
+.color{display:flex;align-items:center;gap:8px;padding:4px 8px 4px 4px;border-radius:var(--r-s);border:1px solid var(--c-brd2);background:var(--c-input)}
+.color input[type=color]{width:30px;height:30px;padding:0;border:0;border-radius:7px;background:none;cursor:pointer;flex:none}
+.color input[type=color]::-webkit-color-swatch-wrapper{padding:0}.color input[type=color]::-webkit-color-swatch{border:1px solid rgba(127,127,127,.4);border-radius:7px}
+.color input[type=text]{border:0;padding:4px 0;background:none;box-shadow:none;font-family:var(--mono);font-size:.84rem;width:6.5em}
+.check{display:inline-flex;align-items:center;gap:8px;font-size:.88rem;color:var(--c-tx2);cursor:pointer;user-select:none}
+.check input{accent-color:var(--c-ac);width:16px;height:16px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:9px 15px;border-radius:var(--r-s);border:1px solid var(--c-brd2);background:var(--c-raised);color:var(--c-tx);font-weight:650;font-size:.88rem;cursor:pointer;text-decoration:none;white-space:nowrap;transition:filter .15s,border-color .15s,background .15s}
+.btn:hover{border-color:var(--c-ac)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.primary{background:var(--c-acs);border-color:var(--c-acs);color:var(--c-onac)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{background:none}
+.btn.small{padding:6px 10px;font-size:.8rem}
+.note{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:var(--r-s);background:var(--c-raised);border:1px solid var(--c-brd);font-size:.86rem;color:var(--c-tx2);margin:8px 0}
+.note b{color:var(--c-tx)}
+.note.ok{border-color:color-mix(in srgb,var(--c-ok) 45%,transparent)}.note.ok .ic{color:var(--c-ok)}
+.note.warn{border-color:color-mix(in srgb,var(--c-warn) 50%,transparent)}.note.warn .ic{color:var(--c-warn)}
+.note.bad{border-color:color-mix(in srgb,var(--c-bad) 50%,transparent)}.note.bad .ic{color:var(--c-bad)}
+.note .ic{margin-top:2px;font-size:16px}
+.note .act{margin-left:auto}
+.muted{color:var(--c-tx3)}
+.kbd{font-family:var(--mono);font-size:.82em;padding:1px 6px;border-radius:6px;background:var(--c-raised);border:1px solid var(--c-brd)}
+
+/* ── Studio: controls beside a sticky preview ── */
+.studio{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,400px);gap:16px;align-items:start}
+.preview{position:sticky;top:64px;display:flex;flex-direction:column;gap:12px}
+.stage{position:relative;display:grid;place-items:center;min-height:300px;padding:22px;border-radius:var(--r);border:1px solid var(--c-brd);overflow:hidden;
+  background-color:var(--c-panel);background-image:linear-gradient(45deg,rgba(127,127,127,.07) 25%,transparent 25%,transparent 75%,rgba(127,127,127,.07) 75%),linear-gradient(45deg,rgba(127,127,127,.07) 25%,transparent 25%,transparent 75%,rgba(127,127,127,.07) 75%);background-size:18px 18px;background-position:0 0,9px 9px}
+.stage .art{max-width:100%;max-height:340px;display:block;filter:drop-shadow(0 6px 18px rgba(0,0,0,.25));transition:opacity .15s}
+.stage .art.svg{width:100%;height:auto}
+.stage .art svg{display:block;width:100%;height:auto;max-height:340px}
+.stage canvas.art{image-rendering:pixelated}
+.stage .empty{color:var(--c-tx3);text-align:center;font-size:.9rem;max-width:26ch}
+.stage .err{color:var(--c-bad);text-align:center;font-size:.9rem;max-width:34ch}
+.verdict{display:flex;align-items:center;gap:8px;font-size:.84rem;font-weight:650;color:var(--c-tx2);min-height:22px}
+.verdict .dot{width:9px;height:9px;border-radius:50%;background:var(--c-tx3);flex:none}
+.verdict.ok .dot{background:var(--c-ok);box-shadow:0 0 0 4px color-mix(in srgb,var(--c-ok) 18%,transparent)}
+.verdict.bad .dot{background:var(--c-bad)}
+.verdict.wait .dot{animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.facts div{padding:8px 10px;border-radius:var(--r-s);background:var(--c-raised);border:1px solid var(--c-brd);min-width:0}
+.facts b{display:block;font-size:.95rem;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.facts span{display:block;font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--c-tx3)}
+.dl{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+@media (max-width:900px){.studio{grid-template-columns:minmax(0,1fr)}.preview{position:static;order:-1}.stage{min-height:220px}.stage .art,.stage .art svg{max-height:260px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ── Hub ── */
+.smart{padding:18px;border-radius:calc(var(--r) + 4px);background:linear-gradient(135deg,color-mix(in srgb,var(--c-ac) 14%,var(--c-card)),var(--c-card));border:1px solid var(--c-brd2);display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:18px;align-items:center;margin-bottom:22px}
+.smart h2{margin:0 0 4px;font-size:1.1rem;letter-spacing:-.01em}
+.smart p{margin:0 0 10px;color:var(--c-tx2);font-size:.9rem}
+.smart .stage{min-height:180px;padding:14px}
+.smart .stage .art,.smart .stage .art svg{max-height:170px}
+.smart .why{font-size:.86rem;color:var(--c-tx2);margin-top:8px;min-height:1.4em}
+.smart .why b{color:var(--c-tx)}
+@media (max-width:700px){.smart{grid-template-columns:minmax(0,1fr)}}
+.group-h{display:flex;align-items:center;gap:8px;margin:22px 0 10px;font-size:.8rem;font-weight:750;letter-spacing:.07em;text-transform:uppercase;color:var(--c-tx3)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.tile{display:flex;gap:12px;align-items:flex-start;padding:14px;border-radius:var(--r);background:var(--c-card);border:1px solid var(--c-brd);color:var(--c-tx);text-decoration:none;transition:border-color .15s,transform .15s,background .15s;min-width:0}
+.tile:hover{border-color:var(--c-ac);transform:translateY(-1px);background:var(--c-hover)}
+.tile .ti{display:grid;place-items:center;width:40px;height:40px;border-radius:11px;background:color-mix(in srgb,var(--c-ac) 16%,transparent);color:var(--c-acl);font-size:19px;flex:none}
+.tile b{display:block;font-size:.92rem}
+.tile small{display:block;color:var(--c-tx2);font-size:.8rem;margin-top:2px}
+
+/* ── Scanner ── */
+.scan{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.scan{grid-template-columns:minmax(0,1fr)}}
+.viewport{position:relative;aspect-ratio:4/3;border-radius:var(--r);overflow:hidden;background:#000;border:1px solid var(--c-brd);display:grid;place-items:center}
+.viewport video,.viewport img.shot{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.viewport canvas.overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.viewport .aim{position:absolute;inset:18% 22%;border-radius:18px;pointer-events:none;box-shadow:0 0 0 999px rgba(0,0,0,.28);outline:2px solid rgba(255,255,255,.7);outline-offset:-2px}
+.viewport .aim::after{content:'';position:absolute;left:8%;right:8%;height:2px;top:50%;background:linear-gradient(90deg,transparent,var(--c-ac),transparent);animation:sweep 2.4s ease-in-out infinite}
+@keyframes sweep{0%,100%{transform:translateY(-60px)}50%{transform:translateY(60px)}}
+.drop{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px;text-align:center;color:#d6deea;background:radial-gradient(circle at 50% 40%,#1b2536,#06090f)}
+.drop.over{outline:3px dashed var(--c-ac);outline-offset:-10px}
+.drop .big{font-size:42px;color:#9fb3d1}
+.drop p{margin:0;max-width:34ch;font-size:.9rem;color:#a9b6c9}
+.scanbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.scanbar select{width:auto;max-width:220px}
+.results{display:flex;flex-direction:column;gap:10px}
+.result{padding:14px;border-radius:var(--r);background:var(--c-card);border:1px solid var(--c-brd);min-width:0;animation:pop .25s ease-out}
+@keyframes pop{from{transform:translateY(4px);opacity:0}}
+.result .rh{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.result .fmt{font-size:.72rem;font-weight:750;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:var(--c-raised);border:1px solid var(--c-brd2);color:var(--c-tx2)}
+.result .kind{font-weight:750}
+.result .when{margin-left:auto;font-size:.76rem;color:var(--c-tx3)}
+.result .raw{font-family:var(--mono);font-size:.84rem;padding:8px 10px;border-radius:8px;background:var(--c-input);border:1px solid var(--c-brd);word-break:break-all;white-space:pre-wrap;max-height:160px;overflow:auto;user-select:all}
+.result dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 12px;margin:8px 0;font-size:.86rem}
+.result dt{color:var(--c-tx3)}.result dd{margin:0;word-break:break-word}
+.result .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+
+/* ── Check (GS1) ── */
+.big-number{font-family:var(--mono);font-size:clamp(1.3rem,4vw,2rem);letter-spacing:.06em;word-break:break-all}
+.big-number .cd{padding:0 3px;border-radius:5px}
+.big-number .cd.ok{background:color-mix(in srgb,var(--c-ok) 22%,transparent);color:var(--c-ok)}
+.big-number .cd.bad{background:color-mix(in srgb,var(--c-bad) 22%,transparent);color:var(--c-bad);text-decoration:line-through}
+table.ais{width:100%;border-collapse:collapse;font-size:.88rem}
+table.ais th,table.ais td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--c-brd);vertical-align:top}
+table.ais th{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--c-tx3);font-weight:700}
+table.ais td.v{font-family:var(--mono);word-break:break-all}
+.st-ok{color:var(--c-ok)}.st-bad{color:var(--c-bad)}
+.aibuild{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) auto;gap:6px;margin-bottom:6px}
+
+/* ── Bulk ── */
+.sheet{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.sheet figure{margin:0;padding:10px;border-radius:var(--r-s);background:#fff;border:1px solid var(--c-brd);display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
+.sheet figure img{max-width:100%;height:auto;max-height:110px}
+.sheet figcaption{font-size:.72rem;color:#333;text-align:center;word-break:break-all;font-family:var(--mono)}
+.fails{font-size:.84rem;color:var(--c-bad);margin:8px 0 0;padding-left:18px}
+
+.toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,90px);padding:10px 18px;border-radius:12px;background:var(--c-raised);border:1px solid var(--c-brd2);color:var(--c-tx);font-weight:650;font-size:.88rem;box-shadow:var(--c-shadow-lg);opacity:0;transition:transform .25s,opacity .25s;z-index:9999;pointer-events:none;max-width:calc(100vw - 32px)}
+.toast.show{transform:translate(-50%,0);opacity:1}
+
+/* ── Printing labels: only the label sheet ── */
+#print-sheet{display:none}
+@media print{
+  body *{visibility:hidden}
+  #print-sheet,#print-sheet *{visibility:visible}
+  #print-sheet{display:block;position:absolute;left:0;top:0}
+  #print-sheet .lab{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;break-inside:avoid;vertical-align:top}
+  #print-sheet .lab img{max-width:100%;max-height:100%}
+  #print-sheet .lab span{font:7pt/1.1 ui-monospace,Menlo,monospace;color:#000;margin-top:1mm;text-align:center;word-break:break-all}
+}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+<div id="navbar-mount"></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-qr" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 17h4v4h-4"/></symbol>
+  <symbol id="i-barcode" viewBox="0 0 24 24"><path d="M4 5v14M7 5v14M10 5v14M14 5v14M17 5v14M20 5v14"/><path d="M8.5 5v14M15.5 5v14" stroke-width="1"/></symbol>
+  <symbol id="i-matrix" viewBox="0 0 24 24"><path d="M4 4v16h16"/><path d="M8 4h2M12 4h2M16 4h2M20 6v2M20 10v2M20 14v2M8 8h2v2H8zM13 9h2v2h-2zM9 13h2v2H9zM14 14h2v2h-2z"/></symbol>
+  <symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3M7 12h10"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2 8.8a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M12 19.5h.01"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></symbol>
+  <symbol id="i-ticket" viewBox="0 0 24 24"><path d="M3 9a3 3 0 0 0 0 6v3a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-3a3 3 0 0 1 0-6V6a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1z"/><path d="M13 5v2M13 11v2M13 17v2"/></symbol>
+  <symbol id="i-id" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h10M7 12h10M7 15h6"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M3 8a2 2 0 0 1 2-2h2l2-2h6l2 2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="4"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></symbol>
+  <symbol id="i-flip" viewBox="0 0 24 24"><path d="M17 3l4 4-4 4M21 7H9M7 21l-4-4 4-4M3 17h12"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3l10 18H2z"/><path d="M12 10v4M12 17.5h.01"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></symbol>
+  <symbol id="i-print" viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2"/><rect x="6" y="14" width="12" height="7"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 21V9M7 14l5-5 5 5M5 3h14"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+</svg>
+
+<main class="cx" id="main">
+  <div class="cx-bar">
+    <a class="cx-fam" href="https://barcodes.openvibe.tools/"><span class="mark"><svg class="ic"><use href="#i-barcode"/></svg></span>Barcode &amp; QR Tools</a>
+    <nav class="cx-tabs" id="tabs" aria-label="Barcode and QR tools"></nav>
+  </div>
+  <header class="cx-head"><h1 id="h1">Barcode &amp; QR Tools</h1><p id="lead">Make, scan and check every kind of code, in your browser.</p></header>
+
+  <!-- Hub -->
+  <section id="view-hub" hidden>
+    <div class="smart">
+      <div>
+        <h2>Type anything. Get the right code.</h2>
+        <p>A link, a product number, an ISBN, a GS1 string or plain text: the right symbology is picked, the check digit verified, and the code test-scanned.</p>
+        <input type="text" id="hub-text" class="mono" placeholder="https://… or 4006381333931 or (01)09506000134352(17)271231" autocomplete="off" spellcheck="false" aria-label="Text or number to encode">
+        <div class="why" id="hub-why" aria-live="polite"></div>
+        <div class="row" style="margin-top:10px"><a class="btn primary" id="hub-open" href="#"><svg class="ic"><use href="#i-spark"/></svg>Open in the studio</a><a class="btn" href="https://barcode-scanner.openvibe.tools/"><svg class="ic"><use href="#i-scan"/></svg>Scan a code</a></div>
+      </div>
+      <div class="stage" id="hub-stage"><div class="empty">Your code appears here</div></div>
+    </div>
+    <div id="hub-tiles"></div>
+  </section>
+
+  <!-- QR studio -->
+  <section id="view-qr" hidden>
+    <div class="studio">
+      <div class="controls">
+        <div class="panel">
+          <h2>What it does</h2>
+          <div class="chips" id="qr-types" role="group" aria-label="Content type"></div>
+          <div id="qr-fields" style="margin-top:14px"></div>
+        </div>
+        <details class="panel" open>
+          <summary>Style</summary>
+          <div class="field"><span class="lbl">Modules</span><div class="seg" id="qr-style" role="group" aria-label="Module shape"></div></div>
+          <div class="field"><span class="lbl">Eyes</span><div class="seg" id="qr-eyes" role="group" aria-label="Eye shape"></div></div>
+          <div class="row">
+            <label class="field"><span>Colour</span><span class="color"><input type="color" id="qr-color" value="#0b1220" aria-label="Colour"><input type="text" id="qr-color-t" value="#0b1220" maxlength="7" aria-label="Colour hex"></span></label>
+            <label class="field"><span>Eyes</span><span class="color"><input type="color" id="qr-eye" value="#0b1220" aria-label="Eye colour"><input type="text" id="qr-eye-t" value="#0b1220" maxlength="7" aria-label="Eye colour hex"></span></label>
+            <label class="field"><span>Background</span><span class="color"><input type="color" id="qr-bg" value="#ffffff" aria-label="Background"><input type="text" id="qr-bg-t" value="#ffffff" maxlength="7" aria-label="Background hex"></span></label>
+          </div>
+          <div class="row" style="align-items:center;gap:16px">
+            <label class="check"><input type="checkbox" id="qr-grad"> Gradient</label>
+            <label class="color" id="qr-grad-box" hidden><input type="color" id="qr-grad-to" value="#3472d8" aria-label="Gradient end colour"><input type="text" id="qr-grad-to-t" value="#3472d8" maxlength="7" aria-label="Gradient end hex"></label>
+            <label class="check"><input type="checkbox" id="qr-transparent"> Transparent background</label>
+          </div>
+          <div class="field" style="margin-top:6px"><span class="lbl">Presets</span><div class="chips" id="qr-presets"></div></div>
+        </details>
+        <details class="panel" id="qr-logo-panel">
+          <summary>Logo</summary>
+          <div class="row" style="align-items:center">
+            <label class="btn"><svg class="ic"><use href="#i-upload"/></svg>Choose a picture<input type="file" id="qr-logo" accept="image/*" class="sr"></label>
+            <button type="button" class="btn ghost" id="qr-logo-clear" hidden><svg class="ic"><use href="#i-trash"/></svg>Remove</button>
+            <span class="muted" id="qr-logo-name"></span>
+          </div>
+          <div class="field" style="margin-top:10px"><span class="lbl">Logo size</span><div class="range"><input type="range" id="qr-logo-size" min="12" max="30" value="22" aria-label="Logo size"><output id="qr-logo-size-o">22%</output></div><small>Error correction rises to H (30%) with a logo, and the code is checked after every change.</small></div>
+        </details>
+        <details class="panel">
+          <summary>Size, frame &amp; error correction</summary>
+          <div class="field"><span class="lbl">Error correction</span><div class="seg" id="qr-ecc" role="group" aria-label="Error correction"></div><small id="qr-ecc-note"></small></div>
+          <div class="row">
+            <div class="field grow"><span class="lbl">Quiet zone</span><div class="range"><input type="range" id="qr-quiet" min="0" max="10" value="4" aria-label="Quiet zone"><output id="qr-quiet-o">4 modules</output></div></div>
+            <div class="field grow"><span class="lbl">PNG size</span><div class="range"><input type="range" id="qr-px" min="256" max="4000" step="16" value="1024" aria-label="PNG size"><output id="qr-px-o">1024 px</output></div></div>
+          </div>
+          <div class="row">
+            <label class="field grow"><span>Caption under the code</span><input type="text" id="qr-caption" maxlength="40" placeholder="Scan me"></label>
+            <label class="field" style="width:130px"><span>Print at</span><select id="qr-dpi"><option value="150">150 DPI</option><option value="300" selected>300 DPI</option><option value="600">600 DPI</option></select></label>
+          </div>
+          <div class="note" id="qr-print-note"><svg class="ic"><use href="#i-print"/></svg><span></span></div>
+        </details>
+      </div>
+      <aside class="preview" aria-label="Preview">
+        <div class="stage" id="qr-stage"><div class="empty">Fill in a link or some text</div></div>
+        <div class="verdict" id="qr-verdict" aria-live="polite"><span class="dot"></span><span>—</span></div>
+        <div class="facts" id="qr-facts"></div>
+        <div class="dl">
+          <button type="button" class="btn primary" id="qr-png"><svg class="ic"><use href="#i-download"/></svg>PNG</button>
+          <button type="button" class="btn" id="qr-svg"><svg class="ic"><use href="#i-download"/></svg>SVG</button>
+          <button type="button" class="btn" id="qr-copy"><svg class="ic"><use href="#i-copy"/></svg>Copy</button>
+        </div>
+        <div id="qr-notes"></div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- Barcode studio (every symbology; single-type pages are presets of it) -->
+  <section id="view-barcode" hidden>
+    <div class="studio">
+      <div class="controls">
+        <div class="panel">
+          <h2>Data</h2>
+          <label class="field"><span class="sr">Text or number to encode</span><textarea id="bc-text" class="mono" rows="2" spellcheck="false" autocomplete="off"></textarea></label>
+          <div id="bc-smart" aria-live="polite"></div>
+        </div>
+        <div class="panel">
+          <h2>Symbology</h2>
+          <div class="row">
+            <label class="field grow"><span class="sr">Find a symbology</span><input type="search" id="bc-find" placeholder="Search 100+ types: ean, gs1, postal, 2d…" autocomplete="off"></label>
+            <label class="field grow"><span class="sr">Symbology</span><select id="bc-type"></select></label>
+          </div>
+          <div class="row" style="align-items:center;justify-content:space-between"><small class="muted" id="bc-type-desc"></small><button type="button" class="btn small ghost" id="bc-sample">Try a sample</button></div>
+          <div id="bc-extra" style="margin-top:10px"></div>
+        </div>
+        <details class="panel" open>
+          <summary>Look</summary>
+          <div class="row">
+            <div class="field grow" id="bc-height-f"><span class="lbl">Bar height</span><div class="range"><input type="range" id="bc-height" min="4" max="60" step="0.5" value="15" aria-label="Bar height"><output id="bc-height-o">15 mm</output></div></div>
+            <div class="field grow"><span class="lbl">Module width (X)</span><div class="range"><input type="range" id="bc-x" min="0.17" max="1.5" step="0.01" value="0.33" aria-label="Module width"><output id="bc-x-o">0.33 mm</output></div></div>
+          </div>
+          <div class="row" style="align-items:center;gap:16px;margin-bottom:10px">
+            <label class="check" id="bc-text-f"><input type="checkbox" id="bc-showtext" checked> Human-readable text</label>
+            <div class="field" style="margin:0"><div class="seg" id="bc-rotate" role="group" aria-label="Rotation"></div></div>
+          </div>
+          <div class="row">
+            <label class="field"><span>Bars</span><span class="color"><input type="color" id="bc-color" value="#000000" aria-label="Bar colour"><input type="text" id="bc-color-t" value="#000000" maxlength="7" aria-label="Bar colour hex"></span></label>
+            <label class="field"><span>Background</span><span class="color"><input type="color" id="bc-bg" value="#ffffff" aria-label="Background"><input type="text" id="bc-bg-t" value="#ffffff" maxlength="7" aria-label="Background hex"></span></label>
+            <div class="field grow"><span class="lbl">Quiet zone</span><div class="range"><input type="range" id="bc-quiet" min="0" max="20" value="10" aria-label="Quiet zone"><output id="bc-quiet-o">10</output></div></div>
+          </div>
+        </details>
+        <details class="panel">
+          <summary>Print size</summary>
+          <div class="row">
+            <label class="field" style="width:150px"><span>Printer</span><select id="bc-dpi"><option value="96">Screen, 96 DPI</option><option value="203">Label printer, 203 DPI</option><option value="300" selected>300 DPI</option><option value="600">600 DPI</option></select></label>
+            <div class="field grow"><span class="lbl">Physical size</span><b id="bc-size" style="font-variant-numeric:tabular-nums">—</b></div>
+          </div>
+          <div class="note"><svg class="ic"><use href="#i-print"/></svg><span>The module width snaps to whole printer dots (<span id="bc-dots">—</span>), so every bar prints the same width. PNG files carry the resolution, so they print at this size.</span></div>
+        </details>
+      </div>
+      <aside class="preview" aria-label="Preview">
+        <div class="stage" id="bc-stage"><div class="empty">Type something to encode</div></div>
+        <div class="verdict" id="bc-verdict" aria-live="polite"><span class="dot"></span><span>—</span></div>
+        <div class="facts" id="bc-facts"></div>
+        <div class="dl">
+          <button type="button" class="btn primary" id="bc-png"><svg class="ic"><use href="#i-download"/></svg>PNG</button>
+          <button type="button" class="btn" id="bc-svg"><svg class="ic"><use href="#i-download"/></svg>SVG</button>
+          <button type="button" class="btn" id="bc-copy"><svg class="ic"><use href="#i-copy"/></svg>Copy</button>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- Scanner -->
+  <section id="view-scan" hidden>
+    <div class="scan">
+      <div>
+        <div class="viewport" id="sc-view">
+          <video id="sc-video" playsinline muted hidden></video>
+          <img class="shot" id="sc-shot" alt="" hidden>
+          <canvas class="overlay" id="sc-overlay"></canvas>
+          <div class="aim" id="sc-aim" hidden></div>
+          <div class="drop" id="sc-drop">
+            <svg class="ic big"><use href="#i-scan"/></svg>
+            <p>Point your camera at a code, or drop, paste (<span class="kbd">Ctrl</span>+<span class="kbd">V</span>) or choose a picture. Every code in it is read.</p>
+            <div class="row" style="justify-content:center">
+              <button type="button" class="btn primary" id="sc-start"><svg class="ic"><use href="#i-camera"/></svg>Start camera</button>
+              <label class="btn"><svg class="ic"><use href="#i-image"/></svg>Choose a picture<input type="file" id="sc-file" accept="image/*" class="sr"></label>
+            </div>
+          </div>
+        </div>
+        <div class="scanbar">
+          <button type="button" class="btn" id="sc-stop" hidden><svg class="ic"><use href="#i-stop"/></svg>Stop</button>
+          <button type="button" class="btn" id="sc-flip" hidden><svg class="ic"><use href="#i-flip"/></svg>Switch camera</button>
+          <button type="button" class="btn" id="sc-torch" hidden aria-pressed="false"><svg class="ic"><use href="#i-bolt"/></svg>Torch</button>
+          <label class="btn ghost" id="sc-again" hidden><svg class="ic"><use href="#i-image"/></svg>Another picture<input type="file" id="sc-file2" accept="image/*" class="sr"></label>
+          <label class="check" style="margin-left:auto"><input type="checkbox" id="sc-beep" checked> Sound</label>
+        </div>
+        <p class="muted" id="sc-engine" style="font-size:.8rem;margin:8px 0 0"></p>
+      </div>
+      <div>
+        <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px"><b>Found</b><button type="button" class="btn small ghost" id="sc-clear"><svg class="ic"><use href="#i-trash"/></svg>Clear history</button></div>
+        <div class="results" id="sc-results"><div class="note"><svg class="ic"><use href="#i-scan"/></svg><span>Codes you scan appear here, with what they contain. Nothing is opened until you choose to.</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Check: GTIN / ISBN / SSCC and GS1 -->
+  <section id="view-check" hidden>
+    <div class="studio">
+      <div class="controls">
+        <div class="panel">
+          <h2>Number or GS1 data</h2>
+          <input type="text" id="ck-text" class="mono" placeholder="4006381333931, 978-0-306-40615-7, 0360002914 or (01)09506000134352(17)271231(10)A1" autocomplete="off" spellcheck="false" aria-label="Number or GS1 data">
+          <div id="ck-out" aria-live="polite" style="margin-top:14px"></div>
+        </div>
+        <details class="panel" id="ck-build-panel">
+          <summary>Build a GS1 element string</summary>
+          <div id="ck-rows"></div>
+          <div class="row"><button type="button" class="btn small" id="ck-add">Add a field</button><span class="muted" style="font-size:.82rem">Fields are checked as you type; the result goes in the preview.</span></div>
+        </details>
+      </div>
+      <aside class="preview" aria-label="Preview">
+        <div class="stage" id="ck-stage"><div class="empty">The matching barcode appears here</div></div>
+        <div class="seg" id="ck-sym" role="group" aria-label="Symbology for GS1 data" hidden></div>
+        <div class="dl">
+          <button type="button" class="btn primary" id="ck-png"><svg class="ic"><use href="#i-download"/></svg>PNG</button>
+          <button type="button" class="btn" id="ck-svg"><svg class="ic"><use href="#i-download"/></svg>SVG</button>
+          <a class="btn" id="ck-studio" href="https://barcode-generator.openvibe.tools/"><svg class="ic"><use href="#i-barcode"/></svg>Studio</a>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- Bulk -->
+  <section id="view-bulk" hidden>
+    <div class="studio">
+      <div class="controls">
+        <div class="panel">
+          <h2>Values</h2>
+          <div class="seg" id="bk-src" role="group" aria-label="Source" style="margin-bottom:10px"></div>
+          <div id="bk-list">
+            <label class="field"><span class="sr">One value per line</span><textarea id="bk-text" class="mono" rows="8" spellcheck="false" placeholder="One value per line&#10;SKU-0001&#10;SKU-0002&#10;or value,caption"></textarea></label>
+            <label class="check"><input type="checkbox" id="bk-csv"> Lines are <span class="kbd">value,caption</span> (CSV or tab-separated)</label>
+          </div>
+          <div id="bk-seq" hidden>
+            <div class="row">
+              <label class="field grow"><span>Prefix</span><input type="text" id="bk-prefix" value="SKU-" maxlength="40"></label>
+              <label class="field" style="width:110px"><span>Start</span><input type="number" id="bk-start" value="1" min="0"></label>
+              <label class="field" style="width:110px"><span>Count</span><input type="number" id="bk-count" value="24" min="1" max="2000"></label>
+              <label class="field" style="width:90px"><span>Step</span><input type="number" id="bk-step" value="1" min="1"></label>
+              <label class="field" style="width:90px"><span>Digits</span><input type="number" id="bk-pad" value="4" min="0" max="18"></label>
+              <label class="field grow"><span>Suffix</span><input type="text" id="bk-suffix" value="" maxlength="40"></label>
+            </div>
+            <label class="check"><input type="checkbox" id="bk-gtin"> Add a GS1 check digit to each number</label>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>Code</h2>
+          <div class="row">
+            <label class="field grow"><span>Symbology</span><select id="bk-type"></select></label>
+            <label class="field" style="width:150px"><span>Files</span><select id="bk-fmt"><option value="png">PNG</option><option value="svg">SVG</option></select></label>
+          </div>
+          <div class="row" style="align-items:center;gap:16px"><label class="check"><input type="checkbox" id="bk-showtext" checked> Human-readable text</label><label class="check"><input type="checkbox" id="bk-caption" checked> Caption on labels</label></div>
+        </div>
+        <details class="panel">
+          <summary>Label sheet</summary>
+          <div class="row">
+            <label class="field" style="width:120px"><span>Label width</span><input type="number" id="bk-lw" value="63.5" min="10" max="300" step="0.1"></label>
+            <label class="field" style="width:120px"><span>Label height</span><input type="number" id="bk-lh" value="38.1" min="10" max="300" step="0.1"></label>
+            <label class="field" style="width:100px"><span>Columns</span><input type="number" id="bk-cols" value="3" min="1" max="10"></label>
+            <label class="field" style="width:100px"><span>Gap (mm)</span><input type="number" id="bk-gap" value="2.5" min="0" max="20" step="0.5"></label>
+            <label class="field" style="width:120px"><span>Page margin</span><input type="number" id="bk-margin" value="10" min="0" max="40" step="0.5"></label>
+          </div>
+          <small class="muted">63.5 × 38.1 mm, 3 across is the common 21-label A4 sheet; 66.7 × 25.4 mm, 3 across, the US 30-label sheet.</small>
+        </details>
+      </div>
+      <aside class="preview" aria-label="Preview">
+        <div class="panel" style="padding:12px">
+          <div class="row" style="justify-content:space-between;align-items:center"><b id="bk-count-o">0 codes</b><span class="muted" id="bk-time" style="font-size:.8rem"></span></div>
+          <ul class="fails" id="bk-fails" hidden></ul>
+        </div>
+        <div class="dl" style="grid-template-columns:1fr 1fr">
+          <button type="button" class="btn primary" id="bk-zip"><svg class="ic"><use href="#i-download"/></svg>Download ZIP</button>
+          <button type="button" class="btn" id="bk-print"><svg class="ic"><use href="#i-print"/></svg>Print labels</button>
+        </div>
+        <div class="sheet" id="bk-sheet"></div>
+      </aside>
+    </div>
+  </section>
+</main>
+<div id="print-sheet" aria-hidden="true"></div>
+<div id="ov-footer"></div>
+<div class="toast" id="toast" role="status"></div>
+<script src="/shared/navbar.js"></script>
+<script src="/shared/footer.js"></script>
+<script src="/shared/theme-loader.js" defer></script>
+<script src="/js/codes/smart.js"></script>
+<script src="/js/codes/draw.js"></script>
+<script src="/js/codes/read.js" id="codes-read" data-zxing="/vendor/zxing-wasm@3.1.5/reader.js" data-zxing-wasm="/vendor/zxing-wasm@3.1.5/zxing_reader.wasm"></script>
+<script src="/vendor/bwip-js@4.11.4/bwip-js.min.js" defer></script>
+<script src="/js/codes/app.js" defer></script>
+</body>
+</html>

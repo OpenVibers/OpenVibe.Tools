@@ -136,7 +136,7 @@ const get = async (url, headers = {}, method = 'GET') => {
         assert.strictEqual((await get(`${G}/api/v1/tools/yt/schema`)).body.$defs.input, false, 'no API, no input');
 
         // ── Not tools ──
-        for (const [id, why] of [['no-such-tool', /No tool is called/], ['qr', /planned/], ['jsonfmt', /mirror of json|second build of json/]]) {
+        for (const [id, why] of [['no-such-tool', /No tool is called/], ['password', /planned/], ['jsonfmt', /mirror of json|second build of json/]]) {
             r = await get(`${G}/api/v1/tools/${id}`);
             assert.strictEqual(r.status, 404, id);
             assert.match(r.h.get('content-type'), /^application\/problem\+json/);

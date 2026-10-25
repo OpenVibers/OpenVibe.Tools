@@ -22,7 +22,8 @@ const DOMAINS_URL = process.env.OV_DOMAINS_URL || 'https://openvibe.network/api/
 
 // Two different tools must never share a display name.
 const RENAME = { curl: 'HTTP Request Tester', curlconvert: 'cURL Converter' };
-const FAMILY_ICON = { net: 'dns', dev: 'code' };
+const FAMILY_ICON = { net: 'dns', dev: 'code', codes: 'barcode' };
+const CODE_ICONS = { qr: 'qr', wifiqr: 'qr', vcardqr: 'qr', scan: 'scan', gs1: 'check' };
 const NET_ICONS = { ip: 'ip', myip: 'ip', dns: 'dns', whois: 'whois', ssl: 'ssl', ping: 'ping', traceroute: 'ping' };
 
 const firstSentence = (s, max = 60) => { const t = String(s || '').split(/(?<=[.!?])\s/)[0].replace(/\.$/, ''); return t.length <= max ? t : t.slice(0, max).replace(/\s+\S*$/, ''); };
@@ -36,7 +37,7 @@ function baseTools() {
         out.push({
             id: rec.sub, family: rec.family, name: rec.name, tagline: firstSentence(rec.desc), description: rec.about || rec.desc,
             keywords: String(rec.kw || '').split(',').map(k => k.trim()).filter(Boolean),
-            icon: (rec.family === 'net' && NET_ICONS[rec.sub]) || (rec.sub.includes('json') ? 'json' : FAMILY_ICON[rec.family]) || 'tools',
+            icon: (rec.family === 'net' && NET_ICONS[rec.sub]) || (rec.family === 'codes' && CODE_ICONS[rec.sub]) || (rec.sub.includes('json') ? 'json' : FAMILY_ICON[rec.family]) || 'tools',
             ...(net && net.status === 'unavailable' && { status: 'unavailable', unavailable: net.unavailable }),
         });
     }
@@ -51,7 +52,6 @@ const PLANNED = [
     { id: 'tiktok', family: 'media', name: 'TikTok Downloader', tagline: 'Save TikTok videos without the watermark dance', icon: 'download' },
     { id: 'videoconvert', family: 'media', name: 'Video Converter', tagline: 'MP4, WebM, MOV and GIF, trimmed and resized', icon: 'video' },
     { id: 'screenrecord', family: 'media', name: 'Screen Recorder', tagline: 'Record a tab or a window straight from the browser', icon: 'video' },
-    { id: 'qr', family: 'dev', name: 'QR Code Generator', tagline: 'Links, Wi-Fi logins and contact cards as QR codes', icon: 'code' },
     { id: 'password', family: 'dev', name: 'Password Generator', tagline: 'Strong passwords and passphrases, made in your browser', icon: 'ssl' },
     { id: 'speedtest', family: 'net', name: 'Speed Test', tagline: 'Download, upload and latency to the OpenVibe network', icon: 'ping' },
     { id: 'ocr', family: 'img', name: 'Image to Text (OCR)', tagline: 'Pull the text out of screenshots and scans', icon: 'text' },
