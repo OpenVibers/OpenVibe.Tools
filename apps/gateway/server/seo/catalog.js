@@ -394,9 +394,136 @@ const NET = {
     sitemap: { name: 'Sitemap Validator', title: 'Sitemap.xml Validator — Online XML Sitemap Checker', desc: 'Check an XML sitemap: its structure, URL count, loc and lastmod values, and sitemap index files, so search engines can read it. Instant.', kw: 'sitemap validator, sitemap.xml checker, xml sitemap test, sitemap errors, seo sitemap check', about: 'Fetches a sitemap (gzipped too) and checks it against the sitemaps.org protocol: the root element and namespace, the URL count, that every loc is an absolute URL on the same site and that lastmod dates are in W3C format. A sitemap index is followed to its first child sitemaps.', bullets: ['Structure, namespace, loc and lastmod checks', 'URL count against the 50,000 entry limit', 'Follows a sitemap index to its first three sitemaps'], faq: [['How many URLs can one sitemap hold?', '50,000 URLs or 50 MB uncompressed. Beyond that, split it and reference the parts from a sitemap index.'], ['Does lastmod matter?', 'Yes, when it is accurate. Crawlers use it to prioritise re-crawling, but they learn to ignore it if every URL claims to have changed today.']] },
 };
 
+// ── Barcode & QR tools (hub: barcodes.openvibe.tools, the family 'codes'; public/codes.html, all in the browser) ─────────
+const API_FAQ = ['Can I make codes from a script, a spreadsheet or an AI agent?', 'Yes, with no account. https://openvibe.tools/api/codes/qrcode.svg?text=Hello is the image itself (any symbology, .svg or .png; /api/codes lists them), so it works in an <img> tag or Markdown. POST /api/v1/tools/<tool>/run answers JSON, and the OpenAPI document is at https://openvibe.tools/api/v1/openapi.json.'];
+const PRIVATE = ['Is anything I type or scan uploaded?', 'No. Codes are drawn and read inside your browser (bwip-js and the ZXing reader, compiled to WebAssembly); nothing you type, upload or point the camera at reaches our servers.'];
+const CODES = {
+    codes: {
+        name: 'Barcode & QR Tools', title: 'Barcode & QR Code Tools — Generate, Scan and Check Every Kind of Code',
+        desc: 'Make QR codes, barcodes, Data Matrix and 100+ other symbologies, scan them with your camera or a picture, and check GTIN, ISBN and GS1 numbers. Free, in your browser.',
+        kw: 'barcode generator, qr code generator, barcode scanner, qr scanner, data matrix, gtin, gs1, ean-13, upc, code 128',
+        about: 'Everything for codes in one place: a QR studio with styles and logos, a generator for every barcode in common use (retail, logistics, postal, pharma and 2D), a scanner for your camera or pictures, and a checker that fixes GTIN, ISBN and SSCC check digits and reads GS1 labels. Each tool works out what you typed and picks the right code for it.',
+        bullets: ['Over 100 symbologies, from EAN-13 and Code 128 to PDF417, Aztec, MaxiCode and DotCode', 'Every code is test-scanned as you make it, so you know it reads', 'PNG at print resolution or vector SVG, sized in pixels or millimetres', 'Nothing leaves your browser'],
+        faq: [PRIVATE, ['Do the codes expire?', 'No. The codes are static: what you encode is in the pattern itself, with no redirect service in between, so they work for as long as the printout lasts.']],
+    },
+    qr: {
+        name: 'QR Code Generator', title: 'QR Code Generator — Free, No Sign-Up, With Logo, Colours and SVG',
+        desc: 'Make a QR code for a link, Wi-Fi, a contact card, an email, a text or an event. Rounded or dotted styles, colours, a logo, PNG or SVG, test-scanned before you download.',
+        kw: 'qr code generator, free qr code, qr code with logo, custom qr code, qr code svg, wifi qr code, vcard qr code, dynamic qr alternative',
+        about: 'Pick what the code should do (open a link, join a Wi-Fi network, save a contact, start an email or a text, add an event, show a place) and fill in the fields. Style it with rounded or dotted modules, your colours and a logo in the middle; the error correction rises on its own so the logo never breaks the code. Every change is test-scanned, and the preview tells you if a colour or a logo makes it hard to read.',
+        bullets: ['Nine content types, each written in the format phone cameras understand', 'Square, rounded, dot and fluid styles; eye shapes; colours, gradients and a logo', 'Automatic error correction and a live scan check', 'PNG up to 4000 px or vector SVG; print size in millimetres'],
+        faq: [['Will this QR code stop working?', 'No. It is a static QR code: the link or text is encoded directly, with no short-link service in between that could expire or be switched off.'], ['Can I put my logo in a QR code?', 'Yes. Add a picture and the generator raises the error correction to level H and clears the space behind it, then checks the result still scans.'], ['What size should I print it?', 'A good rule is one tenth of the scanning distance: about 2 cm across for a business card read at 20 cm, 30 cm for a poster read from 3 metres. The size box converts pixels to millimetres for you.'], PRIVATE],
+    },
+    barcode: {
+        name: 'Barcode Generator', title: 'Barcode Generator — EAN, UPC, Code 128, GS1 and 100+ Types, Free',
+        desc: 'Generate any barcode: EAN-13, UPC-A, Code 128, Code 39, ITF-14, GS1-128, PDF417, Data Matrix and more. Smart type detection, check digits fixed, PNG or SVG at print size.',
+        kw: 'barcode generator, free barcode generator, online barcode maker, code 128, ean-13, upc-a, code 39, itf-14, gs1-128, barcode svg',
+        about: 'Type what you want to encode and the generator suggests the right symbology: a product number goes in EAN-13 or UPC-A with its check digit verified, a shipping container in GS1-128, digits in Interleaved 2 of 5, anything longer in a 2D code. Or choose from more than a hundred symbologies yourself. Set the bar height, the text, colours, rotation and quiet zone, and size it exactly for print at the resolution of your printer.',
+        bullets: ['More than 100 symbologies: retail, industrial, GS1, postal, pharmaceutical and 2D', 'Detects GTIN, ISBN, ISSN, SSCC and UPC-E numbers and corrects their check digits', 'Width in millimetres at your printer\'s DPI, so bars land on whole dots', 'PNG, SVG or a copy to the clipboard'],
+        faq: [['Which barcode should I use?', 'For products sold in shops, EAN-13 (or UPC-A in North America) with a GTIN from GS1. For your own labels, inventory and tickets, Code 128 is the dense, universal choice. If you need more than about 40 characters, use a 2D code such as QR or Data Matrix.'], ['Can I make a barcode for a product I sell?', 'You can draw any number, but a retail barcode only means something if the GTIN is registered to you by GS1. The generator checks the check digit; it cannot check who owns the number.'], PRIVATE],
+    },
+    scan: {
+        name: 'Barcode & QR Scanner', title: 'QR Code & Barcode Scanner Online — Camera or Picture, Free',
+        desc: 'Scan QR codes, barcodes, Data Matrix, PDF417 and more with your camera or from a picture or screenshot. Reads several codes at once and explains what each one contains.',
+        kw: 'qr code scanner, barcode scanner online, scan qr code from image, qr reader, barcode reader, scan barcode with camera, data matrix reader',
+        about: 'Point your camera at a code, or drop, paste or upload a picture or screenshot. The scanner reads every code it finds (QR, Micro QR, Data Matrix, Aztec, PDF417, MaxiCode, EAN, UPC, Code 128, Code 39, ITF, Codabar, GS1 DataBar and more), outlines each one, and says what it holds: a Wi-Fi network with its password, a contact card, a link and where it goes, a product number with its check digit, or GS1 data split into fields.',
+        bullets: ['Camera scanning with torch and camera switching on phones', 'Pictures, screenshots and pasted images, several codes at once', 'Explains Wi-Fi, contacts, events, links, GTINs and GS1 data', 'Links are shown in full before you open them'],
+        faq: [['Is it safe to scan an unknown QR code?', 'The scanner never opens anything by itself. A link is shown with its full address first, and only links starting with http or https get an Open button.'], ['Why does my code not scan?', 'Try more light and hold the code flat, filling about half the frame. For a picture, crop closer to the code; very small or blurry codes may need a sharper photo.'], PRIVATE],
+    },
+    datamatrix: {
+        name: 'Data Matrix Generator', title: 'Data Matrix Code Generator — GS1 DataMatrix, Square or Rectangular',
+        desc: 'Make Data Matrix codes for parts marking, healthcare and GS1 labels. Square or rectangular, GS1 DataMatrix with Application Identifiers, PNG or SVG.',
+        kw: 'data matrix generator, datamatrix code, gs1 datamatrix, 2d barcode generator, data matrix ecc200, dpm code, udi barcode',
+        about: 'Data Matrix packs a lot into a small square: up to 2,335 characters, and still readable when part of it is damaged. It is the code on electronic parts, medical devices (UDI) and pharmaceutical packs. Type text or switch to GS1 mode and add Application Identifiers (GTIN, batch, expiry, serial); the generator checks each field before it draws the code.',
+        bullets: ['ECC 200 Data Matrix, square or rectangular', 'GS1 DataMatrix with checked Application Identifiers', 'Module size in millimetres for laser and inkjet marking', 'PNG or SVG'],
+        faq: [['What is the difference between Data Matrix and QR?', 'Both are 2D codes. Data Matrix is smaller for the same data and is the standard for industrial and healthcare marking; QR is what phone cameras open by default.'], PRIVATE],
+    },
+    gs1: {
+        name: 'GTIN Check Digit & GS1 Parser', title: 'GTIN Check Digit Calculator — EAN, UPC, ISBN, SSCC and GS1 Parser',
+        desc: 'Calculate and verify check digits for GTIN-8, UPC-A, EAN-13, GTIN-14, SSCC, GLN and ISBN. Convert ISBN-10 to ISBN-13 and UPC-E to UPC-A, and read GS1 element strings.',
+        kw: 'gtin check digit calculator, ean check digit, upc check digit, isbn converter, isbn-10 to isbn-13, sscc check digit, gs1 parser, gs1 application identifiers, upc-e to upc-a',
+        about: 'Type a product, book or shipping number and the checker names it (GTIN-8, UPC-A, EAN-13, GTIN-14, SSCC, ISBN, ISSN, UPC-E), says whether its check digit is right and what it should be. It converts between ISBN-10 and ISBN-13 and expands UPC-E. Paste a GS1 element string, bracketed or raw from a scanner, and it splits it into Application Identifiers with dates, weights and check digits verified.',
+        bullets: ['Check digits for every GS1 key, and ISBN-10\'s mod 11', 'ISBN-10 ↔ ISBN-13, UPC-E → UPC-A, GTIN-13 → GTIN-14', 'GS1 element strings split into labelled, validated fields', 'One click to the matching barcode'],
+        faq: [['How is a GTIN check digit calculated?', 'From the right, digits are multiplied alternately by 3 and 1 and added up; the check digit is what brings the total to the next multiple of 10.'], ['What is a GS1 Application Identifier?', 'A number in brackets that says what the data after it is: (01) a GTIN, (17) an expiry date, (10) a batch, (21) a serial number. Labels on cartons, pallets and medicines use them.'], PRIVATE],
+    },
+    wifiqr: {
+        name: 'Wi-Fi QR Code Generator', title: 'Wi-Fi QR Code Generator — Guests Join Without Typing the Password',
+        desc: 'Make a QR code that joins your Wi-Fi network: phone cameras on iPhone and Android connect when they scan it. WPA, WPA3, WEP or open; print it as a card.',
+        kw: 'wifi qr code, wifi qr code generator, qr code for wifi password, share wifi qr, guest wifi qr code',
+        about: 'Enter the network name and password and print the code for guests, a café table or a rental. Scanning it with the phone camera offers to join the network; nobody has to read out or type a long password. The password never leaves your browser.',
+        bullets: ['WPA/WPA2/WPA3, WEP, open and hidden networks', 'Special characters escaped the way phones expect', 'A printable card with the network name under the code', 'Made entirely in your browser'],
+        faq: [['Does the Wi-Fi QR code work on iPhone?', 'Yes. The iPhone camera (iOS 11 and later) and Android cameras both recognise Wi-Fi codes and offer to join.'], PRIVATE],
+    },
+    vcardqr: {
+        name: 'Contact QR Code (vCard)', title: 'vCard QR Code Generator — Contact Details as a QR Code',
+        desc: 'Turn your name, phone, email, company and website into a QR code that saves as a contact when scanned. For business cards, badges and email signatures.',
+        kw: 'vcard qr code, contact qr code, business card qr code, qr code contact card, vcard generator',
+        about: 'Fill in the details you want to share and the generator writes a vCard 3.0 that every phone can save in one tap. Keep it short (name, phone, email) for a small, easy-to-scan code on a business card, or add the company, title, address and website.',
+        bullets: ['vCard 3.0, read by iPhone and Android cameras', 'Size warning when the card grows too dense to print small', 'PNG or SVG for print', 'Made in your browser'],
+        faq: [['Why is my contact QR code so dense?', 'Every field adds characters. A name, phone and email make a small code; add an address and a long title and it grows. Leave out what people do not need.'], PRIVATE],
+    },
+    bulkbarcodes: {
+        name: 'Bulk Barcode & Label Generator', title: 'Bulk Barcode Generator — Hundreds of Barcodes or QR Codes From a List',
+        desc: 'Paste a list or a CSV and get a barcode or QR code for every line: a ZIP of PNG or SVG files, or a printable sheet of labels sized in millimetres.',
+        kw: 'bulk barcode generator, batch barcode generator, barcode labels, qr code bulk, barcode from csv, print barcode labels, sequential barcodes',
+        about: 'Paste one value per line, or a CSV with a value and a caption, or generate a numbered sequence. Choose the symbology and style once, then download every code as a ZIP, or print a sheet of labels with your label size, columns and gaps. Lines that cannot be encoded are listed with the reason.',
+        bullets: ['Values from a list, a CSV or a numbered sequence with a prefix', 'Any symbology the barcode generator supports', 'ZIP of PNG or SVG files, named after each value', 'Print-ready label sheets in millimetres'],
+        faq: [['How many codes can I make at once?', 'Up to 2,000 per batch. Everything is drawn in your browser, so large batches depend on your device; a few hundred take seconds.'], PRIVATE],
+    },
+    code128: {
+        name: 'Code 128 Barcode Generator', title: 'Code 128 Barcode Generator — Free, Online, PNG and SVG',
+        desc: 'Make Code 128 barcodes for labels, inventory, shipping and tickets. Full ASCII, automatic code set switching for the shortest barcode, bar height and text options.',
+        kw: 'code 128 generator, code 128 barcode, code128, barcode for labels, inventory barcode, shipping label barcode',
+        about: 'Code 128 encodes letters, digits and punctuation densely, and every scanner reads it. The generator switches between code sets A, B and C automatically for the shortest result; digits pack two to a symbol.',
+        bullets: ['All 128 ASCII characters', 'Automatic code set optimisation', 'Bar height, human-readable text and quiet zone', 'PNG or SVG at print size'],
+        faq: [['How long can a Code 128 barcode be?', 'There is no fixed limit, but past about 20 characters a 1D barcode gets wide; for more data a 2D code such as Data Matrix or QR is easier to scan.'], PRIVATE],
+    },
+    ean13: {
+        name: 'EAN-13 Barcode Generator', title: 'EAN-13 Barcode Generator — With Check Digit and Add-On',
+        desc: 'Make EAN-13 retail barcodes with the check digit calculated and verified. Optional EAN-2 or EAN-5 add-on for magazines and books. PNG or SVG at print size.',
+        kw: 'ean-13 generator, ean13 barcode, ean barcode generator, gtin-13 barcode, ean check digit, retail barcode',
+        about: 'Type twelve digits and the check digit is added, or thirteen and it is verified. EAN-13 is the retail barcode outside North America; print it at 80 to 200 percent of its nominal 37.29 × 25.93 mm.',
+        bullets: ['Check digit added or verified', 'EAN-2 and EAN-5 add-ons', 'Nominal size presets (80% to 200%)', 'PNG or SVG'],
+        faq: [['What size should an EAN-13 be?', 'The nominal size is 37.29 mm wide by 25.93 mm high; GS1 allows 80% to 200% of it. Smaller codes need a better printer.'], PRIVATE],
+    },
+    upc: {
+        name: 'UPC Barcode Generator', title: 'UPC-A Barcode Generator — UPC Barcodes With Check Digit',
+        desc: 'Make UPC-A and UPC-E barcodes for products sold in North America. Check digit calculated and verified, UPC-E expanded, add-ons, PNG or SVG.',
+        kw: 'upc generator, upc-a barcode, upc barcode generator, upc-e, upc check digit, gtin-12',
+        about: 'Type eleven digits and the check digit is added, or twelve and it is verified. UPC-E, the short form for small packs, is accepted too and shown with the UPC-A it stands for.',
+        bullets: ['UPC-A and UPC-E', 'Check digit added or verified', 'Add-ons for periodicals', 'PNG or SVG'],
+        faq: [['Is a UPC the same as an EAN?', 'A UPC-A is a GTIN-12; put a 0 in front and it is the same number as an EAN-13. Scanners worldwide read both.'], PRIVATE],
+    },
+    pdf417: {
+        name: 'PDF417 Barcode Generator', title: 'PDF417 Barcode Generator — Stacked 2D Codes for IDs and Tickets',
+        desc: 'Make PDF417 and MicroPDF417 codes, the stacked barcode on driving licences, boarding passes and shipping labels. Columns, error correction level, PNG or SVG.',
+        kw: 'pdf417 generator, pdf417 barcode, micropdf417, boarding pass barcode, driver license barcode, 2d barcode',
+        about: 'PDF417 stacks rows of codewords into a wide rectangle that a laser scanner can read line by line. Choose the number of columns and the error correction level; MicroPDF417 makes a smaller code for short data.',
+        bullets: ['PDF417 and MicroPDF417', 'Columns and error correction level', 'Row height control', 'PNG or SVG'],
+        faq: [PRIVATE],
+    },
+    aztec: {
+        name: 'Aztec Code Generator', title: 'Aztec Code Generator — Compact 2D Codes for Tickets',
+        desc: 'Make Aztec codes, the compact 2D code on train and plane tickets. No quiet zone needed, adjustable error correction, PNG or SVG.',
+        kw: 'aztec code generator, aztec barcode, ticket barcode, 2d code generator, compact aztec',
+        about: 'An Aztec code grows from a bullseye in its centre and needs no blank margin around it, which is why rail and airline tickets use it. Set the error correction percentage and the generator picks the smallest size that fits.',
+        bullets: ['Compact and full-range Aztec', 'Error correction from 5% to 95%', 'No quiet zone required', 'PNG or SVG'],
+        faq: [PRIVATE],
+    },
+    isbn: {
+        name: 'ISBN Barcode Generator', title: 'ISBN Barcode Generator — Book Barcodes With Price Add-On',
+        desc: 'Make the barcode for a book\'s back cover from its ISBN-10 or ISBN-13, with the ISBN printed above and an optional EAN-5 price add-on.',
+        kw: 'isbn barcode generator, book barcode, isbn to barcode, isbn-13 barcode, bookland ean, price add-on',
+        about: 'Type the ISBN, with or without hyphens; an ISBN-10 is converted to its ISBN-13. The barcode is an EAN-13 with the ISBN printed above it, and the five-digit add-on can carry the price (for example 51995 for US $19.95).',
+        bullets: ['ISBN-10 or ISBN-13 in, check digit verified', 'ISBN text above the bars', 'EAN-5 price add-on', 'Print-ready PNG or SVG'],
+        faq: [['What goes in the price add-on?', 'The first digit is the currency (5 for US dollars, 6 for Canadian dollars) and the other four the price: 51995 is $19.95. Use 90000 when there is no price.'], PRIVATE],
+    },
+};
+
 const CATALOG = new Map();
 for (const [sub, rec] of Object.entries(DEV)) CATALOG.set(sub, { ...rec, sub, family: 'dev', hub: sub === 'dev' });
 for (const [sub, rec] of Object.entries(NET)) CATALOG.set(sub, { ...rec, sub, family: 'net', hub: sub === 'net' });
+for (const [sub, rec] of Object.entries(CODES)) CATALOG.set(sub, { ...rec, faq: sub === 'scan' ? rec.faq : [...rec.faq, API_FAQ], sub, family: 'codes', hub: sub === 'codes' });
 
 /** SEO record for a subdomain, or null when it is not a catalogued tool. */
 function seoFor(sub) { return CATALOG.get(sub) || null; }
@@ -417,4 +544,4 @@ function relatedTo(sub, limit = 6) {
     return scored.slice(0, limit);
 }
 
-module.exports = { CATALOG, DEV, NET, seoFor, relatedTo, BRAND };
+module.exports = { CATALOG, DEV, NET, CODES, seoFor, relatedTo, BRAND };

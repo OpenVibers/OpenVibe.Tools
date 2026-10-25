@@ -23,6 +23,21 @@ const HOST_DEFAULTS = {
     jsonstringify: { canonical: 'json-stringify', short: 'jsonstringify', aliases: ["jsonescape", "json-escape", "jsonunescape", "stringifyjson"] },
     html2md: { canonical: 'html-to-markdown', short: 'html2md', aliases: ["htmltomarkdown", "html2markdown", "htmltomd"] },
     md2html: { canonical: 'markdown-to-html', short: 'md2html', aliases: ["markdowntohtml", "md2htm", "mdtohtml"] },
+    // Barcode & QR tools (server/codes): the job is the canonical name, the short host is what people type.
+    qr: { canonical: 'qr-code-generator', short: 'qr', aliases: ['qrcode', 'qr-code', 'qrgen', 'qr-generator', 'makeqr'] },
+    barcode: { canonical: 'barcode-generator', short: 'barcode', aliases: ['barcodegen', 'make-barcode', 'bwip'] },
+    scan: { canonical: 'barcode-scanner', short: 'scan', aliases: ['qr-scanner', 'qrscan', 'qr-reader', 'qrreader', 'barcode-reader', 'scanner', 'readqr'] },
+    datamatrix: { canonical: 'data-matrix-generator', short: 'datamatrix', aliases: ['data-matrix', 'dmtx'] },
+    gs1: { canonical: 'gtin-check-digit', short: 'gs1', aliases: ['gtin', 'checkdigit', 'check-digit', 'sscc', 'gs1-parser'] },
+    wifiqr: { canonical: 'wifi-qr-code', short: 'wifiqr', aliases: ['wifi-qr', 'qr-wifi'] },
+    vcardqr: { canonical: 'vcard-qr-code', short: 'vcardqr', aliases: ['contact-qr', 'qr-vcard', 'contactqr'] },
+    bulkbarcodes: { canonical: 'bulk-barcode-generator', short: 'bulkbarcodes', aliases: ['batch-barcodes', 'barcode-labels'] },
+    code128: { canonical: 'code-128-generator', short: 'code128' },
+    ean13: { canonical: 'ean-13-generator', short: 'ean13', aliases: ['ean', 'ean-barcode'] },
+    upc: { canonical: 'upc-barcode-generator', short: 'upc', aliases: ['upca', 'upc-a'] },
+    pdf417: { canonical: 'pdf417-generator', short: 'pdf417' },
+    aztec: { canonical: 'aztec-code-generator', short: 'aztec' },
+    isbn: { canonical: 'isbn-barcode-generator', short: 'isbn', aliases: ['book-barcode'] },
     yt: { canonical: 'youtube-downloader', short: 'yt', aliases: ['youtube', 'ytdl', 'youtubedownloader', 'youtube-download'] },
 };
 

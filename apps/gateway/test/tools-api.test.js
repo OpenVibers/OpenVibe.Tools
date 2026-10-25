@@ -66,10 +66,10 @@ const get = async (url, headers = {}, method = 'GET') => {
         const list = r.body;
         const lc = contracts.tools.checkList(list);
         assert.ok(lc.valid, JSON.stringify(lc.errors.slice(0, 5)));
-        assert.strictEqual(list.count, 170);
+        assert.strictEqual(list.count, 184);
         assert.ok(list.tools.every(d => !d.input || d.input.$ref), 'inputs are $refs in the list');
         assert.ok(!Number.isNaN(Date.parse(list.updated_at)));
-        assert.deepStrictEqual(list.families.map(f => f.id).sort(), ['audio', 'dev', 'docs', 'img', 'media', 'net', 'pastes', 'places', 'text']);
+        assert.deepStrictEqual(list.families.map(f => f.id).sort(), ['audio', 'codes', 'dev', 'docs', 'img', 'media', 'net', 'pastes', 'places', 'text']);
 
         // ETag → 304 (strong, weak, in a list); HEAD; preflight.
         assert.strictEqual((await get(`${G}/api/v1/tools`, { 'If-None-Match': etag })).status, 304);
@@ -136,7 +136,7 @@ const get = async (url, headers = {}, method = 'GET') => {
         assert.strictEqual((await get(`${G}/api/v1/tools/yt/schema`)).body.$defs.input, false, 'no API, no input');
 
         // ── Not tools ──
-        for (const [id, why] of [['no-such-tool', /No tool is called/], ['qr', /planned/], ['jsonfmt', /mirror of json|second build of json/]]) {
+        for (const [id, why] of [['no-such-tool', /No tool is called/], ['password', /planned/], ['jsonfmt', /mirror of json|second build of json/]]) {
             r = await get(`${G}/api/v1/tools/${id}`);
             assert.strictEqual(r.status, 404, id);
             assert.match(r.h.get('content-type'), /^application\/problem\+json/);
@@ -150,7 +150,7 @@ const get = async (url, headers = {}, method = 'GET') => {
 
         // ── /api/catalog.json is unchanged (Network reads it) ──
         const catalog = (await get(`${G}/api/catalog.json`)).body;
-        assert.strictEqual(catalog.tools.length, 170);
+        assert.strictEqual(catalog.tools.length, 184);
         assert.ok(catalog.tools.every(t => ['available', 'unavailable'].includes(t.status) && t.hosts && t.hosts.canonical));
         assert.ok(!('api' in catalog.tools[0]) && !('execution' in catalog.tools[0]), 'no descriptor fields leak into the catalogue');
 

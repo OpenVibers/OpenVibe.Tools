@@ -5,6 +5,7 @@
 //                       (and a default format that operation can write)
 //   net                 an endpoint in net/config.js that the router serves and net.html calls, or status 'unavailable'
 //   dev                 an entry and a processor in dev.html
+//   codes               an entry (a view) in public/js/codes/app.js
 //   text                its host in the text app's host map, pointing at a page that exists
 //   media / places      the app knows the host; pastes live on OpenVibe.Community
 // merge.openvibe.tools pointed at an audio operation that did not exist for months; this test is what
@@ -116,6 +117,12 @@ for (const t of cat.tools) {
             if (!dev.processors.has(t.id)) problems.push(`dev/${t.id}: dev.html has no processor P.${t.id}`);
             break;
         }
+        case 'codes': {
+            // Barcode & QR tools: one page (codes.html), whose app.js names a view for every tool.
+            const app = fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'codes', 'app.js'), 'utf8');
+            if (!new RegExp(`^\\s{8}${t.id}: \\{ view: '`, 'm').test(app)) problems.push(`codes/${t.id}: public/js/codes/app.js has no TOOLS entry`);
+            break;
+        }
         case 'text': {
             const file = TEXT_HOSTS[`${t.id}.openvibe.tools`];
             if (!file) problems.push(`text/${t.id}: ${t.id}.openvibe.tools is not in apps/text/server/hosts.js`);
@@ -138,7 +145,7 @@ for (const t of cat.tools) {
     }
 }
 assert.deepStrictEqual(problems, [], `catalogue tools that resolve to nothing:\n  ${problems.join('\n  ')}`);
-for (const f of ['img', 'audio', 'docs', 'net', 'dev', 'text', 'media', 'places', 'pastes']) assert.ok(counted[f] > 0, `the catalogue has ${f} tools (checked)`);
+for (const f of ['img', 'audio', 'docs', 'net', 'dev', 'codes', 'text', 'media', 'places', 'pastes']) assert.ok(counted[f] > 0, `the catalogue has ${f} tools (checked)`);
 
 // Planned placeholders are never listed as tools; mirrors are not tools either.
 assert.ok(cat.planned.every(p => !cat.tools.some(t => t.id === p.id)));

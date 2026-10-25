@@ -29,6 +29,7 @@ const createNetRoutes = require('./net/routes');
 const { NET_TOOL_MAP, NET_ALIASES } = require('./net/config');
 const createDevRoutes = require('./dev/routes');
 const { DEV_TOOL_MAP, DEV_ALIASES } = require('./dev/config');
+const { CODES } = require('./seo/catalog');
 const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
 
 const app = express();
@@ -82,6 +83,7 @@ const obs = observe({ telemetry,
         if (req.baseUrl === '/api/pastes') return '/api/pastes/*';
         if (isNetHost(req)) return 'page:net';
         if (isDevHost(req)) return 'page:dev';
+        if (isCodesHost(req)) return 'page:codes';
         return null;
     },
     checks: [
@@ -120,7 +122,8 @@ app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "https://openvibe.network", "https://openvibe.live", "cdnjs.cloudflare.com", "cdn.jsdelivr.net", "fonts.googleapis.com", "https://static.cloudflareinsights.com"],
+            // 'wasm-unsafe-eval': the barcode scanner's ZXing reader is WebAssembly (codes.html), served from /vendor here.
+            scriptSrc: ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", "https://openvibe.network", "https://openvibe.live", "cdnjs.cloudflare.com", "cdn.jsdelivr.net", "fonts.googleapis.com", "https://static.cloudflareinsights.com"],
             styleSrc: ["'self'", "'unsafe-inline'", "cdnjs.cloudflare.com", "fonts.googleapis.com", "fonts.gstatic.com"],
             fontSrc: ["'self'", "fonts.gstatic.com", "cdnjs.cloudflare.com"],
             imgSrc: ["'self'", "data:", "blob:", "https://openvibe.network", "https://openvibe.media"],
@@ -373,6 +376,10 @@ function isDevHost(req) {
     return DEV_TOOL_MAP.has(sub) || DEV_ALIASES[sub];
 }
 
+function isCodesHost(req) {
+    return Object.prototype.hasOwnProperty.call(CODES, subdomainOf(req));
+}
+
 function isStaticPath(reqPath) {
     return /\.(js|css|ico|png|svg|jpg|xml|txt|woff2?|webmanifest)$/.test(reqPath);
 }
@@ -383,6 +390,7 @@ function isStaticPath(reqPath) {
 const { renderTool } = require('./seo/render');
 const NET_HTML = path.join(__dirname, '..', 'public', 'net.html');
 const DEV_HTML = path.join(__dirname, '..', 'public', 'dev.html');
+const CODES_HTML = path.join(__dirname, '..', 'public', 'codes.html');
 function sendTool(req, res, file) {
     try {
         res.set('Content-Type', 'text/html; charset=utf-8');
@@ -427,6 +435,12 @@ function sendTool(req, res, file) {
 // Terms, Privacy and DMCA — the same documents on the apex and on every tool host.
 { const legal = require('openvibe-shared/legal'); app.get(legal.PATHS, legal.handler({ id: 'tools', service: 'tools', host: 'openvibe.tools', name: 'OpenVibe.Tools', profile: 'tools' })); app.get('/tos', (_req, res) => res.redirect(301, '/terms')); }
 
+// The barcode tools' libraries, from this app's pinned node_modules (package.json): bwip-js draws every code, the
+// ZXing reader (zxing-wasm) reads them. The version is in the path, so the files are cached for a year.
+app.use(require('./codes/vendor').router());
+// …and every code as an image URL (GET /api/codes/<symbology>.svg|png?text=…), no account, cached for a year.
+app.use(require('./codes/image').router());
+
 // The apex is server-rendered from the registry: index, families, tool pages, search,
 // sitemap.xml, robots.txt, llms.txt and /api/catalog.json (server/pages/site.js).
 // This site's own pinned copy of the OpenVibe Frame's browser files (/shared, openvibe-shared/serve) is
@@ -464,6 +478,14 @@ app.use((req, res, next) => {
     if (req.path.startsWith('/api/') || req.path.startsWith('/auth/')) return next();
     if (isStaticPath(req.path)) return next();
     return sendTool(req, res, DEV_HTML);
+});
+
+// Barcode & QR tool hosts (barcodes., qr., barcode., scan., gs1. …) → codes.html, one page for the family
+app.use((req, res, next) => {
+    if (!isCodesHost(req)) return next();
+    if (req.path.startsWith('/api/') || req.path.startsWith('/auth/') || req.path.startsWith('/vendor/')) return next();
+    if (isStaticPath(req.path)) return next();
+    return sendTool(req, res, CODES_HTML);
 });
 
 // ── Web-push service worker (same-origin, scope "/") ─────────

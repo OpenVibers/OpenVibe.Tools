@@ -33,6 +33,17 @@ const FAMILIES = [
         ],
     },
     {
+        id: 'codes', name: 'Barcode & QR Tools', icon: 'barcode', path: '/barcode-tools', hub: 'barcodes', hubAliases: ['qrcodes', 'barcode-tools'], port: null,
+        tagline: 'Make, scan and check QR codes, barcodes and Data Matrix',
+        description: 'A QR code studio with styles and logos, a generator for more than a hundred barcode types (EAN, UPC, Code 128, GS1-128, PDF417, Aztec, Data Matrix, postal and pharmaceutical codes), a scanner for your camera or pictures, a GTIN and GS1 checker, and bulk labels.',
+        intro: 'Type what you want to encode and the tools pick the right code for it, fix a wrong check digit and test-scan the result before you download it. Everything runs in your browser: nothing you type, upload or scan is sent anywhere.',
+        faq: [
+            ['Are the codes free to use?', 'Yes, commercially too. The codes are static: what you encode is in the pattern, with no redirect service that could expire.'],
+            ['Which barcode types are supported?', 'More than a hundred: retail (EAN, UPC, ISBN), industrial (Code 128, Code 39, ITF), GS1 (GS1-128, DataBar, GS1 DataMatrix), 2D (QR, Data Matrix, PDF417, Aztec, MaxiCode, DotCode, Han Xin) and postal and pharmaceutical codes.'],
+            ['Does scanning work on a computer without a camera?', 'Yes. Drop, paste or upload a picture or a screenshot and the scanner reads every code in it.'],
+        ],
+    },
+    {
         id: 'img', name: 'Image Tools', icon: 'image', path: '/image-tools', hub: 'img', hubAliases: [], port: 4012,
         tagline: 'Convert, compress, resize and crop pictures',
         description: 'Change an image from one format to another, make it smaller, resize it to exact pixel dimensions or crop it to a ratio. Works with PNG, JPG, WebP, AVIF, HEIC photos from iPhones, SVG, GIF, ICO, TIFF and BMP.',

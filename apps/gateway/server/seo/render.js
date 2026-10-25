@@ -17,6 +17,10 @@
 const fs = require('fs');
 const path = require('path');
 const { seoFor, relatedTo, BRAND } = require('./catalog');
+const { FAMILY_MAP } = require('../registry/families');
+
+// A family's breadcrumb name and hub page (net.openvibe.tools, barcodes.openvibe.tools…).
+const familyOf = (rec) => { const f = FAMILY_MAP.get(rec.family) || {}; return { name: f.name || 'Tools', url: f.hub ? `https://${f.hub}.openvibe.tools` : SITE, plural: String(f.name || 'tools').toLowerCase() }; };
 const social = require('openvibe-shared/social');
 
 const SITE = 'https://openvibe.tools';
@@ -42,7 +46,7 @@ function jsonLd(rec, url, related) {
         '@context': 'https://schema.org', '@type': 'BreadcrumbList',
         itemListElement: [
             { '@type': 'ListItem', position: 1, name: BRAND, item: SITE },
-            { '@type': 'ListItem', position: 2, name: rec.family === 'net' ? 'Network Tools' : 'Developer Tools', item: `https://${rec.family}.openvibe.tools` },
+            { '@type': 'ListItem', position: 2, name: familyOf(rec).name, item: familyOf(rec).url },
             { '@type': 'ListItem', position: 3, name: rec.name, item: url },
         ],
     };
@@ -65,8 +69,7 @@ function jsonLd(rec, url, related) {
 
 /** The visible content block appended under the tool: real copy, real internal links. */
 function contentBlock(rec, related) {
-    const hubUrl = `https://${rec.family}.openvibe.tools`;
-    const hubName = rec.family === 'net' ? 'network tools' : 'developer tools';
+    const { url: hubUrl, plural: hubName } = familyOf(rec);
     return `
 <section class="seo-about" id="about-this-tool">
   <div class="seo-about-inner">

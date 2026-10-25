@@ -35,6 +35,7 @@ const PASTE = {
 const SOURCES = [
     { app: 'net', specs: () => require('../net/descriptors').SPECS },
     { app: 'dev', specs: () => require('../dev/descriptors').SPECS, engines: path.join(__dirname, '..', 'dev', 'engines.js') },
+    { app: 'codes', specs: () => require('../codes/descriptors').SPECS, engines: path.join(__dirname, '..', 'codes', 'engines.js') },
     { app: 'img', specs: () => require(path.join(APPS, 'img/server/descriptors')).SPECS, satellite: 'img' },
     { app: 'audio', specs: () => require(path.join(APPS, 'audio/server/descriptors')).SPECS, satellite: 'audio' },
     { app: 'docs', specs: () => require(path.join(APPS, 'docs/server/descriptors')).SPECS, satellite: 'docs' },
