@@ -640,7 +640,7 @@ revocations, analytics, and the event outbox live in PostgreSQL. The guard's tra
 counters and salt use Valkey through `VALKEY_URL`, with process-local state when it is unset.
 
 <!-- versions:start -->
-- openvibe-contracts: v0.217.0
+- openvibe-contracts: v0.218.0
 - openvibe-sdk: v0.65.0
 - openvibe-shared: v4.15.2
 <!-- versions:end -->
