@@ -206,7 +206,8 @@ app.use(guard.identify);
 // A signed-in person's page view of a tool goes into their tools.usage module (the launchers' recent tools).
 app.use(require('../../_shared/usage').usagePages({ snapshot: toolRegistry.snapshot }));
 app.use('/api/', guard.apiQuota);
-app.use('/auth/', rateLimit({ windowMs: 15 * 60_000, max: 60, keyGenerator: (req) => guard.caller(req).ipKey }));
+// /auth/me is the navbar's who-is-signed-in read on every page, so it is not counted with sign-ins: 60 page views in 15 minutes made a signed-in visitor look signed out.
+app.use('/auth/', rateLimit({ windowMs: 15 * 60_000, max: 60, skip: (req) => req.path === '/me', keyGenerator: (req) => guard.caller(req).ipKey }));
 
 // ── Tool registry (ADR-027, capability tools.tool.read) ──────
 // GET /api/v1/tools (tools.tool-list@1), /api/v1/tools/:id (tools.tool@1), /api/v1/tools/:id/schema.
