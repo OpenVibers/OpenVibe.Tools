@@ -76,19 +76,22 @@ function contentBlock(rec, related) {
     <h2>About the ${esc(rec.name)}</h2>
     <p>${esc(rec.about)}</p>
     ${(rec.bullets || []).length ? `<ul class="seo-features">${rec.bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}
-    ${(rec.faq || []).length ? `<h2>Frequently asked questions</h2><dl class="seo-faq">${rec.faq.map(([q, a]) => `<dt>${esc(q)}</dt><dd>${esc(a)}</dd>`).join('')}</dl>` : ''}
+    ${(rec.faq || []).length ? `<h2>Questions</h2><div class="seo-faq">${rec.faq.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</div>` : ''}
     ${related.length ? `<h2>Related tools</h2><ul class="seo-related">${related.map(r => `<li><a href="https://${esc(r.sub)}.openvibe.tools"><strong>${esc(r.name)}</strong><span>${esc(r.desc)}</span></a></li>`).join('')}</ul>` : ''}
     <p class="seo-hub"><a href="${hubUrl}">Browse all ${hubName}</a> · <a href="${SITE}">${BRAND} home</a> · <a href="https://openvibe.live">Live streaming</a></p>
   </div>
 </section>
 <style>
-.seo-about{position:relative;z-index:1;max-width:1100px;margin:48px auto 0;padding:28px 20px 40px;border-top:1px solid var(--brd,rgba(255,255,255,.07));color:var(--tx2,#a0a8c4);font-size:.92rem;line-height:1.65}
+.seo-about{position:relative;z-index:1;max-width:1100px;margin:32px auto 0;padding:20px 16px 28px;border-top:1px solid var(--brd,rgba(255,255,255,.07));color:var(--tx2,#a0a8c4);font-size:.92rem;line-height:1.6}
 .seo-about h2{color:var(--tx,#f1f4fb);font-size:1.05rem;font-weight:700;margin:22px 0 10px}
 .seo-about h2:first-child{margin-top:0}
 .seo-about p{margin:0 0 12px;max-width:72ch}
 .seo-features{margin:0 0 4px;padding-left:20px}.seo-features li{margin:4px 0}
-.seo-faq{margin:0}.seo-faq dt{color:var(--tx,#f1f4fb);font-weight:600;margin:12px 0 4px}.seo-faq dd{margin:0 0 8px;max-width:72ch}
-.seo-related{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.seo-faq{display:grid;gap:6px}.seo-faq details{border:1px solid var(--brd,rgba(255,255,255,.07));border-radius:12px;background:var(--bg2,#12131c)}
+.seo-faq summary{cursor:pointer;list-style:none;padding:11px 14px;color:var(--tx,#f1f4fb);font-weight:600}.seo-faq summary::-webkit-details-marker{display:none}
+.seo-faq summary::after{content:'+';float:right;color:var(--tx3,#5e6580)}.seo-faq details[open] summary::after{content:'\\2212'}
+.seo-faq details p{margin:0;padding:0 14px 12px;max-width:72ch}
+.seo-related{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));gap:8px}
 .seo-related a{display:block;padding:10px 12px;border-radius:12px;background:var(--bg2,#12131c);border:1px solid var(--brd,rgba(255,255,255,.07));transition:border-color .15s,transform .15s}
 .seo-related a:hover{border-color:var(--ac,#a78bfa);transform:translateY(-1px)}
 .seo-related strong{display:block;color:var(--tx,#f1f4fb);font-size:.88rem;font-weight:600}
@@ -143,8 +146,11 @@ function renderTool(file, sub, canonicalHost) {
     ].join('\n');
     html = html.replace(/<\/head>/i, `${extraHead}\n</head>`);
 
-    // Visible content + internal links, appended before </body> so it renders under the tool.
-    html = html.replace(/<\/body>/i, `${contentBlock(rec, related)}\n</body>`);
+    // Visible content + internal links, under the tool and above the footer. It used to go before </body>, after the
+    // footer (the owner, 2026-10-28: "is it intentional to have content after the bottom nav bar like this?"); a page
+    // without a footer mount still gets it before </body>.
+    const block = contentBlock(rec, related);
+    html = /<div id="ov-footer"/i.test(html) ? html.replace(/<div id="ov-footer"/i, `${block}\n<div id="ov-footer"`) : html.replace(/<\/body>/i, `${block}\n</body>`);
 
     if (_rendered.size > 200) _rendered.clear();
     _rendered.set(key, html);
