@@ -265,7 +265,11 @@ for (const method of ['put', 'delete']) {
 }
 
 // ── Net.OpenVibe and Dev.OpenVibe routes (the pages' API; the run API calls the same handlers) ──
-const netRouter = createNetRoutes(null, requireAuth, { guard });
+// Domain history (net/history.js, migration 0008): the WHOIS and RDAP tools keep each domain's public facts over time,
+// and anyone reads them at /api/v1/domains (net/history-routes.js: the WHOIS page's History card, the API, the SDK).
+const domainHistory = require('./net/history').createDomainHistory({ db: toolsDb.db });
+const netRouter = createNetRoutes(null, requireAuth, { guard, history: domainHistory });
+app.use('/api/v1/domains', actorLimits.backstop('tools.tool.run'), require('./net/history-routes').createDomainHistoryRoutes({ history: domainHistory }));
 const devRouter = createDevRoutes(null, requireAuth, { guard });
 
 // ── Run API and jobs facade (ADR-027) ────────────────────────
