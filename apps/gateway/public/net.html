@@ -181,6 +181,16 @@
 
         /* Result table */
         .res-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        /* The domain's history (WHOIS / RDAP): when it was first seen here and what changed when. */
+        .hist-note { margin: 0 0 8px; font-size: 13px; color: var(--text-secondary, #a8b3c4); }
+        .hist-note b { color: var(--text-primary, #e6edf7); }
+        .hist-list { list-style: none; margin: 4px 0 8px; padding: 0 0 0 14px; border-left: 2px solid var(--border, rgba(255,255,255,.12)); display: grid; gap: 10px; }
+        .hist-list > li { position: relative; font-size: 13px; }
+        .hist-list > li::before { content: ''; position: absolute; left: -20px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent, #3b82f6); }
+        .hist-day { display: block; font-weight: 700; font-size: 12px; color: var(--text-muted, #8693a8); margin-bottom: 2px; }
+        .hist-list ul { margin: 0; padding-left: 16px; }
+        .hist-was { color: var(--text-muted, #8693a8); text-decoration: line-through; }
+        .hist-small { margin: 4px 0 0; font-size: 12px; color: var(--text-muted, #8693a8); }
         .res-table th {
             text-align: left; padding: 6px 10px; color: var(--text-muted);
             font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .5px;
@@ -1211,10 +1221,38 @@
                 ${s.entities.map(e => `<tr><td class="val">${esc(e.handle || '—')}</td><td>${(e.roles||[]).join(', ')}</td><td>${esc(e.name || '—')}</td></tr>`).join('')}
                 </table></div>`;
         }
+        // History: what OpenVibe Tools saw of this domain over time (GET /api/v1/domains/<domain>, filled in below)
+        if (data.type === 'domain') html += `<div class="card" id="rdap-history"><div class="card-head"><i class="fa-solid fa-clock-rotate-left"></i> History</div><p class="hist-note">Loading what OpenVibe Tools saw of this domain over time…</p></div>`;
         // Raw toggle
         html += `<details style="margin-top:12px"><summary style="cursor:pointer;color:var(--text-muted);font-size:13px">Raw RDAP response</summary>
             <div class="raw-block" style="margin-top:8px">${esc(JSON.stringify(data.raw, null, 2))}</div></details>`;
         el.innerHTML = html;
+        if (data.type === 'domain') loadDomainHistory(el.querySelector('#rdap-history'), data.target);
+    }
+
+    // The domain's history (apps/gateway/server/net/history.js): every lookup here keeps its public registration facts
+    // (registrar, dates, status, name servers, DNSSEC; never contact details), and a change becomes a new snapshot.
+    const HIST_LABEL = { registrar: 'Registrar', created: 'Registered', expires: 'Expires', status: 'Status', nameservers: 'Name servers', dnssec: 'DNSSEC' };
+    function histValue(field, v) {
+        if (v == null || (Array.isArray(v) && !v.length)) return '—';
+        if (field === 'dnssec') return v ? 'on' : 'off';
+        if (field === 'created' || field === 'expires') return new Date(v).toISOString().slice(0, 10);
+        return Array.isArray(v) ? v.join(', ') : String(v);
+    }
+    async function loadDomainHistory(box, domain) {
+        if (!box) return;
+        let d = null;
+        try { const r = await fetch('/api/v1/domains/' + encodeURIComponent(domain), { credentials: 'omit' }); d = r.ok ? await r.json() : null; } catch (e) { d = null; }
+        const day = (iso) => (iso ? new Date(iso).toISOString().slice(0, 10) : '');
+        if (!d || !d.ok || !d.snapshots || !d.snapshots.length) {
+            box.querySelector('.hist-note').textContent = 'This is the first time OpenVibe Tools has seen this domain. Its facts are kept from now on, so the next lookup can show what changed.';
+            return;
+        }
+        let html = `<p class="hist-note">First seen here on <b>${esc(day(d.first_seen))}</b> · looked up <b>${esc(String(d.lookups))}</b> time${d.lookups === 1 ? '' : 's'} · ${esc(String(d.snapshots.length))} version${d.snapshots.length === 1 ? '' : 's'} kept</p>`;
+        if (!d.changes.length) html += `<p class="hist-note">No changes seen since ${esc(day(d.first_seen))}.</p>`;
+        else html += `<ol class="hist-list">${d.changes.map((c) => `<li><span class="hist-day">${esc(day(c.at))}</span><ul>${c.changes.map((x) => `<li><b>${esc(HIST_LABEL[x.field] || x.field)}</b> <span class="hist-was">${esc(histValue(x.field, x.before))}</span> → ${esc(histValue(x.field, x.after))}</li>`).join('')}</ul></li>`).join('')}</ol>`;
+        html += `<p class="hist-small">Registration facts only, never contact details. <a href="/api/v1/domains/${encodeURIComponent(domain)}" rel="nofollow">As JSON</a></p>`;
+        box.querySelector('.hist-note').outerHTML = html;
     }
 
     function renderSSL(el, data) {

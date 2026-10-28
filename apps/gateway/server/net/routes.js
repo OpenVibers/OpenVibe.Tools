@@ -154,6 +154,9 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
     const guard = opts.guard || null;
     // Traceroute and MTR (net/trace.js): mtr on the checked address; tests pass a tracer with a fake mtr.
     const tracer = opts.tracer || createTracer({ reverse: reverseDns });
+    // Domain history (net/history.js, migration 0008): every domain the WHOIS and RDAP tools look up keeps its public
+    // registration facts over time. index.js passes it, built on the tools database; without it nothing is kept.
+    const history = opts.history || null;
 
     // ── Helpers ──────────────────────────────────────────────
 
@@ -550,6 +553,8 @@ module.exports = function createNetRoutes(db, requireAuth, opts = {}) {
 
             if (!r.ok) return fail(res, r.status === 404 ? `No registration record for ${target}` : `RDAP lookup failed (${r.status})`, r.status >= 500 ? 502 : 404);
             const data = r.data;
+            // Kept in the domain's history without holding the answer up (a failure only logs).
+            if (rdapType === 'domain' && history) history.record(target, data).catch(() => {});
 
             // Extract key fields from RDAP response
             const summary = {
