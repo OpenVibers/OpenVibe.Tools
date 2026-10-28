@@ -13,8 +13,8 @@ const BUDGETS = {
     htmlRawKB: 160,       // measured 135.5 (production; the catalogue is server-rendered)
     htmlBrotliKB: 23,     // 19.5
     jsFiles: 6,           // 5
-    jsRawKB: 260,         // 257.4 with openvibe-shared 4.17.0 (the folded balance chip, Across OpenVibe marks, wallet chips); 243.4 with openvibe-shared 4.15.0 (the compact footer opens into the whole one, the pulse line); 207.9 before
-    jsBrotliKB: 64,       // 63.2 with openvibe-shared 4.17.0; 60.6 with openvibe-shared 4.15.0; 58.0 with openvibe-shared 4.12.0 (light/dark switch, seasonal mark, theme pairs); 48.5 before
+    jsRawKB: 265,         // 263.1 with openvibe-shared 4.22.0 (the navbar's magnifier search and More; search.js and loading.js load only when used); 257.4 with openvibe-shared 4.17.0 (the folded balance chip, Across OpenVibe marks, wallet chips); 243.4 with openvibe-shared 4.15.0 (the compact footer opens into the whole one, the pulse line); 207.9 before
+    jsBrotliKB: 65.5,     // 64.7 with openvibe-shared 4.22.0; 63.2 with openvibe-shared 4.17.0; 60.6 with openvibe-shared 4.15.0; 58.0 with openvibe-shared 4.12.0 (light/dark switch, seasonal mark, theme pairs); 48.5 before
     cssFiles: 1,          // 0
     externalFiles: 3,     // 1 in production
 };
