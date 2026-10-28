@@ -31,6 +31,7 @@ const bwipjs = require('bwip-js');
         assert.ok(page.includes(`<meta name="ov-tool" content="${id}">`), `${id}: the page knows which tool it is`);
         assert.ok(page.includes('"name":"Barcode & QR Tools","item":"https://barcodes.openvibe.tools"'), `${id}: breadcrumb to the family hub`);
         assert.ok(page.includes('id="about-this-tool"'), `${id}: the crawlable about block`);
+        if (page.includes('id="ov-footer"')) assert.ok(page.indexOf('id="about-this-tool"') < page.indexOf('id="ov-footer"'), `${id}: the about block is above the footer, not after it`);
     }
     assert.ok(renderTool(path.join(PUB, 'codes.html'), 'qr', 'qr-code-generator.openvibe.tools').includes('<link rel="canonical" href="https://qr-code-generator.openvibe.tools">'), 'canonical from the registry');
     // Every generator page tells bots and scripts about the image API.
