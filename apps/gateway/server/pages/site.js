@@ -93,15 +93,17 @@ details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px
 .tile{position:relative;display:flex;gap:10px;align-items:center;padding:9px 11px;border-radius:12px;border:1px solid var(--border,rgba(255,255,255,.07));background:var(--bg-secondary,#111826);text-decoration:none;color:inherit;min-width:0;transition:border-color .15s,background .15s}
 .tile:hover,.tile:focus-visible{border-color:var(--accent,#3b82f6);background:color-mix(in srgb,var(--accent,#3b82f6) 7%,var(--bg-secondary,#111826));outline:0}
 .tile>span:not(.ov-icon){min-width:0}.tile b{display:block;font-size:14px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tile small{display:block;font-size:12px;color:var(--text-muted,#7d8aa0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fold details{border:0;padding:0;max-width:none}.fold summary{list-style:none;display:flex;align-items:center;gap:10px}.fold summary::-webkit-details-marker{display:none}.fold summary::after{content:'+';margin-left:auto;font-size:22px;font-weight:400;color:var(--text-muted,#7d8aa0)}.fold details[open] summary::after{content:'\\2212'}.fold summary h2{display:inline}.fold details>:not(summary){margin-top:12px}
+.fam-all{margin:10px 0 0;font-size:14px}.fam-all a{font-weight:650;text-decoration:none}
 .perks{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}.perks div{padding:16px;border-radius:14px;border:1px solid var(--border,rgba(255,255,255,.08));background:var(--bg-secondary,#111826)}.perks p{margin:6px 0 0;color:var(--text-secondary,#a8b3c4);font-size:14px}
-@media (max-width:560px){.tiles{grid-template-columns:1fr 1fr}.tile small{display:none}.jump{top:52px}}
+@media (max-width:560px){.tiles{grid-template-columns:1fr 1fr}.tile small{display:none}.tile b{white-space:normal;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.jump{top:52px}}
 #ov-footer{margin-top:56px}
 .tool .opens{color:var(--text-secondary,#a8b3c4);font-weight:600}
 .api-box{max-width:820px}.api-box pre{background:var(--bg-secondary,#111826);border:1px solid var(--border,rgba(255,255,255,.08));border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.5}
 .api-facts{list-style:none;padding:0;margin:0 0 12px;display:flex;flex-direction:column;gap:6px;color:var(--text-secondary,#a8b3c4)}.api-facts code{overflow-wrap:anywhere}
 .dev{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:14px;align-items:start}.dev pre{margin:0;background:var(--bg-secondary,#111826);border:1px solid var(--border,rgba(255,255,255,.08));border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.5}
 .dev ul{margin:0;padding-left:18px;color:var(--text-secondary,#a8b3c4)}.dev li{margin:4px 0}
-@media (max-width:560px){.grid{grid-template-columns:minmax(0,1fr)}.search button{padding:0 14px}}
+@media (max-width:560px){.grid{grid-template-columns:minmax(0,1fr);gap:6px}.search button{padding:0 14px}.tool{padding:9px 11px;align-items:center}.tool small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tool i{display:none}.hero{padding-top:20px}.hero h1{font-size:28px}.kicker{display:none}}
 @media (prefers-reduced-motion:reduce){.tool{transition:none}}
 ${icons.CSS}`;
 
@@ -208,29 +210,31 @@ function pageIndex(top = []) {
     const fams = families.filter(f => f.path);
     const withApi = require('../registry/descriptors').snapshot().tools.filter((d) => d.api && d.status !== 'unavailable').length;
     // Most opened this week (registry/opens.js): real counts, shown once at least four tools have some.
-    const opened = top.map((r) => [byId.get(r.tool), r.opens]).filter(([t, n]) => t && n > 0).slice(0, 8);
+    const opened = top.map((r) => [byId.get(r.tool), r.opens]).filter(([t, n]) => t && n > 0).slice(0, 6);
     const openedCard = ([t, n]) => toolCard(t).replace('</small><i>', `</small><i><span class="opens">${n.toLocaleString('en-US')} ${n === 1 ? 'person' : 'people'} this week</span> · `);
+    // A family's first six: the hand-picked popular ones first, then as the registry orders them.
+    const famTop = (list) => [...list.filter((t) => POPULAR.includes(t.id)), ...list.filter((t) => !POPULAR.includes(t.id))].slice(0, 6);
     const tile = (t) => `<a class="tile" href="${esc(t.url)}"${go(t)} title="${esc(t.tagline)}">${icon(t.icon, 28)}<span><b>${esc(t.name)}</b><small>${esc(t.tagline)}</small></span></a>`;
     const body = `<div class="hero"><p class="kicker">Open source · community-run · no account needed to start</p><h1>The toolbox for <span>everything you do online</span></h1>
 <p>Convert a video, squeeze an image, merge a PDF, debug DNS, format JSON. ${tools.length} tools that open instantly, each on an address you can remember, like <a href="https://yt.openvibe.tools/">yt.openvibe.tools</a>.</p>
 ${searchForm('')}
-<ul class="stats"><li><b>${tools.length}</b> tools</li><li><b>${fams.length}</b> families</li><li><b>${withApi}</b> with an API</li><li><b>0</b> installs</li></ul></div>
+<ul class="stats"><li><b>${tools.length}</b> tools</li><li><b>${fams.length}</b> families</li><li><b>${withApi}</b> with an API</li><li>nothing to install</li></ul></div>
 <nav class="jump" aria-label="Tool families">${fams.map(f => `<a href="#f-${f.id}">${icon(f.icon, 22)}${esc(f.name)}<i>${tools.filter(t => t.family === f.id).length}</i></a>`).join('')}</nav>
 <section id="results" hidden aria-live="polite"><div class="sec-h"><h2>Results</h2></div><div class="grid" id="results-grid"></div><p class="empty" id="results-empty" hidden>No tool matches that yet. <a href="/all-tools">Browse every tool</a>.</p></section>
 <section id="recent" hidden aria-labelledby="recent-h"><div class="sec-h"><h2 id="recent-h">Your tools</h2><span class="more" id="recent-note"></span></div><div class="grid" id="recent-grid"></div></section>
 ${opened.length >= 4 ? `<section aria-labelledby="top-h"><div class="sec-h"><h2 id="top-h">Most opened this week</h2></div><p class="sec-p">How many people opened each tool in the last seven days, counted once per person a day.</p><div class="grid">${opened.map(openedCard).join('')}</div></section>` : ''}
-<section aria-labelledby="pop-h"><div class="sec-h"><h2 id="pop-h">Good places to start</h2><a class="more" href="/all-tools">A to Z list</a></div><div class="grid">${popular.slice(0, 8).map(toolCard).join('')}</div></section>
-${fams.map(f => { const list = tools.filter(t => t.family === f.id); return `<section class="fam" aria-labelledby="f-${f.id}"><div class="sec-h">${icon(f.icon, 40)}<div><h2 id="f-${f.id}"><a href="${esc(f.path)}">${esc(f.name)}</a></h2><p class="fam-tag">${esc(f.tagline)}</p></div><a class="more" href="${esc(f.path)}">${list.length === 1 ? 'About this one' : `About these ${list.length}`}</a></div><div class="tiles">${list.map(tile).join('')}</div></section>`; }).join('')}
-<section aria-labelledby="dev-h"><div class="sec-h"><h2 id="dev-h">Use any tool from code</h2><a class="more" href="/developers">Developer guide</a></div><p class="sec-p">${withApi} of the ${tools.length} tools take one request each, the same engines the pages use. Each tool's page shows its own request.</p>
+<section aria-labelledby="pop-h"><div class="sec-h"><h2 id="pop-h">Good places to start</h2><a class="more" href="/all-tools">A to Z list</a></div><div class="grid">${popular.slice(0, 6).map(toolCard).join('')}</div></section>
+${fams.map(f => { const list = tools.filter(t => t.family === f.id); return `<section class="fam" aria-labelledby="f-${f.id}"><div class="sec-h">${icon(f.icon, 40)}<div><h2 id="f-${f.id}"><a href="${esc(f.path)}">${esc(f.name)}</a></h2><p class="fam-tag">${esc(f.tagline)}</p></div>${list.length <= 6 ? `<a class="more" href="${esc(f.path)}">${list.length === 1 ? 'About this one' : `About these ${list.length}`}</a>` : ''}</div><div class="tiles">${famTop(list).map(tile).join('')}</div>${list.length > 6 ? `<p class="fam-all"><a href="${esc(f.path)}">See all ${list.length} ${esc(f.name.toLowerCase())}</a></p>` : ''}</section>`; }).join('')}
+<section class="fold" aria-labelledby="dev-h"><details><summary><h2 id="dev-h">Use any tool from code</h2></summary><div class="sec-h"><a class="more" href="/developers">Developer guide</a></div><p class="sec-p">${withApi} of the ${tools.length} tools take one request each, the same engines the pages use. Each tool's page shows its own request.</p>
 <div class="dev"><pre tabindex="0"><code>curl -X POST ${SITE}/api/v1/tools/jsonminify/run \\
   -H 'Content-Type: application/json' \\
   -d '{"input":{"text":"{ \\"a\\": 1 }"}}'</code></pre>
-<ul><li><a href="/api/v1/openapi.json">OpenAPI 3.1</a>, generated from the tool descriptors</li><li><a href="/api/v1/tools">/api/v1/tools</a>: every tool's inputs, limits and access</li><li>Long work runs as a job you can follow over server-sent events</li><li><a href="https://github.com/OpenVibers/OpenVibe.SDK">openvibe-sdk</a>: <code>tools.run(id, input)</code> from JavaScript</li></ul></div></section>
+<ul><li><a href="/api/v1/openapi.json">OpenAPI 3.1</a>, generated from the tool descriptors</li><li><a href="/api/v1/tools">/api/v1/tools</a>: every tool's inputs, limits and access</li><li>Long work runs as a job you can follow over server-sent events</li><li><a href="https://github.com/OpenVibers/OpenVibe.SDK">openvibe-sdk</a>: <code>tools.run(id, input)</code> from JavaScript</li></ul></div></details></section>
 ${frame.shipped({ service: 'tools', title: 'Recently shipped on OpenVibe.Tools' })}
-<section aria-labelledby="acct-h"><div class="sec-h"><h2 id="acct-h">Better with an account, fine without</h2></div><div class="perks">
+<section class="fold" aria-labelledby="acct-h"><details><summary><h2 id="acct-h">Better with an account, fine without</h2></summary><div class="perks">
 <div><b>Without signing in</b><p>Every tool works. Results stay available for an hour, then they are deleted.</p></div>
 <div><b>Signed in</b><p>Results keep for 24 hours, your recent tools follow you across devices, and your theme and notifications come along from the rest of OpenVibe.</p></div>
-<div><b>For developers</b><p>Run any tool from code: see <a href="/developers">the Tools API</a> (<a href="/api/v1/openapi.json">OpenAPI</a>). The catalog is public JSON at <a href="/api/catalog.json">/api/catalog.json</a>, with a plain-text map at <a href="/llms.txt">/llms.txt</a>.</p></div></div></section>
+<div><b>For developers</b><p>Run any tool from code: see <a href="/developers">the Tools API</a> (<a href="/api/v1/openapi.json">OpenAPI</a>). The catalog is public JSON at <a href="/api/catalog.json">/api/catalog.json</a>, with a plain-text map at <a href="/llms.txt">/llms.txt</a>.</p></div></div></details></section>
 <section aria-labelledby="faq-h"><div class="sec-h"><h2 id="faq-h">Questions</h2></div>${HOME_FAQ.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</section>`;
     return shell({ families, body, head: head({
         title: 'Online Tools for Files, Text, Code & Networks', description: `${tools.length} online tools in one place: video and audio converters, image and PDF tools, developer utilities and network diagnostics. Open source and community-run.`,
