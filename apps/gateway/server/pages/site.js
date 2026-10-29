@@ -165,6 +165,9 @@ details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px
 .group-links a{text-decoration:none;white-space:nowrap}
 @media (max-width:820px){.hero.hero-split{grid-template-columns:minmax(0,1fr);gap:20px}.hero-copy h1{max-width:none}.start-grid{grid-template-columns:1fr}}
 @media (max-width:560px){.grid{grid-template-columns:minmax(0,1fr);gap:6px}.search button{padding:0 14px}.tool{padding:9px 11px;align-items:center}.tool small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tool i{display:none}.hero{padding-top:20px}.hero h1{font-size:28px}.kicker{display:none}}
+/* The home on phones (2026-10-29): the examples are one row that scrolls sideways (all four still there), and four of the most
+   opened tools show (the families below and the A to Z list hold the rest). */
+@media (max-width:599px){.start-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-inline:16px;scrollbar-width:none;gap:10px;margin:0 -16px;padding:0 16px 4px}.start-grid::-webkit-scrollbar{display:none}.start-grid>*{flex:0 0 84%;min-width:0;scroll-snap-align:start}section[aria-labelledby="top-h"] .grid>:nth-child(n+5){display:none}}
 @media (prefers-reduced-motion:reduce){.tool{transition:none}}
 ${icons.CSS}`;
 
