@@ -470,7 +470,7 @@ const tools = createToolsClient(createClient({}));
 const out = await tools.run('jsonminify', { text: '{ "a": 1 }' });
 const job = await tools.run('png', { format: 'png' }, { files: [fileBlob] });
 const done = await job.wait();   // any tool, sync or job`)}
-<p class="sec-p">The SDK is <a href="https://github.com/OpenVibers/OpenVibe.SDK">openvibe-sdk</a> (tag v0.6.0+). It retries on 429 after <code>Retry-After</code> and generates idempotency keys for you.</p></section>
+<p class="sec-p">The SDK is <a href="https://github.com/OpenVibers/OpenVibe.SDK">openvibe-sdk</a> (this site pins v0.67.0). It retries on 429 after <code>Retry-After</code> and generates idempotency keys for you.</p></section>
 <section><div class="sec-h"><h2>Access and limits</h2></div>
 <ul><li><b>Anonymous</b>: most tools, on the lowest quota tier, per address. Tools that handle files people should not share anonymously (audio, PDF) need a browser session or a token.</li>
 <li><b>Apps and services</b>: a token from <a href="https://openvibe.network">OpenVibe.Network</a> for audience <code>openvibe.tools</code> with <code>tools.tool.run</code> (developer sandbox apps get it by default) raises the tier.</li>
