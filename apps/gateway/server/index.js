@@ -506,6 +506,13 @@ app.get('/openvibe-sw.js', (req, res) => {
 // not fall through to the SPA/static handlers. Unset INDEXNOW_KEY → off, nothing mounted (404).
 const indexnow = createToolsIndexNow(config.baseUrl, config.indexnow.key);
 if (indexnow.enabled) app.use(indexnow.keyFile);
+// The agent layer (openvibe-shared/agent-layer): /.well-known/agent.json and the Markdown twins of the directory and
+// tool pages. Mounted after the site routes, so a browser gets the page's own head and cache and only a twin request
+// reaches it; before the static files and the catch-all, so an unknown .md is a 404.
+require('openvibe-shared/agent-layer').mount(app, {
+    descriptor: require('./agent-descriptor'),
+    render: require('./pages/agent-pages').createAgentPages({ opens: toolOpens }).renderPublicPage,
+});
 app.use(express.static(path.join(__dirname, '..', 'public'), {
     setHeaders(res, filePath) {
         if (filePath.endsWith('.js') || filePath.endsWith('.css')) {

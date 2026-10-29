@@ -183,7 +183,12 @@ function networkLinks() {
     return NETWORK_COPY.filter(([id]) => up.has(id)).map(([id, d]) => [id, up.get(id).name, d, `${up.get(id).origin}/`]);
 }
 
-function shell({ head, body, families }) {
+function shell({ head, body, families, agent = false }) {
+    // A page with a Markdown twin names it and llms.txt in the head (openvibe-shared/agent-layer).
+    if (agent) {
+        const canonical = (head.match(/<link rel="canonical" href="([^"]+)"/) || [])[1];
+        if (canonical) head += '\n' + seo.linkHeaderTags(canonical, `${SITE}/llms.txt`).head;
+    }
     // Every icon on the page once, as a sprite; the markup above only references them.
     const NETWORK = networkLinks();
     const spriteSvg = icons.sprite([..._used, ...NETWORK.map(n => n[0])]); _used = new Set();
@@ -356,7 +361,7 @@ ${frame.shipped({ service: 'tools', title: 'Recently shipped on OpenVibe.Tools' 
 <div><b>Signed in</b><p>Results keep for 24 hours, your recent tools follow you across devices, and your theme and notifications come along from the rest of OpenVibe.</p></div>
 <div><b>For developers</b><p>Run any tool from code: see <a href="/developers">the Tools API</a> (<a href="/api/v1/openapi.json">OpenAPI</a>). The catalog is public JSON at <a href="/api/catalog.json">/api/catalog.json</a>, with a plain-text map at <a href="/llms.txt">/llms.txt</a>.</p></div></div></details></section>
 <section aria-labelledby="faq-h"><div class="sec-h"><h2 id="faq-h">Questions</h2></div>${HOME_FAQ.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</section>`;
-    return shell({ families, body, head: head({
+    return shell({ families, agent: true, body, head: head({
         title: 'Online Tools for Files, Text, Code & Networks', description: `${tools.length} online tools in one place: video and audio converters, image and PDF tools, developer utilities and network diagnostics. Open source and community-run.`,
         canonical: SITE + '/', keywords: 'online tools, converter, pdf tools, image converter, developer tools, network tools, youtube downloader',
         jsonLd: [seo.jsonLd.organization(), seo.jsonLd.website({ name: NAME, url: SITE + '/', description: 'Online tools for files, text, code and networks.', searchUrl: SITE + '/search?q={search_term_string}' }),
@@ -373,7 +378,7 @@ function pageFamily(f) {
 ${f.hosts ? `<a class="cta" href="${esc(f.url)}">Open ${esc(f.name)}</a>` : ''}
 <section><div class="sec-h"><h2>${list.length} tools</h2></div><p class="sec-p">${esc(f.intro || '')}</p><div class="grid">${list.map(toolCard).join('')}</div></section>
 ${f.faq && f.faq.length ? `<section><div class="sec-h"><h2>Questions</h2></div>${f.faq.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</section>` : ''}`;
-    return shell({ families, body, head: head({ title: `${f.name}: ${f.tagline}`, description: f.description, canonical: url, keywords: list.slice(0, 12).map(t => t.name.toLowerCase()).join(', '),
+    return shell({ families, agent: true, body, head: head({ title: `${f.name}: ${f.tagline}`, description: f.description, canonical: url, keywords: list.slice(0, 12).map(t => t.name.toLowerCase()).join(', '),
         jsonLd: [seo.jsonLd.breadcrumbs([{ name: 'Tools', url: SITE + '/' }, { name: f.name, url }]), seo.jsonLd.itemList(f.name, list.map(t => ({ name: t.name, url: t.url, description: t.tagline }))),
             ...(f.faq && f.faq.length ? [seo.jsonLd.faq(f.faq.map(([q, a]) => ({ q, a })))] : [])] }) });
 }
@@ -392,7 +397,7 @@ ${t.status === 'unavailable' ? `<p class="lead"><strong>Not available yet.</stro
 ${t.keywords && t.keywords.length ? `<section><div class="sec-h"><h2>People also call this</h2></div><ul class="kw">${t.keywords.map(k => `<li>${esc(k)}</li>`).join('')}</ul></section>` : ''}
 ${apiSection(t)}
 ${related.length ? `<section><div class="sec-h"><h2>Related tools</h2>${f && f.path ? `<a class="more" href="${esc(f.path)}">All ${esc(f.name)}</a>` : ''}</div><div class="grid">${related.map(toolCard).join('')}</div></section>` : ''}`;
-    return shell({ families, body, head: head({ title: `${t.name}: ${t.tagline}`, description: t.description, canonical: url, keywords: (t.keywords || []).join(', '),
+    return shell({ families, agent: true, body, head: head({ title: `${t.name}: ${t.tagline}`, description: t.description, canonical: url, keywords: (t.keywords || []).join(', '),
         jsonLd: [seo.jsonLd.breadcrumbs([{ name: 'Tools', url: SITE + '/' }, ...(f && f.path ? [{ name: f.name, url: SITE + f.path }] : []), { name: t.name, url }]),
             seo.jsonLd.softwareApp({ name: t.name, url: t.url, description: t.description, category: 'UtilitiesApplication', keywords: t.keywords })] }) });
 }
@@ -402,7 +407,7 @@ function pageAll() {
     const sorted = [...tools].sort((a, b) => a.name.localeCompare(b.name));
     const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> › All tools</nav><div class="page-h">${icon('tools', 56)}<h1>All ${tools.length} tools, A to Z</h1></div>
 ${searchForm('')}<section><ul class="az">${sorted.map(t => `<li><a href="${esc(t.url)}">${esc(t.name)}</a> <small><a href="/tool/${esc(t.id)}" aria-label="About ${esc(t.name)}">about</a></small></li>`).join('')}</ul></section>`;
-    return shell({ families, body, head: head({ title: `All ${tools.length} Online Tools, A to Z`, description: 'The complete list of tools on OpenVibe.Tools: converters, downloaders, PDF and image tools, text utilities, developer tools and network diagnostics.', canonical: SITE + '/all-tools',
+    return shell({ families, agent: true, body, head: head({ title: `All ${tools.length} Online Tools, A to Z`, description: 'The complete list of tools on OpenVibe.Tools: converters, downloaders, PDF and image tools, text utilities, developer tools and network diagnostics.', canonical: SITE + '/all-tools',
         jsonLd: [seo.jsonLd.breadcrumbs([{ name: 'Tools', url: SITE + '/' }, { name: 'All tools', url: SITE + '/all-tools' }])] }) });
 }
 
@@ -482,6 +487,11 @@ const done = await job.wait();   // any tool, sync or job`)}
 
 function send(req, res, key, render, type, extra) {
     const e = cached(key, render, extra);
+    if (!type || /^text\/html/.test(type)) {
+        const isAgentPage = key === '/' || key === '/all-tools' || key.startsWith('/tool/')
+            || registry.get().families.some((f) => f.path === key);
+        if (isAgentPage) res.set('Link', seo.linkHeaderTags(`${SITE}${key === '/' ? '/' : key}`, `${SITE}/llms.txt`).header);
+    }
     res.set('Content-Type', type || 'text/html; charset=utf-8');
     res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=86400');
     res.set('ETag', e.etag);
@@ -530,6 +540,13 @@ function llmsFullBody() {
 
 function createSiteRouter({ opens = null } = {}) {
     const router = express.Router();
+    // Markdown twin and agent manifest requests go to openvibe-shared/agent-layer, mounted after this router.
+    router.use((req, res, next) => {
+        const p = String(req.path || '');
+        if (p.endsWith('.md') || p.startsWith('/.well-known/') || (req.query && req.query.format === 'markdown')
+            || req.accepts(['html', 'text/markdown']) === 'text/markdown') return next('router');
+        return next();
+    });
     const apexOnly = (req, res, next) => (!req.ovHost || req.ovHost.kind === 'apex' || (req.ovHost.kind === 'unknown' && !req.ovHost.inZone) ? next() : next('router'));
     router.use(apexOnly);
     router.get('/api/v1/openapi.json', (req, res) => { res.set('Access-Control-Allow-Origin', '*'); send(req, res, 'openapi', () => JSON.stringify(require('../openapi').openapi(require('../registry/descriptors').snapshot(), SITE)), 'application/json; charset=utf-8'); });
@@ -547,7 +564,7 @@ function createSiteRouter({ opens = null } = {}) {
     router.get('/search', (req, res) => { res.set('Cache-Control', 'no-store'); res.type('html').send(pageSearch(String(req.query.q || '').slice(0, 80))); });
     router.get('/tool/:id', (req, res, next) => { const t = registry.get().tools.find(x => x.id === req.params.id); return t ? send(req, res, '/tool/' + t.id, () => pageTool(t)) : next(); });
     router.get('/sitemap.xml', (req, res) => send(req, res, 'sitemap', () => seo.sitemapXml(sitemapEntries()), 'application/xml; charset=utf-8'));
-    router.get('/robots.txt', (req, res) => send(req, res, 'robots', () => seo.robotsTxt({ sitemaps: [SITE + '/sitemap.xml'], disallow: ['/api/', '/auth/'], allow: ['/api/catalog.json'], allowAI: true }), 'text/plain; charset=utf-8'));
+    router.get('/robots.txt', (req, res) => send(req, res, 'robots', () => seo.robotsTxt({ sitemaps: [SITE + '/sitemap.xml'], disallow: ['/api/', '/auth/'], allow: ['/api/catalog.json'], allowAI: true }) + `# Agent manifest: ${SITE}/.well-known/agent.json\n`, 'text/plain; charset=utf-8'));
     router.get('/llms.txt', (req, res) => send(req, res, 'llms', llmsTxtBody, 'text/plain; charset=utf-8'));
     // The same document with every public page's text: what /llms.txt lists, readable whole.
     router.get('/llms-full.txt', (req, res) => send(req, res, 'llms-full', llmsFullBody, 'text/plain; charset=utf-8'));
@@ -557,4 +574,4 @@ function createSiteRouter({ opens = null } = {}) {
 
 const renderNotFound = () => pageSearch('').replace('<h1>Search tools</h1>', '<h1>That page is not here</h1>').replace(/<title>[^<]*<\/title>/, '<title>Page not found | OpenVibe.Tools</title>');
 
-module.exports = { createSiteRouter, search, sitemapEntries, renderNotFound };
+module.exports = { createSiteRouter, pageIndex, pageFamily, pageTool, pageAll, search, sitemapEntries, renderNotFound, SITE, NAME };
