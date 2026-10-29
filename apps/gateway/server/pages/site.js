@@ -103,6 +103,67 @@ details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px
 .api-facts{list-style:none;padding:0;margin:0 0 12px;display:flex;flex-direction:column;gap:6px;color:var(--text-secondary,#a8b3c4)}.api-facts code{overflow-wrap:anywhere}
 .dev{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:14px;align-items:start}.dev pre{margin:0;background:var(--bg-secondary,#111826);border:1px solid var(--border,rgba(255,255,255,.08));border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.5}
 .dev ul{margin:0;padding-left:18px;color:var(--text-secondary,#a8b3c4)}.dev li{margin:4px 0}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.api-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:13.5px;line-height:1.45}
+.api-table th,.api-table td{padding:10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--border,rgba(255,255,255,.08))}
+.api-table th{font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted,#7d8aa0)}
+.api-table td code{font-size:12.5px;overflow-wrap:anywhere;word-break:break-word}
+.api-table th:nth-child(1),.api-table td:nth-child(1){width:22%}
+.api-table th:nth-child(2),.api-table td:nth-child(2){width:27%}
+.api-table th:nth-child(3),.api-table td:nth-child(3){width:15%}
+.api-table th:nth-child(4),.api-table td:nth-child(4){width:13%}
+.api-table th:nth-child(5),.api-table td:nth-child(5){width:23%}
+.api-table-empty{color:var(--text-secondary,#a8b3c4)}
+@media (max-width:700px){
+.api-table,.api-table thead,.api-table tbody,.api-table tr,.api-table td{display:block;width:auto}
+.api-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.api-table tr{margin:0 0 10px;padding:8px 12px;border:1px solid var(--border,rgba(255,255,255,.08));border-radius:12px;background:var(--bg-secondary,#111826)}
+.api-table td,.api-table td:nth-child(1),.api-table td:nth-child(2),.api-table td:nth-child(3),.api-table td:nth-child(4),.api-table td:nth-child(5){width:auto;padding:5px 0;border:0}
+.api-table td::before{content:attr(data-label);display:block;margin-bottom:2px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted,#7d8aa0)}
+}
+/* Home: one line, one live example, then the tools grouped by the job they do. */
+.hero.hero-split{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(300px,.85fr);gap:clamp(24px,4vw,52px);align-items:center;text-align:left;padding:clamp(24px,4vw,52px) 0 12px}
+.hero-copy{min-width:0}
+.hero-copy h1{font-size:clamp(30px,4.4vw,48px);line-height:1.06;letter-spacing:-.035em;margin:0 0 12px;font-weight:800;max-width:16ch}
+.hero-copy .hero-sub{max-width:56ch;margin:0 0 20px;color:var(--text-secondary,#a8b3c4);font-size:clamp(15px,1.5vw,17px)}
+.hero-split .search{max-width:560px;margin:0}
+.hero-links{margin:12px 0 0;font-size:13.5px;line-height:1.7;color:var(--text-muted,#7d8aa0)}
+.hero-links a{font-weight:600;white-space:nowrap}
+.hero-split+.stats{justify-content:flex-start;margin:10px 0 0}
+.promo{min-width:0;border:1px solid var(--border,rgba(255,255,255,.1));background:var(--bg-secondary,#111826);border-radius:18px;padding:clamp(16px,2vw,22px);box-shadow:0 12px 40px rgba(0,0,0,.16)}
+.promo-head h2{font-size:19px;letter-spacing:-.01em;margin:0}
+.promo-head p{margin:4px 0 14px;color:var(--text-secondary,#a8b3c4);font-size:13.5px;line-height:1.45}
+.promo label{display:block;margin:0 0 6px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted,#7d8aa0)}
+.promo input{width:100%;min-height:46px;padding:10px 12px;background:var(--bg-primary,#0a0f18);border:1px solid var(--border,rgba(255,255,255,.12));border-radius:10px;color:inherit;font:inherit}
+.promo input:focus{outline:2px solid var(--accent,#3b82f6);outline-offset:1px;border-color:transparent}
+.promo-out{margin:12px 0 0;border-top:1px solid var(--border,rgba(255,255,255,.08))}
+.promo-out>div{min-width:0;padding:9px 0;border-bottom:1px solid var(--border,rgba(255,255,255,.08))}
+.promo-out dt{margin:0;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted,#7d8aa0)}
+.promo-out dt a{color:inherit;text-decoration:none}
+.promo-out dt a:hover{color:var(--accent-light,var(--accent,#60a5fa))}
+.promo-out dd{margin:3px 0 0;min-height:21px;font-size:15px;line-height:1.4;overflow-wrap:anywhere}
+.promo-out output{display:block}
+.promo-foot{margin:12px 0 0;font-size:13.5px;font-weight:600}
+/* Real examples: a card carries a real input/output, not a feature chip. */
+.start-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.start{display:flex;flex-direction:column;gap:8px;min-width:0;padding:16px;border:1px solid var(--border,rgba(255,255,255,.08));border-radius:16px;background:var(--bg-secondary,#111826);text-decoration:none;color:inherit;transition:border-color .15s,transform .15s}
+.start:hover,.start:focus-visible{border-color:var(--accent,#3b82f6);transform:translateY(-1px);outline:0}
+.start-name{font-size:15px;font-weight:700;line-height:1.3}
+.start-name small{display:block;margin-top:2px;font-size:12px;font-weight:500;color:var(--text-muted,#7d8aa0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.start pre{margin:0;max-height:150px;padding:8px 10px;background:var(--bg-primary,#0a0f18);border:1px solid var(--border,rgba(255,255,255,.08));border-radius:9px;font-size:12px;line-height:1.45;overflow-x:auto}
+.start-arrow{font-size:13px;line-height:1;text-align:center;color:var(--text-muted,#7d8aa0)}
+.start-note{margin:0;color:var(--text-secondary,#a8b3c4);font-size:13px;line-height:1.45}
+.start-go{margin-top:auto;padding-top:2px;font-size:13.5px;font-weight:650;color:var(--accent-light,var(--accent,#60a5fa))}
+.flow{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:12.5px;color:var(--text-secondary,#a8b3c4)}
+.flow span{padding:4px 8px;border:1px solid var(--border,rgba(255,255,255,.1));border-radius:6px;background:var(--bg-primary,#0a0f18)}
+.flow .flow-out{border-color:var(--accent,#3b82f6);color:var(--text-primary,#e6edf7);font-weight:600}
+.flow .flow-arrow{border:0;background:none;padding:0;color:var(--text-muted,#7d8aa0)}
+.job{padding:clamp(24px,4vw,36px) 0 0}
+.job .sec-h{margin-bottom:4px}
+.job .tiles{margin-top:14px}
+.group-links{display:flex;flex-wrap:wrap;gap:6px 18px;margin:12px 0 0;font-size:13.5px;font-weight:600}
+.group-links a{text-decoration:none;white-space:nowrap}
+@media (max-width:820px){.hero.hero-split{grid-template-columns:minmax(0,1fr);gap:20px}.hero-copy h1{max-width:none}.start-grid{grid-template-columns:1fr}}
 @media (max-width:560px){.grid{grid-template-columns:minmax(0,1fr);gap:6px}.search button{padding:0 14px}.tool{padding:9px 11px;align-items:center}.tool small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tool i{display:none}.hero{padding-top:20px}.hero h1{font-size:28px}.kicker{display:none}}
 @media (prefers-reduced-motion:reduce){.tool{transition:none}}
 ${icons.CSS}`;
@@ -202,29 +263,88 @@ const HOME_FAQ = [
 ];
 
 // ── Pages ────────────────────────────────────────────────────
+// The home groups the suite by the job a person came to do, not by internal family names. Every
+// family page stays linked, and every tool stays one tap from the group it lives in.
+const JOB_GROUPS = [
+    { id: 'files', name: 'Images and documents', line: 'Shrink a picture, merge a PDF, convert a scan: one file in, the file you need out.', families: ['img', 'docs'] },
+    { id: 'text', name: 'Text and design', line: 'Fancy fonts, clean-ups, counters, barcodes and simple logos you can download.', families: ['text', 'codes'] },
+    { id: 'audio', name: 'Audio', line: 'Convert, trim, join and clean up recordings.', families: ['audio'] },
+    { id: 'media', name: 'Video', line: 'Save a YouTube video, or just its sound, for offline use.', families: ['media'] },
+    { id: 'data', name: 'Data and code', line: 'Format JSON, decode tokens, test regex and move data between formats.', families: ['dev'] },
+    { id: 'web', name: 'Web and network', line: 'Check DNS, domains, certificates, ports and mail servers.', families: ['net'] },
+    { id: 'places', name: 'Maps and food', line: 'Find water, shelter, supplies and an affordable meal nearby.', families: ['places'] },
+];
+const QUICK_LINKS = [['mergepdf', 'merge a PDF'], ['fancy', 'fancy text'], ['compress', 'compress an image'], ['json', 'format JSON'], ['dns', 'check DNS']];
+const FAMILY_SHORT = { img: 'image tools', docs: 'PDF tools', text: 'text tools', codes: 'barcode tools', audio: 'audio tools', media: 'video tools', dev: 'developer tools', net: 'network tools', places: 'map tools' };
+
 function pageIndex(top = []) {
     // Only built tools: a home never shows what is planned (plan §1 "no placeholders").
     const { tools, families } = registry.get();
     const byId = new Map(tools.map(t => [t.id, t]));
-    const popular = POPULAR.map(id => byId.get(id)).filter(Boolean);
     const fams = families.filter(f => f.path);
     const withApi = require('../registry/descriptors').snapshot().tools.filter((d) => d.api && d.status !== 'unavailable').length;
     // Most opened this week (registry/opens.js): real counts, shown once at least four tools have some.
     const opened = top.map((r) => [byId.get(r.tool), r.opens]).filter(([t, n]) => t && n > 0).slice(0, 6);
     const openedCard = ([t, n]) => toolCard(t).replace('</small><i>', `</small><i><span class="opens">${n.toLocaleString('en-US')} ${n === 1 ? 'person' : 'people'} this week</span> · `);
-    // A family's first six: the hand-picked popular ones first, then as the registry orders them.
-    const famTop = (list) => [...list.filter((t) => POPULAR.includes(t.id)), ...list.filter((t) => !POPULAR.includes(t.id))].slice(0, 6);
     const tile = (t) => `<a class="tile" href="${esc(t.url)}"${go(t)} title="${esc(t.tagline)}">${icon(t.icon, 28)}<span><b>${esc(t.name)}</b><small>${esc(t.tagline)}</small></span></a>`;
-    const body = `<div class="hero"><p class="kicker">Open source · community-run · no account needed to start</p><h1>The toolbox for <span>everything you do online</span></h1>
-<p>Convert a video, squeeze an image, merge a PDF, debug DNS, format JSON. ${tools.length} tools that open instantly, each on an address you can remember, like <a href="https://yt.openvibe.tools/">yt.openvibe.tools</a>.</p>
+    // Hand-picked first, then registry order; eight is enough to scan, the family links carry the rest.
+    const pick = (list) => [...list.filter((t) => POPULAR.includes(t.id)), ...list.filter((t) => !POPULAR.includes(t.id))].slice(0, 8);
+    const startLink = (t) => `href="${esc(t.url)}"${go(t)}`;
+    const startCard = (id, inner) => { const t = byId.get(id); return t ? `<a class="start" ${startLink(t)}>${inner(t)}</a>` : ''; };
+    const host = (t) => esc(hostLabel(t.hosts.short || t.hosts.canonical));
+
+    // The live demo and the JSON card show real transforms of real input. The bold-script
+    // transform matches the text engine's contiguous Unicode block; the JS in /js/site.js uses
+    // the same arithmetic.
+    const sample = 'OpenVibe is handy';
+    const boldText = (s) => [...s].map((ch) => {
+        const u = ch.codePointAt(0);
+        if (u >= 65 && u <= 90) return String.fromCodePoint(0x1D4D0 + u - 65);
+        if (u >= 97 && u <= 122) return String.fromCodePoint(0x1D4EA + u - 97);
+        return ch;
+    }).join('');
+    const titleText = (s) => s.replace(/\S+/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+    const countText = (s) => { const w = (s.trim().match(/\S+/g) || []).length; const n = [...s].length; return `${w} word${w === 1 ? '' : 's'} · ${n} character${n === 1 ? '' : 's'}`; };
+    const fancy = byId.get('fancy'), caseTool = byId.get('case'), countTool = byId.get('count');
+    const demo = fancy && caseTool && countTool ? `<aside class="promo" aria-labelledby="demo-h">
+<div class="promo-head"><h2 id="demo-h">Try it now</h2><p>One line in. Three text tools answer as you type.</p></div>
+<label for="demo-text">Your text</label>
+<input id="demo-text" name="demo-text" type="text" value="${esc(sample)}" maxlength="60" autocomplete="off" spellcheck="false">
+<dl class="promo-out">
+<div><dt><a href="/tool/fancy">Fancy text</a></dt><dd><output id="demo-fancy" for="demo-text">${esc(boldText(sample))}</output></dd></div>
+<div><dt><a href="/tool/case">Title case</a></dt><dd><output id="demo-case" for="demo-text">${esc(titleText(sample))}</output></dd></div>
+<div><dt><a href="/tool/count">Words and characters</a></dt><dd><output id="demo-count" for="demo-text">${esc(countText(sample))}</output></dd></div>
+</dl>
+<p class="promo-foot"><a ${startLink(fancy)}>Open Fancy Text →</a></p>
+</aside>` : '';
+    const jsonIn = '{"b":1,"a":2}';
+    const jsonOut = JSON.stringify(JSON.parse(jsonIn), null, 2);
+    const quick = QUICK_LINKS.map(([id, label]) => { const t = byId.get(id); return t ? `<a href="${esc(t.url)}"${go(t)}>${esc(label)}</a>` : ''; }).filter(Boolean);
+    const body = `<div class="hero hero-split">
+<div class="hero-copy"><p class="kicker">Open source · community-run · no account needed to start</p>
+<h1>Small tools that <span>finish the job.</span></h1>
+<p class="hero-sub">Convert a file, merge a PDF, format JSON, check DNS: ${tools.length} tools that open in the browser and get out of your way. Free, and no sign-up to look.</p>
 ${searchForm('')}
-<ul class="stats"><li><b>${tools.length}</b> tools</li><li><b>${fams.length}</b> families</li><li><b>${withApi}</b> with an API</li><li>nothing to install</li></ul></div>
-<nav class="jump" aria-label="Tool families">${fams.map(f => `<a href="#f-${f.id}">${icon(f.icon, 22)}${esc(f.name)}<i>${tools.filter(t => t.family === f.id).length}</i></a>`).join('')}</nav>
+<p class="hero-links">Straight to it: ${quick.join(' · ')}</p></div>
+${demo}</div>
+<ul class="stats"><li><b>${tools.length}</b> tools</li><li><b>${fams.length}</b> families</li><li><b>${withApi}</b> with an API</li><li>nothing to install</li></ul>
 <section id="results" hidden aria-live="polite"><div class="sec-h"><h2>Results</h2></div><div class="grid" id="results-grid"></div><p class="empty" id="results-empty" hidden>No tool matches that yet. <a href="/all-tools">Browse every tool</a>.</p></section>
 <section id="recent" hidden aria-labelledby="recent-h"><div class="sec-h"><h2 id="recent-h">Your tools</h2><span class="more" id="recent-note"></span></div><div class="grid" id="recent-grid"></div></section>
+<section aria-labelledby="start-h"><div class="sec-h"><h2 id="start-h">Good places to start</h2><a class="more" href="/all-tools">A to Z list</a></div>
+<p class="sec-p">Real examples, not a feature list. Each card opens the tool itself.</p>
+<div class="start-grid">
+${startCard('json', (t) => `<span class="start-name">${esc(t.name)}<small>${host(t)}</small></span><pre tabindex="0"><code>${esc(jsonIn)}</code></pre><span class="start-arrow" aria-hidden="true">↓</span><pre tabindex="0"><code>${esc(jsonOut)}</code></pre><span class="start-go">Format JSON →</span>`)}
+${startCard('mergepdf', (t) => `<span class="start-name">${esc(t.name)}<small>${host(t)}</small></span><div class="flow" aria-hidden="true"><span>PDF</span><span>PDF</span><span>PDF</span><span class="flow-arrow">→</span><span class="flow-out">one PDF</span></div><p class="start-note">Drop the files, drag them into order, download one document.</p><span class="start-go">Merge PDFs →</span>`)}
+${startCard('compress', (t) => `<span class="start-name">${esc(t.name)}<small>${host(t)}</small></span><div class="flow" aria-hidden="true"><span>PNG</span><span>JPG</span><span>WebP</span><span class="flow-arrow">→</span><span class="flow-out">smaller file</span></div><p class="start-note">Keep the pixels, lose the weight. iPhone HEIC works too.</p><span class="start-go">Compress an image →</span>`)}
+${startCard('dns', (t) => `<span class="start-name">${esc(t.name)}<small>${host(t)}</small></span><div class="flow" aria-hidden="true"><span>domain</span><span class="flow-arrow">→</span><span class="flow-out">A · AAAA · MX · TXT</span></div><p class="start-note">See what a domain actually points at, from outside your network.</p><span class="start-go">Look up DNS →</span>`)}
+</div></section>
 ${opened.length >= 4 ? `<section aria-labelledby="top-h"><div class="sec-h"><h2 id="top-h">Most opened this week</h2></div><p class="sec-p">How many people opened each tool in the last seven days, counted once per person a day.</p><div class="grid">${opened.map(openedCard).join('')}</div></section>` : ''}
-<section aria-labelledby="pop-h"><div class="sec-h"><h2 id="pop-h">Good places to start</h2><a class="more" href="/all-tools">A to Z list</a></div><div class="grid">${popular.slice(0, 6).map(toolCard).join('')}</div></section>
-${fams.map(f => { const list = tools.filter(t => t.family === f.id); return `<section class="fam" aria-labelledby="f-${f.id}"><div class="sec-h">${icon(f.icon, 40)}<div><h2 id="f-${f.id}"><a href="${esc(f.path)}">${esc(f.name)}</a></h2><p class="fam-tag">${esc(f.tagline)}</p></div>${list.length <= 6 ? `<a class="more" href="${esc(f.path)}">${list.length === 1 ? 'About this one' : `About these ${list.length}`}</a>` : ''}</div><div class="tiles">${famTop(list).map(tile).join('')}</div>${list.length > 6 ? `<p class="fam-all"><a href="${esc(f.path)}">See all ${list.length} ${esc(f.name.toLowerCase())}</a></p>` : ''}</section>`; }).join('')}
+${JOB_GROUPS.map((job) => {
+        const list = job.families.flatMap((fid) => tools.filter((t) => t.family === fid));
+        if (!list.length) return '';
+        const groupFamilies = job.families.map((fid) => families.find((f) => f.id === fid)).filter((f) => f && f.path && tools.some((t) => t.family === f.id));
+        return `<section class="job" id="job-${job.id}" aria-labelledby="job-${job.id}-h"><div class="sec-h"><h2 id="job-${job.id}-h">${esc(job.name)}</h2></div><p class="sec-p">${esc(job.line)}</p><div class="tiles">${pick(list).map(tile).join('')}</div><p class="group-links">${groupFamilies.map((f) => { const n = tools.filter((t) => t.family === f.id).length; const label = FAMILY_SHORT[f.id] || f.name.toLowerCase(); return `<a href="${esc(f.path)}">${n === 1 ? `The ${label.replace(/s$/, '')}` : `All ${n} ${label}`} →</a>`; }).join('')}</p></section>`;
+    }).join('')}
 <section class="fold" aria-labelledby="dev-h"><details><summary><h2 id="dev-h">Use any tool from code</h2></summary><div class="sec-h"><a class="more" href="/developers">Developer guide</a></div><p class="sec-p">${withApi} of the ${tools.length} tools take one request each, the same engines the pages use. Each tool's page shows its own request.</p>
 <div class="dev"><pre tabindex="0"><code>curl -X POST ${SITE}/api/v1/tools/jsonminify/run \\
   -H 'Content-Type: application/json' \\
@@ -315,8 +435,24 @@ function pageDevelopers() {
     const withApi = snap.tools.filter((t) => t.api && t.status !== 'unavailable');
     // A long command scrolls inside its block, not the page (it overflowed at 768 px); tabindex lets a keyboard scroll it.
     const code = (s) => `<pre tabindex="0"><code>${esc(s)}</code></pre>`;
+    // The table's numbers come from the guard's real quota table, not from a copy that can drift.
+    const quotas = require('../../../_shared/guard/limits').quotas();
+    const rate = (cls, tier = 'anonymous') => { const q = quotas[cls] && quotas[cls][tier]; return q ? `${q.perMinute.toLocaleString('en-US')}/min${q.perDay ? ` · ${q.perDay.toLocaleString('en-US')}/day` : ''}` : '—'; };
+    const apiRows = [
+        ['POST /api/v1/tools/{id}/run', 'Run a tool inline; long work answers with a job', 'Anonymous; session or token for file jobs', rate('tools-run'), `curl -X POST ${SITE}/api/v1/tools/fancy/run`],
+        ['GET /api/v1/tools', 'List every tool with its inputs, limits and access', 'Public', rate('tools-api'), `curl ${SITE}/api/v1/tools?api=true`],
+        ['GET /api/v1/tools/{id}/schema', "JSON Schema for a tool's input and output", 'Public', rate('tools-api'), `curl ${SITE}/api/v1/tools/fancy/schema`],
+        ['POST /api/v1/jobs', 'Start a long job with files and follow it', 'Session or token for file jobs', rate('tools-job'), `curl -X POST ${SITE}/api/v1/jobs`],
+        ['GET /api/v1/jobs/{id}/events', 'Follow one job as server-sent events', "The job's owner", rate('tools-api'), `curl -N ${SITE}/api/v1/jobs/{id}/events`],
+        ['GET /api/v1/jobs/{id}/files/{n}', "Download a finished job's result file", "The job's owner", rate('tools-api'), `curl -O ${SITE}/api/v1/jobs/{id}/files/0`],
+    ];
     const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> › Developers</nav><div class="page-h">${icon('code', 56)}<h1>Tools API</h1></div>
 <p class="lead">${withApi.length} of ${snap.tools.length} tools can be called from code, with the same engines the pages use. One request shape for all of them; long work runs as a job you can follow.</p>
+<section><div class="sec-h"><h2>At a glance</h2></div><p class="sec-p">The six calls behind every tool. Rate limits are the anonymous allowance; signing in or using a token raises it, and a tool's cost counts against the limit.</p>
+<table class="api-table" role="table"><caption class="sr-only">Tools API endpoints, what they do, who may call them, their anonymous rate limit and an example request</caption>
+<thead><tr role="row"><th scope="col" role="columnheader">Endpoint</th><th scope="col" role="columnheader">Purpose</th><th scope="col" role="columnheader">Auth</th><th scope="col" role="columnheader">Rate limit</th><th scope="col" role="columnheader">Example</th></tr></thead>
+<tbody>${apiRows.map((r) => `<tr role="row"><td role="cell" data-label="Endpoint"><code>${esc(r[0])}</code></td><td role="cell" data-label="Purpose">${esc(r[1])}</td><td role="cell" data-label="Auth">${esc(r[2])}</td><td role="cell" data-label="Rate limit">${esc(r[3])}</td><td role="cell" data-label="Example"><code>${esc(r[4])}</code></td></tr>`).join('')}</tbody></table>
+<p class="sec-p">Over a limit is <b>429</b> with <code>Retry-After</code>; every answer also carries <code>RateLimit-*</code> headers. Errors are RFC 9457 problems with a stable <code>code</code>.</p></section>
 <section><div class="sec-h"><h2>Discover</h2></div><p class="sec-p">Every tool is described by a machine-readable descriptor (inputs as JSON Schema, file limits, how it runs, who may call it).</p>
 <ul><li><a href="/api/v1/tools">/api/v1/tools</a>: the registry (filter with <code>?family=</code>, <code>?q=</code>, <code>?api=true</code>)</li>
 <li><code>/api/v1/tools/{id}</code> and <code>/api/v1/tools/{id}/schema</code>: one tool</li>
@@ -334,7 +470,7 @@ const tools = createToolsClient(createClient({}));
 const out = await tools.run('jsonminify', { text: '{ "a": 1 }' });
 const job = await tools.run('png', { format: 'png' }, { files: [fileBlob] });
 const done = await job.wait();   // any tool, sync or job`)}
-<p class="sec-p">The SDK is <a href="https://github.com/OpenVibers/OpenVibe.SDK">openvibe-sdk</a> (tag v0.6.0+). It retries on 429 after <code>Retry-After</code> and generates idempotency keys for you.</p></section>
+<p class="sec-p">The SDK is <a href="https://github.com/OpenVibers/OpenVibe.SDK">openvibe-sdk</a> (this site pins v0.67.0). It retries on 429 after <code>Retry-After</code> and generates idempotency keys for you.</p></section>
 <section><div class="sec-h"><h2>Access and limits</h2></div>
 <ul><li><b>Anonymous</b>: most tools, on the lowest quota tier, per address. Tools that handle files people should not share anonymously (audio, PDF) need a browser session or a token.</li>
 <li><b>Apps and services</b>: a token from <a href="https://openvibe.network">OpenVibe.Network</a> for audience <code>openvibe.tools</code> with <code>tools.tool.run</code> (developer sandbox apps get it by default) raises the tier.</li>

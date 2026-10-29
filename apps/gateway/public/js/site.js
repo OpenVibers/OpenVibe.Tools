@@ -16,6 +16,43 @@
         e.preventDefault(); location.href = a.getAttribute('data-go');
     });
 
+    // The home's live example: real client-side transforms of what the visitor types. The server
+    // renders the same defaults, so the promo card still reads without this file.
+    var demo = document.getElementById('demo-text');
+    if (demo) {
+        var demoFancy = document.getElementById('demo-fancy');
+        var demoCase = document.getElementById('demo-case');
+        var demoCount = document.getElementById('demo-count');
+        function demoBold(s) {
+            return Array.from(s).map(function (ch) {
+                var u = ch.codePointAt(0);
+                if (u >= 65 && u <= 90) return String.fromCodePoint(0x1D4D0 + u - 65);
+                if (u >= 97 && u <= 122) return String.fromCodePoint(0x1D4EA + u - 97);
+                return ch;
+            }).join('');
+        }
+        function demoTitle(s) { return s.replace(/\S+/g, function (w) { return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(); }); }
+        function demoCountText(s) { var w = (s.trim().match(/\S+/g) || []).length, n = Array.from(s).length; return w + ' word' + (w === 1 ? '' : 's') + ' · ' + n + ' character' + (n === 1 ? '' : 's'); }
+        function updateDemo() {
+            var v = demo.value || '';
+            if (demoFancy) demoFancy.textContent = demoBold(v);
+            if (demoCase) demoCase.textContent = demoTitle(v);
+            if (demoCount) demoCount.textContent = demoCountText(v);
+        }
+        demo.addEventListener('input', updateDemo);
+        updateDemo();
+    }
+
+    // On a phone the hero's search box shows about half the long placeholder, so it was cut mid-quote
+    // (2026-10-29 review). Keep the hint whole below 640 px; the server still renders the full one.
+    var heroInput = document.querySelector('.search input[name="q"]');
+    if (heroInput) {
+        var wideHint = heroInput.getAttribute('placeholder') || '', narrowHint = 'Try “merge pdf” or “dns lookup”';
+        var fitHint = function () { if (!heroInput.value) heroInput.setAttribute('placeholder', window.innerWidth < 640 ? narrowHint : wideHint); };
+        fitHint();
+        window.addEventListener('resize', fitHint);
+    }
+
     var input = document.getElementById('q'), results = document.getElementById('results');
     if (!input || !results) return;
     var grid = document.getElementById('results-grid'), empty = document.getElementById('results-empty');
