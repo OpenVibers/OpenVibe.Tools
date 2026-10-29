@@ -71,7 +71,7 @@ function createOutputCard(name, text, container) {
     card.innerHTML = `
         <div class="style-name">${escapeHtml(name)}</div>
         <div class="style-text">${escapeHtml(text)}</div>
-        <button class="copy-btn" title="Copy">Copy</button>
+        <button class="copy-btn" title="Copy ${escapeHtml(name)}" aria-label="Copy ${escapeHtml(name)} style">Copy</button>
     `;
     card.querySelector('.copy-btn').addEventListener('click', (e) => {
         e.stopPropagation();
