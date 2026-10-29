@@ -43,6 +43,16 @@
         updateDemo();
     }
 
+    // On a phone the hero's search box shows about half the long placeholder, so it was cut mid-quote
+    // (2026-10-29 review). Keep the hint whole below 640 px; the server still renders the full one.
+    var heroInput = document.querySelector('.search input[name="q"]');
+    if (heroInput) {
+        var wideHint = heroInput.getAttribute('placeholder') || '', narrowHint = 'Try “merge pdf” or “dns lookup”';
+        var fitHint = function () { if (!heroInput.value) heroInput.setAttribute('placeholder', window.innerWidth < 640 ? narrowHint : wideHint); };
+        fitHint();
+        window.addEventListener('resize', fitHint);
+    }
+
     var input = document.getElementById('q'), results = document.getElementById('results');
     if (!input || !results) return;
     var grid = document.getElementById('results-grid'), empty = document.getElementById('results-empty');
