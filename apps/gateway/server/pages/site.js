@@ -19,6 +19,7 @@ const seo = require('openvibe-shared/seo');
 const icons = require('openvibe-shared/icons');
 const appIcon = require('openvibe-shared/app-icon');
 const registry = require('../registry');
+const { foldBlock } = require('../short');
 
 const SITE = 'https://openvibe.tools';
 const NAME = 'OpenVibe.Tools';
@@ -94,6 +95,27 @@ details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px
 .tile:hover,.tile:focus-visible{border-color:var(--accent,#3b82f6);background:color-mix(in srgb,var(--accent,#3b82f6) 7%,var(--bg-secondary,#111826));outline:0}
 .tile>span:not(.ov-icon){min-width:0}.tile b{display:block;font-size:14px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tile small{display:block;font-size:12px;color:var(--text-muted,#7d8aa0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fold details{border:0;padding:0;max-width:none}.fold summary{list-style:none;display:flex;align-items:center;gap:10px}.fold summary::-webkit-details-marker{display:none}.fold summary::after{content:'+';margin-left:auto;font-size:22px;font-weight:400;color:var(--text-muted,#7d8aa0)}.fold details[open] summary::after{content:'\\2212'}.fold summary h2{display:inline}.fold details>:not(summary){margin-top:12px}
+/* The fold (the owner's short-pages rule, 2026-10-30): a part a reader rarely needs. On a phone it is closed — the
+   title row is a 44 px target that opens it — and where there is room it is open and looks like the section it
+   replaces. A checkbox and a label, no script: the part stays in the page for the crawlers. */
+.fold-block{margin-top:26px}
+.fold-toggle{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.fold-h{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer}
+.fold-h>h2{margin:0;flex:1 1 auto}
+.fold-h:focus-within{outline:2px solid var(--accent,#3b82f6);outline-offset:2px}
+.fold-mark{flex:none}
+.fold-mark::after{content:'+';font-size:22px;font-weight:400;color:var(--text-muted,#7d8aa0)}
+.fold-toggle:checked~.fold-h .fold-mark::after{content:'\\2212'}
+.fold-body{display:none}
+.fold-toggle:checked~.fold-body{display:block}
+.fold:not(.fold-bare) .fold-body .ov-shipped-home h3{display:none}
+@media (min-width:641px){
+.fold-block{margin-top:40px}
+.fold-toggle{display:none}
+.fold-h{min-height:0;margin-bottom:6px;cursor:default}
+.fold-mark{display:none}
+.fold-body{display:block}
+}
 .fam-all{margin:10px 0 0;font-size:14px}.fam-all a{font-weight:650;text-decoration:none}
 .perks{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}.perks div{padding:16px;border-radius:14px;border:1px solid var(--border,rgba(255,255,255,.08));background:var(--bg-secondary,#111826)}.perks p{margin:6px 0 0;color:var(--text-secondary,#a8b3c4);font-size:14px}
 @media (max-width:560px){.tiles{grid-template-columns:1fr 1fr}.tile small{display:none}.tile b{white-space:normal;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.jump{top:52px}}
@@ -227,8 +249,12 @@ ${appIcon.headTags({ site: 'tools', iconBase: '/assets' })}
 <style>${CSS}</style></head><body>${spriteSvg}
 <div id="navbar-mount"></div><noscript><style>#navbar-mount{display:none}</style><header class="topbar"><a href="${SITE}/">${NAME}</a><nav>${families.filter(f => f.path).map(f => `<a href="${esc(f.path)}">${esc(f.name)}</a>`).join('')}<a href="/all-tools">All tools</a></nav></header></noscript>
 <main class="wrap">${body}
-<section aria-labelledby="net-h"><div class="sec-h"><h2 id="net-h">The rest of OpenVibe</h2></div><p class="sec-p">One account works on every site. Open source and community-run.</p>
-<div class="net">${NETWORK.map(([ic, n, d, u]) => `<a class="tool" href="${u}">${icon(ic, 36)}<span class="tool-t"><b>${n}</b><small>${d}</small></span></a>`).join('')}</div></section>
+${foldBlock({
+        id: 'net',
+        head: '<h2 id="net-h">The rest of OpenVibe</h2>',
+        html: `<section aria-labelledby="net-h"><p class="sec-p">One account works on every site. Open source and community-run.</p>
+<div class="net">${NETWORK.map(([ic, n, d, u]) => `<a class="tool" href="${u}">${icon(ic, 36)}<span class="tool-t"><b>${n}</b><small>${d}</small></span></a>`).join('')}</div></section>`,
+    })}
 </main>${frame.footer({ service: 'tools', variant: 'full', updates: '/updates' })}
 <script src="${ovServe.url('navbar.js')}" defer></script><script src="${ovServe.url('footer.js')}" defer></script><script src="/js/site.js" defer></script>
 </body></html>`;
@@ -381,7 +407,11 @@ ${startCard('mergepdf', (t) => `<span class="start-name">${esc(t.name)}<small>${
 ${startCard('compress', (t) => `<span class="start-name">${esc(t.name)}<small>${host(t)}</small></span><div class="flow" aria-hidden="true"><span>PNG</span><span>JPG</span><span>WebP</span><span class="flow-arrow">→</span><span class="flow-out">smaller file</span></div><p class="start-note">Keep the pixels, lose the weight. iPhone HEIC works too.</p><span class="start-go">Compress an image →</span>`)}
 ${startCard('dns', (t) => `<span class="start-name">${esc(t.name)}<small>${host(t)}</small></span><div class="flow" aria-hidden="true"><span>domain</span><span class="flow-arrow">→</span><span class="flow-out">A · AAAA · MX · TXT</span></div><p class="start-note">See what a domain actually points at, from outside your network.</p><span class="start-go">Look up DNS →</span>`)}
 </div></section>
-${opened.length >= 4 ? `<section aria-labelledby="top-h"><div class="sec-h"><h2 id="top-h">Most opened this week</h2></div><p class="sec-p">How many people opened each tool in the last seven days, counted once per person a day.</p><div class="grid">${opened.map(openedCard).join('')}</div></section>` : ''}
+${opened.length >= 4 ? foldBlock({
+        id: 'top',
+        head: '<h2 id="top-h">Most opened this week</h2>',
+        html: `<section aria-labelledby="top-h"><p class="sec-p">How many people opened each tool in the last seven days, counted once per person a day.</p><div class="grid">${opened.map(openedCard).join('')}</div></section>`,
+    }) : ''}
 ${jobsBlock(JOB_GROUPS.map((job) => {
         const list = job.families.flatMap((fid) => tools.filter((t) => t.family === fid));
         if (!list.length) return '';
@@ -393,12 +423,20 @@ ${jobsBlock(JOB_GROUPS.map((job) => {
   -H 'Content-Type: application/json' \\
   -d '{"input":{"text":"{ \\"a\\": 1 }"}}'</code></pre>
 <ul><li><a href="/api/v1/openapi.json">OpenAPI 3.1</a>, generated from the tool descriptors</li><li><a href="/api/v1/tools">/api/v1/tools</a>: every tool's inputs, limits and access</li><li>Long work runs as a job you can follow over server-sent events</li><li><a href="https://github.com/OpenVibers/OpenVibe.SDK">openvibe-sdk</a>: <code>tools.run(id, input)</code> from JavaScript</li></ul></div></details></section>
-${frame.shipped({ service: 'tools', title: 'Recently shipped on OpenVibe.Tools' })}
+${foldBlock({
+        id: 'shipped',
+        head: '<h2 id="shipped-h">Recently shipped on OpenVibe.Tools</h2>',
+        html: frame.shipped({ service: 'tools', title: 'Recently shipped on OpenVibe.Tools' }),
+    })}
 <section class="fold" aria-labelledby="acct-h"><details><summary><h2 id="acct-h">Better with an account, fine without</h2></summary><div class="perks">
 <div><b>Without signing in</b><p>Every tool works. Results stay available for an hour, then they are deleted.</p></div>
 <div><b>Signed in</b><p>Results keep for 24 hours, your recent tools follow you across devices, and your theme and notifications come along from the rest of OpenVibe.</p></div>
 <div><b>For developers</b><p>Run any tool from code: see <a href="/developers">the Tools API</a> (<a href="/api/v1/openapi.json">OpenAPI</a>). The catalog is public JSON at <a href="/api/catalog.json">/api/catalog.json</a>, with a plain-text map at <a href="/llms.txt">/llms.txt</a>.</p></div></div></details></section>
-<section aria-labelledby="faq-h"><div class="sec-h"><h2 id="faq-h">Questions</h2></div>${HOME_FAQ.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</section>`;
+${foldBlock({
+        id: 'faq',
+        head: '<h2 id="faq-h">Questions</h2>',
+        html: `<section aria-labelledby="faq-h">${HOME_FAQ.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</section>`,
+    })}`;
     return shell({ families, agent: true, body, head: head({
         title: 'Online Tools for Files, Text, Code & Networks', description: `${tools.length} online tools in one place: video and audio converters, image and PDF tools, developer utilities and network diagnostics. Open source and community-run.`,
         canonical: SITE + '/', keywords: 'online tools, converter, pdf tools, image converter, developer tools, network tools, youtube downloader',
