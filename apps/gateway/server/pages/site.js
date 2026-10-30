@@ -108,7 +108,7 @@ details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px
 .fold-toggle:checked~.fold-h .fold-mark::after{content:'\\2212'}
 .fold-body{display:none}
 .fold-toggle:checked~.fold-body{display:block}
-.fold:not(.fold-bare) .fold-body .ov-shipped-home h3{display:none}
+.fold-block:not(.fold-bare) .fold-body .ov-shipped-home h3{display:none}
 @media (min-width:641px){
 .fold-block{margin-top:40px}
 .fold-toggle{display:none}

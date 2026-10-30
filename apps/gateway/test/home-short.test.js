@@ -18,7 +18,7 @@ const site = require('../server/pages/site');
         const home = await (await fetch(`${base}/`)).text();
         // The folds that are on the home: the parts a reader rarely needs.
         for (const [id, title] of [['shipped', 'Recently shipped on OpenVibe.Tools'], ['faq', 'Questions'], ['net', 'The rest of OpenVibe']]) {
-            const re = new RegExp(`<div class="fold" id="fold-${id}"><input class="fold-toggle" type="checkbox" id="fold-${id}-open">`
+            const re = new RegExp(`<div class="fold-block" id="fold-${id}"><input class="fold-toggle" type="checkbox" id="fold-${id}-open">`
                 + `<label class="fold-h" for="fold-${id}-open"><h2[^>]*>[^<]*${title}[^<]*</h2>.*?<div class="fold-body">`);
             assert.ok(re.test(home), `the ${title} fold is on the home`);
         }
