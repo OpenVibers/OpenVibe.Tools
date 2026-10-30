@@ -10,17 +10,25 @@
  *
  * The gateway owns the write, so it also bumps the shared Valkey version the readers watch: with it,
  * a revocation reaches every app on their next read rather than after their cache ttl.
+ *
+ * The same route answers the two account topics (ADR-033, ./account-data.js): what Tools holds about a person
+ * is exported on request and erased when the account goes. They arrive on the same signed endpoint.
  */
 const express = require('express');
 const { createPgRevocationStore } = require('openvibe-sdk/auth');
+const { TOPICS: ACCOUNT_TOPICS } = require('openvibe-sdk/account-data');
 
 const TOPIC = 'network.user.token_valid_after';
 let store = null;
 let storeDb = null;
 let storeValkey = null;
+let accountData = null;
+let accountSend = null;
 
 /** The gateway calls this once, at boot, with the one `tools` database and the shared Valkey. */
-function configure({ db = null, valkey = null } = {}) { storeDb = db; storeValkey = valkey; store = null; }
+function configure({ db = null, valkey = null, account: account = null, send = null } = {}) {
+    storeDb = db; storeValkey = valkey; store = null; accountData = account; accountSend = send;
+}
 
 async function cutoffs() {
     if (store) return store;
@@ -46,6 +54,17 @@ function handler() {
         for (const k of keys) { d = parseDelivery(raw, req.headers, k, { requireV2: true }); if (d) break; }
         if (!d || !d.event) { stats.refused++; return res.status(401).json({ error: 'bad signature' }); }
         stats.received++;
+        // The account topics (ADR-033): what Tools holds about a person is exported or erased here, not revoked.
+        if (ACCOUNT_TOPICS.includes(d.event.event_type)) {
+            if (!accountData) return res.status(503).json({ error: 'no account-data module is configured' });
+            try {
+                const outcome = await accountData.apply(d.event, { send: accountSend });
+                return res.json({ event_id: d.event.event_id || null, outcome });
+            } catch (err) {
+                console.warn(`[account-data] event ${d.event.event_id} (${d.event.event_type}) failed: ${(err && err.message) || err}`);
+                return res.status(503).json({ error: 'not applied; Events will retry' });
+            }
+        }
         const outcome = await (await cutoffs()).apply(d.event);
         if (outcome === 'revoked') {
             stats.revoked++;
@@ -71,12 +90,17 @@ async function ensureSubscription({ port, fetchImpl = globalThis.fetch, log = co
     const list = await fetchImpl(`${eventsUrl}/api/v1/subscriptions`, { headers });
     if (!list.ok) throw new Error(`Events answered ${list.status} listing subscriptions`);
     const subs = ((await list.json()).subscriptions || []);
-    if (subs.some((s) => s.topic_pattern === TOPIC && s.endpoint === endpoint)) return 'exists';
-    const r = await fetchImpl(`${eventsUrl}/api/v1/subscriptions`, { method: 'POST', headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify({ topic_pattern: TOPIC, endpoint, secret }) });
-    if (r.status === 409) return 'exists';
-    if (!r.ok) throw new Error(`Events answered ${r.status} creating the ${TOPIC} subscription`);
-    log.log && log.log(`[Events] subscription created: ${TOPIC} → ${endpoint}`);
-    return 'created';
+    // The cutoff topic and the two account topics (ADR-033) share this endpoint and this secret.
+    let made = false;
+    for (const topic of [TOPIC, ...ACCOUNT_TOPICS]) {
+        if (subs.some((s) => s.topic_pattern === topic && s.endpoint === endpoint)) continue;
+        const r = await fetchImpl(`${eventsUrl}/api/v1/subscriptions`, { method: 'POST', headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify({ topic_pattern: topic, endpoint, secret }) });
+        if (r.status === 409) continue;
+        if (!r.ok) throw new Error(`Events answered ${r.status} creating the ${topic} subscription`);
+        made = true;
+        log.log && log.log(`[Events] subscription created: ${topic} → ${endpoint}`);
+    }
+    return made ? 'created' : 'exists';
 }
 
 module.exports = { handler, ensureSubscription, close, configure, stats, TOPIC, _cutoffs: cutoffs };
