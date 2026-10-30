@@ -31,6 +31,7 @@ const createDevRoutes = require('./dev/routes');
 const { DEV_TOOL_MAP, DEV_ALIASES } = require('./dev/config');
 const { CODES } = require('./seo/catalog');
 const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
+const { createNetworkSender } = require('openvibe-sdk/account-data');   // ADR-033: Tools' part of an export, back to Network
 
 const app = express();
 // Network's sign-out-everywhere cutoffs for every Tools app (./revocation-events.js): before any body parser.
@@ -63,7 +64,13 @@ let auth = null;   // created below; the key check reads it at request time
 // The one `tools` database and the shared Valkey (plan T8, decisions 3 and 4).
 const toolsDb = require('../../_shared/db').openToolsDb({ createDb: require('openvibe-sdk/db').createDb, service: 'tools-gateway' });
 const toolsValkey = require('../../_shared/db').openToolsValkey({ createValkey: require('openvibe-sdk/valkey').createValkey });
-require('./revocation-events').configure({ db: toolsDb.db, valkey: toolsValkey });
+// The account export and deletion (ADR-033, ./account-data.js): what Tools holds about a person, and the erasure
+// of it. The network sender posts Tools' part of an export back to Network with Tools' own token.
+const accountData = require('./account-data').create({ db: toolsDb.db, log: console });
+const accountSend = config.oauth.clientSecret ? createNetworkSender({
+    networkInternalUrl: config.networkInternalUrl, clientId: config.oauth.clientId, clientSecret: config.oauth.clientSecret,
+}) : null;
+require('./revocation-events').configure({ db: toolsDb.db, valkey: toolsValkey, account: accountData, send: accountSend });
 const guard = createGuard({
     app: 'gateway', db: toolsDb.db, valkey: toolsValkey, contracts: require('openvibe-contracts'),
     specs: [...require('./net/descriptors').SPECS, ...require('./dev/descriptors').SPECS],
