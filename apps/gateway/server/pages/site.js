@@ -169,7 +169,18 @@ details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px
    opened tools show (the families below and the A to Z list hold the rest). */
 @media (max-width:599px){.start-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-inline:16px;scrollbar-width:none;gap:10px;margin:0 -16px;padding:0 16px 4px}.start-grid::-webkit-scrollbar{display:none}.start-grid>*{flex:0 0 84%;min-width:0;scroll-snap-align:start}section[aria-labelledby="top-h"] .grid>:nth-child(n+5){display:none}}
 @media (prefers-reduced-motion:reduce){.tool{transition:none}}
-${icons.CSS}`;
+${icons.CSS}
+/* Touch targets on phones (fleet audit, 2026-10-29): touch pointers only. */
+@media (pointer: coarse) {
+  main.wrap summary, .fold summary { min-height: 44px; }
+  .sec-h a.more { position: relative; display: inline-block; }
+  .sec-h a.more::after { content: ''; position: absolute; left: 0; right: 0; top: -11px; bottom: -11px; }
+  .group-links a { min-height: 44px; display: inline-flex; align-items: center; }
+  .promo-out dt a { display: inline-block; min-height: 44px; }
+  .promo-foot a { position: relative; display: inline-block; }
+  .promo-foot a::after { content: ''; position: absolute; left: 0; right: 0; top: -12px; bottom: -12px; }
+}
+`;
 
 // "Elsewhere on OpenVibe": which services, their names and origins come from Network's registry
 // (registry.services); only the one-line descriptions are ours. A service the registry lists as a
