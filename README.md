@@ -31,7 +31,7 @@ offline against the Network's public key (JWKS).
   OpenVibe.Search (tool documents), OpenVibe.Community (the paste hand-over), OpenVibe.Billing (job usage
   readings)
 - host programs some tools need (ffmpeg, yt-dlp, qpdf, poppler, libheif; [Host packages](#host-packages-some-tools-need))
-- in each app: `openvibe-contracts` v0.92.0 (img, audio, docs, gateway), `openvibe-sdk` v0.12.0 and `openvibe-shared` v4.43.0, pinned
+- in each app: `openvibe-contracts` v0.92.0 (img, audio, docs, gateway), `openvibe-sdk` v0.12.0 and `openvibe-shared` v4.48.0, pinned
   by release tarball, and `apps/_shared` (openvibe-tools-shared) by relative path
 
 ## Capabilities
@@ -642,5 +642,5 @@ counters and salt use Valkey through `VALKEY_URL`, with process-local state when
 <!-- versions:start -->
 - openvibe-contracts: v0.222.0
 - openvibe-sdk: v0.67.0
-- openvibe-shared: v4.43.0
+- openvibe-shared: v4.48.0
 <!-- versions:end -->
