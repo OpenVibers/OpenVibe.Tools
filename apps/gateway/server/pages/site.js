@@ -159,6 +159,18 @@ details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px
 .flow .flow-out{border-color:var(--accent,#3b82f6);color:var(--text-primary,#e6edf7);font-weight:600}
 .flow .flow-arrow{border:0;background:none;padding:0;color:var(--text-muted,#7d8aa0)}
 .job{padding:clamp(24px,4vw,36px) 0 0}
+.job-pick,.job-pick-h{display:none}
+@supports selector(:has(*)){@media (max-width:640px){
+.job-pick-h{display:flex;margin-top:30px}
+.job-pick{display:flex;gap:8px;overflow-x:auto;margin:10px -16px 0;padding:2px 16px 4px;scrollbar-width:none;overscroll-behavior-x:contain}.job-pick::-webkit-scrollbar{display:none}
+.job-pick input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.job-pick label{display:inline-flex;align-items:center;flex:none;min-height:44px;padding:0 15px;border-radius:999px;border:1px solid var(--border,rgba(255,255,255,.1));color:var(--text-secondary,#a8b3c4);font-size:13.5px;font-weight:650;white-space:nowrap;cursor:pointer}
+.job-pick input:checked+label{color:var(--text-primary,#e6edf7);border-color:var(--accent,#3b82f6);background:color-mix(in srgb,var(--accent,#3b82f6) 12%,transparent)}
+.job-pick input:focus-visible+label{outline:2px solid var(--accent,#3b82f6);outline-offset:2px}
+.jobs .job{display:none;padding-top:14px}.jobs .job .sec-h{display:none}
+.jobs:has(#jp-files:checked) #job-files,.jobs:has(#jp-text:checked) #job-text,.jobs:has(#jp-audio:checked) #job-audio,.jobs:has(#jp-media:checked) #job-media,.jobs:has(#jp-data:checked) #job-data,.jobs:has(#jp-web:checked) #job-web,.jobs:has(#jp-places:checked) #job-places{display:block}
+.jobs .job:target{display:block}
+}}
 .job .sec-h{margin-bottom:4px}
 .job .tiles{margin-top:14px}
 .group-links{display:flex;flex-wrap:wrap;gap:6px 18px;margin:12px 0 0;font-size:13.5px;font-weight:600}
@@ -293,6 +305,18 @@ const JOB_GROUPS = [
     { id: 'web', name: 'Web and network', line: 'Check DNS, domains, certificates, ports and mail servers.', families: ['net'] },
     { id: 'places', name: 'Maps and food', line: 'Find water, shelter, supplies and an affordable meal nearby.', families: ['places'] },
 ];
+/**
+ * The job sections as one block. On a phone (640 px and under) a row of chips picks one job at a time, so the home
+ * stays short (the owner's short-pages rule, 2026-10-30): radio inputs and :has(), no script, and every section stays
+ * in the page for crawlers. A wider screen, or a browser without :has(), shows every section and no chips. A link to
+ * #job-x still opens that section (:target).
+ */
+function jobsBlock(sections, jobs) {
+    if (!sections.length) return '';
+    const shown = jobs.filter((j) => sections.some((h) => h.includes(`id="job-${j.id}"`)));
+    const chips = shown.map((j, i) => `<input type="radio" name="job-pick" id="jp-${j.id}" value="${j.id}"${i === 0 ? ' checked' : ''}><label for="jp-${j.id}">${esc(j.name)}</label>`).join('');
+    return `<div class="jobs"><div class="sec-h job-pick-h"><h2>Tools by job</h2><a class="more" href="/all-tools">All tools</a></div><div class="job-pick" role="radiogroup" aria-label="Tools by job">${chips}</div>${sections.join('')}</div>`;
+}
 const QUICK_LINKS = [['mergepdf', 'merge a PDF'], ['fancy', 'fancy text'], ['compress', 'compress an image'], ['json', 'format JSON'], ['dns', 'check DNS']];
 const FAMILY_SHORT = { img: 'image tools', docs: 'PDF tools', text: 'text tools', codes: 'barcode tools', audio: 'audio tools', media: 'video tools', dev: 'developer tools', net: 'network tools', places: 'map tools' };
 
@@ -358,12 +382,12 @@ ${startCard('compress', (t) => `<span class="start-name">${esc(t.name)}<small>${
 ${startCard('dns', (t) => `<span class="start-name">${esc(t.name)}<small>${host(t)}</small></span><div class="flow" aria-hidden="true"><span>domain</span><span class="flow-arrow">→</span><span class="flow-out">A · AAAA · MX · TXT</span></div><p class="start-note">See what a domain actually points at, from outside your network.</p><span class="start-go">Look up DNS →</span>`)}
 </div></section>
 ${opened.length >= 4 ? `<section aria-labelledby="top-h"><div class="sec-h"><h2 id="top-h">Most opened this week</h2></div><p class="sec-p">How many people opened each tool in the last seven days, counted once per person a day.</p><div class="grid">${opened.map(openedCard).join('')}</div></section>` : ''}
-${JOB_GROUPS.map((job) => {
+${jobsBlock(JOB_GROUPS.map((job) => {
         const list = job.families.flatMap((fid) => tools.filter((t) => t.family === fid));
         if (!list.length) return '';
         const groupFamilies = job.families.map((fid) => families.find((f) => f.id === fid)).filter((f) => f && f.path && tools.some((t) => t.family === f.id));
         return `<section class="job" id="job-${job.id}" aria-labelledby="job-${job.id}-h"><div class="sec-h"><h2 id="job-${job.id}-h">${esc(job.name)}</h2></div><p class="sec-p">${esc(job.line)}</p><div class="tiles">${pick(list).map(tile).join('')}</div><p class="group-links">${groupFamilies.map((f) => { const n = tools.filter((t) => t.family === f.id).length; const label = FAMILY_SHORT[f.id] || f.name.toLowerCase(); return `<a href="${esc(f.path)}">${n === 1 ? `The ${label.replace(/s$/, '')}` : `All ${n} ${label}`} →</a>`; }).join('')}</p></section>`;
-    }).join('')}
+    }).filter(Boolean), JOB_GROUPS)}
 <section class="fold" aria-labelledby="dev-h"><details><summary><h2 id="dev-h">Use any tool from code</h2></summary><div class="sec-h"><a class="more" href="/developers">Developer guide</a></div><p class="sec-p">${withApi} of the ${tools.length} tools take one request each, the same engines the pages use. Each tool's page shows its own request.</p>
 <div class="dev"><pre tabindex="0"><code>curl -X POST ${SITE}/api/v1/tools/jsonminify/run \\
   -H 'Content-Type: application/json' \\
