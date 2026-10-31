@@ -100,14 +100,14 @@ details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px
    replaces. A checkbox and a label, no script: the part stays in the page for the crawlers. */
 .fold-block{margin-top:26px}
 .fold-toggle{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
-.fold-h{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer}
+.fold-h{display:flex;align-items:center;gap:10px;min-height:44px;cursor:default}
 .fold-h>h2{margin:0;flex:1 1 auto}
 .fold-h:focus-within{outline:2px solid var(--accent,#3b82f6);outline-offset:2px}
-.fold-mark{flex:none}
+.fold-mark{display:none}
 .fold-mark::after{content:'+';font-size:22px;font-weight:400;color:var(--text-muted,#7d8aa0)}
 .fold-toggle:checked~.fold-h .fold-mark::after{content:'\\2212'}
-.fold-body{display:none}
-.fold-toggle:checked~.fold-body{display:block}
+.fold-body{display:block}
+.fold-toggle{display:none}
 .fold-block:not(.fold-bare) .fold-body .ov-shipped-home h3{display:none}
 @media (min-width:641px){
 .fold-block{margin-top:40px}
@@ -181,17 +181,8 @@ details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px
 .flow .flow-out{border-color:var(--accent,#3b82f6);color:var(--text-primary,#e6edf7);font-weight:600}
 .flow .flow-arrow{border:0;background:none;padding:0;color:var(--text-muted,#7d8aa0)}
 .job{padding:clamp(24px,4vw,36px) 0 0}
-.job-pick,.job-pick-h{display:none}
 @supports selector(:has(*)){@media (max-width:640px){
-.job-pick-h{display:flex;margin-top:30px}
-.job-pick{display:flex;gap:8px;overflow-x:auto;margin:10px -16px 0;padding:2px 16px 4px;scrollbar-width:none;overscroll-behavior-x:contain}.job-pick::-webkit-scrollbar{display:none}
-.job-pick input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
-.job-pick label{display:inline-flex;align-items:center;flex:none;min-height:44px;padding:0 15px;border-radius:999px;border:1px solid var(--border,rgba(255,255,255,.1));color:var(--text-secondary,#a8b3c4);font-size:13.5px;font-weight:650;white-space:nowrap;cursor:pointer}
-.job-pick input:checked+label{color:var(--text-primary,#e6edf7);border-color:var(--accent,#3b82f6);background:color-mix(in srgb,var(--accent,#3b82f6) 12%,transparent)}
-.job-pick input:focus-visible+label{outline:2px solid var(--accent,#3b82f6);outline-offset:2px}
-.jobs .job{display:none;padding-top:14px}.jobs .job .sec-h{display:none}
-.jobs:has(#jp-files:checked) #job-files,.jobs:has(#jp-text:checked) #job-text,.jobs:has(#jp-audio:checked) #job-audio,.jobs:has(#jp-media:checked) #job-media,.jobs:has(#jp-data:checked) #job-data,.jobs:has(#jp-web:checked) #job-web,.jobs:has(#jp-places:checked) #job-places{display:block}
-.jobs .job:target{display:block}
+
 }}
 .job .sec-h{margin-bottom:4px}
 .job .tiles{margin-top:14px}
@@ -201,7 +192,7 @@ details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px
 @media (max-width:560px){.grid{grid-template-columns:minmax(0,1fr);gap:6px}.search button{padding:0 14px}.tool{padding:9px 11px;align-items:center}.tool small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tool i{display:none}.hero{padding-top:20px}.hero h1{font-size:28px}.kicker{display:none}}
 /* The home on phones (2026-10-29): the examples are one row that scrolls sideways (all four still there), and four of the most
    opened tools show (the families below and the A to Z list hold the rest). */
-@media (max-width:599px){.start-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-inline:16px;scrollbar-width:none;gap:10px;margin:0 -16px;padding:0 16px 4px}.start-grid::-webkit-scrollbar{display:none}.start-grid>*{flex:0 0 84%;min-width:0;scroll-snap-align:start}section[aria-labelledby="top-h"] .grid>:nth-child(n+5){display:none}}
+@media (max-width:599px){.start-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-inline:16px;scrollbar-width:none;gap:10px;margin:0 -16px;padding:0 16px 4px}.start-grid::-webkit-scrollbar{display:none}.start-grid>*{flex:0 0 84%;min-width:0;scroll-snap-align:start}section[aria-labelledby="top-h"] .grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-inline:16px;scrollbar-width:none;gap:10px;margin:0 -16px;padding:0 16px 4px}section[aria-labelledby="top-h"] .grid::-webkit-scrollbar{display:none}section[aria-labelledby="top-h"] .grid>*{flex:0 0 84%;min-width:0;scroll-snap-align:start}}
 @media (prefers-reduced-motion:reduce){.tool{transition:none}}
 ${icons.CSS}
 /* Touch targets on phones (fleet audit, 2026-10-29): touch pointers only. */
@@ -332,16 +323,13 @@ const JOB_GROUPS = [
     { id: 'places', name: 'Maps and food', line: 'Find water, shelter, supplies and an affordable meal nearby.', families: ['places'] },
 ];
 /**
- * The job sections as one block. On a phone (640 px and under) a row of chips picks one job at a time, so the home
- * stays short (the owner's short-pages rule, 2026-10-30): radio inputs and :has(), no script, and every section stays
- * in the page for crawlers. A wider screen, or a browser without :has(), shows every section and no chips. A link to
- * #job-x still opens that section (:target).
+ * The job sections as one block (the owner's rule, 2026-10-31): every section is on the page on every screen. A row
+ * of chips used to pick one at a time on a phone; that hid content, so the chips are gone and the sections read in
+ * order. A link to #job-x still opens that section.
  */
-function jobsBlock(sections, jobs) {
+function jobsBlock(sections) {
     if (!sections.length) return '';
-    const shown = jobs.filter((j) => sections.some((h) => h.includes(`id="job-${j.id}"`)));
-    const chips = shown.map((j, i) => `<input type="radio" name="job-pick" id="jp-${j.id}" value="${j.id}"${i === 0 ? ' checked' : ''}><label for="jp-${j.id}">${esc(j.name)}</label>`).join('');
-    return `<div class="jobs"><div class="sec-h job-pick-h"><h2>Tools by job</h2><a class="more" href="/all-tools">All tools</a></div><div class="job-pick" role="radiogroup" aria-label="Tools by job">${chips}</div>${sections.join('')}</div>`;
+    return `<div class="jobs"><div class="sec-h"><h2>Tools by job</h2><a class="more" href="/all-tools">All tools</a></div>${sections.join('')}</div>`;
 }
 const QUICK_LINKS = [['mergepdf', 'merge a PDF'], ['fancy', 'fancy text'], ['compress', 'compress an image'], ['json', 'format JSON'], ['dns', 'check DNS']];
 const FAMILY_SHORT = { img: 'image tools', docs: 'PDF tools', text: 'text tools', codes: 'barcode tools', audio: 'audio tools', media: 'video tools', dev: 'developer tools', net: 'network tools', places: 'map tools' };
@@ -417,7 +405,7 @@ ${jobsBlock(JOB_GROUPS.map((job) => {
         if (!list.length) return '';
         const groupFamilies = job.families.map((fid) => families.find((f) => f.id === fid)).filter((f) => f && f.path && tools.some((t) => t.family === f.id));
         return `<section class="job" id="job-${job.id}" aria-labelledby="job-${job.id}-h"><div class="sec-h"><h2 id="job-${job.id}-h">${esc(job.name)}</h2></div><p class="sec-p">${esc(job.line)}</p><div class="tiles">${pick(list).map(tile).join('')}</div><p class="group-links">${groupFamilies.map((f) => { const n = tools.filter((t) => t.family === f.id).length; const label = FAMILY_SHORT[f.id] || f.name.toLowerCase(); return `<a href="${esc(f.path)}">${n === 1 ? `The ${label.replace(/s$/, '')}` : `All ${n} ${label}`} →</a>`; }).join('')}</p></section>`;
-    }).filter(Boolean), JOB_GROUPS)}
+    }).filter(Boolean))}
 <section class="fold" aria-labelledby="dev-h"><details><summary><h2 id="dev-h">Use any tool from code</h2></summary><div class="sec-h"><a class="more" href="/developers">Developer guide</a></div><p class="sec-p">${withApi} of the ${tools.length} tools take one request each, the same engines the pages use. Each tool's page shows its own request.</p>
 <div class="dev"><pre tabindex="0"><code>curl -X POST ${SITE}/api/v1/tools/jsonminify/run \\
   -H 'Content-Type: application/json' \\

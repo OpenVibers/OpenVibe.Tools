@@ -1,8 +1,7 @@
 'use strict';
-// The home on a phone (the owner's short-pages rule, 2026-10-30): the parts a reader rarely needs — the tools
-// opened most this week, what shipped and the questions — fold closed, with a checkbox and a label and no script.
-// Everything stays in the page for the crawlers, and where there is room the fold is open and looks like the section
-// it replaces.
+// The home on a phone (the owner's rule, 2026-10-31): a short page never hides content. The folds that held the
+// tools opened most this week, what shipped and the questions are open on every screen; every job group and every
+// most-opened tool is on the page, and a long list scrolls sideways instead of dropping its later cards.
 const assert = require('assert');
 const http = require('http');
 const express = require('express');
@@ -27,17 +26,21 @@ const site = require('../server/pages/site');
         assert.match(home, /<summary>Do I need an account\?<\/summary>/, 'the questions keep their own summaries');
         assert.match(home, /class="net"/, 'the rest of OpenVibe is in the page');
         assert.match(home, /data-ov-shipped="list"/, 'what shipped is in the page');
-        // What the home keeps: the search, the good places to start and the job chips.
+        // What the home keeps: the search and the good places to start.
         assert.match(home, /<form class="search"/, 'the search is where it was');
         assert.match(home, /<h2 id="start-h">Good places to start<\/h2>/, 'the good places to start are where they were');
-        assert.match(home, /<div class="job-pick" role="radiogroup" aria-label="Tools by job">/, 'the job chips are where they were');
-        // The CSS: the fold is closed on a phone and open where there is room.
+        // Every job group stays on the page; the phone no longer picks one at a time.
+        for (const id of ['files', 'text', 'audio', 'media', 'data', 'web', 'places']) {
+            assert.ok(home.includes(`id="job-${id}"`), `the ${id} job group is on the page`);
+        }
+        // The CSS: no fold, job group or most-opened card is hidden on a phone, and every long row scrolls sideways.
         const css = home.slice(home.indexOf('/* The fold (the owner'));
         assert.ok(css.length > 0, 'the fold rules are on the page');
-        assert.match(css, /\.fold-body\{display:none\}/, 'the body is closed by default');
-        assert.match(css, /\.fold-toggle:checked~\.fold-body\{display:block\}/, 'the title row opens it');
-        assert.match(css, /\.fold-toggle\{display:none\}/, 'the toggle is hidden where there is room');
-        assert.match(css, /\.fold-body\{display:block\}/, 'the body is open where there is room');
+        assert.match(css, /\.fold-body\{display:block\}/, 'the fold body is open on every screen');
+        assert.ok(!/\.fold-body\{display:none\}/.test(css), 'no fold body is hidden');
+        assert.ok(!/nth-child\(n\+5\)[^{]*\{[^}]*display:none/.test(css), 'no most-opened tool is hidden');
+        assert.ok(!/\.jobs \.job\{display:none/.test(css), 'no job group is hidden');
+        assert.match(css, /section\[aria-labelledby="top-h"\] \.grid\{display:flex;overflow-x:auto/, 'the most-opened tools scroll sideways');
         console.log('home short: all checks passed');
     } finally {
         srv.close();
