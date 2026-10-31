@@ -209,10 +209,10 @@ body { min-height:100%; font-family:var(--font); background:var(--bg); color:var
 .leaflet-popup-content { font-family:var(--font) !important; font-size:12px !important; }
 
 /* Spinner */
-.spinner { width:24px; height:24px; border:3px solid var(--border); border-top-color:var(--green); border-radius:50%; animation:spin 0.8s linear infinite; margin:0 auto; }
+.spinner { width:24px; height:24px; border: 3px solid var(--green); --spin-c: var(--green); border-radius:50%; animation: spin 1.4s ease-out infinite; margin:0 auto; }
 .loading-state { text-align:center; padding:32px; }
 .loading-state p { font-size:12px; color:var(--text-muted); margin-top:8px; }
-@keyframes spin { to { transform:rotate(360deg); } }
+@keyframes spin { from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--spin-c, var(--accent, #3b82f6)) 50%, transparent); } to { box-shadow: 0 0 0 10px transparent; } }   /* "spin" pulses out now: nothing spins (design lint, plan L45) */
 
 /* Footer */
 /* Data attribution line above the shared footer (OpenVibeFooter mounts on #ov-footer) */

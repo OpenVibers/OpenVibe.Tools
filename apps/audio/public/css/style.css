@@ -359,13 +359,12 @@ a:hover { color: var(--accent-hover); }
 .spinner {
     width: 48px;
     height: 48px;
-    border: 4px solid var(--border);
-    border-top-color: var(--accent);
+    border: 4px solid var(--accent); --spin-c: var(--accent);
     border-radius: 50%;
-    animation: spin .8s linear infinite;
+    animation: spin 1.4s ease-out infinite;
     margin: 0 auto 16px;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spin { from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--spin-c, var(--accent, #3b82f6)) 50%, transparent); } to { box-shadow: 0 0 0 10px transparent; } }   /* "spin" pulses out now: nothing spins (design lint, plan L45) */
 @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 /* ---------- Result Panel ---------- */
