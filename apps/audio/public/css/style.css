@@ -46,13 +46,16 @@ a { color: var(--accent); text-decoration: none; }
 a:hover { color: var(--accent-hover); }
 
 /* ---------- App Container ---------- */
+/* The page is the shared tool frame: the frame's own .ovk-page sets the width and the padding. */
 #app {
     width: 100%;
-    max-width: var(--max-width);
-    margin: 0 auto;
-    padding: 0 20px 60px;
     flex: 1;
 }
+
+/* The tool frame: the brand is the site ("Tools"), not the subdomain's name. */
+.openvibe-navbar .openvibe-navbar-brand .b-core,
+.openvibe-navbar .openvibe-navbar-brand .b-dot,
+.openvibe-navbar .openvibe-navbar-brand .b-tld { display: none; }
 
 /* ---------- Hero ---------- */
 .hero {
@@ -311,6 +314,8 @@ a:hover { color: var(--accent-hover); }
     transition: var(--transition);
 }
 .text-input:focus, .num-input:focus { border-color: var(--accent); }
+/* The frame's option rows: the field sits beside its label and keeps its own width. */
+.num-input-sm { width: 120px; flex: none; }
 
 /* Slider */
 .slider {
@@ -583,3 +588,7 @@ a:hover { color: var(--accent-hover); }
 .file-details .file-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 4px 0; }
 .file-details .file-row + .file-row { border-top: 1px solid var(--border); }
 .file-details .btn-sm { padding: 4px 10px; font-size: 12px; margin-top: 4px; }
+
+
+/* The page is the shared tool frame: it starts under the navbar, not behind it. */
+.ovk-page { padding-top: calc(var(--ovk-nav-h, 52px) + 12px); }

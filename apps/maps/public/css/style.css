@@ -544,3 +544,33 @@ body {
   .filter-chips { overflow-x: auto; }
   .header-btn { width: 30px; height: 30px; font-size: 12px; }
 }
+
+
+/* ── The tool frame ──────────────────────────────────────────────
+   The map is in the frame's answer slot now, so the page is a normal scrolling page and the map
+   takes a fixed height of the screen instead of the whole of it. */
+html, body { height: auto; min-height: 100%; overflow: auto; }
+.ovk-page #main-content { height: 68vh; }
+.ovk-page #header { position: static; }
+.ovk-maps-box .search-container { max-width: 720px; margin: 0 auto; }
+.ovk-maps-box .search-box { max-width: none; }
+
+
+/* The tool frame: the brand is the site ("Tools"), not the subdomain's name. */
+.openvibe-navbar .openvibe-navbar-brand .b-core,
+.openvibe-navbar .openvibe-navbar-brand .b-dot,
+.openvibe-navbar .openvibe-navbar-brand .b-tld { display: none; }
+
+
+/* The search box sits in the frame's box now: on a phone it wraps instead of running off the screen. */
+.ovk-maps-box .search-box input { min-width: 0; flex: 1 1 120px; }
+.ovk-maps-box .search-box select { max-width: 78px; }
+@media (max-width: 560px) {
+  .ovk-maps-box .search-box { flex-wrap: wrap; }
+  .ovk-maps-box .search-box input { flex: 1 1 100%; order: -1; }
+}
+
+
+/* The page is the shared tool frame: it starts under the navbar, not behind it. */
+#app { padding-top: calc(var(--ovk-nav-h, 52px) + 8px); }
+.ovk-page { padding-top: 12px; }

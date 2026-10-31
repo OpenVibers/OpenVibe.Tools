@@ -38,13 +38,16 @@ body {
     flex-direction: column;
 }
 
+/* The page is the shared tool frame: the frame's own .ovk-page sets the width and the padding. */
 #app {
     flex: 1;
-    max-width: 900px;
     width: 100%;
-    margin: 0 auto;
-    padding: 0 20px 40px;
 }
+
+/* The tool frame: the brand is the site ("Tools"), not the subdomain's name. */
+.openvibe-navbar .openvibe-navbar-brand .b-core,
+.openvibe-navbar .openvibe-navbar-brand .b-dot,
+.openvibe-navbar .openvibe-navbar-brand .b-tld { display: none; }
 
 /* ── Hero ───────────────────────────────────────────────────── */
 .hero {
@@ -477,3 +480,7 @@ body {
     font-size: 14px;
     line-height: 1.5;
 }
+
+
+/* The page is the shared tool frame: it starts under the navbar, not behind it. */
+.ovk-page { padding-top: calc(var(--ovk-nav-h, 52px) + 12px); }
