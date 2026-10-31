@@ -604,6 +604,54 @@ const EXAMPLES = {
 // The examples live on the record too, so the catalogue, the page and any future caller read the same values.
 for (const [sub, examples] of Object.entries(EXAMPLES)) { const rec = DEV[sub] || NET[sub]; if (rec) rec.examples = examples; }
 
+// ── The tools' modes ─────────────────────────────────────────
+// A dev tool's modes are the verbs in its box: one mode is the button itself ("Validate"), several are the kit's
+// segmented control with the button saying the active one ("Encode"). Mirrors dev.html's T[...].m; a test keeps them
+// equal. Network tools have no modes (their options are record types and ports).
+const MODES = {
+    jsonfmt: ['Format', 'Validate', 'Minify'],
+    yaml: ['YAML→JSON', 'JSON→YAML'],
+    xml: ['Format', 'Validate', 'Minify'],
+    csv: ['Table', 'To JSON'],
+    sql: ['Format', 'Uppercase', 'Compact'],
+    md: ['Preview', 'To HTML'],
+    html: ['Format', 'Minify', 'Entities', 'Unescape'],
+    base64: ['Encode', 'Decode'],
+    url: ['Encode', 'Decode', 'Parse'],
+    jwt: ['Decode'],
+    uuid: ['Generate', 'Bulk 10', 'Bulk 100', 'Validate'],
+    hash: ['SHA-256', 'SHA-1', 'SHA-512'],
+    hex: ['To Hex', 'From Hex'],
+    entities: ['HTML Enc', 'HTML Dec', 'JS Esc', 'JS Unesc', 'URL Enc', 'URL Dec'],
+    timestamp: ['Now', 'To Date', 'To Unix'],
+    cron: ['Parse'],
+    beautify: ['JSON', 'HTML', 'CSS'],
+    minify: ['JSON', 'HTML', 'CSS'],
+    codediff: ['Compare'],
+    regex: ['Test'],
+    slugify: ['Generate'],
+    lorem: ['1 Para', '3 Para', '5 Para', '10 Sent', '50 Words'],
+    curlconvert: ['To fetch', 'To Python', 'To Node', 'Parsed'],
+    webhook: ['Create Bin'],
+    color: ['Convert'],
+    opengraph: ['Preview'],
+    read: ['Markdown', 'Text'],
+    jsminify: ['Minify', 'Minify + mangle', 'Whitespace only'],
+    jsformat: ['Beautify'],
+    cssminify: ['Minify'],
+    cssformat: ['Beautify'],
+    htmlminify: ['Minify'],
+    xmlminify: ['Minify'],
+    jsonminify: ['Minify'],
+    jsonparse: ['Tree', 'Paths', 'Types'],
+    jsonvalidate: ['Validate'],
+    jsonstringify: ['Stringify', 'Parse string'],
+    html2md: ['Convert'],
+    md2html: ['To HTML', 'Preview'],
+};
+
+for (const [sub, modes] of Object.entries(MODES)) { const rec = DEV[sub]; if (rec) rec.modes = modes; }
+
 const CATALOG = new Map();
 for (const [sub, rec] of Object.entries(DEV)) CATALOG.set(sub, { ...rec, sub, family: 'dev', hub: sub === 'dev' });
 for (const [sub, rec] of Object.entries(NET)) CATALOG.set(sub, { ...rec, sub, family: 'net', hub: sub === 'net' });

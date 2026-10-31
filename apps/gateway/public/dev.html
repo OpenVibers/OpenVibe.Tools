@@ -78,7 +78,8 @@ a{color:inherit;text-decoration:none}
 @media(max-width:640px){.io{flex-direction:column}.hg{grid-template-columns:1fr}}
 /* The tool frame: the brand is the site ("Tools"), not the subdomain's name. A framed page's box comes from the server. */
 .ov-tool-page .openvibe-navbar .openvibe-navbar-brand .b-core,.ov-tool-page .openvibe-navbar .openvibe-navbar-brand .b-dot,.ov-tool-page .openvibe-navbar .openvibe-navbar-brand .b-tld{display:none}
-.ovk-tool-modes{display:flex;gap:6px;flex-wrap:wrap}
+.ovk-tool-modes{display:block;min-width:0}
+.ovk-tool-modes .ovk-seg{flex-wrap:wrap;max-width:100%}
 .ovk-tool-buttons{display:flex;gap:8px;flex-wrap:wrap}
 .ovk-dev-out{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:.86rem/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--text-primary,#f1f4fb)}
 .ovk-dev-out table{border-collapse:collapse;width:100%;font-size:.82rem}.ovk-dev-out td,.ovk-dev-out th{border:1px solid var(--border,rgba(255,255,255,.07));padding:6px 10px;text-align:left}
@@ -216,11 +217,11 @@ let ACT=T[META]?META:(T[sub]?sub:'dev'),MODE='';
 document.addEventListener('DOMContentLoaded',()=>{
     const tok=localStorage.getItem('ov_token');
     const cur=T[ACT]||T.dev;
-    if(window.OpenVibeNavbar)try{OpenVibeNavbar.init({service:'dev',apiBase:'https://openvibe.network',token:tok,history:{type:'tool',title:ACT==='dev'?'Dev.OpenVibe':cur.n},silentLogin:'https://openvibe.tools/auth/login?silent=1&next={url}',...(document.body.classList.contains('ov-tool-page')?{brand:{subLabel:'Tools'}}:{})})}catch(e){}
+    if(window.OpenVibeNavbar)try{OpenVibeNavbar.init({service:'dev',apiBase:'https://openvibe.network',token:tok,history:{type:'tool',title:ACT==='dev'?'Dev.OpenVibe':cur.n},silentLogin:'https://openvibe.tools/auth/login?silent=1&next={url}',...(document.body.classList.contains('ov-tool-page')?{brand:{subLabel:'Tools',name:'OpenVibe.Tools'}}:{})})}catch(e){}
     if(window.OpenVibeFooter)try{
         // Footer columns come from the same catalog as the hub, one column per category.
         const links=Object.entries(CATS).map(([cid,cat])=>({heading:cat.l,items:Object.entries(T).filter(([,t])=>t.c===cid).map(([id,t])=>({name:t.n,url:'https://'+id+'.openvibe.tools'}))})).filter(g=>g.items.length);
-        OpenVibeFooter.init({service:'dev',variant:ACT==='dev'?'full':'compact',mount:'#ov-footer',apiBase:'https://openvibe.network',links});
+        OpenVibeFooter.init({service:'dev',variant:ACT==='dev'?'full':'compact',mount:'#ov-footer',apiBase:'https://openvibe.network',brandName:document.body.classList.contains('ov-tool-page')?'OpenVibe.Tools':undefined,links});
     }catch(e){}
     // The frame's box is a form (GET without JavaScript); with it, submit runs in place.
     const form=document.querySelector('[data-ov-tool-page] form[data-ov-tool-form]');
@@ -261,9 +262,25 @@ function showTool(){
         if(t.dual)ioh+='<textarea id="in2" spellcheck="false" placeholder="'+H(t.p2||'')+'"></textarea>';
         $('io').innerHTML=ioh;
     }
-    // Modes are the page's own: the server cannot know a tool's transforms. The active one is drawn as a primary button.
-    const modes=document.getElementById('modes');
-    if(t.m){
+    // A framed page's modes are drawn by the server: one mode is the button's own verb, several are the kit's
+    // segmented control and the button says the active one. A page served without the frame keeps the old buttons.
+    if(framed){
+        const runBtn=document.getElementById('tool-run');
+        const checked=document.querySelector('#modes input[name="mode"]:checked');
+        MODE=(checked&&checked.value)||(runBtn&&runBtn.dataset.mode)||MODE||'';
+        const modes=document.getElementById('modes');
+        if(modes&&!modes.dataset.ovWired){
+            modes.dataset.ovWired='1';
+            modes.addEventListener('change',(e)=>{
+                if(e.target.name!=='mode')return;
+                MODE=e.target.value;
+                const span=runBtn&&runBtn.querySelector('span');
+                if(span)span.textContent=MODE;
+                run();
+            });
+        }
+    } else if(t.m){
+        const modes=document.getElementById('modes');
         MODE=t.m[0];
         if(modes)modes.innerHTML=t.m.map((m,i)=>'<button type="button" class="ovk-btn ovk-btn--'+(i===0?'ghost':'quiet')+' ovk-btn--small mb" data-m="'+H(m)+'" aria-pressed="'+(i===0?'true':'false')+'" onclick="setMode(this)">'+H(m)+'</button>').join('');
     }

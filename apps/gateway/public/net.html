@@ -755,12 +755,13 @@
                 service: 'net', apiBase: 'https://openvibe.network', token,
                 history: { type: 'tool', title: isHub ? 'Net.OpenVibe' : tool.name },
                 silentLogin: 'https://openvibe.tools/auth/login?silent=1&next={url}',
-                ...(document.body.classList.contains('ov-tool-page') ? { brand: { subLabel: 'Tools' } } : {}),
+                ...(document.body.classList.contains('ov-tool-page') ? { brand: { subLabel: 'Tools', name: 'OpenVibe.Tools' } } : {}),
             });
         } catch {}
         try {
             OpenVibeFooter.init({
                 service: 'net', variant: isHub ? 'full' : 'compact', mount: '#ov-footer', apiBase: 'https://openvibe.network',
+                brandName: document.body.classList.contains('ov-tool-page') ? 'OpenVibe.Tools' : undefined,
                 links: [
                     { heading: 'Network tools', items: [
                         { name: 'Domain & IP lookup', url: 'https://lookup.openvibe.tools' },

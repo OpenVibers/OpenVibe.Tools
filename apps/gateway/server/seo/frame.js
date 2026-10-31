@@ -18,6 +18,7 @@ const serve = require('openvibe-shared/serve');
 const { CATALOG, relatedTo } = require('./catalog');
 const registry = require('../registry');
 const { FAMILY_MAP } = require('../registry/families');
+const { quotas } = require('../../../_shared/guard/limits');
 
 const SITE = 'https://openvibe.tools';
 const esc = kit.esc;
@@ -86,6 +87,10 @@ const DEV_PLACEHOLDER = {
     uuid: 'A UUID to check (optional)', lorem: 'Words, sentences or paragraphs (optional)', timestamp: 'A Unix time or a date',
 };
 const URL_TOOLS = new Set(['headers', 'curl', 'httpstatus', 'redirects', 'uptime', 'robots', 'sitemap', 'opengraph', 'read']);
+// Where the work happens: every net. tool is a server lookup; in dev., only these three call the server (dev.html's
+// P.opengraph, P.read and P.webhook). The rest compute in the page, so they must not claim the server.
+const SERVER_DEV = new Set(['opengraph', 'read', 'webhook']);
+const serverWork = (rec) => rec.family === 'net' || SERVER_DEV.has(rec.sub);
 
 /** A page that gets the frame: a catalogued net./dev. tool, not the family hub. */
 const isFramed = (rec) => !!rec && !rec.hub && (rec.family === 'net' || rec.family === 'dev');
@@ -134,6 +139,51 @@ function tryItems(rec) {
     return (rec.examples || []).filter((e) => typeof e === 'string').slice(0, 3).map((value, i) => ({ value, label: labels[i] || shortLabel(value) }));
 }
 
+/** The field's label, from the tool's own descriptor: "A domain" is Domain, "A domain or an IP address" is
+ *  Domain or IP, and a URL tool says so. The label must match what the input accepts. */
+function fieldLabel(rec) {
+    const d = descriptorOf(rec.sub);
+    const target = d && d.input && d.input.properties && d.input.properties.target;
+    const desc = String((target && target.description) || '');
+    if (/^A domain or an IP address, or a URL/i.test(desc)) return 'Domain, IP or URL';
+    if (/^An IPv4 address, a CIDR block/i.test(desc)) return 'IPv4, CIDR or domain';
+    if (/^An IPv6 address or a domain/i.test(desc)) return 'IPv6 or domain';
+    if (/^A domain or a public IP address/i.test(desc)) return 'Domain or IP';
+    if (/^A domain or an IP address/i.test(desc)) return 'Domain or IP';
+    if (/^An IPv4 address or a domain/i.test(desc)) return 'Domain or IP';
+    if (/^A mail server/i.test(desc)) return 'Mail server or domain';
+    if (/^A sitemap URL/i.test(desc)) return 'Sitemap URL or domain';
+    if (/^A URL,/i.test(desc)) return 'URL or domain';
+    if (/^A domain$/i.test(desc)) return 'Domain';
+    return 'Domain, IP address or URL';
+}
+
+/** The tool's terms, from its real configuration: cost, where the work happens, the gateway's anonymous limit
+ *  for its quota class (the same table the API docs show) and whether an account is needed. A page-side tool
+ *  says so and, when it has an API, names the API's limit; it never pretends to be a server run. */
+function factsFor(rec) {
+    const d = descriptorOf(rec.sub);
+    const onServer = serverWork(rec);
+    const q = d && d.quotaClass && quotas()[d.quotaClass];
+    const anonymous = !(d && d.auth && d.auth.anonymous === false);
+    const facts = [
+        { text: 'Free', icon: 'gift' },
+        { text: onServer ? 'Runs on our server' : 'Runs in your browser: nothing is sent', icon: onServer ? 'server' : 'computer' },
+    ];
+    if (onServer) {
+        if (!anonymous) facts.push({ text: 'Needs a free account', icon: 'user' }, { text: 'No sign-up for lookups', icon: 'globe' });
+        else {
+            if (q) facts.push({ text: `${q.anonymous.perMinute} ${rec.family === 'net' ? 'lookups' : 'runs'} a minute without an account`, icon: 'clock' });
+            facts.push({ text: 'No sign-up', icon: 'user' });
+        }
+    } else {
+        if (d && d.api && q) facts.push({ text: `API: ${q.anonymous.perMinute} ${rec.family === 'net' ? 'lookups' : 'runs'} a minute without an account`, icon: 'clock' });
+        else facts.push({ text: 'No limit: it runs on your device', icon: 'zap' });
+        facts.push({ text: 'No sign-up', icon: 'user' });
+    }
+    return facts;
+}
+
 /** The box: kit.toolInput for a lookup, a kit editor for a text tool. */
 function inputFor(rec, value = '') {
     if (rec.family === 'net') {
@@ -142,7 +192,7 @@ function inputFor(rec, value = '') {
                 + `<button type="submit" class="ovk-btn ovk-btn--primary ovk-tool-go">${kit.icon('globe')}<span>Show my IP</span></button></form>`;
         }
         const input = kit.toolInput({
-            name: 'q', id: 'search-input', label: 'Domain, IP address or URL', placeholder: placeholderFor(rec), value,
+            name: 'q', id: 'search-input', label: fieldLabel(rec), placeholder: placeholderFor(rec), value,
             button: rec.sub === 'lookup' ? 'Look up all' : 'Look up', icon: 'search',
             inputmode: URL_TOOLS.has(rec.sub) ? 'url' : 'text',
             tries: tryItems(rec).length ? { items: tryItems(rec) } : null,
@@ -153,14 +203,17 @@ function inputFor(rec, value = '') {
     const ex = rec.examples || [];
     const second = typeof ex[1] === 'string' ? ex[1] : '';
     const dual = rec.sub === 'codediff' || rec.sub === 'regex';
+    const modes = rec.modes || [];
+    const active = modes[0] || 'Go';
+    const seg = modes.length > 1 ? `<div id="modes" class="ovk-tool-modes">${kit.seg({ name: 'mode', options: modes.map((m) => [m, m]), value: active })}</div>` : '';
     const tries = tryItems(rec).length
         ? kit.tries({ name: 'q', target: '#in1', items: tryItems(rec) })
         : (dual ? pairTries(rec) : '');
     return `<form class="ovk-tool-form" data-ovk-tool-form data-ov-tool="${esc(rec.sub)}">
 <textarea class="ovk-tool-editor" id="in1" name="q" spellcheck="false" placeholder="${esc(placeholderFor(rec))}" aria-label="${esc(rec.name)} input">${esc(value || '')}</textarea>
 ${dual ? `<textarea class="ovk-tool-editor" id="in2" name="q2" spellcheck="false" aria-label="${esc(rec.name)} second input" placeholder="${esc(second ? shortLabel(second) : 'The second value')}"></textarea>` : ''}
-<div id="modes" class="ovk-tool-modes"></div>
-<div class="ovk-tool-buttons"><button type="submit" class="ovk-btn ovk-btn--primary ovk-tool-go">${kit.icon('play')}<span>Run</span></button><button type="button" class="ovk-btn ovk-btn--quiet ovk-btn--small" id="tool-clear">${kit.icon('close')}<span>Clear</span></button></div>
+${seg}
+<div class="ovk-tool-buttons"><button type="submit" id="tool-run" data-mode="${esc(active)}" class="ovk-btn ovk-btn--primary ovk-tool-go"><span>${esc(active)}</span></button><button type="button" class="ovk-btn ovk-btn--quiet ovk-btn--small" id="tool-clear">${kit.icon('close')}<span>Clear</span></button></div>
 ${tries}</form>`;
 }
 
@@ -263,7 +316,7 @@ function frameFor(rec, { q = '' } = {}) {
     const tool = kit.tool({
         head: kit.toolHead({
             icon: ICON[rec.sub] || fam.icon, hue: fam.hue, family: rec.family,
-            crumb: { href: fam.hub, label: fam.label }, title: rec.name, task: taskOf(rec),
+            crumb: { href: fam.hub, label: fam.label }, title: rec.name, task: taskOf(rec), facts: factsFor(rec),
         }),
         input: inputFor(rec, q),
         answer: '',
