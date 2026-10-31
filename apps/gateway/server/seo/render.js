@@ -18,6 +18,7 @@ const fs = require('fs');
 const path = require('path');
 const { seoFor, relatedTo, BRAND } = require('./catalog');
 const { FAMILY_MAP } = require('../registry/families');
+const { frameFor, isFramed, assets } = require('./frame');
 
 // A family's breadcrumb name and hub page (net.openvibe.tools, barcodes.openvibe.tools…).
 const familyOf = (rec) => { const f = FAMILY_MAP.get(rec.family) || {}; return { name: f.name || 'Tools', url: f.hub ? `https://${f.hub}.openvibe.tools` : SITE, plural: String(f.name || 'tools').toLowerCase() }; };
@@ -104,15 +105,18 @@ function contentBlock(rec, related) {
  * Render the SPA file for one subdomain with its own metadata and content.
  * Returns the original HTML untouched when the subdomain is not catalogued.
  */
-function renderTool(file, sub, canonicalHost) {
+function renderTool(file, sub, canonicalHost, query = {}) {
     const rec = seoFor(sub);
     if (!rec) return baseHtml(file);
-    const key = `${file}::${sub}::${canonicalHost || ''}`;
+    const framed = isFramed(rec);
+    // The tool's own input name (q, and the older aliases) fills the box, so a Try or a shared link runs on open.
+    const q = framed ? String(query.q || query.target || query.domain || query.ip || '').slice(0, 2048) : '';
+    const key = `${file}::${sub}::${canonicalHost || ''}::${framed ? q : ''}`;
     if (_rendered.has(key)) return _rendered.get(key);
 
     // The registry decides the canonical host (a custom domain may own the tool).
     const url = `https://${canonicalHost || sub + '.openvibe.tools'}`;
-    const related = relatedTo(sub, 6);
+    const related = relatedTo(sub, framed ? 3 : 6);   // the frame shows three; a family/hub block shows six
     const title = `${rec.title} | ${BRAND}`;
     let html = baseHtml(file);
 
@@ -132,8 +136,10 @@ function renderTool(file, sub, canonicalHost) {
         `<meta property="og:image" content="${card}">`, '<meta property="og:image:width" content="1200">', '<meta property="og:image:height" content="630">',
         `<meta name="twitter:image" content="${card}">`,
     ];
+    const frameAssets = framed ? assets() : null;
     const extraHead = [
         ...image,
+        ...(frameAssets ? frameAssets.css.map((href) => `<link rel="stylesheet" href="${href}">`) : []),
         `<meta name="ov-tool" content="${esc(sub)}">`,   // the page script reads this: the host may be descriptive, a mirror or a custom domain
         `<meta name="keywords" content="${esc(rec.kw || '')}">`,
         '<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">',
@@ -146,11 +152,22 @@ function renderTool(file, sub, canonicalHost) {
     ].join('\n');
     html = html.replace(/<\/head>/i, `${extraHead}\n</head>`);
 
+    // The tool frame (openvibe-shared 4.55.0): replace the old hero, chips and search bar in one go, and keep the
+    // page's own run code (it fills .ovk-tool-out). The ?q= value is already in the box.
+    if (framed) {
+        const frame = frameFor(rec, { q });
+        if (/<!-- ov-frame:start -->/.test(html)) html = html.replace(/<!-- ov-frame:start -->[\s\S]*?<!-- ov-frame:end -->/, frame);
+        html = html.replace(/<body(\s[^>]*)?>/i, (m, attrs = '') => { const cls = /\sclass="([^"]*)"/.exec(attrs || ''); const next = cls ? attrs.replace(cls[0], ` class="${cls[1]} ov-tool-page"`) : `${attrs || ''} class="ov-tool-page"`; return `<body${next}>`; });
+        if (frameAssets) html = html.replace(/<\/body>/i, `${frameAssets.js.map((src) => `<script src="${src}"></script>`).join('\n')}\n</body>`);
+    }
+
     // Visible content + internal links, under the tool and above the footer. It used to go before </body>, after the
     // footer (the owner, 2026-10-28: "is it intentional to have content after the bottom nav bar like this?"); a page
     // without a footer mount still gets it before </body>.
-    const block = contentBlock(rec, related);
-    html = /<div id="ov-footer"/i.test(html) ? html.replace(/<div id="ov-footer"/i, `${block}\n<div id="ov-footer"`) : html.replace(/<\/body>/i, `${block}\n</body>`);
+    if (!framed) {
+        const block = contentBlock(rec, related);
+        html = /<div id="ov-footer"/i.test(html) ? html.replace(/<div id="ov-footer"/i, `${block}\n<div id="ov-footer"`) : html.replace(/<\/body>/i, `${block}\n</body>`);
+    }
 
     if (_rendered.size > 200) _rendered.clear();
     _rendered.set(key, html);

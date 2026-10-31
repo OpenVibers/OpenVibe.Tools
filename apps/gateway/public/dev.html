@@ -27,7 +27,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <style>
-:root{--bg:#0b0c12;--bg2:#12131c;--bg3:#1a1b28;--card:rgba(22,24,36,.85);--tx:#f1f4fb;--tx2:#a0a8c4;--tx3:#5e6580;--ac:#a78bfa;--acl:#c4b5fd;--brd:rgba(255,255,255,.07);--r:16px}
+:root{--bg:var(--bg-primary,#0b0c12);--bg2:var(--bg-secondary,#12131c);--bg3:var(--bg-tertiary,#1a1b28);--card:var(--bg-card,rgba(22,24,36,.85));--tx:var(--text-primary,#f1f4fb);--tx2:var(--text-secondary,#a0a8c4);--tx3:var(--text-muted,#5e6580);--ac:var(--accent,#a78bfa);--acl:var(--accent-light,#c4b5fd);--brd:var(--border,rgba(255,255,255,.07));--r:16px}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{background:var(--bg)}
 body{min-height:100vh;font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--tx);-webkit-font-smoothing:antialiased}
@@ -76,6 +76,14 @@ a{color:inherit;text-decoration:none}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--bg3);color:var(--tx);padding:10px 24px;border-radius:10px;font-size:.85rem;font-weight:600;border:1px solid var(--brd);opacity:0;transition:.3s;z-index:9999;pointer-events:none}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 @media(max-width:640px){.io{flex-direction:column}.hg{grid-template-columns:1fr}}
+/* The tool frame: the brand is the site ("Tools"), not the subdomain's name. A framed page's box comes from the server. */
+.ov-tool-page .openvibe-navbar .openvibe-navbar-brand .b-core,.ov-tool-page .openvibe-navbar .openvibe-navbar-brand .b-dot,.ov-tool-page .openvibe-navbar .openvibe-navbar-brand .b-tld{display:none}
+.ovk-tool-modes{display:block;min-width:0}
+.ovk-tool-modes .ovk-seg{flex-wrap:wrap;max-width:100%}
+.ovk-tool-buttons{display:flex;gap:8px;flex-wrap:wrap}
+.ovk-dev-out{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:.86rem/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--text-primary,#f1f4fb)}
+.ovk-dev-out table{border-collapse:collapse;width:100%;font-size:.82rem}.ovk-dev-out td,.ovk-dev-out th{border:1px solid var(--border,rgba(255,255,255,.07));padding:6px 10px;text-align:left}
+.ov-tool-page .page{padding:0}
 </style>
 <script type="application/ld+json">
 {
@@ -131,7 +139,9 @@ a{color:inherit;text-decoration:none}
 <body>
 <div class="bg-glow"></div>
 <div id="navbar-mount"></div>
-<div class="page"><div class="shell">
+<div class="page">
+<!-- ov-frame:start -->
+<div class="shell">
     <div class="hero"><div class="hero-icon" id="hi"><i class="fa-solid fa-code"></i></div><h1 id="ht">Dev.OpenVibe</h1><p id="hd">Developer & SEO Tools Hub</p></div>
     <div id="tool" style="display:none">
         <div class="modes" id="modes"></div>
@@ -141,7 +151,9 @@ a{color:inherit;text-decoration:none}
     </div>
     <div id="hub"></div>
     <div class="rel" id="rel"></div>
-</div></div>
+</div>
+<!-- ov-frame:end -->
+</div>
 <div id="ov-footer"></div>
 <div class="toast" id="toast"></div>
 <script src="/shared/navbar.js"></script>
@@ -183,7 +195,7 @@ jsonminify:{n:"JSON Minifier",i:'fa-compress',c:'data',d:"Compact JSON to the sm
 jsonparse:{n:"JSON Parser",i:'fa-sitemap',c:'data',d:"Explore JSON as a tree, a list of paths or a type map",p:"{\"user\":{\"id\":7,\"name\":\"Ada\",\"roles\":[\"admin\",\"dev\"],\"active\":true},\"count\":2}",m:["Tree", "Paths", "Types"]},
 jsonvalidate:{n:"JSON Validator",i:'fa-circle-check',c:'data',d:"Check JSON and find the exact error",p:"{\n  \"name\": \"openvibe\",\n  \"version\": 1,\n}",m:["Validate"]},
 jsonstringify:{n:"JSON Stringify",i:'fa-quote-right',c:'data',d:"Turn JSON into an escaped string literal, and back",p:"{\"name\":\"openvibe\",\"note\":\"line one\\nline two\"}",m:["Stringify", "Parse string"]},
-html2md:{n:"HTML to Markdown",i:'fa-right-left',c:'data',d:"Convert HTML into clean Markdown",p:"<h1>Hello World</h1>\n<p>This is <strong>bold</strong>, <em>italic</em> and a <a href=\"https://openvibe.network\">link</a>.</p>\n<ul><li>Item one</li><li>Item two</li></ul>\n<pre><code>code block</code></pre>",m:["Convert"]},
+html2md:{n:"HTML to Markdown",i:'fa-right-left',c:'data',d:"Convert HTML into clean Markdown",p:"\u003ch1>Hello World\u003c/h1>\n<p>This is <strong>bold</strong>, <em>italic</em> and a <a href=\"https://openvibe.network\">link</a>.</p>\n<ul><li>Item one</li><li>Item two</li></ul>\n<pre><code>code block</code></pre>",m:["Convert"]},
 md2html:{n:"Markdown to HTML",i:'fa-right-left',c:'data',d:"Convert Markdown into HTML you can paste anywhere",p:"# Hello World\n\nThis is **bold** and *italic* with a [link](https://openvibe.network).\n\n- Item one\n- Item two\n\n> A quote\n\n`inline code`",m:["To HTML", "Preview"]},
 minify:{n:'Code Minifier',i:'fa-compress',c:'qual',d:'Minify JS, CSS, HTML & JSON',p:'{\n  "name": "openvibe",\n  "version": 1\n}',m:['JSON','HTML','CSS']},
 codediff:{n:'Diff Checker',i:'fa-code-compare',c:'qual',d:'Side-by-side text diff checker',p:'Line one\nLine two\nLine three\nLine four',p2:'Line one\nLine 2 modified\nLine three\nLine five\nLine six',dual:1,m:['Compare']},
@@ -205,12 +217,21 @@ let ACT=T[META]?META:(T[sub]?sub:'dev'),MODE='';
 document.addEventListener('DOMContentLoaded',()=>{
     const tok=localStorage.getItem('ov_token');
     const cur=T[ACT]||T.dev;
-    if(window.OpenVibeNavbar)try{OpenVibeNavbar.init({service:'dev',apiBase:'https://openvibe.network',token:tok,history:{type:'tool',title:ACT==='dev'?'Dev.OpenVibe':cur.n},silentLogin:'https://openvibe.tools/auth/login?silent=1&next={url}'})}catch(e){}
+    if(window.OpenVibeNavbar)try{OpenVibeNavbar.init({service:'dev',apiBase:'https://openvibe.network',token:tok,history:{type:'tool',title:ACT==='dev'?'Dev.OpenVibe':cur.n},silentLogin:'https://openvibe.tools/auth/login?silent=1&next={url}',...(document.body.classList.contains('ov-tool-page')?{brand:{subLabel:'Tools',name:'OpenVibe.Tools'}}:{})})}catch(e){}
     if(window.OpenVibeFooter)try{
         // Footer columns come from the same catalog as the hub, one column per category.
         const links=Object.entries(CATS).map(([cid,cat])=>({heading:cat.l,items:Object.entries(T).filter(([,t])=>t.c===cid).map(([id,t])=>({name:t.n,url:'https://'+id+'.openvibe.tools'}))})).filter(g=>g.items.length);
-        OpenVibeFooter.init({service:'dev',variant:ACT==='dev'?'full':'compact',mount:'#ov-footer',apiBase:'https://openvibe.network',links});
+        OpenVibeFooter.init({service:'dev',variant:ACT==='dev'?'full':'compact',mount:'#ov-footer',apiBase:'https://openvibe.network',brandName:document.body.classList.contains('ov-tool-page')?'OpenVibe.Tools':undefined,links});
     }catch(e){}
+    // The frame's box is a form (GET without JavaScript); with it, submit runs in place.
+    const form=document.querySelector('[data-ov-tool-page] form[data-ov-tool-form]');
+    if(form)form.addEventListener('submit',e=>{e.preventDefault();run()});
+    const clear=document.getElementById('tool-clear');
+    if(clear)clear.addEventListener('click',()=>clr());
+    document.querySelectorAll('[data-ov-try-two]').forEach(a=>a.addEventListener('click',e=>{
+        e.preventDefault();
+        try{const [x,y]=JSON.parse(a.getAttribute('data-ov-try-two'));if($('in1'))$('in1').value=x;if($('in2'))$('in2').value=y;run()}catch(_){}
+    }));
     ACT==='dev'?showHub():showTool();
 });
 
@@ -229,31 +250,66 @@ function showHub(){
 }
 
 function showTool(){
-    $('hub').style.display='none';$('tool').style.display='';
+    const framed=!!document.querySelector('[data-ov-tool-page]');
     const t=T[ACT];if(!t)return showHub();
-    $('hi').innerHTML='<i class="fa-solid '+t.i+'"></i>';
-    $('ht').textContent=t.n;$('hd').textContent=t.d;
-    // Title comes from the server (server/seo) so crawlers and the tab agree — don't clobber it.
-    if(!document.querySelector('link[rel=canonical][href*="'+ACT+'.openvibe"]'))document.title=t.n+' \u2014 '+t.d;
-    let mh='';
-    if(t.m)t.m.forEach((m,i)=>{mh+='<button class="mb'+(i===0?' on':'')+'" data-m="'+m+'" onclick="setMode(this)">'+m+'</button>'});
-    $('modes').innerHTML=mh;MODE=t.m?t.m[0]:'';
-    let ioh='<textarea id="in1" spellcheck="false" placeholder="'+H(t.p||'Paste here...')+'"></textarea>';
-    if(t.dual)ioh+='<textarea id="in2" spellcheck="false" placeholder="'+H(t.p2||'')+'"></textarea>';
-    $('io').innerHTML=ioh;
-    let ah='<button class="ab ab-go" onclick="run()"><i class="fa-solid fa-play"></i> Run</button>';
-    ah+='<button class="ab ab-s" onclick="copyOut()"><i class="fa-solid fa-copy"></i> Copy</button>';
-    ah+='<button class="ab ab-s" onclick="saveAsPaste(this)" title="Save the output as an unlisted paste on OpenVibe.Community"><i class="fa-solid fa-note-sticky"></i> Save as paste</button>';
-    ah+='<button class="ab ab-s" onclick="clr()"><i class="fa-solid fa-trash"></i> Clear</button>';
-    ah+='<button class="ab ab-s" onclick="sample()"><i class="fa-solid fa-flask"></i> Sample</button>';
-    $('acts').innerHTML=ah;
-    buildRel();
-    const q=new URLSearchParams(location.search).get('q');
-    if(q){$('in1').value=q;run()}
-    else if(['uuid','lorem','timestamp','color'].includes(ACT)){if(t.p)$('in1').value=t.p;run()}
+    if(!framed){
+        $('hub').style.display='none';$('tool').style.display='';
+        $('hi').innerHTML='<i class="fa-solid '+t.i+'"></i>';
+        $('ht').textContent=t.n;$('hd').textContent=t.d;
+        // Title comes from the server (server/seo) so crawlers and the tab agree — don't clobber it.
+        if(!document.querySelector('link[rel=canonical][href*="'+ACT+'.openvibe"]')&&!document.querySelector('[data-ov-tool-page]'))document.title=t.n+' \u2014 '+t.d;
+        let ioh='<textarea id="in1" spellcheck="false" placeholder="'+H(t.p||'Paste here...')+'"></textarea>';
+        if(t.dual)ioh+='<textarea id="in2" spellcheck="false" placeholder="'+H(t.p2||'')+'"></textarea>';
+        $('io').innerHTML=ioh;
+    }
+    // A framed page's modes are drawn by the server: one mode is the button's own verb, several are the kit's
+    // segmented control and the button says the active one. A page served without the frame keeps the old buttons.
+    if(framed){
+        const runBtn=document.getElementById('tool-run');
+        const checked=document.querySelector('#modes input[name="mode"]:checked');
+        MODE=(checked&&checked.value)||(runBtn&&runBtn.dataset.mode)||MODE||'';
+        const modes=document.getElementById('modes');
+        if(modes&&!modes.dataset.ovWired){
+            modes.dataset.ovWired='1';
+            modes.addEventListener('change',(e)=>{
+                if(e.target.name!=='mode')return;
+                MODE=e.target.value;
+                const span=runBtn&&runBtn.querySelector('span');
+                if(span)span.textContent=MODE;
+                run();
+            });
+        }
+    } else if(t.m){
+        const modes=document.getElementById('modes');
+        MODE=t.m[0];
+        if(modes)modes.innerHTML=t.m.map((m,i)=>'<button type="button" class="ovk-btn ovk-btn--'+(i===0?'ghost':'quiet')+' ovk-btn--small mb" data-m="'+H(m)+'" aria-pressed="'+(i===0?'true':'false')+'" onclick="setMode(this)">'+H(m)+'</button>').join('');
+    }
+    if(!framed){
+        let ah='<button class="ab ab-go" onclick="run()"><i class="fa-solid fa-play"></i> Run</button>';
+        ah+='<button class="ab ab-s" onclick="copyOut()"><i class="fa-solid fa-copy"></i> Copy</button>';
+        ah+='<button class="ab ab-s" onclick="saveAsPaste(this)" title="Save the output as an unlisted paste on OpenVibe.Community"><i class="fa-solid fa-note-sticky"></i> Save as paste</button>';
+        ah+='<button class="ab ab-s" onclick="clr()"><i class="fa-solid fa-trash"></i> Clear</button>';
+        ah+='<button class="ab ab-s" onclick="sample()"><i class="fa-solid fa-flask"></i> Sample</button>';
+        $('acts').innerHTML=ah;
+    }
+    if(!framed)buildRel();
+    // A Try or a shared link (?q=, and the second box for diff/regex) fills the box and runs once.
+    if(devRunFromQuery())return;
+    if(['uuid','lorem','timestamp','color'].includes(ACT)&&t.p){$('in1').value=t.p;run()}
 }
 
-function setMode(el){document.querySelectorAll('.mb').forEach(b=>b.classList.remove('on'));el.classList.add('on');MODE=el.dataset.m;run()}
+/** Fill the box from ?q= (and ?q2=) and run once; true when it did. */
+function devRunFromQuery(){
+    const params=new URLSearchParams(location.search);
+    const q=params.get('q'),q2=params.get('q2');
+    if(!q||!$('in1'))return false;
+    $('in1').value=q;
+    if(q2&&$('in2'))$('in2').value=q2;
+    run();
+    return true;
+}
+
+function setMode(el){document.querySelectorAll('#modes .mb').forEach(b=>{b.classList.toggle('ovk-btn--ghost',b===el);b.classList.toggle('ovk-btn--quiet',b!==el);b.setAttribute('aria-pressed',b===el?'true':'false')});MODE=el.dataset.m;run()}
 
 function buildRel(){
     const cat=T[ACT]?.c;let h='';
@@ -269,9 +325,59 @@ function buildRel(){
 const RT=OVWebRuntime.create({});
 async function run(){
     const g=RT.nextRoute(),sc=RT.scope();
-    const i1=$('in1')?.value||'',i2=$('in2')?.value||'',o=$('out');
-    try{const r=await P[ACT](i1,MODE,i2,sc);if(r==null||!RT.isCurrent(g))return;o.innerHTML=typeof r==='object'?r.html:H(String(r))}
-    catch(e){if(RT.isCurrent(g)&&e.name!=='AbortError')o.innerHTML='<span class="err">\u2717 '+H(e.message)+'</span>'}
+    const i1=$('in1')?.value||'',i2=$('in2')?.value||'';
+    try{
+        const r=await P[ACT](i1,MODE,i2,sc);
+        if(r==null||!RT.isCurrent(g))return;
+        renderDevAnswer(r);
+    }catch(e){
+        if(RT.isCurrent(g)&&e.name!=='AbortError')renderDevError(e);
+    }
+}
+
+// ── The answer, in the kit's tool frame (.ovk-tool-out) ──
+// A transform's result is the output itself; a validator's error names the line and the cause (tone 'bad'). Every
+// answer keeps Copy and Save as paste as its actions, and the untouched output in a closed Raw fold.
+let ANSWER_RAW='';
+function answerOut(){return document.querySelector('.ovk-tool-out')||$('out')}
+function answerActions(){
+    const kit=window.OpenVibeKit;if(!kit)return[];
+    return [
+        kit.iconButton({type:'button',icon:'copy',label:'Copy result',attrs:{'data-ovk-copy':'#ov-tool-answer'}}),
+        kit.iconButton({type:'button',icon:'file',label:'Save as paste',attrs:{'data-ov-save-paste':''}}),
+    ];
+}
+function wireAnswer(root){
+    if(window.OpenVibeKitWeb)OpenVibeKitWeb.enhance(root);
+    if(window.OpenVibeKitData)OpenVibeKitData.enhance(root);
+    const save=root.querySelector('[data-ov-save-paste]');
+    if(save)save.addEventListener('click',()=>saveAsPaste(save));
+}
+function renderDevAnswer(r){
+    const out=answerOut();if(!out)return;
+    const kit=window.OpenVibeKit;if(!kit){out.innerHTML=typeof r==='object'&&r.html?r.html:'<pre>'+H(String(r))+'</pre>';return}
+    ANSWER_RAW=typeof r==='string'?r:(r&&r.html!=null?r.html:JSON.stringify(r,null,2));
+    const body=(r&&typeof r==='object'&&r.html!=null?'<div class="ovk-dev-out">'+r.html+'</div>':'<pre class="ovk-dev-out">'+H(String(r))+'</pre>')
+        +kit.fold({title:'Raw',body:kit.snippet({code:ANSWER_RAW})});
+    out.innerHTML=kit.answer({
+        id:'ov-tool-answer',title:(r&&typeof r==='object'&&r.title)||((MODE||'Tool')+' result'),badge:(r&&typeof r==='object'&&r.badge)||{text:MODE||'Done',tone:'ok'},
+        rows:(r&&typeof r==='object'&&r.rows)||[],body,actions:answerActions(),next:(r&&typeof r==='object'&&r.next)||[],
+    });
+    wireAnswer(out);
+}
+function renderDevError(e){
+    const out=answerOut();if(!out)return;
+    const msg=String(e&&e.message||e||'The tool failed');
+    const line=/Line (\d+)/.exec(msg);
+    ANSWER_RAW=msg;
+    const kit=window.OpenVibeKit;
+    if(!kit){out.innerHTML='<span class="err">\u2717 '+H(msg)+'</span>';return}
+    out.innerHTML=kit.answer({
+        id:'ov-tool-answer',tone:'bad',title:line?'Not valid JSON':'Run failed',badge:line?{text:'Line '+line[1],tone:'bad'}:{text:'Error',tone:'bad'},
+        rows:[['Problem',msg]],body:'<p class="ovk-muted">'+(line?'The line and column above are where the input stops being valid.':'')+'</p>',
+        actions:answerActions(),
+    });
+    wireAnswer(out);
 }
 const P={};
 
@@ -331,7 +437,8 @@ P.xmlminify=(s)=>{const d=new DOMParser().parseFromString(s,'application/xml');c
     const keep=[];let o=s.replace(/<!\[CDATA\[[\s\S]*?\]\]>/g,(m)=>{keep.push(m);return'\u0000'+(keep.length-1)+'\u0000'}).replace(/<!--[\s\S]*?-->/g,'').replace(/>\s+</g,'><').trim().replace(/\u0000(\d+)\u0000/g,(_,i)=>keep[+i]);return withNote(o,saved(s,o))};
 P.jsonminify=(s)=>{const o=DevEngine.jsonMinify(s);return withNote(o,saved(s,o))};
 P.jsonvalidate=(s)=>{const j=DevEngine.jsonStats(s);
-    return'\u2713 Valid JSON\n\nTop level: '+j.kind+(j.kind==='array'?' with '+j.size+' items':j.kind==='object'?' with '+j.size+' keys':'')+'\nValues: '+j.values.toLocaleString()+'\nDeepest nesting: '+j.depth};
+    const size=j.kind==='array'?j.size+' items':j.kind==='object'?j.size+' keys':null;
+    return{title:'Valid JSON',badge:{text:'Valid',tone:'ok'},rows:[['Top level',j.kind],['Size',size],['Values',j.values.toLocaleString()],['Deepest nesting',String(j.depth)]],html:'<p>No syntax error. The document parses as JSON.</p>'}};
 P.jsonparse=(s,m)=>DevEngine.jsonParse(s,m);
 P.jsonstringify=(s,m)=>DevEngine.jsonStringify(s,m);
 P.html2md=(s)=>{const doc=new DOMParser().parseFromString(s,'text/html');const esc=(t)=>t.replace(/([\\`*_{}\[\]#|])/g,'\\$1');
@@ -384,7 +491,7 @@ P.lorem=(s,m)=>DevEngine.lorem(m.includes('Words')?'words':m.includes('Sent')?'s
 P.curlconvert=(s,m)=>DevEngine.curlconvert(s,m);
 
 P.webhook=async(s,m,s2,sc)=>{
-    const o=$('out');
+    const o=answerOut();
     const r=await sc.fetch(API+'/webhook/bins',{method:'POST',credentials:'include'});const d=await r.json();if(!d.ok)throw new Error(d.error||'Failed');
     const binUrl=API+'/webhook/bins/'+d.binId+'/in';
     o.innerHTML='<div style="margin-bottom:12px"><div class="jl">Your Webhook URL</div><div style="font-size:1rem;word-break:break-all;color:var(--ac);cursor:pointer" onclick="navigator.clipboard.writeText(\''+binUrl+"');toast('Copied!')\">"+binUrl+'</div><div style="color:var(--tx3);font-size:.78rem;margin-top:4px">Click to copy \u00b7 Polling for requests...</div></div><div id="whr">Waiting for requests...</div>';
@@ -418,11 +525,12 @@ P.read=async(s,m)=>{
 };
 
 // ═══════════════ UTILITY ═══════════════
-function copyOut(){navigator.clipboard.writeText(($('out').innerText||'')).then(()=>toast('Copied!')).catch(()=>{})}
+function copyOut(){const a=document.querySelector('#ov-tool-answer');navigator.clipboard.writeText((a&&a.innerText)||ANSWER_RAW||'').then(()=>toast('Copied!')).catch(()=>{})}
 // The output becomes an unlisted OpenVibe.Community paste (through this gateway's /api/pastes proxy, as
 // the signed-in person when there is one); the link appears under the buttons.
 async function saveAsPaste(btn){
-    const text=($('out').innerText||'').trim();
+    const ans=document.querySelector('#ov-tool-answer');
+    const text=((ans&&ans.innerText)||ANSWER_RAW||'').trim();
     if(!text)return toast('Run the tool first');
     btn.disabled=true;
     try{
@@ -431,13 +539,13 @@ async function saveAsPaste(btn){
         const d=await r.json().catch(()=>({}));
         if(!r.ok||!d.slug)throw new Error(d.error||d.detail||'Could not save the paste');
         const url='https://openvibe.community/p/'+encodeURIComponent(d.slug);
-        let n=$('pasted');if(!n){n=document.createElement('div');n.id='pasted';n.style.cssText='margin:8px 0;font-size:.85rem';$('acts').after(n)}
+        let n=$('pasted');if(!n){n=document.createElement('div');n.id='pasted';n.style.cssText='margin:8px 0;font-size:.85rem';const out=document.querySelector('.ovk-tool-out');if(out)out.append(n);else if($('acts'))$('acts').after(n)}
         n.textContent='Saved as an unlisted paste: ';
         const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';a.textContent=url.replace('https://','');n.appendChild(a);
         toast('Saved as a paste');
     }catch(e){toast(e.message)}finally{btn.disabled=false}
 }
-function clr(){RT.nextRoute();const p=$('pasted');if(p)p.remove();const a=$('in1');if(a)a.value='';const b=$('in2');if(b)b.value='';$('out').innerHTML=''}
+function clr(){RT.nextRoute();const p=$('pasted');if(p)p.remove();const a=$('in1');if(a)a.value='';const b=$('in2');if(b)b.value='';const o=answerOut();if(o)o.innerHTML='';ANSWER_RAW=''}
 function sample(){const t=T[ACT];if(t?.p){$('in1').value=t.p;if(t.p2&&$('in2'))$('in2').value=t.p2}run()}
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000)}
 </script>

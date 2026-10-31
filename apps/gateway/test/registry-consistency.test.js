@@ -69,7 +69,7 @@ function netPage() {
         out.set(m[1], { endpoint: ep ? ep[1] || null : undefined, unavailable: /unavailable: '/.test(m[0]) });
     }
     const dispatch = html.slice(html.indexOf('function renderResults('), html.indexOf('// Fallback: raw JSON'));
-    out.rendered = new Set([...dispatch.matchAll(/tool\.endpoint === '([^']+)'\) return render/g)].map(m => m[1]));
+    out.rendered = new Set([...dispatch.matchAll(/tool\.endpoint === '([^']+)'\)\s*return (?:render|answer)/g)].map(m => m[1]));
     out.renderedById = new Set([...dispatch.matchAll(/activeTool === '([a-z0-9]+)'/g)].map(m => m[1]));
     return out;
 }
