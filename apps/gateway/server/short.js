@@ -26,7 +26,9 @@ const str = (v) => (v && typeof v === 'object' && typeof v.s === 'string') ? v.s
  */
 function foldBlock({ id, head, html, bare = false }) {
     const key = `fold-${esc(id)}`;
-    return `<div class="fold${bare ? ' fold-bare' : ''}" id="${key}">`
+    // The class is `fold-block`, not `fold`: this site already has a `fold` of its own (the <details> fold in the
+    // developer block), and the two must not share their rules.
+    return `<div class="fold-block${bare ? ' fold-bare' : ''}" id="${key}">`
         + `<input class="fold-toggle" type="checkbox" id="${key}-open">`
         + `<label class="fold-h" for="${key}-open">${str(head)}<span class="fold-mark" aria-hidden="true"></span></label>`
         + `<div class="fold-body">${str(html)}</div></div>`;
