@@ -406,7 +406,7 @@ const CODES_HTML = path.join(__dirname, '..', 'public', 'codes.html');
 function sendTool(req, res, file) {
     try {
         res.set('Content-Type', 'text/html; charset=utf-8');
-        return res.send(renderTool(file, subdomainOf(req), req.ovHost && req.ovHost.canonicalHost));
+        return res.send(renderTool(file, subdomainOf(req), req.ovHost && req.ovHost.canonicalHost, req.query));
     } catch (err) {
         console.error('[SEO] render failed:', err.message);
         return res.sendFile(file);

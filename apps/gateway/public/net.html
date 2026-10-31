@@ -504,6 +504,12 @@
             from { opacity: 0; transform: scale(0.9); }
             to { opacity: 1; transform: scale(1); }
         }
+        /* The tool frame: the brand is the site ("Tools"), not the subdomain's name; the kit's buttons carry the accent. */
+        .ov-tool-page .openvibe-navbar .openvibe-navbar-brand .b-core,
+        .ov-tool-page .openvibe-navbar .openvibe-navbar-brand .b-dot,
+        .ov-tool-page .openvibe-navbar .openvibe-navbar-brand .b-tld { display: none; }
+        #options-area .options-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: .85rem; color: var(--text-secondary); }
+        #options-area select, #options-area input { min-height: 40px; padding: 4px 10px; border-radius: 10px; border: 1px solid var(--border-light); background: var(--bg-input); color: var(--text-primary); font: inherit; }
     </style>
     <script type="application/ld+json">
     {
@@ -545,6 +551,7 @@
         <!-- Navbar injected by OpenVibeNavbar.init() -->
         <div class="nav-placeholder" id="navbar-mount"></div>
 
+        <!-- ov-frame:start -->
         <!-- Hero -->
         <div class="hero shell" id="hero">
             <div class="hero-icon"><i class="fa-solid fa-network-wired"></i></div>
@@ -604,6 +611,7 @@
 
         <!-- Results -->
         <div class="shell results" id="results"></div>
+        <!-- ov-frame:end -->
 
         <!-- Hub: tool directory (shown on net.openvibe.tools) -->
         <div class="shell" id="hub-directory" style="display:none"></div>
@@ -730,8 +738,13 @@
     const isLookup = activeTool === 'lookup';
 
     // ── Set page title + meta ────────────────────────────────
-    document.title = isHub ? 'Net.OpenVibe — Network & Internet Diagnostics' : `${tool.name} — ${tool.placeholder || 'Network Tool'}`;
-    document.querySelector('meta[property="og:title"]').content = document.title;
+    // The server wrote this page's own title, description and canonical (seo/render). A framed page keeps them;
+    // the old script rewrote them, which made every tool subdomain share the hub's title.
+    if (!document.querySelector('[data-ov-tool-page]')) {
+        document.title = isHub ? 'Net.OpenVibe — Network & Internet Diagnostics' : `${tool.name} — ${tool.placeholder || 'Network Tool'}`;
+        const ogTitle = document.querySelector('meta[property="og:title"]');
+        if (ogTitle) ogTitle.content = document.title;
+    }
 
     // ── Init ─────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', () => {
@@ -742,6 +755,7 @@
                 service: 'net', apiBase: 'https://openvibe.network', token,
                 history: { type: 'tool', title: isHub ? 'Net.OpenVibe' : tool.name },
                 silentLogin: 'https://openvibe.tools/auth/login?silent=1&next={url}',
+                ...(document.body.classList.contains('ov-tool-page') ? { brand: { subLabel: 'Tools' } } : {}),
             });
         } catch {}
         try {
@@ -777,18 +791,34 @@
             document.getElementById('stat-tools').textContent = String(n);
         }
 
+        // The box is a GET form; its submit runs the tool without reloading the page.
+        document.querySelectorAll('[data-ov-tool-page] form.ovk-tool-form, form[data-ovk-tool-form]').forEach((form) => {
+            if (form.dataset.ovWired) return;
+            form.dataset.ovWired = '1';
+            form.addEventListener('submit', (e) => { e.preventDefault(); runTool(); });
+        });
+
         // If tool auto-runs (myip), do it immediately
         if (tool.auto) runTool();
-
-        // Enter key
-        const input = document.getElementById('search-input');
-        if (input) input.addEventListener('keydown', e => { if (e.key === 'Enter') runTool(); });
-
-        // Check for ?q= parameter
-        const params = new URLSearchParams(location.search);
-        const q = params.get('q') || params.get('target') || params.get('domain') || params.get('ip');
-        if (q && input) { input.value = q; runTool(); }
+        // A Try link or a shared link (?q=, or an older target/domain/ip) fills the box and runs once.
+        runFromQuery();
     });
+
+    /** The first value the address names for this tool, from its own input name or an older alias. */
+    function queryValue(search) {
+        const params = new URLSearchParams(search);
+        return params.get('q') || params.get('target') || params.get('domain') || params.get('ip') || '';
+    }
+
+    /** Fill the box from ?q= and run it once (a shared link or a Try link opened without JavaScript's form submit). */
+    function runFromQuery() {
+        const q = queryValue(location.search);
+        const input = document.getElementById('search-input');
+        if (!q || !input) return false;
+        input.value = q;
+        runTool();
+        return true;
+    }
 
     function getCookie(name) {
         const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
@@ -797,103 +827,92 @@
 
     // ── Setup UI based on active tool ────────────────────────
     function setupUI() {
-        const hero = document.getElementById('hero');
-        const heroIcon = hero.querySelector('.hero-icon');
-        const heroH1 = hero.querySelector('h1');
-        const heroSub = hero.querySelector('.sub');
+        const framed = !!document.querySelector('[data-ov-tool-page]');
         const searchInput = document.getElementById('search-input');
         const btnGo = document.getElementById('btn-go');
         const chipsArea = document.getElementById('tool-chips-area');
 
-        // Update hero
-        heroIcon.innerHTML = `<i class="fa-solid ${tool.icon}"></i>`;
-        if (isHub) {
-            heroH1.innerHTML = '<span class="accent">OpenVibe</span>Net';
-            heroSub.textContent = 'Online network diagnostics — DNS, GeoIP, ping, SSL, Whois, HTTP headers, and more. No login required.';
-        } else {
-            heroH1.innerHTML = tool.name.replace('OpenVibe', '<span class="accent">OpenVibe</span>');
-            heroSub.textContent = tool.placeholder || '';
-        }
-
-        // Update search
-        if (tool.placeholder) {
-            searchInput.placeholder = tool.placeholder;
-        }
-        if (tool.auto || tool.unavailable) {
-            document.getElementById('search-bar').style.display = 'none';
-        }
-        // A tool this server cannot run: say so where the results would be, and point at what works.
-        if (tool.unavailable) {
-            const box = document.createElement('div');
-            box.className = 'card tool-unavailable';
-            box.setAttribute('role', 'status');
-            const head = document.createElement('div');
-            head.className = 'card-head';
-            head.textContent = 'Not available';
-            const p = document.createElement('p');
-            p.textContent = tool.unavailable;
-            box.append(head, p);
-            if (tool.instead && TOOLS[tool.instead]) {
-                const a = document.createElement('a');
-                a.className = 'pivot';
-                a.href = `https://${tool.instead}.openvibe.tools`;
-                a.textContent = `Open the ${TOOLS[tool.instead].name}`;
-                box.append(a);
+        // A framed page has its head and box from the server (seo/frame.js): no hero, no chip cloud.
+        if (!framed) {
+            const hero = document.getElementById('hero');
+            if (hero) {
+                const heroIcon = hero.querySelector('.hero-icon');
+                const heroH1 = hero.querySelector('h1');
+                const heroSub = hero.querySelector('.sub');
+                if (heroIcon) heroIcon.innerHTML = `<i class="fa-solid ${tool.icon}"></i>`;
+                if (isHub) {
+                    if (heroH1) heroH1.innerHTML = '<span class="accent">OpenVibe</span>Net';
+                    if (heroSub) heroSub.textContent = 'Online network diagnostics — DNS, GeoIP, ping, SSL, Whois, HTTP headers, and more. No login required.';
+                } else {
+                    if (heroH1) heroH1.innerHTML = tool.name.replace('OpenVibe', '<span class="accent">OpenVibe</span>');
+                    if (heroSub) heroSub.textContent = tool.placeholder || '';
+                }
             }
-            document.getElementById('results').append(box);
-        }
-        if (tool.btnText) {
-            btnGo.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i> ${tool.btnText}`;
-        }
-
-        // Build tool chips or tool selector
-        if (isHub) {
-            // Hub: show tool directory
-            document.getElementById('hub-directory').style.display = '';
-            buildHubDirectory();
-            // Quick-pick chips
-            const popular = ['lookup', 'myip', 'dns', 'ping', 'ssl', 'geoip', 'whois', 'headers', 'rdns', 'port'];
-            chipsArea.innerHTML = `<div class="tool-chips">${popular.map(id => {
-                const t = TOOLS[id];
-                return `<span class="tool-chip" onclick="goTool('${id}')"><i class="fa-solid ${t.icon}"></i> ${t.name.replace('OpenVibe', '')}</span>`;
-            }).join('')}</div>`;
-        } else {
-            // Tool page: show related tools as mini-nav
-            const related = Object.entries(TOOLS).filter(([,t]) => t.cat === tool.cat && !t.auto && !t.unavailable);
-            if (related.length > 1) {
-                chipsArea.innerHTML = `<div class="tool-selector">${related.map(([id, t]) => {
-                    const active = id === activeTool ? ' active' : '';
-                    return `<button class="ts-btn${active}" onclick="goTool('${id}')"><i class="fa-solid ${t.icon}"></i> ${t.name.replace('OpenVibe', '')}</button>`;
+            if (tool.placeholder && searchInput) searchInput.placeholder = tool.placeholder;
+            if ((tool.auto || tool.unavailable) && document.getElementById('search-bar')) document.getElementById('search-bar').style.display = 'none';
+            if (tool.unavailable) {
+                const results = document.getElementById('results');
+                if (results) {
+                    const box = document.createElement('div');
+                    box.className = 'card tool-unavailable';
+                    box.setAttribute('role', 'status');
+                    const head = document.createElement('div');
+                    head.className = 'card-head';
+                    head.textContent = 'Not available';
+                    const p = document.createElement('p');
+                    p.textContent = tool.unavailable;
+                    box.append(head, p);
+                    if (tool.instead && TOOLS[tool.instead]) {
+                        const a = document.createElement('a');
+                        a.className = 'pivot';
+                        a.href = `https://${tool.instead}.openvibe.tools`;
+                        a.textContent = `Open the ${TOOLS[tool.instead].name}`;
+                        box.append(a);
+                    }
+                    results.append(box);
+                }
+            }
+            if (tool.btnText && btnGo) btnGo.innerHTML = `<i class="fa-solid fa-magnifying-glass"></i> ${tool.btnText}`;
+            if (isHub) {
+                document.getElementById('hub-directory').style.display = '';
+                buildHubDirectory();
+                const popular = ['lookup', 'myip', 'dns', 'ping', 'ssl', 'geoip', 'whois', 'headers', 'rdns', 'port'];
+                if (chipsArea) chipsArea.innerHTML = `<div class="tool-chips">${popular.map(id => {
+                    const t = TOOLS[id];
+                    return `<span class="tool-chip" onclick="goTool('${id}')"><i class="fa-solid ${t.icon}"></i> ${t.name.replace('OpenVibe', '')}</span>`;
                 }).join('')}</div>`;
+            } else if (chipsArea) {
+                const related = Object.entries(TOOLS).filter(([, t]) => t.cat === tool.cat && !t.auto && !t.unavailable);
+                if (related.length > 1) chipsArea.innerHTML = `<div class="tool-selector">${related.map(([id, t]) => `<button class="ts-btn${id === activeTool ? ' active' : ''}" onclick="goTool('${id}')"><i class="fa-solid ${t.icon}"></i> ${t.name.replace('OpenVibe', '')}</button>`).join('')}</div>`;
             }
         }
 
-        // Tool options
+        // Tool options (still inside the framed card, under the box): a record type, a port, a robots path, DNS types.
         const opts = document.getElementById('options-area');
-        if (tool.propTypes) {
-            opts.innerHTML = `<div class="options-row"><label for="prop-type">Record type:</label>
-                <select id="prop-type">${['A', 'AAAA', 'CNAME', 'MX', 'NS', 'TXT'].map(t => `<option value="${t}">${t}</option>`).join('')}</select></div>`;
-        }
-        if (tool.smtpPorts) {
-            opts.innerHTML = `<div class="options-row"><label for="smtp-port">Port:</label>
-                <select id="smtp-port"><option value="25">25 (server to server)</option><option value="587">587 (submission)</option></select></div>`;
-        }
-        if (tool.robotsTest) {
-            opts.innerHTML = `<div class="options-row"><label for="robots-path">Test a path (optional):</label>
-                <input id="robots-path" type="text" placeholder="/private/page.html" spellcheck="false" style="min-width:200px">
-                <label for="robots-ua">as</label>
-                <select id="robots-ua"><option value="*">any crawler (*)</option><option>Googlebot</option><option>Bingbot</option><option>GPTBot</option></select></div>`;
-        }
-
-        // DNS type options
-        if (tool.dnsTypes) {
-            const types = ['A', 'AAAA', 'MX', 'TXT', 'CNAME', 'NS', 'SOA', 'PTR', 'CAA', 'SRV'];
-            document.getElementById('options-area').innerHTML = `<div class="options-row">
-                <label>Record types:</label>
-                <select id="dns-types" multiple style="min-width:200px;min-height:28px">
-                    ${types.map(t => `<option value="${t}" ${['A','AAAA','MX','TXT','NS'].includes(t) ? 'selected' : ''}>${t}</option>`).join('')}
-                </select>
-            </div>`;
+        if (opts) {
+            if (tool.propTypes) {
+                opts.innerHTML = `<div class="options-row"><label for="prop-type">Record type:</label>
+                    <select id="prop-type">${['A', 'AAAA', 'CNAME', 'MX', 'NS', 'TXT'].map(t => `<option value="${t}">${t}</option>`).join('')}</select></div>`;
+            }
+            if (tool.smtpPorts) {
+                opts.innerHTML = `<div class="options-row"><label for="smtp-port">Port:</label>
+                    <select id="smtp-port"><option value="25">25 (server to server)</option><option value="587">587 (submission)</option></select></div>`;
+            }
+            if (tool.robotsTest) {
+                opts.innerHTML = `<div class="options-row"><label for="robots-path">Test a path (optional):</label>
+                    <input id="robots-path" type="text" placeholder="/private/page.html" spellcheck="false" style="min-width:200px">
+                    <label for="robots-ua">as</label>
+                    <select id="robots-ua"><option value="*">any crawler (*)</option><option>Googlebot</option><option>Bingbot</option><option>GPTBot</option></select></div>`;
+            }
+            if (tool.dnsTypes) {
+                const types = ['A', 'AAAA', 'MX', 'TXT', 'CNAME', 'NS', 'SOA', 'PTR', 'CAA', 'SRV'];
+                opts.innerHTML = `<div class="options-row">
+                    <label>Record types:</label>
+                    <select id="dns-types" multiple style="min-width:200px;min-height:28px">
+                        ${types.map(t => `<option value="${t}" ${['A','AAAA','MX','TXT','NS'].includes(t) ? 'selected' : ''}>${t}</option>`).join('')}
+                    </select>
+                </div>`;
+            }
         }
     }
 
@@ -973,7 +992,8 @@
     async function runTool() {
         const input = document.getElementById('search-input');
         const target = input ? input.value.trim() : '';
-        const resultsEl = document.getElementById('results');
+        const resultsEl = document.querySelector('.ovk-tool-out');
+        if (!resultsEl) return;
 
         // Hub: if user types something, redirect to lookup
         if (isHub && target) {
@@ -984,8 +1004,8 @@
         if (!tool.endpoint || tool.unavailable) return;
         if (!target && !tool.auto) { toast('Please enter a domain, IP, or URL', 'error'); return; }
 
-        // Show loading
-        resultsEl.innerHTML = `<div class="loading"><i class="fa-solid fa-circle-notch fa-spin"></i><p>Running ${tool.name}…${tool.wait ? ` (${tool.wait})` : ''}</p></div>`;
+        // Show loading (in the frame's answer slot)
+        resultsEl.innerHTML = `<section class="ovk-answer" aria-live="polite"><div class="ovk-answer-head"><h2>Running ${esc(tool.name)}…</h2></div><div class="ovk-answer-body"><p class="ovk-muted">${esc(tool.wait ? `This takes ${tool.wait}.` : 'Asking OpenVibe\'s server.')}</p></div></section>`;
 
         try {
             // The tool's run API (plan T8, Phase 1): the fields the page collected, kept only where the
@@ -1017,708 +1037,385 @@
 
             renderResults(data);
         } catch (err) {
-            resultsEl.innerHTML = `<div class="error-msg"><i class="fa-solid fa-circle-exclamation"></i> ${esc(err.message)}</div>`;
+            showAnswer({ title: 'Lookup failed', badge: { text: 'Error', tone: 'bad' }, tone: 'bad', rows: [], body: `<p>${esc(err.message)}</p>` });
         }
     }
 
     // A probe (port, ping, latency, traceroute, mtr) sends traffic to the target, so the run API asks for an account
     // (401); an expired sign-in answers 401 too, and the same card signs the visitor back in.
-    function renderSignIn(el) {
+    function renderSignIn() {
         const next = encodeURIComponent(location.href);
-        el.innerHTML = `<div class="card signin-card"><i class="fa-solid fa-lock" aria-hidden="true"></i><div class="signin-text"><b>Sign in to run ${esc(tool.name)}</b><p>Probes like ping, port checks and traceroute send traffic to the target itself, so they run under an OpenVibe account. It is free, and lookups like DNS still work without one.</p></div><a class="btn-go" href="https://openvibe.tools/auth/login?next=${next}">Sign in</a></div>`;
+        const kit = window.OpenVibeKit;
+        showAnswer({
+            title: 'Sign in to run this probe', badge: { text: 'Account needed', tone: 'warn' },
+            rows: [], body: `<p>Probes like ping, port checks and traceroute send traffic to the target itself, so they run under an OpenVibe account. It is free, and lookups like DNS still work without one.</p>`,
+            next: kit ? [kit.button({ href: `https://openvibe.tools/auth/login?next=${next}`, label: 'Sign in', icon: 'user' })] : [],
+        });
     }
 
     // ── Render results based on tool type ────────────────────
     function renderResults(data) {
-        const el = document.getElementById('results');
-
-        // Route to specialized renderers
-        if (activeTool === 'myip') return renderMyIP(el, data);
-        if (activeTool === 'lookup' || isLookup) return renderLookup(el, data);
-        if (tool.endpoint === '/ip') return renderIP(el, data);
-        if (tool.endpoint === '/ipv4') return renderIPv4(el, data);
-        if (tool.endpoint === '/ipv6') return renderIPv6(el, data);
-        if (tool.endpoint === '/dns') return renderDNS(el, data);
-        if (tool.endpoint === '/rdns') return renderRDNS(el, data);
-        if (tool.endpoint === '/rdap') return renderRDAP(el, data);
-        if (tool.endpoint === '/ssl') return renderSSL(el, data);
-        if (tool.endpoint === '/headers') return renderHeaders(el, data);
-        if (tool.endpoint === '/redirects') return renderRedirects(el, data);
-        if (tool.endpoint === '/port') return renderPort(el, data);
-        if (tool.endpoint === '/ping') return renderPing(el, data);
-        if (tool.endpoint === '/trace') return renderTrace(el, data, false);
-        if (tool.endpoint === '/mtr') return renderTrace(el, data, true);
-        if (tool.endpoint === '/dnsprop') return renderDnsProp(el, data);
-        if (tool.endpoint === '/blacklist') return renderBlacklist(el, data);
-        if (tool.endpoint === '/reputation') return renderReputation(el, data);
-        if (tool.endpoint === '/smtp') return renderSMTP(el, data);
-        if (tool.endpoint === '/uptime') return renderUptime(el, data);
-        if (tool.endpoint === '/robots') return renderRobots(el, data);
-        if (tool.endpoint === '/sitemap') return renderSitemap(el, data);
-
+        if (activeTool === 'myip') return answerMyIP(data);
+        if (activeTool === 'lookup' || isLookup) return answerLookup(data);
+        if (tool.endpoint === '/ip') return answerIP(data);
+        if (tool.endpoint === '/ipv4') return answerIPv4(data);
+        if (tool.endpoint === '/ipv6') return answerIPv6(data);
+        if (tool.endpoint === '/dns') return answerDNS(data);
+        if (tool.endpoint === '/rdns') return answerRDNS(data);
+        if (tool.endpoint === '/rdap') return answerRDAP(data);
+        if (tool.endpoint === '/ssl') return answerSSL(data);
+        if (tool.endpoint === '/headers') return answerHeaders(data);
+        if (tool.endpoint === '/redirects') return answerRedirects(data);
+        if (tool.endpoint === '/port') return answerPort(data);
+        if (tool.endpoint === '/ping') return answerPing(data);
+        if (tool.endpoint === '/trace') return answerTrace(data, false);
+        if (tool.endpoint === '/mtr') return answerTrace(data, true);
+        if (tool.endpoint === '/dnsprop') return answerDnsProp(data);
+        if (tool.endpoint === '/blacklist') return answerBlacklist(data);
+        if (tool.endpoint === '/reputation') return answerReputation(data);
+        if (tool.endpoint === '/smtp') return answerSMTP(data);
+        if (tool.endpoint === '/uptime') return answerUptime(data);
+        if (tool.endpoint === '/robots') return answerRobots(data);
+        if (tool.endpoint === '/sitemap') return answerSitemap(data);
         // Fallback: raw JSON
-        el.innerHTML = `<div class="card"><div class="raw-block">${esc(JSON.stringify(data, null, 2))}</div></div>`;
+        return answerRaw(data);
     }
 
-    // ── Renderers ────────────────────────────────────────────
-
-    function renderMyIP(el, data) {
-        el.innerHTML = `<div class="myip-card">
-            <div style="font-size:13px;color:var(--text-muted)">Your Public IP Address</div>
-            <div class="ip-display">${esc(data.ip)}</div>
-            <button class="copy-btn" onclick="copyText('${esc(data.ip)}')"><i class="fa-solid fa-copy"></i> Copy</button>
-            <div style="margin-top:12px">
-                <span class="pivot" onclick="goLookup('${esc(data.ip)}')"><i class="fa-solid fa-magnifying-glass"></i> Full lookup</span>
-                &nbsp;
-                <span class="pivot" onclick="goToolWithTarget('geoip','${esc(data.ip)}')"><i class="fa-solid fa-earth-americas"></i> GeoIP</span>
-                &nbsp;
-                <span class="pivot" onclick="goToolWithTarget('rdns','${esc(data.ip)}')"><i class="fa-solid fa-rotate-left"></i> Reverse DNS</span>
-            </div>
-        </div>`;
-        // Also fetch full IP info
-        fetchAndAppendIPInfo(el, data.ip);
-    }
-
-    async function fetchAndAppendIPInfo(el, ip) {
-        try {
-            const token = localStorage.getItem('ov_token') || getCookie('ov_token');
-            const headers = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
-            const r = await fetch(`${API_BASE}/ip/run`, { method: 'POST', headers, credentials: 'same-origin', body: JSON.stringify({ input: { target: ip } }) });
-            const body = await r.json();
-            if (body.state === 'succeeded' && body.result) {
-                const data = { ok: true, ...body.result.data };
-                if (data.ok) el.innerHTML += renderIPCard(data);
-            }
-        } catch {}
-    }
-
-    function renderIP(el, data) {
-        el.innerHTML = renderIPCard(data);
-    }
-
-    function renderIPCard(data) {
-        const geo = data.geo || {};
-        const net = data.network || {};
-        return `
-            <div class="badges">
-                ${geo.city ? `<span class="badge badge-cyan">📍 ${esc(geo.city)}, ${esc(geo.country)}</span>` : ''}
-                ${net.isp ? `<span class="badge badge-blue">🏢 ${esc(net.isp)}</span>` : ''}
-                ${net.as ? `<span class="badge">🔗 ${esc(net.as)}</span>` : ''}
-                ${data.reverse ? `<span class="badge">🔄 ${esc(data.reverse)}</span>` : ''}
-            </div>
-            <div class="card">
-                <div class="card-head"><i class="fa-solid fa-earth-americas"></i> GeoIP & Network</div>
-                <table class="res-table">
-                    <tr><td class="key">IP</td><td class="val">${esc(data.ip)}</td></tr>
-                    ${data.hostname ? `<tr><td class="key">Hostname</td><td class="val">${esc(data.hostname)}</td></tr>` : ''}
-                    <tr><td class="key">Country</td><td class="val">${esc(geo.country || '—')} (${esc(geo.countryCode || '')})</td></tr>
-                    <tr><td class="key">Region</td><td class="val">${esc(geo.region || '—')}</td></tr>
-                    <tr><td class="key">City</td><td class="val">${esc(geo.city || '—')}</td></tr>
-                    <tr><td class="key">Timezone</td><td class="val">${esc(geo.timezone || '—')}</td></tr>
-                    <tr><td class="key">Coordinates</td><td class="val">${geo.lat != null ? `${geo.lat}, ${geo.lon}` : '—'}</td></tr>
-                    <tr><td class="key">ISP</td><td class="val">${esc(net.isp || '—')}</td></tr>
-                    <tr><td class="key">Organization</td><td class="val">${esc(net.org || '—')}</td></tr>
-                    <tr><td class="key">AS</td><td class="val">${esc(net.as || '—')}</td></tr>
-                    <tr><td class="key">AS Name</td><td class="val">${esc(net.asname || '—')}</td></tr>
-                    ${data.reverse ? `<tr><td class="key">Reverse DNS</td><td class="val">${esc(data.reverse)}</td></tr>` : ''}
-                </table>
-            </div>
-            <div style="text-align:center;margin-top:8px">
-                <span class="pivot" onclick="goLookup('${esc(data.ip)}')"><i class="fa-solid fa-magnifying-glass"></i> Full lookup</span>
-                &nbsp;
-                <span class="pivot" onclick="goToolWithTarget('rdns','${esc(data.ip)}')"><i class="fa-solid fa-rotate-left"></i> Reverse DNS</span>
-                &nbsp;
-                <span class="pivot" onclick="goToolWithTarget('whois','${esc(data.ip)}')"><i class="fa-solid fa-address-book"></i> Whois</span>
-            </div>`;
-    }
-
-    function renderDNS(el, data) {
-        const records = data.records || {};
-        let html = `<div class="badges"><span class="badge badge-cyan">🔍 ${esc(data.target)}</span><span class="badge">📡 Server: ${esc(data.server)}</span></div>`;
-        for (const [type, recs] of Object.entries(records)) {
-            if (recs.error) {
-                html += `<div class="card"><div class="card-head"><i class="fa-solid fa-sitemap"></i> ${type}</div><p style="color:var(--text-muted);font-size:13px">No ${type} records (${recs.error})</p></div>`;
-                continue;
-            }
-            html += `<div class="card"><div class="card-head"><i class="fa-solid fa-sitemap"></i> ${type} Records</div>`;
-            if (Array.isArray(recs) && recs.length > 0) {
-                if (type === 'MX') {
-                    html += `<table class="res-table"><tr><th>Priority</th><th>Exchange</th></tr>${recs.map(r => `<tr><td class="val">${r.priority}</td><td class="val">${esc(typeof r === 'object' ? r.exchange : r)}</td></tr>`).join('')}</table>`;
-                } else if (type === 'SOA') {
-                    const soa = recs;
-                    html += `<table class="res-table">
-                        <tr><td class="key">Primary NS</td><td class="val">${esc(soa.nsname || soa[0]?.nsname || '—')}</td></tr>
-                        <tr><td class="key">Hostmaster</td><td class="val">${esc(soa.hostmaster || soa[0]?.hostmaster || '—')}</td></tr>
-                        <tr><td class="key">Serial</td><td class="val">${soa.serial || soa[0]?.serial || '—'}</td></tr>
-                        <tr><td class="key">Refresh</td><td class="val">${soa.refresh || soa[0]?.refresh || '—'}s</td></tr>
-                        <tr><td class="key">Retry</td><td class="val">${soa.retry || soa[0]?.retry || '—'}s</td></tr>
-                        <tr><td class="key">Expire</td><td class="val">${soa.expire || soa[0]?.expire || '—'}s</td></tr>
-                        <tr><td class="key">Min TTL</td><td class="val">${soa.minttl || soa[0]?.minttl || '—'}s</td></tr>
-                    </table>`;
-                } else if (type === 'TXT') {
-                    html += `<div style="display:flex;flex-direction:column;gap:6px">${recs.map(r => {
-                        const txt = Array.isArray(r) ? r.join('') : (typeof r === 'object' ? (r.data || JSON.stringify(r)) : r);
-                        const isSPF = txt.startsWith('v=spf1');
-                        const isDMARC = txt.startsWith('v=DMARC1');
-                        const isDKIM = txt.startsWith('v=DKIM1');
-                        const label = isSPF ? '🛡️ SPF' : isDMARC ? '🛡️ DMARC' : isDKIM ? '🔑 DKIM' : '';
-                        return `<div class="raw-block">${label ? `<strong>${label}</strong> ` : ''}${esc(txt)}</div>`;
-                    }).join('')}</div>`;
-                } else {
-                    html += `<table class="res-table"><tr><th>Value</th></tr>${recs.map(r => {
-                        const val = typeof r === 'object' ? (r.data || JSON.stringify(r)) : r;
-                        return `<tr><td class="val">${esc(String(val))}</td></tr>`;
-                    }).join('')}</table>`;
-                }
-            } else {
-                html += `<p style="color:var(--text-muted);font-size:13px">No records found</p>`;
-            }
-            html += `</div>`;
+    // ── The answer, in the kit's tool frame (.ovk-tool-out) ──
+    // Every lookup now answers as labelled rows with the fact that matters marked, the detail in a kit.table
+    // and the untouched JSON in a closed "Raw" fold. The next step links to a sibling for the same input.
+    const ANSWER_ID = 'ov-tool-answer';
+    const K = () => window.OpenVibeKit;
+    const fmtDate = (v) => {
+        if (!v) return '';
+        const d = new Date(v);
+        return Number.isFinite(d.getTime()) ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : String(v);
+    };
+    // "in 10 months", "1 year ago": the note on a date row.
+    function relTime(v) {
+        const t = Date.parse(v);
+        if (!Number.isFinite(t)) return '';
+        const days = Math.round((t - Date.now()) / 86400000);
+        const n = Math.abs(days);
+        const word = (unit, one) => `${n} ${one || unit}${n === 1 ? '' : 's'}`;
+        if (days >= 0) {
+            if (n < 1) return 'today';
+            if (n < 60) return `in ${word('day')}`;
+            const months = Math.round(n / 30.44);
+            return `in ${months} month${months === 1 ? '' : 's'}`;
         }
-
-        // Pivot links
-        html += `<div style="text-align:center;margin-top:8px">
-            <span class="pivot" onclick="goLookup('${esc(data.target)}')"><i class="fa-solid fa-magnifying-glass"></i> Full lookup</span>
-            &nbsp;
-            <span class="pivot" onclick="goToolWithTarget('ssl','${esc(data.target)}')"><i class="fa-solid fa-lock"></i> SSL</span>
-            &nbsp;
-            <span class="pivot" onclick="goToolWithTarget('whois','${esc(data.target)}')"><i class="fa-solid fa-address-book"></i> Whois</span>
-        </div>`;
-
-        el.innerHTML = html;
+        if (n < 2) return 'yesterday';
+        if (n < 60) return `${word('day')} ago`;
+        const months = Math.round(n / 30.44);
+        return `${months} month${months === 1 ? '' : 's'} ago`;
     }
-
-    function renderRDNS(el, data) {
-        el.innerHTML = `<div class="card">
-            <div class="card-head"><i class="fa-solid fa-rotate-left"></i> Reverse DNS</div>
-            <table class="res-table">
-                <tr><td class="key">IP</td><td class="val">${esc(data.ip)}</td></tr>
-                <tr><td class="key">PTR / Hostname</td><td class="val">${data.hostnames?.length ? data.hostnames.map(h => esc(h)).join('<br>') : '<span style="color:var(--text-muted)">No PTR record</span>'}</td></tr>
-            </table>
-        </div>`;
+    const lineValue = (arr) => ({ html: (arr || []).filter((x) => x != null && x !== '').map((x) => esc(String(x))).join('<br>') });
+    function rawFold(data) {
+        const kit = K();
+        return kit.fold({ title: 'Raw', body: kit.snippet({ code: JSON.stringify(data, null, 2) }) });
     }
-
-    function renderRDAP(el, data) {
-        const s = data.summary || {};
-        let html = `<div class="badges">
-            <span class="badge badge-cyan">${esc(data.target)}</span>
-            <span class="badge">${esc(data.type)}</span>
-            ${(s.status || []).map(st => `<span class="badge ${st.includes('active') ? 'badge-green' : ''}">${esc(st)}</span>`).join('')}
-        </div>`;
-        html += `<div class="card"><div class="card-head"><i class="fa-solid fa-id-card"></i> Registration Data (RDAP)</div>
-            <table class="res-table">
-                <tr><td class="key">Name</td><td class="val">${esc(s.name || data.target)}</td></tr>
-                <tr><td class="key">Handle</td><td class="val">${esc(s.handle || '—')}</td></tr>
-                ${(s.events || []).map(e => `<tr><td class="key">${esc(e.action)}</td><td class="val">${esc(e.date)}</td></tr>`).join('')}
-                ${s.nameservers?.length ? `<tr><td class="key">Nameservers</td><td class="val">${s.nameservers.map(n => esc(n)).join('<br>')}</td></tr>` : ''}
-                ${s.port43 ? `<tr><td class="key">Whois Server</td><td class="val">${esc(s.port43)}</td></tr>` : ''}
-            </table>
-        </div>`;
-        if (s.entities?.length) {
-            html += `<div class="card"><div class="card-head"><i class="fa-solid fa-users"></i> Entities</div>
-                <table class="res-table"><tr><th>Handle</th><th>Roles</th><th>Name</th></tr>
-                ${s.entities.map(e => `<tr><td class="val">${esc(e.handle || '—')}</td><td>${(e.roles||[]).join(', ')}</td><td>${esc(e.name || '—')}</td></tr>`).join('')}
-                </table></div>`;
-        }
-        // History: what OpenVibe Tools saw of this domain over time (GET /api/v1/domains/<domain>, filled in below)
-        if (data.type === 'domain') html += `<div class="card" id="rdap-history"><div class="card-head"><i class="fa-solid fa-clock-rotate-left"></i> History</div><p class="hist-note">Loading what OpenVibe Tools saw of this domain over time…</p></div>`;
-        // Raw toggle
-        html += `<details style="margin-top:12px"><summary style="cursor:pointer;color:var(--text-muted);font-size:13px">Raw RDAP response</summary>
-            <div class="raw-block" style="margin-top:8px">${esc(JSON.stringify(data.raw, null, 2))}</div></details>`;
-        el.innerHTML = html;
-        if (data.type === 'domain') loadDomainHistory(el.querySelector('#rdap-history'), data.target);
+    function nextTool(id, label, value) {
+        return K().button({ href: `https://${id}.openvibe.tools/?q=${encodeURIComponent(value)}`, label, icon: 'chevron', kind: 'quiet', small: true });
     }
-
-    // The domain's history (apps/gateway/server/net/history.js): every lookup here keeps its public registration facts
-    // (registrar, dates, status, name servers, DNSSEC; never contact details), and a change becomes a new snapshot.
-    const HIST_LABEL = { registrar: 'Registrar', created: 'Registered', expires: 'Expires', status: 'Status', nameservers: 'Name servers', dnssec: 'DNSSEC' };
-    function histValue(field, v) {
-        if (v == null || (Array.isArray(v) && !v.length)) return '—';
-        if (field === 'dnssec') return v ? 'on' : 'off';
-        if (field === 'created' || field === 'expires') return new Date(v).toISOString().slice(0, 10);
-        return Array.isArray(v) ? v.join(', ') : String(v);
+    function watchNext(value) {
+        if (!/^https?:\/\//i.test(String(value || ''))) return '';
+        return K().button({ href: `https://openvibe.watch/watches/new?template=page&url=${encodeURIComponent(value)}`, label: 'Watch for changes', icon: 'bell', kind: 'quiet', small: true });
     }
-    async function loadDomainHistory(box, domain) {
-        if (!box) return;
-        let d = null;
-        try { const r = await fetch('/api/v1/domains/' + encodeURIComponent(domain), { credentials: 'omit' }); d = r.ok ? await r.json() : null; } catch (e) { d = null; }
-        const day = (iso) => (iso ? new Date(iso).toISOString().slice(0, 10) : '');
-        if (!d || !d.ok || !d.snapshots || !d.snapshots.length) {
-            box.querySelector('.hist-note').textContent = 'This is the first time OpenVibe Tools has seen this domain. Its facts are kept from now on, so the next lookup can show what changed.';
+    function answerTable(columns, rows, label) { return K().table({ columns, rows, label }); }
+    function showAnswer(o) {
+        const out = document.querySelector('.ovk-tool-out');
+        if (!out) return;
+        const kit = K();
+        if (!kit) {
+            out.innerHTML = `<div class="card"><pre class="raw-block">${esc(JSON.stringify(o, null, 2))}</pre></div>`;
             return;
         }
-        let html = `<p class="hist-note">First seen here on <b>${esc(day(d.first_seen))}</b> · looked up <b>${esc(String(d.lookups))}</b> time${d.lookups === 1 ? '' : 's'} · ${esc(String(d.snapshots.length))} version${d.snapshots.length === 1 ? '' : 's'} kept</p>`;
-        if (!d.changes.length) html += `<p class="hist-note">No changes seen since ${esc(day(d.first_seen))}.</p>`;
-        else html += `<ol class="hist-list">${d.changes.map((c) => `<li><span class="hist-day">${esc(day(c.at))}</span><ul>${c.changes.map((x) => `<li><b>${esc(HIST_LABEL[x.field] || x.field)}</b> <span class="hist-was">${esc(histValue(x.field, x.before))}</span> → ${esc(histValue(x.field, x.after))}</li>`).join('')}</ul></li>`).join('')}</ol>`;
-        html += `<p class="hist-small">Registration facts only, never contact details. <a href="/api/v1/domains/${encodeURIComponent(domain)}" rel="nofollow">As JSON</a></p>`;
-        box.querySelector('.hist-note').outerHTML = html;
+        const actions = [
+            kit.iconButton({ type: 'button', icon: 'copy', label: 'Copy result', attrs: { 'data-ovk-copy': `#${ANSWER_ID}` } }),
+            kit.iconButton({ href: location.href, icon: 'link', label: 'Copy link', attrs: { 'data-ovk-share': 'Copy link' } }),
+            ...(o.actions || []),
+        ];
+        out.innerHTML = kit.answer({ id: ANSWER_ID, title: o.title || '', badge: o.badge || null, rows: o.rows || [], body: o.body || '', next: o.next || [], tone: o.tone || '', actions });
+        if (window.OpenVibeKitWeb) OpenVibeKitWeb.enhance(out);
+        if (window.OpenVibeKitData) OpenVibeKitData.enhance(out);
+    }
+    function answerRaw(data) {
+        showAnswer({ title: 'Lookup result', badge: { text: 'Raw', tone: 'ok' }, rows: [], body: rawFold(data) });
     }
 
-    function renderSSL(el, data) {
-        const c = data.certificate || {};
-        const statusClass = c.isExpired ? 'badge-red' : c.isExpiringSoon ? 'badge-yellow' : 'badge-green';
-        const statusText = c.isExpired ? '🔴 EXPIRED' : c.isExpiringSoon ? `🟡 Expires in ${c.daysLeft}d` : `🟢 Valid (${c.daysLeft}d left)`;
-        let html = `<div class="badges">
-            <span class="badge ${statusClass}">${statusText}</span>
-            <span class="badge badge-cyan">${esc(data.protocol || '')}</span>
-            ${data.cipher ? `<span class="badge">${esc(data.cipher.name)}</span>` : ''}
-        </div>`;
-        html += `<div class="card"><div class="card-head"><i class="fa-solid fa-lock"></i> SSL Certificate</div>
-            <table class="res-table">
-                <tr><td class="key">Subject</td><td class="val">${esc(c.subject?.CN || '—')}</td></tr>
-                <tr><td class="key">Issuer</td><td class="val">${esc(c.issuer?.CN || c.issuer?.O || '—')}</td></tr>
-                <tr><td class="key">Serial</td><td class="val" style="font-size:11px">${esc(c.serialNumber || '—')}</td></tr>
-                <tr><td class="key">Valid From</td><td class="val">${esc(c.validFrom || '—')}</td></tr>
-                <tr><td class="key">Valid To</td><td class="val">${esc(c.validTo || '—')}</td></tr>
-                <tr><td class="key">Days Left</td><td class="val ${c.isExpired ? 'style="color:var(--red)"' : ''}">${c.daysLeft}</td></tr>
-                <tr><td class="key">SANs</td><td class="val">${c.sans?.length ? c.sans.map(s => esc(s)).join(', ') : '—'}</td></tr>
-                <tr><td class="key">Fingerprint</td><td class="val" style="font-size:10px">${esc(c.fingerprint || '—')}</td></tr>
-            </table>
-        </div>`;
-        if (data.chain?.length) {
-            html += `<div class="card"><div class="card-head"><i class="fa-solid fa-link"></i> Certificate Chain</div>
-                <table class="res-table"><tr><th>Subject</th><th>Issuer</th><th>Valid To</th></tr>
-                ${data.chain.map(c => `<tr><td class="val">${esc(c.subject)}</td><td>${esc(c.issuer)}</td><td>${esc(c.validTo)}</td></tr>`).join('')}
-                </table></div>`;
+    function answerMyIP(data) {
+        showAnswer({
+            title: data.ip, badge: { text: 'Your public IP', tone: 'ok' },
+            rows: [['IP address', data.ip], ['Version', data.version ? `IPv${data.version}` : '']],
+            next: [nextTool('geoip', 'Where is it?', data.ip), nextTool('rdns', 'Reverse DNS', data.ip), nextTool('lookup', 'Full lookup', data.ip)],
+            body: rawFold(data),
+        });
+    }
+
+    function answerIP(data) {
+        const g = data.geo || {}, n = data.network || {};
+        showAnswer({
+            title: data.ip, badge: g.country ? { text: g.countryCode || g.country, tone: 'ok' } : null,
+            rows: [
+                ['IP address', data.ip], ['Hostname', data.hostname], ['Reverse DNS', data.reverse],
+                ['Country', g.country ? `${g.country}${g.countryCode ? ` (${g.countryCode})` : ''}` : ''],
+                ['Region', g.region], ['City', g.city], ['Timezone', g.timezone],
+                ['Coordinates', g.lat != null ? `${g.lat}, ${g.lon}` : ''],
+                ['ISP', n.isp], ['Organisation', n.org], ['AS', n.as], ['AS name', n.asname],
+            ],
+            next: [nextTool('rdns', 'Reverse DNS', data.ip), nextTool('whois', 'Whois', data.ip), nextTool('lookup', 'Full lookup', data.ip)],
+            body: rawFold(data),
+        });
+    }
+
+    function answerIPv4(data) {
+        const v = data.ipv4 || {}, c = data.cidr;
+        const rows = [['Address', data.ip], ['Class', v.class], ['Type', v.type], ['Public', v.isPublic == null ? '' : (v.isPublic ? 'Yes' : 'No')]];
+        if (c && c.prefix < 32) rows.push(['Block', c.cidr], ['Network', c.network], ['Broadcast', c.broadcast], ['Netmask', c.netmask], ['Wildcard', c.wildcard], ['Usable hosts', `${c.firstUsable} – ${c.lastUsable}`], ['Addresses', `${Number(c.total).toLocaleString('en-US')} total, ${Number(c.usable).toLocaleString('en-US')} usable`]);
+        if (data.geo) rows.push(['Location', [data.geo.city, data.geo.country].filter(Boolean).join(', ')], ['Organisation', (data.network || {}).org || (data.network || {}).isp]);
+        showAnswer({ title: data.ip, badge: { text: v.isPublic ? 'Public' : 'Reserved', tone: v.isPublic ? 'ok' : 'warn' }, rows, next: [nextTool('ip', 'IP lookup', data.ip), nextTool('lookup', 'Full lookup', data.ip)], body: (data.note ? `<p class="ovk-muted">${esc(data.note)}</p>` : '') + rawFold(data) });
+    }
+
+    function answerIPv6(data) {
+        const v = data.ipv6 || {}, nw = data.network || {};
+        showAnswer({
+            title: data.ip, badge: v.type ? { text: v.type, tone: v.type === 'Global unicast' ? 'ok' : 'warn' } : null,
+            rows: [['Compressed', v.compressed], ['Expanded', v.expanded], ['Scope', v.scope], ['Range', v.prefix], ['Reverse DNS', v.ptr || 'none found'], ['Network', nw.org || nw.isp], ['AS', nw.as], ['Location', data.geo ? [data.geo.city, data.geo.country].filter(Boolean).join(', ') : '']],
+            next: [nextTool('rdns', 'Reverse DNS', data.ip), nextTool('ip', 'IPv4 lookup', data.ip)],
+            body: rawFold(data),
+        });
+    }
+
+    function answerRDNS(data) {
+        showAnswer({
+            title: data.ip, badge: data.ptr ? { text: 'PTR found', tone: 'ok' } : { text: 'No PTR', tone: 'warn' },
+            rows: [['IP address', data.ip], ['PTR / hostname', (data.hostnames || []).length ? lineValue(data.hostnames) : 'none found']],
+            next: [nextTool('ip', 'IP lookup', data.ip), nextTool('whois', 'Whois', data.ip)],
+            body: rawFold(data),
+        });
+    }
+
+    function answerLookup(data) {
+        const ip = data.ip || {}, dns = data.dns || {}, rdap = data.rdap || {}, ssl = data.ssl || {}, hd = data.headers || {};
+        const dnsCount = Object.values(dns.records || {}).reduce((n, r) => n + (Array.isArray(r) ? r.length : 0), 0);
+        const s = rdap.summary || {};
+        showAnswer({
+            title: 'Domain & IP lookup', badge: { text: 'All-in-one', tone: 'ok' },
+            rows: [
+                ['Target', data.target],
+                ['IP address', ip.ip], ['Location', ip.geo ? [ip.geo.city, ip.geo.country].filter(Boolean).join(', ') : ''], ['Organisation', (ip.network || {}).org || (ip.network || {}).isp],
+                ['DNS', dnsCount ? `${dnsCount} records` : 'none found'],
+                ['Registration', (s.status || []).join(', ') || rdap.error || ''],
+                ['Certificate', ssl.certificate ? `${fmtDate(ssl.certificate.validTo)}${ssl.certificate.daysLeft != null ? ` · ${ssl.certificate.daysLeft} days left` : ''}` : ''],
+                ['HTTP', hd.status ? `${hd.status} ${hd.statusText || ''}` : ''],
+            ],
+            next: [nextTool('dns', 'DNS records', data.target), nextTool('whois', 'Whois', data.target), nextTool('ssl', 'SSL certificate', data.target)],
+            body: rawFold(data),
+        });
+    }
+
+    function answerRDAP(data) {
+        const s = data.summary || {}, ev = {};
+        for (const e of s.events || []) ev[e.action] = e.date;
+        const registrar = (s.entities || []).find((e) => (e.roles || []).includes('registrar'));
+        const created = ev.registration, expires = ev.expiration;
+        const rows = [
+            ['Registrar', registrar ? registrar.name : ''], ['Created', fmtDate(created), created ? relTime(created) : ''],
+            ['Expires', fmtDate(expires), expires ? { text: relTime(expires), tone: 'warn' } : ''],
+            ['Updated', fmtDate(ev['last changed'])], ['Name servers', s.nameservers && s.nameservers.length ? lineValue(s.nameservers) : ''],
+            ['Status', (s.status || []).join(', ')], ['Whois server', s.port43],
+        ];
+        showAnswer({
+            title: data.type === 'ip' ? 'IP registration' : 'Registration record', badge: { text: data.type === 'ip' ? 'IP' : 'Registered', tone: 'ok' },
+            rows: [[data.type === 'ip' ? 'IP address' : 'Domain', data.target], ...rows],
+            next: [nextTool('dns', 'DNS records', data.target), nextTool('ssl', 'SSL certificate', data.target), nextTool('lookup', 'Full lookup', data.target)],
+            body: rawFold(data),
+        });
+    }
+
+    function answerDNS(data) {
+        const records = data.records || {};
+        const badgeText = ({ mx: 'MX', txt: 'TXT', ns: 'NS', spf: 'SPF', dkim: 'DKIM', dmarc: 'DMARC' })[activeTool] || 'DNS';
+        const one = (r) => {
+            if (r == null) return '';
+            if (typeof r === 'string') return r;
+            if (Array.isArray(r)) return r.join('');
+            if (r.exchange) return `${r.priority} ${r.exchange}`;
+            if (r.data) return r.data;
+            if (r.nsname) return `${r.nsname} serial ${r.serial}`;
+            return JSON.stringify(r);
+        };
+        const rows = [];
+        for (const [type, recs] of Object.entries(records)) {
+            if (recs && recs.error) { rows.push([`${type} records`, 'none found', { text: recs.error, tone: 'warn' }]); continue; }
+            const list = Array.isArray(recs) ? recs : (recs && typeof recs === 'object' ? [recs] : []);
+            if (!list.length) { rows.push([`${type} records`, 'none found', { text: 'no answer', tone: 'warn' }]); continue; }
+            const vals = list.map(one).filter(Boolean);
+            rows.push([`${type} records`, vals.length === 1 ? vals[0] : lineValue(vals)]);
         }
-        el.innerHTML = html;
+        if (!rows.length) rows.push(['Records', 'none found', { text: 'no answer', tone: 'warn' }]);
+        showAnswer({
+            title: `${badgeText} records`, badge: { text: badgeText, tone: 'ok' },
+            rows: [['Domain', data.target], ...rows], next: [nextTool('whois', 'Whois', data.target), nextTool('ssl', 'SSL certificate', data.target), nextTool('lookup', 'Full lookup', data.target)],
+            body: `<p class="ovk-muted">${data.server && data.server !== 'system' ? `Asked ${esc(data.server)}.` : 'Asked the system resolver.'}</p>` + rawFold(data),
+        });
     }
 
-    function renderHeaders(el, data) {
-        const h = data.headers || {};
-        let html = `<div class="badges">
-            <span class="badge ${data.status < 400 ? 'badge-green' : 'badge-red'}">HTTP ${data.status} ${esc(data.statusText || '')}</span>
-            ${data.server ? `<span class="badge">Server: ${esc(data.server)}</span>` : ''}
-            ${data.timing ? `<span class="badge badge-cyan">⚡ ${data.timing.ms}ms</span>` : ''}
-            <span class="badge">Security: ${data.securityScore || '?/6'}</span>
-        </div>`;
-        // Security analysis
-        const sec = data.security || {};
-        html += `<div class="card"><div class="card-head"><i class="fa-solid fa-shield-halved"></i> Security Headers</div>
-            <table class="res-table">
-                <tr><td class="key">HSTS</td><td class="val">${sec.hasHSTS ? '✅ Present' : '❌ Missing'}</td></tr>
-                <tr><td class="key">CSP</td><td class="val">${sec.hasCSP ? '✅ Present' : '❌ Missing'}</td></tr>
-                <tr><td class="key">X-Content-Type-Options</td><td class="val">${sec.hasXCTO ? '✅ nosniff' : '❌ Missing'}</td></tr>
-                <tr><td class="key">X-Frame-Options</td><td class="val">${sec.hasXFO ? '✅ Present' : '❌ Missing'}</td></tr>
-                <tr><td class="key">Referrer-Policy</td><td class="val">${sec.hasRP ? '✅ Present' : '❌ Missing'}</td></tr>
-                <tr><td class="key">Permissions-Policy</td><td class="val">${sec.hasPermissions ? '✅ Present' : '❌ Missing'}</td></tr>
-            </table>
-        </div>`;
-        // All headers
-        html += `<div class="card"><div class="card-head"><i class="fa-solid fa-list"></i> Response Headers</div>
-            <table class="res-table">${Object.entries(h).map(([k, v]) => `<tr><td class="key">${esc(k)}</td><td class="val">${esc(v)}</td></tr>`).join('')}</table>
-        </div>`;
-        el.innerHTML = html;
-    }
-
-    function renderRedirects(el, data) {
-        const chain = data.chain || [];
-        let html = `<div class="badges">
-            <span class="badge badge-cyan">${chain.length} hop${chain.length !== 1 ? 's' : ''}</span>
-            <span class="badge badge-green">Final: ${esc(data.finalUrl || '')}</span>
-        </div>`;
-        html += `<div class="card"><div class="card-head"><i class="fa-solid fa-share"></i> Redirect Chain</div>
-            <table class="res-table"><tr><th>#</th><th>URL</th><th>Status</th><th>Time</th></tr>
-            ${chain.map((h, i) => `<tr>
-                <td class="val">${i + 1}</td>
-                <td class="val" style="max-width:400px;overflow:hidden;text-overflow:ellipsis">${esc(h.url)}</td>
-                <td>${h.status == null ? `<span class="badge badge-red" title="${esc(h.error || '')}">${h.refused ? 'refused' : 'error'}</span>` : `<span class="badge ${h.status < 400 ? (h.status >= 300 ? 'badge-yellow' : 'badge-green') : 'badge-red'}">${h.status}</span>`}</td>
-                <td class="val">${h.ms}ms</td>
-            </tr>`).join('')}
-            </table>${data.stopped ? `<p style="color:var(--text-muted);font-size:13px">Stopped: ${esc(data.stopped)}</p>` : ''}</div>`;
-        el.innerHTML = html;
-    }
-
-    function renderPort(el, data) {
-        const ports = data.ports || [];
-        let html = `<div class="badges">
-            <span class="badge badge-cyan">${esc(data.target)} (${esc(data.ip)})</span>
-            <span class="badge badge-green">${ports.filter(p => p.status === 'open').length} open</span>
-            <span class="badge badge-red">${ports.filter(p => p.status !== 'open').length} closed/filtered</span>
-        </div>`;
-        html += `<div class="card"><div class="card-head"><i class="fa-solid fa-door-open"></i> Port Scan Results</div>
-            <table class="res-table"><tr><th>Port</th><th>Status</th><th>Latency</th></tr>
-            ${ports.map(p => `<tr>
-                <td class="val">${p.port}</td>
-                <td><span class="badge ${p.status === 'open' ? 'badge-green' : p.status === 'filtered' ? 'badge-yellow' : 'badge-red'}">${p.status}</span></td>
-                <td class="val">${p.ms}ms</td>
-            </tr>`).join('')}
-            </table></div>`;
-        el.innerHTML = html;
-    }
-
-    function renderPing(el, data) {
-        const results = data.results || [];
-        const stats = data.stats || {};
-        let html = `<div class="badges">
-            <span class="badge badge-cyan">${esc(data.target)} (${esc(data.ip)})</span>
-            <span class="badge badge-green">Avg: ${stats.avg}ms</span>
-            <span class="badge">Min: ${stats.min}ms / Max: ${stats.max}ms</span>
-            <span class="badge ${stats.loss > 0 ? 'badge-red' : 'badge-green'}">Loss: ${stats.loss}%</span>
-        </div>`;
-        html += `<div class="card"><div class="card-head"><i class="fa-solid fa-satellite-dish"></i> Ping Results (TCP)</div>
-            <table class="res-table"><tr><th>Seq</th><th>Status</th><th>Time</th></tr>
-            ${results.map(r => `<tr>
-                <td class="val">${r.seq}</td>
-                <td><span class="badge ${r.status === 'ok' ? 'badge-green' : 'badge-red'}">${r.status}</span></td>
-                <td class="val">${r.ms}ms</td>
-            </tr>`).join('')}
-            </table>
-            <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-                <table class="res-table">
-                    <tr><td class="key">Min</td><td class="val">${stats.min}ms</td><td class="key">Max</td><td class="val">${stats.max}ms</td></tr>
-                    <tr><td class="key">Avg</td><td class="val">${stats.avg}ms</td><td class="key">Loss</td><td class="val">${stats.loss}%</td></tr>
-                </table>
-            </div>
-        </div>`;
-        el.innerHTML = html;
-    }
-
-    // ── Traceroute and MTR: the path from our server, hop by hop (mtr's report; no reply = a router that stays quiet) ──
-    function renderTrace(el, data, full) {
-        const hops = data.hops || [];
-        const ms = (v) => v === null || v === undefined ? '—' : `${v}ms`;
-        const lossBadge = (l) => l === null || l === undefined ? '' : `<span class="badge ${l === 0 ? 'badge-green' : l < 100 ? 'badge-yellow' : 'badge-red'}">${l}%</span>`;
-        let html = `<div class="badges">
-            <span class="badge badge-cyan">${esc(data.target)} (${esc(data.ip)})</span>
-            <span class="badge">${hops.length} ${hops.length === 1 ? 'hop' : 'hops'}</span>
-            <span class="badge ${data.reached ? 'badge-green' : 'badge-yellow'}">${data.reached ? 'Reached' : 'Not reached'}</span>
-            <span class="badge">${data.probes} probes a hop</span>
-        </div>`;
-        html += `<div class="card"><div class="card-head"><i class="fa-solid ${full ? 'fa-chart-line' : 'fa-route'}"></i> ${full ? 'MTR report' : 'Route'} from OpenVibe's server</div>
-            <div style="overflow-x:auto"><table class="res-table"><tr><th>#</th><th>Host</th><th>Network</th><th>Loss</th>${full ? '<th>Sent</th><th>Last</th>' : ''}<th>Best</th><th>Avg</th><th>Worst</th>${full ? '<th>StDev</th>' : ''}</tr>
-            ${hops.map(h => `<tr>
-                <td class="val">${h.hop}</td>
-                <td class="val">${h.ip ? `${h.host ? `${esc(h.host)}<br><span style="color:var(--text-muted);font-size:11px">${esc(h.ip)}</span>` : esc(h.ip)}` : '<span style="color:var(--text-muted)">no reply</span>'}</td>
-                <td class="val">${h.asn ? esc(h.asn) : '—'}</td>
-                <td>${h.ip ? lossBadge(h.loss) : ''}</td>
-                ${full ? `<td class="val">${h.sent}</td><td class="val">${ms(h.last)}</td>` : ''}
-                <td class="val">${ms(h.best)}</td><td class="val">${ms(h.avg)}</td><td class="val">${ms(h.worst)}</td>
-                ${full ? `<td class="val">${h.stdev === null || h.stdev === undefined ? '—' : h.stdev}</td>` : ''}
-            </tr>`).join('')}
-            </table></div>
-            <p style="color:var(--text-muted);font-size:12px;margin:10px 0 0">Probes are ICMP echo from OpenVibe's server (mtr). A router that does not answer is shown as no reply; loss at one hop that does not carry on to the next is usually that router rate-limiting replies, not lost traffic.</p>
-        </div>`;
-        el.innerHTML = html;
-    }
-
-    // ── Reputation: the public signals, each with what it saw and what it cost ──
-    function renderReputation(el, data) {
-        const findings = data.findings || [];
-        const tone = { good: 'badge-green', warn: 'badge-yellow', bad: 'badge-red', info: '' };
-        const word = { good: 'Good', warn: 'Check', bad: 'Problem', info: 'Note' };
-        let html = `<div class="badges">
-            <span class="badge badge-cyan">${esc(data.domain || data.target)}</span>
-            <span class="badge ${data.grade === 'good' ? 'badge-green' : data.grade === 'fair' ? 'badge-yellow' : 'badge-red'}">Score ${data.score} / 100 (${esc(data.grade)})</span>
-        </div>`;
-        html += `<div class="card"><div class="card-head"><i class="fa-solid fa-star"></i> What the score is made of</div>
-            <table class="res-table"><tr><th>Check</th><th>Result</th><th>Finding</th><th>Cost</th></tr>
-            ${findings.map(f => `<tr>
-                <td class="key">${esc(f.check)}</td>
-                <td><span class="badge ${tone[f.status] || ''}">${word[f.status] || esc(f.status)}</span></td>
-                <td class="val" style="white-space:normal">${esc(f.detail)}</td>
-                <td class="val">${f.cost ? `−${f.cost}` : '—'}</td>
-            </tr>`).join('')}
-            </table>
-            <p style="color:var(--text-muted);font-size:12px;margin:10px 0 0">Public signals only: mail providers keep their own private scores. The blacklist checker shows every list, and the DKIM lookup checks a selector.</p>${from(data)}</div>`;
-        el.innerHTML = html;
-    }
-
-    // ── IPv4 (address or CIDR block) and IPv6 ────────────────
-    function renderIPv4(el, data) {
-        const v = data.ipv4 || {};
-        const c = data.cidr;
-        let html = `<div class="badges">
-            <span class="badge badge-cyan">${esc(c && c.prefix < 32 ? c.cidr : data.ip)}</span>
-            <span class="badge">Class ${esc(v.class)}</span>
-            <span class="badge ${v.isPublic ? 'badge-green' : 'badge-yellow'}">${esc(v.type)}</span>
-        </div>`;
-        if (c && c.prefix < 32) {
-            const n = (x) => Number(x).toLocaleString('en-US');
-            html += `<div class="card"><div class="card-head"><i class="fa-solid fa-hashtag"></i> Subnet ${esc(c.cidr)}</div><table class="res-table">
-                ${row('Network', esc(c.network))}${c.broadcast ? row('Broadcast', esc(c.broadcast)) : ''}
-                ${row('Netmask', esc(c.netmask))}${row('Wildcard', esc(c.wildcard))}
-                ${row('Usable hosts', `${esc(c.firstUsable)} – ${esc(c.lastUsable)}`)}
-                ${row('Addresses', `${n(c.total)} total, ${n(c.usable)} usable`)}
-            </table></div>`;
-        }
-        if (data.geo) html += renderIPCard(data);
-        else if (data.note) html += `<p style="color:var(--text-muted);font-size:13px">${esc(data.note)}</p>`;
-        el.innerHTML = html;
-    }
-
-    function renderIPv6(el, data) {
-        const v = data.ipv6 || {};
-        const nw = data.network;
-        let html = `<div class="badges">
-            <span class="badge badge-cyan">${esc(data.ip)}</span>
-            <span class="badge ${v.type === 'Global unicast' ? 'badge-green' : 'badge-yellow'}">${esc(v.type)}</span>
-            ${v.scope ? `<span class="badge">scope: ${esc(v.scope)}</span>` : ''}
-        </div>`;
-        html += `<div class="card"><div class="card-head"><i class="fa-solid fa-code"></i> IPv6 address</div><table class="res-table">
-            ${row('Compressed', esc(v.compressed))}${row('Expanded', esc(v.expanded))}
-            ${v.prefix ? row('Range', esc(v.prefix)) : ''}
-            ${row('Reverse DNS', v.ptr ? esc(v.ptr) : '<span style="color:var(--text-muted)">No PTR record</span>')}
-            ${nw ? row('Network', `${esc(nw.org || nw.isp || '—')}${nw.as ? ` (${esc(nw.as)})` : ''}`) : ''}
-            ${data.geo && data.geo.country ? row('Location', esc([data.geo.city, data.geo.country].filter(Boolean).join(', '))) : ''}
-        </table></div>`;
-        el.innerHTML = html;
-    }
-
-    // ── Website, mail and DNS checks ─────────────────────────
-    const row = (k, v) => `<tr><td class="key">${esc(k)}</td><td class="val">${v}</td></tr>`;
-    const from = (data) => data.checkedFrom ? `<p style="color:var(--text-muted);font-size:12px;margin-top:8px">Checked from ${esc(data.checkedFrom)}.</p>` : '';
-
-    function renderDnsProp(el, data) {
+    function answerDnsProp(data) {
         const list = data.resolvers || [];
-        let html = `<div class="badges">
-            <span class="badge badge-cyan">${esc(data.target)} ${esc(data.type)}</span>
-            <span class="badge ${data.agree ? 'badge-green' : 'badge-yellow'}">${data.agree ? 'All resolvers agree' : 'Resolvers disagree'}</span>
-            <span class="badge">${data.answered}/${list.length} answered</span>
-        </div>`;
-        html += `<div class="card"><div class="card-head"><i class="fa-solid fa-globe"></i> Public resolvers</div>
-            <table class="res-table"><tr><th>Resolver</th><th>Answer</th><th>Time</th></tr>
-            ${list.map(r => `<tr>
-                <td class="val">${esc(r.name)}<br><span style="color:var(--text-muted);font-size:11px">${esc(r.ip)}</span></td>
-                <td class="val">${r.status === 'ok' ? r.answers.map(a => esc(a)).join('<br>') : `<span class="badge ${r.status === 'error' ? 'badge-red' : ''}">${esc(r.status === 'error' ? (r.error || 'error') : r.status === 'nxdomain' ? 'NXDOMAIN (no such name)' : 'no record')}</span>`}
-                    ${r.differs ? ' <span class="badge badge-yellow">differs</span>' : ''}</td>
-                <td class="val">${r.ms}ms</td></tr>`).join('')}
-            </table>${from(data)}</div>`;
-        el.innerHTML = html;
+        const rows = [['Answered', `${data.answered} of ${list.length}`], ['Resolvers agree', data.agree ? 'Yes' : 'No']];
+        if (data.majority && data.majority.answers) rows.push(['Most say', lineValue(data.majority.answers)]);
+        const table = answerTable([{ key: 'name', label: 'Resolver', primary: true }, { key: 'answers', label: 'Answer' }, { key: 'status', label: 'Status' }, { key: 'ms', label: 'Time', num: true }],
+            list.map((r) => ({ name: r.name || r.ip, answers: r.status === 'ok' ? (r.answers || []).join(', ') : '', status: r.status === 'ok' ? (r.differs ? 'differs' : 'ok') : r.status, ms: r.ms })), 'Public resolvers');
+        showAnswer({ title: `${data.target} ${data.type || ''}`.trim(), badge: { text: data.agree ? 'All agree' : 'Resolvers disagree', tone: data.agree ? 'ok' : 'warn' }, rows, body: table + rawFold(data) });
     }
 
-    function renderBlacklist(el, data) {
+    function answerSSL(data) {
+        const c = data.certificate || {};
+        const days = c.daysLeft;
+        showAnswer({
+            title: 'Certificate', badge: { text: c.isExpired ? 'Expired' : c.isExpiringSoon ? 'Expires soon' : 'Valid', tone: c.isExpired ? 'bad' : c.isExpiringSoon ? 'warn' : 'ok' },
+            rows: [['Domain', data.target], ['Subject', c.subject && (c.subject.CN || c.subject.O)], ['Issuer', c.issuer && (c.issuer.CN || c.issuer.O)], ['Valid until', fmtDate(c.validTo), c.validTo ? { text: relTime(c.validTo), tone: 'warn' } : ''], ['Days left', days != null ? String(days) : ''], ['Protocol', data.protocol], ['Port', data.port], ['Chain', (data.chain || []).length ? `${data.chain.length} certificates` : '']],
+            next: [nextTool('whois', 'Whois', data.target), nextTool('dns', 'DNS records', data.target), watchNext(`https://${data.target}`)],
+            body: ((data.chain || []).length ? answerTable([{ key: 'subject', label: 'Subject', primary: true }, { key: 'issuer', label: 'Issuer' }, { key: 'validTo', label: 'Valid to' }], data.chain.map((x) => ({ subject: x.subject, issuer: x.issuer, validTo: fmtDate(x.validTo) })), 'Certificate chain') : '') + rawFold(data),
+        });
+    }
+
+    function answerHeaders(data) {
+        const sec = data.security || {};
+        const hd = data.headers || {};
+        const yes = (v) => v ? 'present' : 'missing';
+        const secTable = answerTable([{ key: 'name', label: 'Security header', primary: true }, { key: 'state', label: 'State' }], [
+            { name: 'Strict-Transport-Security', state: yes(sec.hasHSTS) }, { name: 'Content-Security-Policy', state: yes(sec.hasCSP) },
+            { name: 'X-Content-Type-Options', state: yes(sec.hasXCTO) }, { name: 'X-Frame-Options', state: yes(sec.hasXFO) },
+            { name: 'Referrer-Policy', state: yes(sec.hasRP) }, { name: 'Permissions-Policy', state: yes(sec.hasPermissions) },
+        ], 'Security headers');
+        const hdTable = answerTable([{ key: 'name', label: 'Header', primary: true }, { key: 'value', label: 'Value' }], Object.entries(hd).map(([k, v]) => ({ name: k, value: String(v) })), 'Response headers');
+        showAnswer({
+            title: 'HTTP response', badge: { text: `HTTP ${data.status}`, tone: data.status < 400 ? 'ok' : 'bad' },
+            rows: [['URL', data.url || data.target], ['Status', `${data.status} ${data.statusText || ''}`.trim()], ['Server', data.server], ['Content type', data.contentType], ['Security score', data.securityScore], ['Time', data.timing ? `${data.timing.ms} ms` : '']],
+            next: [watchNext(data.url || data.target), nextTool('ssl', 'SSL certificate', data.url || data.target), nextTool('redirects', 'Redirects', data.url || data.target)],
+            body: secTable + hdTable + rawFold(data),
+        });
+    }
+
+    function answerRedirects(data) {
+        const chain = data.chain || [];
+        const table = answerTable([{ key: 'n', label: '#', primary: true }, { key: 'url', label: 'URL' }, { key: 'status', label: 'Status' }, { key: 'ms', label: 'Time', num: true }], chain.map((h, i) => ({ n: i + 1, url: h.url || h.error || '', status: h.status == null ? (h.refused ? 'refused' : 'error') : h.status, ms: h.ms })), 'Redirect chain');
+        showAnswer({
+            title: 'Redirect chain', badge: { text: `${chain.length} hop${chain.length === 1 ? '' : 's'}`, tone: 'ok' },
+            rows: [['Original URL', data.originalUrl || data.target], ['Final URL', data.finalUrl], ['Hops', String(chain.length)], ['Stopped', data.stopped]],
+            next: [watchNext(data.originalUrl || data.target), nextTool('headers', 'HTTP headers', data.finalUrl || data.originalUrl || data.target)],
+            body: table + rawFold(data),
+        });
+    }
+
+    function answerPort(data) {
+        const ports = data.ports || [];
+        const open = ports.filter((p) => p.status === 'open').length;
+        const table = answerTable([{ key: 'port', label: 'Port', primary: true, num: true }, { key: 'status', label: 'Status' }, { key: 'ms', label: 'Time', num: true }], ports.map((p) => ({ port: p.port, status: p.status, ms: p.ms })), 'Ports');
+        showAnswer({
+            title: 'Port check', badge: { text: `${open} open`, tone: open ? 'ok' : 'warn' },
+            rows: [['Target', `${data.target} (${data.ip})`], ['Open ports', open ? ports.filter((p) => p.status === 'open').map((p) => p.port).join(', ') : 'none found'], ['Closed or filtered', String(ports.length - open)]],
+            next: [nextTool('ping', 'Ping', data.target), nextTool('headers', 'HTTP headers', data.target)],
+            body: table + rawFold(data),
+        });
+    }
+
+    function answerPing(data) {
+        const s = data.stats || {};
+        const table = answerTable([{ key: 'seq', label: 'Attempt', primary: true, num: true }, { key: 'status', label: 'Status' }, { key: 'ms', label: 'Time', num: true }], (data.results || []).map((r) => ({ seq: r.seq, status: r.status, ms: r.ms })), 'Attempts');
+        showAnswer({
+            title: 'Ping test', badge: { text: s.loss ? `${s.loss}% loss` : 'Reachable', tone: s.loss ? 'warn' : 'ok' },
+            rows: [['Target', `${data.target} (${data.ip})`], ['Average', s.avg != null ? `${s.avg} ms` : ''], ['Best', s.min != null ? `${s.min} ms` : ''], ['Worst', s.max != null ? `${s.max} ms` : ''], ['Loss', s.loss != null ? `${s.loss}%` : '']],
+            next: [nextTool('traceroute', 'Traceroute', data.target), nextTool('port', 'Port checker', data.target)],
+            body: table + rawFold(data),
+        });
+    }
+
+    function answerTrace(data, full) {
+        const hops = data.hops || [];
+        const cols = [{ key: 'hop', label: '#', primary: true, num: true }, { key: 'host', label: 'Host' }, { key: 'asn', label: 'Network' }, { key: 'loss', label: 'Loss', num: true }, { key: 'best', label: 'Best', num: true }, { key: 'avg', label: 'Avg', num: true }, { key: 'worst', label: 'Worst', num: true }];
+        const table = answerTable(cols, hops.map((h) => ({ hop: h.hop, host: h.host ? `${h.host}${h.ip ? ` (${h.ip})` : ''}` : (h.ip || 'no reply'), asn: h.asn || '', loss: h.loss == null ? '' : `${h.loss}%`, best: h.best == null ? '' : `${h.best}ms`, avg: h.avg == null ? '' : `${h.avg}ms`, worst: h.worst == null ? '' : `${h.worst}ms` })), full ? 'MTR report' : 'Route');
+        showAnswer({
+            title: full ? 'MTR report' : 'Route', badge: { text: data.reached ? 'Reached' : 'Not reached', tone: data.reached ? 'ok' : 'warn' },
+            rows: [['Target', `${data.target} (${data.ip})`], ['Hops', String(hops.length)], ['Probes a hop', data.probes != null ? String(data.probes) : ''], ['Family', data.family ? `IPv${data.family}` : '']],
+            next: [nextTool('ping', 'Ping', data.target), nextTool('mtr', 'MTR report', data.target)],
+            body: table + `<p class="ovk-muted">Probes are ICMP echo from OpenVibe's server. A router that stays quiet shows as no reply; loss at one hop that does not carry on is usually that router rate-limiting replies.</p>` + rawFold(data),
+        });
+    }
+
+    function answerBlacklist(data) {
         const lists = data.lists || [];
-        let html = `<div class="badges">
-            <span class="badge badge-cyan">${esc(data.domain || data.ip || data.target)}${data.domain && data.ip ? ` (${esc(data.ip)})` : ''}</span>
-            <span class="badge ${data.listedCount ? 'badge-red' : 'badge-green'}">${data.listedCount ? `Listed on ${data.listedCount}` : 'Not listed'}</span>
-            ${data.unknownCount ? `<span class="badge badge-yellow">${data.unknownCount} could not be checked</span>` : ''}
-        </div>`;
-        if (data.domain && !data.ip) html += `<p style="color:var(--text-muted);font-size:13px">${esc(data.domain)} has no IPv4 address, so only the domain lists were checked.</p>`;
-        html += `<div class="card"><div class="card-head"><i class="fa-solid fa-ban"></i> Blacklists</div>
-            <table class="res-table"><tr><th>List</th><th>Checked</th><th>Result</th></tr>
-            ${lists.map(l => `<tr>
-                <td class="val">${esc(l.name)}<br><span style="color:var(--text-muted);font-size:11px">${esc(l.zone)}</span></td>
-                <td class="val">${esc(l.query)}</td>
-                <td>${l.listed === true ? `<span class="badge badge-red">Listed</span> ${l.reason ? `<div style="font-size:12px;margin-top:4px">${esc(l.reason)}</div>` : ''} <a class="pivot" href="${esc(l.delist)}" target="_blank" rel="noopener">Delisting</a>`
-                    : l.listed === false ? '<span class="badge badge-green">Not listed</span>'
-                        : `<span class="badge badge-yellow" title="${esc(l.error || '')}">Unknown</span><div style="font-size:11px;color:var(--text-muted);margin-top:4px">${esc(l.error || '')}</div>`}</td>
-            </tr>`).join('')}
-            </table>${from(data)}</div>`;
-        el.innerHTML = html;
+        const table = answerTable([{ key: 'name', label: 'List', primary: true }, { key: 'zone', label: 'Zone' }, { key: 'result', label: 'Result' }], lists.map((l) => ({ name: l.name, zone: l.zone, result: l.listed === true ? 'listed' : l.listed === false ? 'not listed' : 'unknown' })), 'Blacklists');
+        showAnswer({
+            title: 'Blacklist check', badge: { text: data.listedCount ? `Listed on ${data.listedCount}` : 'Not listed', tone: data.listedCount ? 'bad' : 'ok' },
+            rows: [['Target', data.domain || data.ip || data.target], ['Listed', String(data.listedCount || 0)], ['Clean', String(data.cleanCount || 0)], ['Could not check', String(data.unknownCount || 0)]],
+            next: [nextTool('reputation', 'Reputation', data.domain || data.target), nextTool('dns', 'DNS records', data.domain || data.target)],
+            body: table + rawFold(data),
+        });
     }
 
-    function renderSMTP(el, data) {
-        let html = `<div class="badges">
-            <span class="badge badge-cyan">${esc(data.host)}:${data.port} (${esc(data.ip)})</span>
-            <span class="badge ${data.connected ? 'badge-green' : 'badge-red'}">${data.connected ? 'Connected' : 'No connection'}</span>
-            ${data.starttls ? `<span class="badge ${data.starttls.ok ? 'badge-green' : data.starttls.offered ? 'badge-yellow' : 'badge-red'}">${data.starttls.ok ? 'STARTTLS ' + esc(data.starttls.protocol || '') : data.starttls.offered ? 'STARTTLS failed' : 'No STARTTLS'}</span>` : ''}
-        </div>`;
-        if (data.mx && data.mx.length) html += `<p style="color:var(--text-muted);font-size:13px">${esc(data.target)} receives mail at ${data.mx.map(m => `${esc(m.exchange)} (${m.priority})`).join(', ')}; tested the first.</p>`;
-        if (data.error) html += `<div class="error-msg" style="margin-bottom:12px">${esc(data.error)}</div>`;
-        html += `<div class="card"><div class="card-head"><i class="fa-solid fa-paper-plane"></i> Conversation</div><table class="res-table">
-            ${data.connectMs != null ? row('Connect time', `${data.connectMs}ms`) : ''}
-            ${data.banner ? row('Greeting', `${data.banner.code} ${esc(data.banner.text)}`) : ''}
-            ${data.ehlo ? row('EHLO', `${data.ehlo.code} ${esc(data.ehlo.greeting)}`) : ''}
-            ${data.ehlo ? row('Extensions', (data.starttls && data.starttls.extensions ? data.starttls.extensions : data.ehlo.extensions).map(e => esc(e)).join('<br>') || '—') : ''}
-            ${data.auth ? row('Login methods', data.auth.length ? data.auth.map(esc).join(', ') : 'none offered') : ''}
-        </table></div>`;
-        const c = data.starttls && data.starttls.certificate;
-        if (c) {
-            html += `<div class="card"><div class="card-head"><i class="fa-solid fa-lock"></i> STARTTLS certificate</div><table class="res-table">
-                ${row('Protocol', esc(data.starttls.protocol || '—'))}${row('Cipher', esc(data.starttls.cipher || '—'))}
-                ${row('Subject', esc(c.subject || '—'))}${row('Issuer', esc(c.issuer || '—'))}
-                ${row('Valid to', `${esc(c.validTo || '—')}${c.daysLeft != null ? ` (${c.daysLeft} days)` : ''}`)}
-                ${row('Trusted chain', c.trusted ? '✅ yes' : `❌ no${c.error ? ' — ' + esc(c.error) : ''}`)}
-                ${c.hostnameMatch != null ? row('Name matches', c.hostnameMatch ? '✅ yes' : '❌ no') : ''}
-            </table></div>`;
-        }
-        el.innerHTML = html + from(data);
+    function answerReputation(data) {
+        const findings = data.findings || [];
+        const table = answerTable([{ key: 'check', label: 'Check', primary: true }, { key: 'status', label: 'Result' }, { key: 'detail', label: 'Finding' }, { key: 'cost', label: 'Cost', num: true }], findings.map((f) => ({ check: f.check, status: f.status, detail: f.detail, cost: f.cost ? `−${f.cost}` : '' })), 'Signals');
+        showAnswer({
+            title: 'Reputation', badge: { text: `${data.score} / 100 · ${data.grade}`, tone: data.grade === 'good' ? 'ok' : data.grade === 'fair' ? 'warn' : 'bad' },
+            rows: [['Target', data.domain || data.target], ['Score', `${data.score} / 100`], ['Grade', data.grade]],
+            next: [nextTool('blacklist', 'Blacklist check', data.domain || data.target), nextTool('spf', 'SPF record', data.domain || data.target)],
+            body: table + rawFold(data),
+        });
     }
 
-    function renderUptime(el, data) {
-        let html = `<div class="badges">
-            <span class="badge ${data.state === 'up' ? 'badge-green' : 'badge-red'}">${data.state === 'up' ? '🟢 Up' : '🔴 Down'}</span>
-            ${data.status ? `<span class="badge">HTTP ${data.status} ${esc(data.statusText || '')}</span>` : ''}
-            <span class="badge badge-cyan">⚡ ${data.ms}ms</span>
-        </div>`;
-        html += `<div class="card"><div class="card-head"><i class="fa-solid fa-heart-pulse"></i> ${esc(data.url)}</div><table class="res-table">
-            ${data.error ? row('Problem', esc(data.error)) : ''}
-            ${data.finalUrl && data.finalUrl !== data.url ? row('Ended at', esc(data.finalUrl)) : ''}
-            ${data.redirects ? row('Redirects', (data.chain || []).map(h => `${h.status} ${esc(h.url)}`).join('<br>')) : ''}
-            ${data.server ? row('Server', esc(data.server)) : ''}
-            ${row('Checked at', esc(data.checkedAt || ''))}
-        </table>${from(data)}</div>`;
-        el.innerHTML = html;
+    function answerSMTP(data) {
+        const st = data.starttls || {}, c = st.certificate || {};
+        const ext = st.extensions || (data.ehlo && data.ehlo.extensions) || [];
+        showAnswer({
+            title: `${data.host || data.target}:${data.port}`, badge: { text: data.connected ? 'Connected' : 'No connection', tone: data.connected ? 'ok' : 'bad' },
+            rows: [['Host', data.host], ['IP', data.ip], ['Port', data.port], ['Greeting', data.banner ? `${data.banner.code} ${data.banner.text}` : ''], ['STARTTLS', st.ok ? `${st.protocol || 'yes'}` : st.offered ? 'offered but failed' : 'not offered'], ['Certificate', c.subject || ''], ['Trusted chain', c.trusted == null ? '' : c.trusted ? 'Yes' : 'No'], ['Name matches', c.hostnameMatch == null ? '' : c.hostnameMatch ? 'Yes' : 'No'], ['Error', data.error]],
+            next: [nextTool('mx', 'MX records', data.target), nextTool('spf', 'SPF record', data.target)],
+            body: (ext.length ? `<p class="ovk-muted">Extensions: ${ext.map(esc).join(', ')}</p>` : '') + rawFold(data),
+        });
     }
 
-    function renderRobots(el, data) {
-        let html = `<div class="badges">
-            <span class="badge ${data.found ? 'badge-green' : 'badge-yellow'}">HTTP ${data.status}</span>
-            <span class="badge badge-cyan">${esc(data.verdict || '')}</span>
-            ${data.found ? `<span class="badge">${data.size} bytes</span>` : ''}
-        </div>`;
-        if (data.test) {
-            const t = data.test;
-            html += `<div class="card"><div class="card-head"><i class="fa-solid fa-vial"></i> ${esc(t.path)} as ${esc(t.ua)}</div>
-                <p><span class="badge ${t.allowed ? 'badge-green' : 'badge-red'}">${t.allowed ? 'Allowed' : 'Blocked'}</span>
-                ${t.rule ? ` by <code>${esc(t.rule.type)}: ${esc(t.rule.path)}</code> (line ${t.rule.line})` : ' (no rule matches)'}</p></div>`;
-        }
-        for (const w of data.warnings || []) html += `<div class="error-msg" style="margin-bottom:8px;text-align:left">${w.line ? `Line ${w.line}: ` : ''}${esc(w.text)}</div>`;
-        for (const g of data.groups || []) {
-            html += `<div class="card"><div class="card-head"><i class="fa-solid fa-robot"></i> User-agent: ${g.agents.map(esc).join(', ')}</div>
-                <table class="res-table">${g.rules.map(r => `<tr><td class="key">${esc(r.type)}</td><td class="val">${esc(r.path) || '<span style="color:var(--text-muted)">(empty: allows everything)</span>'}</td></tr>`).join('') || '<tr><td class="val">No rules</td></tr>'}
-                ${g.crawlDelay ? row('crawl-delay', esc(g.crawlDelay)) : ''}</table></div>`;
-        }
-        if ((data.sitemaps || []).length) html += `<div class="card"><div class="card-head"><i class="fa-solid fa-sitemap"></i> Sitemaps</div>${data.sitemaps.map(u => `<div class="raw-block">${esc(u)}</div>`).join('')}</div>`;
-        el.innerHTML = html + from(data);
+    function answerUptime(data) {
+        showAnswer({
+            title: 'Uptime check', badge: { text: data.state === 'up' ? 'Up' : 'Down', tone: data.state === 'up' ? 'ok' : 'bad' },
+            rows: [['URL', data.url], ['State', data.state], ['HTTP status', data.status != null ? String(data.status) : ''], ['Answer time', data.ms != null ? `${data.ms} ms` : ''], ['Final URL', data.finalUrl && data.finalUrl !== data.url ? data.finalUrl : ''], ['Redirects', data.redirects != null ? String(data.redirects) : ''], ['Error', data.error], ['Checked at', data.checkedAt ? fmtDate(data.checkedAt) : '']],
+            next: [watchNext(data.url), nextTool('headers', 'HTTP headers', data.url), nextTool('ssl', 'SSL certificate', data.url)],
+            body: rawFold(data),
+        });
     }
 
-    function renderSitemap(el, data) {
+    function answerRobots(data) {
+        const groups = data.groups || [];
+        const table = groups.length ? answerTable([{ key: 'agents', label: 'User-agent', primary: true }, { key: 'rules', label: 'Rules' }], groups.map((g) => ({ agents: (g.agents || []).join(', '), rules: (g.rules || []).map((r) => `${r.type}: ${r.path || ''}`).join(' · ') || 'none' })), 'Rules') : '';
+        const warn = (data.warnings || []).map((w) => `<p><span class="ovk-pill ovk-pill--warn">${w.line ? `line ${w.line}` : 'warning'}</span> ${esc(w.text)}</p>`).join('');
+        showAnswer({
+            title: 'robots.txt', badge: { text: data.found ? `HTTP ${data.status}` : 'Not found', tone: data.found ? 'ok' : 'warn' },
+            rows: [['URL', data.url], ['Verdict', data.verdict], ['Found', data.found ? 'Yes' : 'No'], ['Final URL', data.finalUrl && data.finalUrl !== data.url ? data.finalUrl : ''], ['Sitemaps', (data.sitemaps || []).length ? lineValue(data.sitemaps) : '']],
+            next: [nextTool('sitemap', 'Sitemap validator', data.url), watchNext(data.url)],
+            body: table + warn + rawFold(data),
+        });
+    }
+
+    function answerSitemap(data) {
         const issues = data.issues || [];
-        const errors = issues.filter(i => i.level === 'error');
-        let html = `<div class="badges">
-            <span class="badge ${data.valid ? 'badge-green' : 'badge-red'}">${data.valid ? 'Valid' : `${errors.length} problem${errors.length === 1 ? '' : 's'}`}</span>
-            ${data.kind ? `<span class="badge badge-cyan">${data.kind === 'index' ? `Sitemap index: ${data.count} sitemaps` : `${Number(data.count).toLocaleString('en-US')} URLs`}</span>` : ''}
-            <span class="badge">HTTP ${data.status}${data.gzip ? ' · gzip' : ''}</span>
-        </div>`;
-        html += `<p style="color:var(--text-muted);font-size:13px">${esc(data.finalUrl || data.url)}${data.source === 'robots.txt' ? ' (from robots.txt)' : data.source === 'default' ? ' (the default location)' : ''}</p>`;
-        for (const i of issues) {
-            html += `<div class="card"><div class="card-head"><span class="badge ${i.level === 'error' ? 'badge-red' : 'badge-yellow'}">${i.level}</span> ${esc(i.message)}${i.count > 1 ? ` (${i.count}×)` : ''}</div>
-                ${i.examples && i.examples.length ? i.examples.map(x => `<div class="raw-block">${esc(x)}</div>`).join('') : ''}</div>`;
-        }
-        if ((data.sample || []).length) {
-            html += `<div class="card"><div class="card-head"><i class="fa-solid fa-list"></i> First entries</div><table class="res-table">
-                ${data.sample.map(u => `<tr><td class="val">${esc(u.loc)}</td><td class="val">${esc(u.lastmod || '')}</td></tr>`).join('')}</table></div>`;
-        }
-        if ((data.childResults || []).length) {
-            html += `<div class="card"><div class="card-head"><i class="fa-solid fa-sitemap"></i> First ${data.childResults.length} of ${data.childrenTotal} sitemaps</div><table class="res-table">
-                ${data.childResults.map(c => `<tr><td class="val">${esc(c.url)}</td><td>${c.error ? `<span class="badge badge-red">${esc(c.error)}</span>` : `<span class="badge ${c.valid ? 'badge-green' : 'badge-red'}">${c.valid ? 'valid' : 'problems'}</span> ${Number(c.count || 0).toLocaleString('en-US')} URLs`}</td></tr>`).join('')}</table></div>`;
-        }
-        el.innerHTML = html + from(data);
+        const table = issues.length ? answerTable([{ key: 'level', label: 'Level', primary: true }, { key: 'message', label: 'Problem' }], issues.map((i) => ({ level: i.level, message: `${i.message}${i.count > 1 ? ` (${i.count}×)` : ''}` })), 'Problems') : '';
+        const sample = (data.sample || []).length ? answerTable([{ key: 'loc', label: 'URL', primary: true }, { key: 'lastmod', label: 'Last modified' }], (data.sample || []).map((u) => ({ loc: u.loc, lastmod: u.lastmod || '' })), 'First entries') : '';
+        showAnswer({
+            title: 'Sitemap', badge: { text: data.valid ? 'Valid' : 'Problems', tone: data.valid ? 'ok' : 'bad' },
+            rows: [['URL', data.url], ['Kind', data.kind === 'index' ? 'Sitemap index' : data.kind], ['URLs', data.count != null ? String(data.count) : ''], ['HTTP status', data.status != null ? String(data.status) : ''], ['Final URL', data.finalUrl && data.finalUrl !== data.url ? data.finalUrl : '']],
+            next: [nextTool('robots', 'robots.txt', data.url), watchNext(data.url)],
+            body: table + sample + rawFold(data),
+        });
     }
-
-    function renderLookup(el, data) {
-        // Supertool: tabbed view
-        const sections = [];
-        if (data.ip) sections.push({ id: 'ip', label: 'IP / Geo', icon: 'fa-earth-americas' });
-        if (data.dns) sections.push({ id: 'dns', label: 'DNS', icon: 'fa-sitemap' });
-        if (data.rdap) sections.push({ id: 'rdap', label: 'RDAP / Whois', icon: 'fa-id-card' });
-        if (data.ssl) sections.push({ id: 'ssl', label: 'SSL', icon: 'fa-lock' });
-        if (data.headers) sections.push({ id: 'headers', label: 'Headers', icon: 'fa-list' });
-        if (data.reverseDns) sections.push({ id: 'rdns', label: 'Reverse DNS', icon: 'fa-rotate-left' });
-
-        // Badges
-        let html = `<div class="badges">${(data.badges || []).map(b => `<span class="badge badge-cyan">${esc(b)}</span>`).join('')}</div>`;
-
-        // Tabs
-        html += `<div class="tabs">${sections.map((s, i) => `<button class="tab-btn ${i === 0 ? 'active' : ''}" onclick="switchTab('${s.id}', this)"><i class="fa-solid ${s.icon}"></i> ${s.label}</button>`).join('')}</div>`;
-
-        // Tab contents
-        if (data.ip) {
-            const ip = data.ip;
-            html += `<div class="tab-content ${sections[0]?.id === 'ip' ? 'active' : ''}" id="tab-ip">
-                <div class="card"><div class="card-head"><i class="fa-solid fa-earth-americas"></i> IP / Geolocation</div>
-                <table class="res-table">
-                    <tr><td class="key">IP</td><td class="val">${esc(ip.address || '—')}</td></tr>
-                    <tr><td class="key">Country</td><td class="val">${esc(ip.country || '—')} (${esc(ip.countryCode || '')})</td></tr>
-                    <tr><td class="key">Region</td><td class="val">${esc(ip.region || '—')}</td></tr>
-                    <tr><td class="key">City</td><td class="val">${esc(ip.city || '—')}</td></tr>
-                    <tr><td class="key">Timezone</td><td class="val">${esc(ip.timezone || '—')}</td></tr>
-                    <tr><td class="key">Coordinates</td><td class="val">${ip.lat != null ? `${ip.lat}, ${ip.lon}` : '—'}</td></tr>
-                    <tr><td class="key">ISP</td><td class="val">${esc(ip.isp || '—')}</td></tr>
-                    <tr><td class="key">Organization</td><td class="val">${esc(ip.org || '—')}</td></tr>
-                    <tr><td class="key">AS</td><td class="val">${esc(ip.as || '—')}</td></tr>
-                    <tr><td class="key">AS Name</td><td class="val">${esc(ip.asname || '—')}</td></tr>
-                </table></div></div>`;
-        }
-        if (data.dns) {
-            html += `<div class="tab-content" id="tab-dns">`;
-            for (const [type, recs] of Object.entries(data.dns)) {
-                if (!recs?.length) continue;
-                html += `<div class="card"><div class="card-head"><i class="fa-solid fa-sitemap"></i> ${type}</div>`;
-                if (type === 'MX') {
-                    html += `<table class="res-table"><tr><th>Priority</th><th>Exchange</th></tr>${recs.map(r => `<tr><td class="val">${r.priority}</td><td class="val">${esc(r.exchange)}</td></tr>`).join('')}</table>`;
-                } else if (type === 'TXT') {
-                    html += `<div style="display:flex;flex-direction:column;gap:6px">${recs.map(r => `<div class="raw-block">${esc(Array.isArray(r) ? r.join('') : r)}</div>`).join('')}</div>`;
-                } else {
-                    html += `<div class="raw-block">${recs.map(r => esc(typeof r === 'object' ? JSON.stringify(r) : r)).join('\n')}</div>`;
-                }
-                html += `</div>`;
-            }
-            html += `</div>`;
-        }
-        if (data.rdap) {
-            const r = data.rdap;
-            html += `<div class="tab-content" id="tab-rdap"><div class="card"><div class="card-head"><i class="fa-solid fa-id-card"></i> RDAP / Whois</div>
-                <table class="res-table">
-                    <tr><td class="key">Name</td><td class="val">${esc(r.name || '—')}</td></tr>
-                    ${(r.status || []).map(s => `<tr><td class="key">Status</td><td class="val">${esc(s)}</td></tr>`).join('')}
-                    ${(r.events || []).map(e => `<tr><td class="key">${esc(e.action)}</td><td class="val">${esc(e.date)}</td></tr>`).join('')}
-                    ${r.nameservers?.length ? `<tr><td class="key">Nameservers</td><td class="val">${r.nameservers.map(n => esc(n)).join('<br>')}</td></tr>` : ''}
-                </table></div></div>`;
-        }
-        if (data.ssl) {
-            const s = data.ssl;
-            html += `<div class="tab-content" id="tab-ssl"><div class="card"><div class="card-head"><i class="fa-solid fa-lock"></i> SSL Certificate</div>
-                <table class="res-table">
-                    <tr><td class="key">Subject</td><td class="val">${esc(s.subject || '—')}</td></tr>
-                    <tr><td class="key">Issuer</td><td class="val">${esc(s.issuer || '—')}</td></tr>
-                    <tr><td class="key">Valid From</td><td class="val">${esc(s.validFrom || '—')}</td></tr>
-                    <tr><td class="key">Valid To</td><td class="val">${esc(s.validTo || '—')}</td></tr>
-                    <tr><td class="key">Days Left</td><td class="val">${s.daysLeft}</td></tr>
-                    <tr><td class="key">Protocol</td><td class="val">${esc(s.protocol || '—')}</td></tr>
-                    <tr><td class="key">SANs</td><td class="val">${s.sans?.length ? s.sans.map(x => esc(x)).join(', ') : '—'}</td></tr>
-                </table></div></div>`;
-        }
-        if (data.headers) {
-            const h = data.headers;
-            html += `<div class="tab-content" id="tab-headers"><div class="card"><div class="card-head"><i class="fa-solid fa-list"></i> HTTP Response</div>
-                <table class="res-table">
-                    <tr><td class="key">Status</td><td class="val">${h.status} — ${h.ms}ms</td></tr>
-                    ${h.server ? `<tr><td class="key">Server</td><td class="val">${esc(h.server)}</td></tr>` : ''}
-                    ${Object.entries(h.headers || {}).map(([k, v]) => `<tr><td class="key">${esc(k)}</td><td class="val">${esc(v)}</td></tr>`).join('')}
-                </table></div></div>`;
-        }
-        if (data.reverseDns) {
-            const r = data.reverseDns;
-            html += `<div class="tab-content" id="tab-rdns"><div class="card"><div class="card-head"><i class="fa-solid fa-rotate-left"></i> Reverse DNS</div>
-                <table class="res-table">
-                    <tr><td class="key">IP</td><td class="val">${esc(r.ip || '—')}</td></tr>
-                    <tr><td class="key">Hostnames</td><td class="val">${r.hostnames?.length ? r.hostnames.map(h => esc(h)).join('<br>') : 'No PTR record'}</td></tr>
-                </table></div></div>`;
-        }
-
-        el.innerHTML = html;
-    }
-
-    function switchTab(id, btn) {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        btn.classList.add('active');
-        const tab = document.getElementById(`tab-${id}`);
-        if (tab) tab.classList.add('active');
-    }
-
     // ── Utility functions ────────────────────────────────────
     function esc(s) {
         if (s == null) return '';
         const d = document.createElement('div');
         d.textContent = String(s);
         return d.innerHTML;
-    }
-
-    function copyText(text) {
-        navigator.clipboard.writeText(text).then(() => toast('Copied!', 'info')).catch(() => {});
-    }
-
-    function goLookup(target) {
-        location.href = `https://lookup.openvibe.tools?q=${encodeURIComponent(target)}`;
-    }
-
-    function goToolWithTarget(toolId, target) {
-        location.href = `https://${toolId}.openvibe.tools?q=${encodeURIComponent(target)}`;
     }
 
     function toast(msg, type = 'info') {

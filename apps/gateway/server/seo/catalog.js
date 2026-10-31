@@ -520,6 +520,90 @@ const CODES = {
     },
 };
 
+// ── Try examples (the tool frame, 4.55.0) ─────────────────────
+// Two or three public, harmless values per input tool, under the box: a tap fills it and runs the tool. A tool
+// with no input (my.ip, the generators, the webhook bin) has none. A two-box tool (diff, regex) gets [a, b] pairs.
+const EXAMPLES = {
+    // Network & diagnostics
+    lookup: ['openvibe.network', 'example.com', '1.1.1.1'],
+    ip: ['1.1.1.1', '8.8.8.8', 'openvibe.network'],
+    ipv4: ['192.168.1.0/24', '8.8.8.8', '203.0.113.0/24'],
+    ipv6: ['2001:db8::1', '2606:4700:4700::1111', 'openvibe.network'],
+    geoip: ['1.1.1.1', '8.8.8.8', '193.0.0.1'],
+    hostname: ['1.1.1.1', '8.8.8.8', '93.184.216.34'],
+    isp: ['1.1.1.1', '8.8.8.8', '193.0.0.1'],
+    asn: ['1.1.1.1', '8.8.8.8', '193.0.0.1'],
+    rdns: ['1.1.1.1', '8.8.8.8', '93.184.216.34'],
+    whois: ['openvibe.network', 'wikipedia.org', 'example.com'],
+    rdap: ['openvibe.network', 'wikipedia.org', '1.1.1.1'],
+    dns: ['openvibe.network', 'wikipedia.org', 'example.com'],
+    dig: ['openvibe.network', 'wikipedia.org', 'example.com'],
+    nslookup: ['openvibe.network', 'wikipedia.org', 'example.com'],
+    dnspropagation: ['openvibe.network', 'example.com', 'wikipedia.org'],
+    mx: ['openvibe.network', 'gmail.com', 'wikipedia.org'],
+    txt: ['openvibe.network', 'example.com', 'wikipedia.org'],
+    ns: ['openvibe.network', 'wikipedia.org', 'example.com'],
+    spf: ['openvibe.network', 'example.com', 'wikipedia.org'],
+    dkim: ['openvibe.network', 'example.com', 'wikipedia.org'],
+    dmarc: ['openvibe.network', 'example.com', 'wikipedia.org'],
+    ping: ['1.1.1.1', 'openvibe.network', 'example.com'],
+    traceroute: ['1.1.1.1', 'openvibe.network', 'example.com'],
+    mtr: ['1.1.1.1', 'openvibe.network', 'example.com'],
+    port: ['openvibe.network', '1.1.1.1', 'example.com'],
+    headers: ['https://openvibe.network', 'https://example.com', 'https://wikipedia.org'],
+    redirects: ['https://openvibe.network', 'https://example.com', 'http://wikipedia.org'],
+    ssl: ['openvibe.network', 'wikipedia.org', 'example.com'],
+    curl: ['https://openvibe.network', 'https://example.com', 'https://wikipedia.org'],
+    httpstatus: ['https://openvibe.network', 'https://example.com', 'https://wikipedia.org'],
+    latency: ['1.1.1.1', 'openvibe.network', 'example.com'],
+    blacklist: ['1.1.1.1', '8.8.8.8', 'example.com'],
+    reputation: ['openvibe.network', 'example.com', '1.1.1.1'],
+    smtp: ['openvibe.network', 'example.com', 'gmail.com'],
+    uptime: ['https://openvibe.network', 'https://example.com', 'https://wikipedia.org'],
+    robots: ['openvibe.network', 'wikipedia.org', 'example.com'],
+    sitemap: ['openvibe.network', 'wikipedia.org', 'example.com'],
+    // Developer tools
+    jsonfmt: ['{"name":"openvibe","version":1,"active":true}', '{"a":1,"b":[2,3]}', '{"name": }'],
+    yaml: ['name: openvibe\nversion: 1\nactive: true', 'services:\n  web:\n    image: nginx', 'a: 1\n b: 2'],
+    xml: ['<catalog><item id="1"><name>OpenVibe</name></item></catalog>', '<?xml version="1.0"?><root><a>1</a></root>'],
+    csv: ['name,age,city\nAda,36,London\nLinus,55,Portland', 'a,b\n1,2\n3,4'],
+    sql: ['select u.id, u.name from users u join orders o on u.id = o.user_id where o.total > 100 order by o.total desc', 'select * from users where active = true'],
+    md: ['# Hello\n\nThis is **bold** and *italic*.\n\n- one\n- two', '## Notes\n\nA [link](https://openvibe.network).'],
+    html: ['<div><p>Hello <strong>World</strong></p></div>', '<section><h1>OpenVibe</h1></section>'],
+    base64: ['Hello, World!', 'openvibe.network', 'The quick brown fox'],
+    url: ['https://openvibe.tools/search?q=hello world&lang=en#results', 'a b&c', 'hello/world?x=1'],
+    // Public example tokens made for the Try links (no key, no account, not a secret).
+    jwt: ['eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6Ik9wZW5WaWJlIiwiaWF0IjoxNTE2MjM5MDIyfQ.c2lnbmF0dXJl', 'eyJhbGciOiJub25lIn0.eyJzdWIiOiJleGFtcGxlIiwicm9sZSI6InJlYWRlciJ9.', 'not.a.jwt'], // gitleaks:allow (public examples)
+    hash: ['Hello, World!', 'openvibe.network', 'The quick brown fox'],
+    hex: ['Hello', '4f70656e56696265', 'openvibe'],
+    entities: ['<script>alert("hello")</script>', 'Tom & Jerry', 'a "quote" and \'single\''],
+    cron: ['*/15 9-17 * * 1-5', '0 3 * * *', '*/5 * * * *'],
+    beautify: ['{"a":1,"b":[2,3],"c":{"d":true}}', '<div><p>Hi</p></div>', '.a{color:red}'],
+    minify: ['{\n  "name": "openvibe",\n  "version": 1\n}', '<!-- c -->\n<div>\n  <p>Hi</p>\n</div>'],
+    codediff: [['Line one\nLine two\nLine three\nLine four', 'Line one\nLine 2 modified\nLine three\nLine five\nLine six'], ['a\nb\nc', 'a\nB\nc']],
+    regex: [['\\b[A-Z][a-z]+\\b', 'Hello World from OpenVibe.Tools today'], ['\\d{4}-\\d{2}-\\d{2}', 'Released 2026-10-30 on openvibe.tools']],
+    slugify: ['Hello World! This is a Test -- 2024', 'OpenVibe.Tools — every tool', 'Café au lait'],
+    curlconvert: ["curl -X POST https://api.example.com/users -H 'Content-Type: application/json' -d '{\"name\":\"openvibe\"}'", 'curl https://openvibe.network', 'curl -I https://example.com'],
+    color: ['#a78bfa', '#ff7a1a', 'rgb(255,122,26)'],
+    opengraph: ['https://openvibe.network', 'https://wikipedia.org', 'https://example.com'],
+    read: ['https://openvibe.network', 'https://wikipedia.org', 'https://example.com'],
+    jsminify: ['function greet(name) {\n  // say hello\n  const message = "Hello, " + name + "!";\n  console.log(message);\n  return message;\n}', 'const a = 1;  // comment\nconsole.log(a);'],
+    jsformat: ['function greet(n){const m="Hello, "+n+"!";console.log(m);return m}greet("OpenVibe");', 'const add=(a,b)=>a+b;export default add;'],
+    cssminify: ['/* card */\n.card {\n  color: #ffffff;\n  margin: 0px;\n  padding: 12px;\n}', '.row { display: flex; gap: 0px; }\n/* end */'],
+    cssformat: ['.card{color:#fff;margin:0 0 10px;padding:12px}.card:hover{color:#3b82f6}', '@media (max-width:600px){.card{padding:8px}}'],
+    htmlminify: ['<!-- header -->\n<div class="card">\n    <p>Hello <strong>World</strong></p>\n</div>', '<section>\n  <h1>OpenVibe</h1>\n</section>'],
+    xmlminify: ['<?xml version="1.0"?>\n<!-- catalog -->\n<catalog>\n  <item id="1">\n    <name>OpenVibe</name>\n  </item>\n</catalog>', '<rss><channel><title>OpenVibe</title></channel></rss>'],
+    jsonminify: ['{\n  "name": "openvibe",\n  "version": 1,\n  "tags": ["open", "source"]\n}', '{"a": [1, 2, 3], "b": {"c": true}}'],
+    jsonparse: ['{"user":{"id":7,"name":"Ada","roles":["admin","dev"],"active":true},"count":2}', '{"items":[{"id":1},{"id":2}],"next":null}'],
+    jsonvalidate: ['{"name":"openvibe","version":1,"active":true}', '{\n  "name": "openvibe",\n  "version": 1,\n}'],
+    jsonstringify: ['{"name":"openvibe","note":"line one\\nline two"}', '"{\\"a\\":1}"'],
+    html2md: ['<h1>Hello World</h1>\n<p>This is <strong>bold</strong> and <a href="https://openvibe.network">a link</a>.</p>\n<ul><li>One</li><li>Two</li></ul>', '<blockquote>A quote</blockquote><pre><code>openvibe</code></pre>'],
+    md2html: ['# Hello World\n\nThis is **bold** and *italic* with a [link](https://openvibe.network).\n\n- one\n- two', '> A quote\n\n`inline code`'],
+};
+
+// The examples live on the record too, so the catalogue, the page and any future caller read the same values.
+for (const [sub, examples] of Object.entries(EXAMPLES)) { const rec = DEV[sub] || NET[sub]; if (rec) rec.examples = examples; }
+
 const CATALOG = new Map();
 for (const [sub, rec] of Object.entries(DEV)) CATALOG.set(sub, { ...rec, sub, family: 'dev', hub: sub === 'dev' });
 for (const [sub, rec] of Object.entries(NET)) CATALOG.set(sub, { ...rec, sub, family: 'net', hub: sub === 'net' });

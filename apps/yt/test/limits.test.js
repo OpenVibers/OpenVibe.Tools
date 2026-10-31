@@ -69,6 +69,9 @@ if (args.includes('--dump-json')) {
     process.exit(0);
 }
 const i = args.indexOf('--match-filter');
+// The app's upstream probe (--simulate) is not a download and must not write args.json. It runs five
+// seconds after boot, so a probe landing before the 'no download was started' check made this flaky.
+if (i < 0) { process.stdout.write('jNQXAC9IVRw\\n'); process.exit(0); }
 require('fs').writeFileSync(${JSON.stringify(path.join(data, 'args.json'))}, JSON.stringify(args));
 process.stdout.write('OVD|' + (long ? 4000 : 30) + '|False\\n');
 process.exit(0);   // the match filter skipped it: no file
