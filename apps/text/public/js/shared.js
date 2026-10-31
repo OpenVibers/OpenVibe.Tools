@@ -185,6 +185,9 @@ function initNavbar() {
             token,
             history: { type: 'tool', title: pageTitle() },
             silentLogin: SILENT_LOGIN,
+            // The brand is the site ("Tools"), not the tool's own name: the same brand every framed
+            // tool page carries (owner ask 11).
+            brand: { subLabel: 'Tools', name: 'OpenVibe.Tools' },
         });
     } catch (e) { /* the page works without the navbar */ }
     if (typeof OpenVibeAccountSwitcher !== 'undefined') {
@@ -219,7 +222,7 @@ function initFooter(opts = {}) {
         links.push({ heading: 'Logo tools', items: LOGO_TOOLS });
     }
     try {
-        OpenVibeFooter.init({ service, variant: opts.variant || 'compact', links, apiBase: NETWORK, mount: '#ov-footer' });
+        OpenVibeFooter.init({ service, variant: opts.variant || 'compact', links, apiBase: NETWORK, mount: '#ov-footer', brandName: 'OpenVibe.Tools' });
     } catch (e) { /* optional */ }
 }
 

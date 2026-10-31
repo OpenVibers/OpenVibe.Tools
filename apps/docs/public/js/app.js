@@ -1,51 +1,27 @@
 // ═══════════════════════════════════════════════════════════════
 // Docs.OpenVibe — Client Application
-// Domain-aware document processing SPA.
-// Detects hostname → fetches context → adapts branding + tools.
+// The page around the tool is the shared frame (openvibe-shared ≥ 4.57.1): the server draws the head,
+// the box, the answer slot, the family and the folds for this host. This file fills the box (the drop
+// zone, the tool's own options and the one button) and the answer (the file it made, its size before
+// and after, and Download). The upload, the processing and the download are the app's own, unchanged.
 // ═══════════════════════════════════════════════════════════════
 
 (function () {
     'use strict';
 
     // ── State ────────────────────────────────────────────────
-    let ctx = null;              // domain context from /api/context
-    let selectedFiles = [];      // File objects (single or multi)
-    let selectedTool = 'merge';
-    let selectedAngle = 90;
-    let selectedImgFmt = 'png';
+    let ctx = null;           // domain context from /api/context
+    let selectedFiles = [];   // the File objects the drop zone holds
 
     // ── DOM refs ─────────────────────────────────────────────
     const $ = (sel) => document.querySelector(sel);
     const $$ = (sel) => document.querySelectorAll(sel);
 
-    const heroIcon = $('#hero-icon');
-    const heroTitle = $('#hero-title');
-    const heroSubtitle = $('#hero-subtitle');
-    const toolTabs = $('#tool-tabs');
-    const uploadArea = $('#upload-area');
-    const uploadHint = $('#upload-hint');
-    const uploadInfo = $('#upload-info');
-    const multiFileZone = $('#multi-file-zone');
     const fileInput = $('#file-input');
-    const multiFileInput = $('#multi-file-input');
-    const browseBtn = $('#browse-btn');
-    const clearBtn = $('#clear-btn');
-    const addMoreBtn = $('#add-more-btn');
-    const clearAllBtn = $('#clear-all-btn');
-    const fileList = $('#file-list');
     const optionsPanel = $('#options-panel');
     const processBtn = $('#process-btn');
-    const processText = $('#process-text');
-    const processingEl = $('#processing');
-    const resultPanel = $('#result-panel');
-    const resultInfo = $('#result-info');
-    const downloadBtn = $('#download-btn');
-    const anotherBtn = $('#another-btn');
-    const subdomainsSection = $('#subdomains');
-    const subdomainGrid = $('#subdomain-grid');
-
-    // Multi-file tools
-    const MULTI_FILE_TOOLS = new Set(['merge', 'img2pdf']);
+    const clearBtn = $('#clear-btn');
+    const kit = () => window.OpenVibeKit;
 
     // ── Init ─────────────────────────────────────────────────
     async function init() {
@@ -53,104 +29,43 @@
             const res = await fetch('/api/context');
             ctx = await res.json();
         } catch {
-            ctx = { toolId: 'hub', brandName: 'Docs.OpenVibe', defaultOp: null, faIcon: 'fa-file-pdf', tools: [] };
+            ctx = { toolId: 'hub', brandName: 'Docs.OpenVibe', tools: [] };
         }
 
-        applyBranding();
-        showAvailability();
         initNavbar();
         initNotifications();
         if (typeof OpenVibeAccountSwitcher !== 'undefined') OpenVibeAccountSwitcher.init({ apiBase: 'https://openvibe.network' });
-        initToolTabs();
-        initUpload();
+        showAvailability();
+        initDrop();
         initOptions();
-        initSubdomains();
-        initResult();
         reattach();
     }
 
-    // ── Branding ─────────────────────────────────────────────
-    function applyBranding() {
-        document.title = ctx.seoTitle || `${ctx.brandName} — Document Tools`;
-        heroIcon.innerHTML = `<i class="fa-solid ${ctx.faIcon || 'fa-file-pdf'}"></i>`;
-        heroTitle.textContent = ctx.brandName || 'Docs.OpenVibe';
-
-        const subtitles = {
-            hub: 'Online PDF & Document Tools',
-            merge: 'Combine PDF Files Online',
-            split: 'Split PDF Files Online',
-            compress: 'Compress PDF Files Online',
-            rotate: 'Rotate PDF Pages Online',
-            reorder: 'Rearrange PDF Pages Online',
-            watermark: 'Add Watermarks to PDFs Online',
-            protect: 'Password Protect PDFs Online',
-            unlock: 'Remove PDF Password Online',
-            img2pdf: 'Convert Images to PDF Online',
-            pdf2img: 'Convert PDF to Images Online',
-        };
-        heroSubtitle.textContent = subtitles[ctx.toolId] || ctx.seoDescription || subtitles.hub;
-
-        if (ctx.defaultOp) selectedTool = ctx.defaultOp;
-
-        // Hide tool tabs on single-tool domains
-        if (ctx.toolId !== 'hub') {
-            toolTabs.style.display = 'none';
-        }
-
-        // Hide subdomains section on non-hub domains
-        if (ctx.toolId !== 'hub') {
-            subdomainsSection.style.display = 'none';
-        }
-
-        // Update upload hint based on tool
-        updateUploadHint();
-
-        // Update meta description
-        const metaDesc = document.querySelector('meta[name="description"]');
-        if (metaDesc && ctx.seoDescription) metaDesc.content = ctx.seoDescription;
-    }
-
-    // A tool whose server-side program is not installed yet (Protect/Unlock need qpdf, PDF to image
-    // needs poppler): the page says so instead of letting an upload fail.
+    // ── A tool whose command-line tools are not on the server yet ──
+    // Protect and Unlock need qpdf, PDF to images needs poppler: while one is missing the tool answers
+    // 503, so the page says so instead of letting the upload fail.
     function showAvailability() {
-        const tool = (ctx.tools || []).find(t => t.id === selectedTool);
+        const op = (ctx && ctx.defaultOp) || null;
+        const tool = (ctx.tools || []).find((t) => t.id === op);
         const off = !!(tool && tool.available === false);
+        const card = document.querySelector('.ovk-tool-card');
+        if (!card) return;
         let note = document.getElementById('tool-notice');
-        const zone = document.getElementById('upload-zone');
-        if (off && !note && zone) {
+        if (off && !note) {
             note = document.createElement('div');
             note.id = 'tool-notice';
             note.className = 'tool-notice';
             note.setAttribute('role', 'status');
-            zone.parentNode.insertBefore(note, zone);
+            card.appendChild(note);
         }
         if (note) {
             note.textContent = off ? `${tool.label} is being set up on the server and is not available yet. The other PDF tools work now.` : '';
             note.style.display = off ? '' : 'none';
         }
-        if (zone) zone.style.display = off ? 'none' : '';
-        if (off) { optionsPanel.style.display = 'none'; processBtn.disabled = true; }
-    }
-
-    function updateUploadHint() {
-        const isImageTool = selectedTool === 'img2pdf';
-        const isPdfTool = !isImageTool;
-        if (isImageTool) {
-            uploadHint.textContent = 'or click to browse — PNG, JPG, WebP, TIFF, BMP, GIF';
-            fileInput.accept = 'image/*';
-            multiFileInput.accept = 'image/*';
-        } else {
-            uploadHint.textContent = 'or click to browse — PDF files';
-            fileInput.accept = '.pdf,application/pdf';
-            multiFileInput.accept = '.pdf,application/pdf';
-        }
-
-        // Multi-file tools allow multiple selection
-        if (MULTI_FILE_TOOLS.has(selectedTool)) {
-            fileInput.multiple = true;
-        } else {
-            fileInput.multiple = false;
-        }
+        const drop = document.querySelector('.ovk-drop');
+        if (drop) drop.hidden = off;
+        if (optionsPanel) optionsPanel.hidden = off || optionsPanel.hidden;
+        if (off && processBtn) processBtn.disabled = true;
     }
 
     // ── Navbar ───────────────────────────────────────────────
@@ -158,13 +73,11 @@
         const token = getCookie('ov_token') || localStorage.getItem('ov_token');
         let user = null;
         if (token) {
-            try {
-                const payload = JSON.parse(atob(token.split('.')[1]));
-                user = payload;
-            } catch { /* invalid token */ }
+            try { user = JSON.parse(atob(token.split('.')[1])); } catch { /* invalid token */ }
         }
 
-        // Brand name/icon come from the hostname now (png.openvibe.tools → "PNG.OpenVibe.Tools").
+        // The brand is the site ("Tools"), not the subdomain's name: the same brand the network and
+        // code tool pages carry (owner ask 11).
         if (typeof OpenVibeNavbar !== 'undefined') {
             OpenVibeNavbar.init({
                 service: 'docs',
@@ -173,39 +86,41 @@
                 apiBase: 'https://openvibe.network',
                 history: { type: 'tool', title: ctx?.brandName || 'Docs.OpenVibe' },
                 silentLogin: 'https://openvibe.tools/auth/login?silent=1&next={url}',
+                brand: { subLabel: 'Tools', name: 'OpenVibe.Tools' },
             });
         }
         initFooter();
     }
 
     /* ---------- Footer (shared OpenVibeFooter) ---------- */
-    // Full footer on the hub host, the compact strip on the single-tool hosts.
     function initFooter() {
         if (typeof OpenVibeFooter === 'undefined') return;
         try {
             OpenVibeFooter.init({
                 service: 'docs',
-                variant: (!ctx || ctx.toolId === 'hub') ? 'full' : 'compact',
+                variant: 'compact',
                 mount: '#ov-footer',
                 apiBase: 'https://openvibe.network',
-                links: [{ heading: 'Docs tools', items: [
-                    { name: 'Merge PDF', url: 'https://mergepdf.openvibe.tools' },
-                    { name: 'Split PDF', url: 'https://splitpdf.openvibe.tools' },
-                    { name: 'Compress PDF', url: 'https://compresspdf.openvibe.tools' },
-                    { name: 'Rotate PDF', url: 'https://rotatepdf.openvibe.tools' },
-                    { name: 'Watermark PDF', url: 'https://watermarkpdf.openvibe.tools' },
-                    { name: 'Protect PDF', url: 'https://protectpdf.openvibe.tools' },
-                    { name: 'Images to PDF', url: 'https://image2pdf.openvibe.tools' },
-                    { name: 'PDF to images', url: 'https://pdf2jpg.openvibe.tools' },
+                brandName: 'OpenVibe.Tools',
+                links: [{ heading: 'PDF tools', items: [
+                    { name: 'Merge', url: 'https://mergepdf.openvibe.tools' },
+                    { name: 'Split', url: 'https://splitpdf.openvibe.tools' },
+                    { name: 'Compress', url: 'https://compresspdf.openvibe.tools' },
+                    { name: 'Rotate', url: 'https://rotatepdf.openvibe.tools' },
+                    { name: 'Watermark', url: 'https://watermarkpdf.openvibe.tools' },
+                    { name: 'Protect', url: 'https://protectpdf.openvibe.tools' },
                 ] }],
             });
         } catch { /* optional */ }
     }
 
+    // ── Notifications (OpenVibe bell + toasts) ───────────
     function initNotifications() {
         const token = getCookie('ov_token') || localStorage.getItem('ov_token');
         if (typeof OpenVibeNotifications === 'undefined') return;
+
         OpenVibeNotifications.init({ token: token || null, apiBase: 'https://openvibe.network' });
+
         if (typeof OpenVibeNavbar !== 'undefined') {
             const mount = OpenVibeNavbar.getBellMount();
             if (mount) {
@@ -215,255 +130,90 @@
         }
     }
 
-    // ── Tool Tabs ────────────────────────────────────────────
-    function initToolTabs() {
-        $$('.tool-tab[data-tool]').forEach(tab => {
-            if (tab.dataset.tool === selectedTool) tab.classList.add('active');
-            else tab.classList.remove('active');
-
-            tab.addEventListener('click', () => {
-                selectedTool = tab.dataset.tool;
-                $$('.tool-tab[data-tool]').forEach(t => t.classList.toggle('active', t.dataset.tool === selectedTool));
-                resetUpload();
-                updateUploadHint();
-                updateProcessButton();
-                showAvailability();
-            });
-        });
-    }
-
-    // ── Upload ───────────────────────────────────────────────
-    function initUpload() {
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
-        });
-        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            if (e.dataTransfer.files.length) handleFiles(Array.from(e.dataTransfer.files));
-        });
-
-        uploadArea.addEventListener('click', () => fileInput.click());
-        browseBtn.addEventListener('click', (e) => { e.stopPropagation(); fileInput.click(); });
+    // ── The box: the drop zone ───────────────────────────────
+    function initDrop() {
+        if (!fileInput) return;
         fileInput.addEventListener('change', () => {
-            if (fileInput.files.length) handleFiles(Array.from(fileInput.files));
+            const files = Array.prototype.slice.call(fileInput.files || []);
+            if (files.length) handleFiles(files);
         });
+        if (clearBtn) clearBtn.addEventListener('click', resetUpload);
 
-        // Multi-file controls
-        addMoreBtn.addEventListener('click', () => multiFileInput.click());
-        multiFileInput.addEventListener('change', () => {
-            if (multiFileInput.files.length) handleFiles(Array.from(multiFileInput.files), true);
-        });
-
-        clearBtn.addEventListener('click', resetUpload);
-        clearAllBtn.addEventListener('click', resetUpload);
-    }
-
-    function handleFiles(files, append = false) {
-        const isMulti = MULTI_FILE_TOOLS.has(selectedTool);
-
-        // Validate file types
-        for (const file of files) {
-            if (selectedTool === 'img2pdf') {
-                if (!file.type.startsWith('image/')) {
-                    alert(`"${file.name}" is not an image file.`);
-                    return;
-                }
-            } else {
-                if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
-                    alert(`"${file.name}" is not a PDF file.`);
-                    return;
-                }
-            }
-            if (file.size > 100 * 1024 * 1024) {
-                alert(`"${file.name}" is too large. Maximum 100MB per file.`);
-                return;
-            }
-        }
-
-        if (isMulti) {
-            if (append) {
-                selectedFiles = [...selectedFiles, ...files];
-            } else {
-                selectedFiles = [...files];
-            }
-            showMultiFileList();
-        } else {
-            selectedFiles = [files[0]];
-            showSingleFile(files[0]);
-        }
-
-        optionsPanel.style.display = '';
-        showToolOptions();
-        updateProcessButton();
-    }
-
-    function showSingleFile(file) {
-        uploadArea.style.display = 'none';
-        multiFileZone.style.display = 'none';
-        uploadInfo.style.display = 'flex';
-
-        const preview = $('#file-preview');
-        const details = $('#file-details');
-
-        if (file.type === 'application/pdf') {
-            preview.innerHTML = '<i class="fa-solid fa-file-pdf"></i>';
-        } else {
-            const url = URL.createObjectURL(file);
-            preview.innerHTML = `<img src="${url}" alt="Preview">`;
-        }
-
-        details.innerHTML = `
-            <div class="fname">${escapeHtml(file.name)}</div>
-            <div class="fmeta">${file.type || 'application/pdf'} &bull; ${formatBytes(file.size)}</div>
-        `;
-    }
-
-    function showMultiFileList() {
-        uploadArea.style.display = 'none';
-        uploadInfo.style.display = 'none';
-        multiFileZone.style.display = '';
-
-        fileList.innerHTML = selectedFiles.map((f, i) => `
-            <li>
-                <span class="fname"><i class="fa-solid ${f.type === 'application/pdf' ? 'fa-file-pdf' : 'fa-file-image'}" style="color:var(--accent);margin-right:8px"></i>${escapeHtml(f.name)}</span>
-                <span class="fsize">${formatBytes(f.size)}</span>
-                <button class="remove-file" data-idx="${i}" title="Remove"><i class="fa-solid fa-xmark"></i></button>
-            </li>
-        `).join('');
-
-        // Bind remove buttons
-        fileList.querySelectorAll('.remove-file').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const idx = parseInt(btn.dataset.idx);
-                selectedFiles.splice(idx, 1);
-                if (selectedFiles.length === 0) {
-                    resetUpload();
-                } else {
-                    showMultiFileList();
-                    updateProcessButton();
-                }
+        const sampleLink = document.querySelector('[data-ovk-sample]');
+        if (sampleLink && window.OVToolFrame) {
+            sampleLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.OVToolFrame.sample(sampleLink.getAttribute('data-ovk-sample'), (file) => handleFiles([file]));
             });
-        });
+        }
+    }
+
+    function handleFiles(files) {
+        const many = fileInput.hasAttribute('multiple');
+        const max = many ? 50 : 1;
+        if (files.length > max) {
+            fail(`That is more than ${max} file${max === 1 ? '' : 's'}.`);
+            return;
+        }
+        const tooBig = files.find((f) => f.size > 100 * 1024 * 1024);
+        if (tooBig) {
+            fail('That file is too large. The maximum is 100 MB.');
+            return;
+        }
+        selectedFiles = files;
+        if (optionsPanel) optionsPanel.hidden = false;
+        if (processBtn) processBtn.disabled = false;
+        hideAnswer();
     }
 
     function resetUpload() {
         selectedFiles = [];
-        fileInput.value = '';
-        multiFileInput.value = '';
-        uploadArea.style.display = '';
-        uploadInfo.style.display = 'none';
-        multiFileZone.style.display = 'none';
-        optionsPanel.style.display = 'none';
-        resultPanel.style.display = 'none';
-        processingEl.style.display = 'none';
-        processBtn.disabled = true;
+        if (fileInput) fileInput.value = '';
+        if (optionsPanel) optionsPanel.hidden = true;
+        if (processBtn) processBtn.disabled = true;
+        hideAnswer();
     }
 
-    // ── Options ──────────────────────────────────────────────
+    // ── The box: the options and the one button ─────────────
     function initOptions() {
-        // Split mode toggle
-        const splitMode = $('#split-mode');
-        if (splitMode) {
-            splitMode.addEventListener('change', () => {
-                const rangesInput = $('#split-ranges-input');
-                rangesInput.style.display = splitMode.value === 'ranges' ? '' : 'none';
-            });
-        }
-
-        // Watermark opacity slider
-        const wmOpacity = $('#wm-opacity');
-        const wmOpacityVal = $('#wm-opacity-val');
-        if (wmOpacity) {
-            wmOpacity.addEventListener('input', () => { wmOpacityVal.textContent = wmOpacity.value; });
-        }
-
-        // Angle buttons
-        $$('[data-angle]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                selectedAngle = parseInt(btn.dataset.angle);
-                $$('[data-angle]').forEach(b => b.classList.toggle('active', b.dataset.angle === btn.dataset.angle));
-            });
-        });
-
-        // Image format buttons
-        $$('[data-imgfmt]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                selectedImgFmt = btn.dataset.imgfmt;
-                $$('[data-imgfmt]').forEach(b => b.classList.toggle('active', b.dataset.imgfmt === btn.dataset.imgfmt));
-            });
-        });
-
-        processBtn.addEventListener('click', processDocument);
+        if (processBtn) processBtn.addEventListener('click', processDocument);
     }
 
-    function showToolOptions() {
-        // Hide all option groups
-        const groups = ['opt-split', 'opt-compress', 'opt-rotate', 'opt-reorder',
-            'opt-watermark', 'opt-img2pdf', 'opt-pdf2img', 'opt-protect', 'opt-unlock'];
-        groups.forEach(id => {
-            const el = $(`#${id}`);
-            if (el) el.style.display = 'none';
+    /** The tool's own options, as the job's input: the fields the descriptor names, and nothing else. */
+    function collectInput() {
+        const form = document.querySelector('#ovk-docs-form');
+        const input = {};
+        if (!form) return input;
+        form.querySelectorAll('input[name], select[name], textarea[name]').forEach((el) => {
+            if (el.type === 'hidden') { input[el.name] = el.value; return; }
+            // The drop zone's own file field is not an option: the file goes in the job's files.
+            if (el.type === 'file') return;
+            if (el.type === 'radio') { if (el.checked) input[el.name] = el.value; return; }
+            if (el.type === 'checkbox') { input[el.name] = el.checked; return; }
+            if (el.value === '') return;
+            input[el.name] = el.value;
         });
-
-        // Show active tool options
-        const optEl = $(`#opt-${selectedTool}`);
-        if (optEl) optEl.style.display = '';
-    }
-
-    function updateProcessButton() {
-        const isMulti = MULTI_FILE_TOOLS.has(selectedTool);
-        const hasFiles = selectedFiles.length > 0;
-        const hasEnoughFiles = isMulti ? selectedFiles.length >= (selectedTool === 'merge' ? 2 : 1) : hasFiles;
-        processBtn.disabled = !hasEnoughFiles;
-
-        const labels = {
-            merge: 'Merge PDFs',
-            split: 'Split PDF',
-            compress: 'Compress PDF',
-            rotate: 'Rotate Pages',
-            reorder: 'Reorder Pages',
-            watermark: 'Add Watermark',
-            protect: 'Protect PDF',
-            unlock: 'Unlock PDF',
-            img2pdf: 'Convert to PDF',
-            pdf2img: 'Convert to Images',
-            metadata: 'View Info',
-        };
-        processText.textContent = labels[selectedTool] || 'Process Document';
+        return input;
     }
 
     // ── Process ──────────────────────────────────────────────
     async function processDocument() {
-        if (selectedFiles.length === 0) return;
+        if (!selectedFiles.length) return;
 
-        optionsPanel.style.display = 'none';
-        resultPanel.style.display = 'none';
-        processingEl.style.display = '';
-        processBtn.disabled = true;
-
-        const isMulti = MULTI_FILE_TOOLS.has(selectedTool);
-        const formData = new FormData();
-        formData.append('tool', selectedTool);
-
-        if (isMulti) {
-            for (const file of selectedFiles) {
-                formData.append('files', file);
-            }
-        } else {
-            formData.append('file', selectedFiles[0]);
+        const input = collectInput();
+        if (processBtn) {
+            processBtn.disabled = true;
+            const span = processBtn.querySelector('span');
+            // The button keeps its verb while it works: "Compress…", not "Working…".
+            if (span) span.textContent = `${span.textContent.replace(/…$/, '')}…`;
         }
+        showWorking();
 
-        // Add tool-specific options
-        addToolOptions(formData);
-
-        // Jobs: the work is accepted, followed live and survives a reload (?job=<id> in the address).
-        const input = {};
-        for (const [k, v] of formData.entries()) if (k !== 'file' && k !== 'files') input[k] = v;
         try {
-            const job = await OVJobs.submit({ type: 'docs.process', input, files: isMulti ? selectedFiles : [selectedFiles[0]], fileField: isMulti ? 'files' : 'file' });
+            const many = selectedFiles.length > 1;
+            const job = await OVJobs.submit({
+                type: 'docs.process', input, files: selectedFiles, fileField: many ? 'files' : 'file',
+            });
             OVJobs.remember(job.id);
             followJob(job);
         } catch (err) {
@@ -471,99 +221,29 @@
         }
     }
 
-    function addToolOptions(formData) {
-        switch (selectedTool) {
-            case 'split': {
-                const mode = $('#split-mode').value;
-                if (mode === 'ranges') {
-                    formData.append('ranges', $('#split-ranges').value);
-                } else {
-                    formData.append('mode', mode);
-                }
-                break;
-            }
-            case 'compress':
-                formData.append('level', $('#compress-level').value);
-                break;
-            case 'rotate':
-                formData.append('angle', selectedAngle);
-                formData.append('pages', $('#rotate-pages').value || 'all');
-                break;
-            case 'reorder':
-                formData.append('order', $('#reorder-order').value);
-                break;
-            case 'watermark':
-                formData.append('text', $('#wm-text').value);
-                formData.append('fontSize', $('#wm-fontsize').value);
-                formData.append('opacity', ($('#wm-opacity').value / 100).toString());
-                formData.append('rotation', $('#wm-rotation').value);
-                formData.append('color', $('#wm-color').value);
-                formData.append('pages', $('#wm-pages').value || 'all');
-                break;
-            case 'img2pdf':
-                formData.append('pageSize', $('#img2pdf-pagesize').value);
-                break;
-            case 'pdf2img':
-                formData.append('format', selectedImgFmt);
-                formData.append('dpi', $('#pdf2img-dpi').value);
-                formData.append('pages', $('#pdf2img-pages').value || 'all');
-                break;
-            case 'protect':
-                formData.append('password', $('#protect-password').value);
-                formData.append('allowPrint', $('#protect-print').checked ? 'true' : 'false');
-                formData.append('allowCopy', $('#protect-copy').checked ? 'true' : 'false');
-                break;
-            case 'unlock':
-                formData.append('password', $('#unlock-password').value);
-                break;
-        }
-    }
-
     // ── Jobs ─────────────────────────────────────────────────
     let watcher = null;
-    let currentJob = null;
 
     function processingText(job) {
         const pct = job.progress && job.progress.percent;
-        if (job.cancel_requested) return 'Cancelling...';
-        if (job.state === 'queued') return 'Waiting for a free slot...';
-        const label = (job.progress && job.progress.message) || 'Processing your document';
-        return pct != null ? `${label}... ${Math.round(pct)}%` : `${label}...`;
-    }
-
-    function cancelButton() {
-        let btn = processingEl.querySelector('.job-cancel');
-        if (!btn) {
-            btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'btn-secondary job-cancel';
-            btn.textContent = 'Cancel';
-            btn.addEventListener('click', () => { if (currentJob) OVJobs.cancel(currentJob).catch(() => {}); });
-            processingEl.appendChild(btn);
-        }
-        return btn;
+        if (job.cancel_requested) return 'Cancelling…';
+        if (job.state === 'queued') return 'Waiting for a free slot…';
+        const label = (job.progress && job.progress.message) || 'Working on your document';
+        return pct != null ? `${label}… ${Math.round(pct)}%` : `${label}…`;
     }
 
     function followJob(job) {
-        currentJob = job.id;
-        optionsPanel.style.display = 'none';
-        resultPanel.style.display = 'none';
-        processingEl.style.display = '';
-        processBtn.disabled = true;
-        const label = processingEl.querySelector('p');
-        const update = (j) => { if (label) label.textContent = processingText(j); };
-        cancelButton().style.display = '';
-        update(job);
+        hideAnswer();
+        showWorking();
         if (watcher) watcher.close();
         watcher = OVJobs.watch(job.id, {
-            onUpdate: update,
+            onUpdate: (j) => {
+                const out = document.querySelector('.ovk-tool-out');
+                if (out) out.querySelector('[data-ovk-working]')?.setAttribute('data-progress', processingText(j));
+            },
             onDone(done) {
                 watcher = null;
-                cancelButton().style.display = 'none';
-                if (done.state === 'succeeded') {
-                    const data = jobResult(done);
-                    return data.viewOnly ? showMetadataResult(data) : showResult(data);
-                }
+                if (done.state === 'succeeded') return showResult(jobResult(done));
                 OVJobs.forget();
                 failProcessing(done.state === 'cancelled' ? null : (done.error && done.error.detail) || 'Processing failed');
             },
@@ -571,20 +251,25 @@
         });
     }
 
-    /** A finished job in the shape the synchronous endpoints answer with. */
+    /** A finished job in the shape the synchronous endpoint answers with. */
     function jobResult(job) {
-        const f = job.result && job.result.files && job.result.files[0];
+        const f = (job.result && job.result.files && job.result.files[0]) || {};
         return {
             ...(job.result && job.result.data),
-            download: f ? { id: job.id, downloadUrl: f.url, filename: f.name, expiresIn: OVJobs.expiresIn(job) } : undefined,
+            download: { id: job.id, downloadUrl: f.url, previewUrl: f.url ? `${f.url}?inline=1` : null, filename: f.name, expiresIn: OVJobs.expiresIn(job) },
         };
     }
 
+    function resetVerb() {
+        const span = processBtn && processBtn.querySelector('span');
+        if (span) span.textContent = span.textContent.replace(/…$/, '');
+    }
+
     function failProcessing(message) {
-        processingEl.style.display = 'none';
-        optionsPanel.style.display = selectedFiles.length ? '' : 'none';
-        processBtn.disabled = !selectedFiles.length;
-        if (message) alert(`Error: ${message}`);
+        resetVerb();
+        if (processBtn) processBtn.disabled = !selectedFiles.length;
+        if (message) fail(message);
+        else hideAnswer();
     }
 
     /** After a reload: pick the job up again from ?job=<id> or this tab's session. */
@@ -594,116 +279,56 @@
         OVJobs.get(id).then(followJob).catch(() => OVJobs.forget());
     }
 
-    // ── Result ───────────────────────────────────────────────
-    function initResult() {
-        anotherBtn.addEventListener('click', () => {
-            if (window.OVJobs) OVJobs.forget();
-            resetUpload();
-            (toolTabs.style.display !== 'none' ? toolTabs : uploadArea).scrollIntoView({ behavior: 'smooth' });
+    // ── The answer ───────────────────────────────────────────
+    function showWorking() {
+        const out = document.querySelector('.ovk-tool-out');
+        if (!out || !kit()) return;
+        out.innerHTML = kit().answer({
+            title: 'Working…',
+            body: '<p data-ovk-working>Your document is being worked on by our server. This page stays open until it is done.</p>',
         });
     }
 
+    function hideAnswer() {
+        const out = document.querySelector('.ovk-tool-out');
+        if (out) out.innerHTML = '';
+    }
+
+    function fail(message) {
+        const out = document.querySelector('.ovk-tool-out');
+        if (!out || !kit()) return;
+        out.innerHTML = kit().answer({ title: 'That did not work', tone: 'bad', body: `<p>${escapeHtml(message)}</p>` });
+    }
+
     function showResult(data) {
-        processingEl.style.display = 'none';
-        resultPanel.style.display = '';
-
-        let infoHtml = '';
-
-        if (data.output) {
-            infoHtml += `<p>Format: <strong>${data.output.ext.toUpperCase()}</strong> &bull; Size: <strong>${data.output.sizeKB} KB</strong></p>`;
-        }
-        if (data.pageCount !== undefined) {
-            infoHtml += `<p>Pages: <strong>${data.pageCount}</strong></p>`;
-        }
-        if (data.fileCount) {
-            infoHtml += `<p>Files processed: <strong>${data.fileCount}</strong></p>`;
-        }
-        if (data.savings) {
-            const pct = data.savings.savedPercent;
-            if (pct > 0) {
-                infoHtml += `<p class="savings">Saved ${pct}% (${formatBytes(data.savings.savedBytes)} smaller)</p>`;
-            } else {
-                infoHtml += `<p>File size unchanged or slightly larger.</p>`;
-            }
-        }
-        if (data.note) {
-            infoHtml += `<p style="color:var(--text-muted);font-size:12px">${escapeHtml(data.note)}</p>`;
-        }
-
-        const expires = data.download?.expiresIn;
+        resetVerb();
+        if (processBtn) processBtn.disabled = false;
+        const out = data.output || {};
+        const rows = [];
+        if (out.ext) rows.push(['Format', String(out.ext).toUpperCase()]);
+        if (data.fileCount) rows.push(['Files', String(data.fileCount)]);
+        if (data.pageCount) rows.push(['Pages', String(data.pageCount)]);
+        if (data.savings && data.savings.savedPercent) rows.push(['Smaller by', `${data.savings.savedPercent}%`, { text: 'good', tone: 'ok' }]);
+        const expires = data.download && data.download.expiresIn;
         if (expires) {
-            const expiresStr = expires >= 3600000 ? `${Math.round(expires / 3600000)}h` : `${Math.round(expires / 60000)}m`;
-            infoHtml += `<p style="color:var(--text-muted);font-size:12px;margin-top:8px">Download expires in ${expiresStr}</p>`;
+            const mins = Math.max(1, Math.round(expires / 60000));
+            rows.push(['Kept for', mins >= 60 ? `${Math.round(mins / 60)} hour${Math.round(mins / 60) === 1 ? '' : 's'}` : `${mins} minutes`]);
         }
-
-        resultInfo.innerHTML = infoHtml;
-        downloadBtn.href = data.download?.downloadUrl || '#';
-        downloadBtn.download = '';
-        downloadBtn.style.display = data.download ? '' : 'none';
-        resultPanel.scrollIntoView({ behavior: 'smooth' });
-    }
-
-    function showMetadataResult(data) {
-        processingEl.style.display = 'none';
-        resultPanel.style.display = '';
-
-        const m = data.metadata || {};
-        let infoHtml = '<div style="text-align:left;max-width:500px;margin:0 auto">';
-        infoHtml += `<p><strong>Title:</strong> ${escapeHtml(m.title || '(none)')}</p>`;
-        infoHtml += `<p><strong>Author:</strong> ${escapeHtml(m.author || '(none)')}</p>`;
-        infoHtml += `<p><strong>Subject:</strong> ${escapeHtml(m.subject || '(none)')}</p>`;
-        infoHtml += `<p><strong>Creator:</strong> ${escapeHtml(m.creator || '(none)')}</p>`;
-        infoHtml += `<p><strong>Producer:</strong> ${escapeHtml(m.producer || '(none)')}</p>`;
-        infoHtml += `<p><strong>Pages:</strong> ${m.pageCount || '?'}</p>`;
-        if (m.creationDate) infoHtml += `<p><strong>Created:</strong> ${m.creationDate}</p>`;
-        if (m.modificationDate) infoHtml += `<p><strong>Modified:</strong> ${m.modificationDate}</p>`;
-        infoHtml += '</div>';
-
-        resultInfo.innerHTML = infoHtml;
-        downloadBtn.style.display = 'none';
-        resultPanel.scrollIntoView({ behavior: 'smooth' });
-    }
-
-    // ── Subdomains Grid ──────────────────────────────────────
-    function initSubdomains() {
-        const tools = [
-            { host: 'mergepdf.openvibe.tools',     name: 'MergePDF',     icon: 'fa-object-group',  desc: 'Combine PDF files' },
-            { host: 'splitpdf.openvibe.tools',     name: 'SplitPDF',     icon: 'fa-scissors',      desc: 'Split by page range' },
-            { host: 'compresspdf.openvibe.tools',  name: 'CompressPDF',  icon: 'fa-compress',      desc: 'Reduce file size' },
-            { host: 'rotatepdf.openvibe.tools',    name: 'RotatePDF',    icon: 'fa-rotate',        desc: 'Rotate PDF pages' },
-            { host: 'reorderpdf.openvibe.tools',   name: 'ReorderPDF',   icon: 'fa-sort',          desc: 'Rearrange pages' },
-            { host: 'watermarkpdf.openvibe.tools', name: 'WatermarkPDF', icon: 'fa-stamp',         desc: 'Add watermarks' },
-            { host: 'protectpdf.openvibe.tools',   name: 'ProtectPDF',   icon: 'fa-lock',          desc: 'Password protect' },
-            { host: 'unlockpdf.openvibe.tools',    name: 'UnlockPDF',    icon: 'fa-lock-open',     desc: 'Remove password' },
-            { host: 'image2pdf.openvibe.tools',    name: 'Image2PDF',    icon: 'fa-file-image',    desc: 'Images to PDF' },
-            { host: 'jpg2pdf.openvibe.tools',      name: 'JPG2PDF',      icon: 'fa-file-image',    desc: 'JPG to PDF' },
-            { host: 'png2pdf.openvibe.tools',      name: 'PNG2PDF',      icon: 'fa-file-image',    desc: 'PNG to PDF' },
-            { host: 'pdf2jpg.openvibe.tools',      name: 'PDF2JPG',      icon: 'fa-image',         desc: 'PDF to JPG' },
-            { host: 'pdf2png.openvibe.tools',      name: 'PDF2PNG',      icon: 'fa-image',         desc: 'PDF to PNG' },
-            { host: 'pdf.openvibe.tools',          name: 'OpenVibePDF',      icon: 'fa-file-pdf',      desc: 'All PDF tools' },
-        ];
-
-        subdomainGrid.innerHTML = tools.map(t => `
-            <a class="subdomain-card" href="https://${t.host}">
-                <span class="sd-icon"><i class="fa-solid ${t.icon}"></i></span>
-                <span class="sd-info">
-                    <span class="sd-name">${t.name}</span>
-                    <span class="sd-desc">${t.desc}</span>
-                </span>
-            </a>
-        `).join('');
+        const html = window.OVToolFrame.fileAnswer({
+            title: 'Your document is ready',
+            before: selectedFiles.reduce((sum, f) => sum + f.size, 0) || null,
+            after: out.size != null ? out.size : null,
+            rows,
+            downloadUrl: data.download && data.download.downloadUrl,
+            filename: data.download && data.download.filename,
+        });
+        window.OVToolFrame.show(html);
     }
 
     // ── Helpers ──────────────────────────────────────────────
     function getCookie(name) {
         const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
         return match ? decodeURIComponent(match[1]) : null;
-    }
-
-    function formatBytes(bytes) {
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     }
 
     function escapeHtml(str) {

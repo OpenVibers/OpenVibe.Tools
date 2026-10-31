@@ -40,6 +40,10 @@
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
+  <!-- The tool frame (the shared one, openvibe-shared >= 4.57.1): the server draws it for this
+       host — the head, the box, the answer slot, the family, the folds and "People also use". -->
+  <!--OVK:FRAME-->
+  <!--OVK:BOX-->
   <!-- Location Bar -->
   <div id="loc-bar">
     <div class="loc-search">
@@ -50,6 +54,8 @@
     </div>
   </div>
 
+  <!--/OVK:BOX-->
+  <!--OVK:ANSWER-->
   <!-- Main Content -->
   <main id="main">
     <!-- Tabs -->
@@ -162,6 +168,7 @@
       </section>
     </div>
   </main>
+  <!--/OVK:ANSWER-->
 
   <p class="data-credit"><i class="fa-solid fa-database"></i> Data from USDA, OSM and store pricing research</p>
   <div id="ov-footer"></div>
@@ -171,7 +178,11 @@
   <script src="/shared/footer.js"></script>
   <script src="/shared/notification-ui.js"></script>
   <script src="/shared/account-switcher.js"></script>
-  <script src="/js/app.js"></script>
+  <script src="/shared/kit.js" defer></script>
+<script src="/shared/kit-web.js" defer></script>
+<script src="/shared/kit-data-web.js" defer></script>
+<script src="/js/tool-frame.js" defer></script>
+<script src="/js/app.js"></script>
   <script>
   (function () {
       function getCookie(name) {
@@ -182,12 +193,15 @@
       let user = null;
       if (token) { try { user = JSON.parse(atob(token.split('.')[1])); } catch {} }
       if (typeof OpenVibeNavbar !== 'undefined') {
-          OpenVibeNavbar.init({ service: 'food', token, user, apiBase: 'https://openvibe.network', history: { type: 'tool', title: 'Food.OpenVibe' }, silentLogin: 'https://openvibe.tools/auth/login?silent=1&next={url}' });
+          // The brand is the site ("Tools"), not the subdomain's name: the same brand every framed tool
+          // page carries (owner ask 11).
+          OpenVibeNavbar.init({ service: 'food', token, user, apiBase: 'https://openvibe.network', history: { type: 'tool', title: 'Food.OpenVibe' }, silentLogin: 'https://openvibe.tools/auth/login?silent=1&next={url}', brand: { subLabel: 'Tools', name: 'OpenVibe.Tools' } });
       }
       if (typeof OpenVibeFooter !== 'undefined') {
           try {
               OpenVibeFooter.init({
                   service: 'food', variant: 'compact', mount: '#ov-footer', apiBase: 'https://openvibe.network',
+                  brandName: 'OpenVibe.Tools',
                   links: [{ heading: 'Food.OpenVibe', items: [
                       { name: 'Find food', url: 'https://food.openvibe.tools' },
                       { name: 'Maps.OpenVibe', url: 'https://maps.openvibe.tools' },

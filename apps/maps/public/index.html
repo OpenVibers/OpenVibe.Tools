@@ -65,7 +65,7 @@
 <div id="splash-screen">
   <div class="splash-content">
     <div class="splash-icon"><i class="fa-solid fa-person-shelter"></i></div>
-    <h1 class="splash-title">OPENVIBE<span class="green">MAPS</span></h1>
+    <p class="splash-title">OPENVIBE<span class="green">MAPS</span></p>
     <p class="splash-subtitle"><i class="fa-solid fa-map-location-dot"></i> Survival Map for North America</p>
     <div class="splash-loader">
       <div class="loader-bar"><div class="loader-fill" id="loader-fill"></div></div>
@@ -92,7 +92,7 @@
 <div id="disclaimer-overlay" class="hidden">
   <div class="disclaimer-box">
     <div class="disclaimer-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
-    <h1 class="disclaimer-title">IMPORTANT DISCLAIMER</h1>
+    <h2 class="disclaimer-title">IMPORTANT DISCLAIMER</h2>
     <div class="disclaimer-body">
       <p><strong>READ CAREFULLY BEFORE USING MAPS.OPENVIBE</strong></p>
       <p>Maps.OpenVibe is provided <strong>strictly for informational and educational purposes only</strong>.</p>
@@ -131,7 +131,23 @@
       <span class="header-tagline"><i class="fa-solid fa-map-location-dot"></i> Survival Map</span>
     </div>
 
-    <div class="search-container">
+
+    <div class="header-right">
+      <button id="btn-weather" class="header-btn" title="Weather"><i class="fa-solid fa-cloud-sun"></i></button>
+      <button id="btn-food" class="header-btn" title="Food Banks & Grocery"><i class="fa-solid fa-utensils"></i></button>
+      <button id="btn-favorites" class="header-btn" title="Favorites"><i class="fa-solid fa-heart"></i></button>
+      <button id="btn-add-spot" class="header-btn" title="Add Custom Spot"><i class="fa-solid fa-plus"></i></button>
+      <button id="btn-guide" class="header-btn" title="Survival Guide"><i class="fa-solid fa-book-skull"></i></button>
+      <button id="btn-stats" class="header-btn" title="Statistics"><i class="fa-solid fa-chart-pie"></i></button>
+      <button id="btn-theme" class="header-btn" title="Toggle theme"><i class="fa-solid fa-moon"></i></button>
+    </div>
+  </header>
+
+  <!-- The tool frame (the shared one, openvibe-shared >= 4.57.1): the server draws it for this
+       host — the head, the box, the answer slot, the family, the folds and "People also use". -->
+  <!--OVK:FRAME-->
+  <!--OVK:BOX-->
+  <div class="search-container">
       <div class="search-box">
         <i class="fa-solid fa-magnifying-glass search-icon"></i>
         <input type="text" id="search-input" placeholder="Address, city, or coordinates..." autocomplete="off">
@@ -146,18 +162,10 @@
         <button id="btn-search" class="btn-primary"><i class="fa-solid fa-person-shelter"></i><span>Search</span></button>
       </div>
     </div>
+  <!--/OVK:BOX-->
 
-    <div class="header-right">
-      <button id="btn-weather" class="header-btn" title="Weather"><i class="fa-solid fa-cloud-sun"></i></button>
-      <button id="btn-food" class="header-btn" title="Food Banks & Grocery"><i class="fa-solid fa-utensils"></i></button>
-      <button id="btn-favorites" class="header-btn" title="Favorites"><i class="fa-solid fa-heart"></i></button>
-      <button id="btn-add-spot" class="header-btn" title="Add Custom Spot"><i class="fa-solid fa-plus"></i></button>
-      <button id="btn-guide" class="header-btn" title="Survival Guide"><i class="fa-solid fa-book-skull"></i></button>
-      <button id="btn-stats" class="header-btn" title="Statistics"><i class="fa-solid fa-chart-pie"></i></button>
-      <button id="btn-theme" class="header-btn" title="Toggle theme"><i class="fa-solid fa-moon"></i></button>
-    </div>
-  </header>
 
+  <!--OVK:ANSWER-->
   <!-- Filter Bar -->
   <div id="filter-bar">
     <div class="filter-section">
@@ -232,6 +240,7 @@
       </button>
     </div>
   </main>
+  <!--/OVK:ANSWER-->
 
   <!-- Footer -->
   <footer id="footer">
@@ -397,6 +406,10 @@
 <script src="/shared/footer.js"></script>
 <script src="/shared/notification-ui.js"></script>
 <script src="/shared/account-switcher.js"></script>
+<script src="/shared/kit.js" defer></script>
+<script src="/shared/kit-web.js" defer></script>
+<script src="/shared/kit-data-web.js" defer></script>
+<script src="/js/tool-frame.js" defer></script>
 <script src="/js/app.js"></script>
 <script>
 (function () {
@@ -408,12 +421,15 @@
     let user = null;
     if (token) { try { user = JSON.parse(atob(token.split('.')[1])); } catch {} }
     if (typeof OpenVibeNavbar !== 'undefined') {
-        OpenVibeNavbar.init({ service: 'maps', token, user, apiBase: 'https://openvibe.network', history: { type: 'tool', title: 'Maps.OpenVibe' }, silentLogin: 'https://openvibe.tools/auth/login?silent=1&next={url}' });
+        // The brand is the site ("Tools"), not the subdomain's name: the same brand every framed tool
+        // page carries (owner ask 11).
+        OpenVibeNavbar.init({ service: 'maps', token, user, apiBase: 'https://openvibe.network', history: { type: 'tool', title: 'Maps.OpenVibe' }, silentLogin: 'https://openvibe.tools/auth/login?silent=1&next={url}', brand: { subLabel: 'Tools', name: 'OpenVibe.Tools' } });
     }
     if (typeof OpenVibeFooter !== 'undefined') {
         try {
             OpenVibeFooter.init({
                 service: 'maps', variant: 'compact', mount: '#ov-footer', apiBase: 'https://openvibe.network',
+                brandName: 'OpenVibe.Tools',
                 links: [{ heading: 'Maps.OpenVibe', items: [
                     { name: 'Survival map', url: 'https://maps.openvibe.tools' },
                     { name: 'OpenVibe.Food', url: 'https://openvibe.food' },

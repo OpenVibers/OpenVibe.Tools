@@ -1,7 +1,9 @@
 // ═══════════════════════════════════════════════════════════════
 // Img.OpenVibe — Client Application
-// Domain-aware image processing SPA.
-// Detects hostname → fetches context → adapts branding + tools.
+// The page around the tool is the shared frame (openvibe-shared ≥ 4.57.1): the server draws the head,
+// the box, the answer slot, the family and the folds for this host. This file fills the box (the drop
+// zone, the options and the one button) and the answer (the file it made, its size before and after,
+// and Download). The upload, the processing and the download are the app's own, unchanged.
 // ═══════════════════════════════════════════════════════════════
 
 (function () {
@@ -11,43 +13,19 @@
     let ctx = null;           // domain context from /api/context
     let selectedFile = null;  // File object
     let selectedTool = 'convert';
-    let selectedFormat = 'png';
-    let selectedAspect = '';
 
     // ── DOM refs ─────────────────────────────────────────────
     const $ = (sel) => document.querySelector(sel);
     const $$ = (sel) => document.querySelectorAll(sel);
 
-    const heroIcon = $('#hero-icon');
-    const heroTitle = $('#hero-title');
-    const heroSubtitle = $('#hero-subtitle');
-    const toolTabs = $('#tool-tabs');
-    const uploadArea = $('#upload-area');
-    const uploadInfo = $('#upload-info');
     const fileInput = $('#file-input');
-    const browseBtn = $('#browse-btn');
-    const clearBtn = $('#clear-btn');
     const optionsPanel = $('#options-panel');
     const processBtn = $('#process-btn');
-    const processText = $('#process-text');
-    const processingEl = $('#processing');
-    const resultPanel = $('#result-panel');
-    const resultPreview = $('#result-preview');
-    const resultInfo = $('#result-info');
-    const downloadBtn = $('#download-btn');
-    const anotherBtn = $('#another-btn');
-    const subdomainsSection = $('#subdomains');
-    const subdomainGrid = $('#subdomain-grid');
-
-    // Option elements
-    const qualitySlider = $('#quality-slider');
-    const qualityVal = $('#quality-val');
-    const compressSlider = $('#compress-slider');
-    const compressVal = $('#compress-val');
+    const clearBtn = $('#clear-btn');
+    const kit = () => window.OpenVibeKit;
 
     // ── Init ─────────────────────────────────────────────────
     async function init() {
-        // Fetch domain context
         try {
             const res = await fetch('/api/context');
             ctx = await res.json();
@@ -55,74 +33,14 @@
             ctx = { toolId: 'hub', brandName: 'Img.OpenVibe', defaultOp: 'convert', faIcon: 'fa-images', tools: [] };
         }
 
-        applyBranding();
-        showUnavailableInputs();
         initNavbar();
         initNotifications();
         if (typeof OpenVibeAccountSwitcher !== 'undefined') OpenVibeAccountSwitcher.init({ apiBase: 'https://openvibe.network' });
-        initToolTabs();
-        initUpload();
+        showUnavailableInputs();
+        initDrop();
         initOptions();
-        initSubdomains();
         initResult();
         reattach();
-    }
-
-    // ── Branding ─────────────────────────────────────────────
-    function applyBranding() {
-        document.title = ctx.seoTitle || `${ctx.brandName} — Image Tools`;
-        heroIcon.innerHTML = `<i class="fa-solid ${ctx.faIcon || 'fa-images'}"></i>`;
-        heroTitle.textContent = ctx.brandName || 'Img.OpenVibe';
-
-        // Set subtitle based on tool
-        const subtitles = {
-            hub: 'Online Image Converter & Tools',
-            convert: 'Online Image Format Converter',
-            compress: 'Online Image Compressor',
-            resize: 'Online Image Resizer',
-            crop: 'Online Image Cropper',
-            favicon: 'Online Favicon Generator',
-        };
-        heroSubtitle.textContent = subtitles[ctx.toolId] || ctx.seoDescription || subtitles.hub;
-
-        // If format-specific domain, set default format
-        if (ctx.defaultFormat) {
-            selectedFormat = ctx.defaultFormat;
-        }
-
-        // Set default tool from context
-        selectedTool = ctx.defaultOp || 'convert';
-
-        // Hide tool tabs on single-tool domains (format-specific ones show convert)
-        const isFormatDomain = ctx.toolId && !['hub', 'convert', 'compress', 'resize', 'crop', 'favicon'].includes(ctx.toolId);
-        if (isFormatDomain) {
-            toolTabs.style.display = 'none';
-            selectedTool = 'convert';
-        }
-
-        // Hide subdomains section on non-hub domains
-        if (ctx.toolId !== 'hub') {
-            subdomainsSection.style.display = 'none';
-        }
-
-        // Update meta description
-        const metaDesc = document.querySelector('meta[name="description"]');
-        if (metaDesc && ctx.seoDescription) metaDesc.content = ctx.seoDescription;
-    }
-
-    // A format this server cannot read yet (HEIC before libheif's decoder is installed): say so up
-    // front on the page that is about it, instead of letting the upload fail.
-    function showUnavailableInputs() {
-        const heicPage = ctx.toolId === 'heic';
-        if (!ctx.inputs || ctx.inputs.heic !== false || !heicPage) return;
-        const zone = document.getElementById('upload-zone');
-        if (!zone || document.getElementById('input-notice')) return;
-        const note = document.createElement('div');
-        note.id = 'input-notice';
-        note.className = 'tool-notice';
-        note.setAttribute('role', 'status');
-        note.textContent = 'HEIC (iPhone) photos cannot be converted yet: the decoder is being set up on the server. JPG, PNG, WebP, AVIF and the other formats work now.';
-        zone.parentNode.insertBefore(note, zone);
     }
 
     // ── Navbar ───────────────────────────────────────────────
@@ -130,13 +48,11 @@
         const token = getCookie('ov_token') || localStorage.getItem('ov_token');
         let user = null;
         if (token) {
-            try {
-                const payload = JSON.parse(atob(token.split('.')[1]));
-                user = payload;
-            } catch { /* invalid token */ }
+            try { user = JSON.parse(atob(token.split('.')[1])); } catch { /* invalid token */ }
         }
 
-        // Brand name/icon come from the hostname now (png.openvibe.tools → "PNG.OpenVibe.Tools").
+        // The brand is the site ("Tools"), not the subdomain's name: the same brand the network and
+        // code tool pages carry (owner ask 11).
         if (typeof OpenVibeNavbar !== 'undefined') {
             OpenVibeNavbar.init({
                 service: 'img',
@@ -145,21 +61,22 @@
                 apiBase: 'https://openvibe.network',
                 history: { type: 'tool', title: ctx?.brandName || 'Img.OpenVibe' },
                 silentLogin: 'https://openvibe.tools/auth/login?silent=1&next={url}',
+                brand: { subLabel: 'Tools', name: 'OpenVibe.Tools' },
             });
         }
         initFooter();
     }
 
     /* ---------- Footer (shared OpenVibeFooter) ---------- */
-    // Full footer on the hub host, the compact strip on the single-tool hosts.
     function initFooter() {
         if (typeof OpenVibeFooter === 'undefined') return;
         try {
             OpenVibeFooter.init({
                 service: 'img',
-                variant: (!ctx || ctx.toolId === 'hub') ? 'full' : 'compact',
+                variant: 'compact',
                 mount: '#ov-footer',
                 apiBase: 'https://openvibe.network',
+                brandName: 'OpenVibe.Tools',
                 links: [{ heading: 'Img tools', items: [
                     { name: 'Convert', url: 'https://convert.openvibe.tools' },
                     { name: 'Compress', url: 'https://compress.openvibe.tools' },
@@ -184,7 +101,6 @@
             apiBase: 'https://openvibe.network',
         });
 
-        // Mount bell into navbar if available
         if (typeof OpenVibeNavbar !== 'undefined') {
             const mount = OpenVibeNavbar.getBellMount();
             if (mount) {
@@ -194,188 +110,143 @@
         }
     }
 
-    // ── Tool Tabs ────────────────────────────────────────────
-    function initToolTabs() {
-        // Highlight active tab
-        $$('.tool-tab').forEach(tab => {
-            if (tab.dataset.tool === selectedTool) tab.classList.add('active');
-            else tab.classList.remove('active');
-
-            tab.addEventListener('click', () => {
-                selectedTool = tab.dataset.tool;
-                $$('.tool-tab').forEach(t => t.classList.toggle('active', t.dataset.tool === selectedTool));
-                showToolOptions();
-                updateProcessButton();
-            });
+    // A format this server cannot read yet (HEIC before libheif's decoder is installed): say so up
+    // front on the page that is about it, instead of letting the upload fail.
+    function showUnavailableInputs() {
+        if (!ctx || ctx.toolId !== 'heic') return;
+        if (!ctx.inputs || ctx.inputs.heic !== false) return;
+        const card = document.querySelector('.ovk-tool-card');
+        if (!card || document.getElementById('input-notice') || !kit()) return;
+        const note = document.createElement('div');
+        note.id = 'input-notice';
+        note.innerHTML = kit().notice({
+            kind: 'warn',
+            text: 'HEIC (iPhone) photos cannot be converted yet: the decoder is being set up on the server. JPG, PNG, WebP, AVIF and the other formats work now.',
         });
+        card.insertBefore(note, card.firstChild);
     }
 
-    // ── Upload ───────────────────────────────────────────────
-    function initUpload() {
-        // Drag & drop
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
-        });
-        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
-        });
-
-        // Click to browse
-        uploadArea.addEventListener('click', () => fileInput.click());
-        browseBtn.addEventListener('click', (e) => { e.stopPropagation(); fileInput.click(); });
+    // ── The box: the drop zone ───────────────────────────────
+    function initDrop() {
+        if (!fileInput) return;
         fileInput.addEventListener('change', () => {
-            if (fileInput.files.length) handleFile(fileInput.files[0]);
+            if (fileInput.files && fileInput.files.length) handleFile(fileInput.files[0]);
         });
+        if (clearBtn) clearBtn.addEventListener('click', resetUpload);
 
-        // Clear
-        clearBtn.addEventListener('click', resetUpload);
+        // "Try": the sample picture goes into the drop zone as if it had been chosen.
+        const sampleLink = document.querySelector('[data-ovk-sample]');
+        if (sampleLink && window.OVToolFrame) {
+            sampleLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.OVToolFrame.sample(sampleLink.getAttribute('data-ovk-sample'), handleFile);
+            });
+        }
     }
 
     function handleFile(file) {
+        if (!file) return;
         if (!file.type.startsWith('image/') && file.type !== 'image/svg+xml') {
-            alert('Please select an image file.');
+            fail('Please choose an image file.');
             return;
         }
         if (file.size > 50 * 1024 * 1024) {
-            alert('File too large. Maximum 50MB.');
+            fail('That file is too large. The maximum is 50 MB.');
             return;
         }
 
         selectedFile = file;
-        uploadArea.style.display = 'none';
-        uploadInfo.style.display = 'flex';
-
-        // Preview
-        const preview = $('#file-preview');
-        const details = $('#file-details');
-        const objectUrl = URL.createObjectURL(file);
-        preview.innerHTML = `<img src="${objectUrl}" alt="Preview">`;
-        details.innerHTML = `
-            <div class="fname">${escapeHtml(file.name)}</div>
-            <div class="fmeta">${file.type} &bull; ${formatBytes(file.size)}</div>
-        `;
-
-        optionsPanel.style.display = '';
-        showToolOptions();
-        updateProcessButton();
+        selectedTool = (ctx && ctx.defaultOp) || 'convert';
+        if (optionsPanel) optionsPanel.hidden = false;
+        if (processBtn) processBtn.disabled = false;
+        hideAnswer();
     }
 
     function resetUpload() {
         selectedFile = null;
-        fileInput.value = '';
-        uploadArea.style.display = '';
-        uploadInfo.style.display = 'none';
-        optionsPanel.style.display = 'none';
-        resultPanel.style.display = 'none';
-        processingEl.style.display = 'none';
-        processBtn.disabled = true;
+        if (fileInput) fileInput.value = '';
+        if (optionsPanel) optionsPanel.hidden = true;
+        if (processBtn) processBtn.disabled = true;
+        hideAnswer();
     }
 
-    // ── Options ──────────────────────────────────────────────
+    // ── The box: the options and the one button ─────────────
     function initOptions() {
-        // Quality slider
-        qualitySlider.addEventListener('input', () => { qualityVal.textContent = qualitySlider.value; });
-        compressSlider.addEventListener('input', () => { compressVal.textContent = compressSlider.value; });
+        // The format chips: the button follows the format that is picked ("Convert to PNG").
+        $$('input[name=format]').forEach((radio) => radio.addEventListener('change', updateVerb));
 
-        // Format buttons
-        $$('.format-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                selectedFormat = btn.dataset.format;
-                $$('.format-btn').forEach(b => b.classList.toggle('active', b.dataset.format === selectedFormat));
-            });
-        });
-
-        // Aspect ratio buttons
-        $$('.aspect-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                selectedAspect = btn.dataset.aspect;
-                $$('.aspect-btn').forEach(b => b.classList.toggle('active', b.dataset.aspect === selectedAspect));
-                // Show/hide custom coords
-                $('#crop-coords').style.display = selectedAspect ? 'none' : 'grid';
-            });
-        });
-
-        // Process button
-        processBtn.addEventListener('click', processImage);
+        // The quality slider: the kit shows the value; the app only reads it.
+        if (processBtn) processBtn.addEventListener('click', processImage);
     }
 
-    function showToolOptions() {
-        // Hide all option groups
-        ['opt-convert', 'opt-compress', 'opt-resize', 'opt-crop'].forEach(id => {
-            const el = $(`#${id}`);
-            if (el) el.style.display = 'none';
-        });
-
-        // Show active tool options
-        const optEl = $(`#opt-${selectedTool}`);
-        if (optEl) optEl.style.display = '';
-
-        // Pre-select format if domain-specific
-        if (ctx.defaultFormat) {
-            selectedFormat = ctx.defaultFormat;
-            $$('.format-btn').forEach(b => b.classList.toggle('active', b.dataset.format === selectedFormat));
-        }
+    function selectedFormat() {
+        const checked = document.querySelector('input[name=format]:checked');
+        return checked ? checked.value : ((ctx && ctx.defaultFormat) || 'png');
     }
 
-    function updateProcessButton() {
-        processBtn.disabled = !selectedFile;
-        const labels = { convert: 'Convert Image', compress: 'Compress Image', resize: 'Resize Image', crop: 'Crop Image' };
-        processText.textContent = labels[selectedTool] || 'Process Image';
+    function updateVerb() {
+        if (!processBtn) return;
+        const span = processBtn.querySelector('span');
+        if (!span) return;
+        if (selectedTool === 'compress') span.textContent = 'Compress';
+        else if (selectedTool === 'resize') span.textContent = 'Resize';
+        else if (selectedTool === 'crop') span.textContent = 'Crop';
+        else if (ctx && ctx.toolId === 'favicon') span.textContent = 'Make favicon';
+        else span.textContent = `Convert to ${selectedFormat().toUpperCase()}`;
+    }
+
+    function numberValue(name) {
+        const el = document.querySelector(`[name="${name}"]`);
+        return el && el.value !== '' ? Number(el.value) : null;
+    }
+
+    function radioValue(name) {
+        const el = document.querySelector(`input[name="${name}"]:checked`);
+        return el ? el.value : '';
     }
 
     // ── Process ──────────────────────────────────────────────
     async function processImage() {
         if (!selectedFile) return;
 
-        // Show processing state
-        optionsPanel.style.display = 'none';
-        resultPanel.style.display = 'none';
-        processingEl.style.display = '';
-        processBtn.disabled = true;
-
-        const formData = new FormData();
-        formData.append('file', selectedFile);
-        formData.append('tool', selectedTool);
-
-        // Add tool-specific options
+        const input = { tool: selectedTool };
         if (selectedTool === 'convert') {
-            formData.append('format', selectedFormat);
-            formData.append('quality', qualitySlider.value);
+            input.format = selectedFormat();
+            const q = numberValue('quality');
+            if (q != null) input.quality = q;
         } else if (selectedTool === 'compress') {
-            formData.append('quality', compressSlider.value);
+            const q = numberValue('quality');
+            if (q != null) input.quality = q;
         } else if (selectedTool === 'resize') {
-            const w = $('#resize-w').value;
-            const h = $('#resize-h').value;
-            const pct = $('#resize-pct').value;
-            const fit = $('#resize-fit').value;
-            if (pct) formData.append('percentage', pct);
+            const pct = numberValue('percentage');
+            if (pct != null) input.percentage = pct;
             else {
-                if (w) formData.append('width', w);
-                if (h) formData.append('height', h);
+                const w = numberValue('width');
+                const h = numberValue('height');
+                if (w != null) input.width = w;
+                if (h != null) input.height = h;
             }
-            formData.append('fit', fit);
+            const fit = document.querySelector('[name="fit"]');
+            if (fit && fit.value) input.fit = fit.value;
         } else if (selectedTool === 'crop') {
-            if (selectedAspect) {
-                formData.append('aspect', selectedAspect);
-            } else {
-                const l = $('#crop-left').value;
-                const t = $('#crop-top').value;
-                const w = $('#crop-w').value;
-                const h = $('#crop-h').value;
-                if (l) formData.append('left', l);
-                if (t) formData.append('top', t);
-                if (w) formData.append('width', w);
-                if (h) formData.append('height', h);
+            const aspect = radioValue('aspect');
+            if (aspect) input.aspect = aspect;
+            else {
+                for (const k of ['left', 'top', 'width', 'height']) {
+                    const v = numberValue(k);
+                    if (v != null) input[k] = v;
+                }
             }
         }
 
-        // Jobs: the work is accepted, followed live and survives a reload (?job=<id> in the address).
-        const input = {};
-        for (const [k, v] of formData.entries()) if (k !== 'file') input[k] = v;
+        if (processBtn) {
+            processBtn.disabled = true;
+            const span = processBtn.querySelector('span');
+            // The button keeps its verb while it works: "Compress…", not "Working…".
+            if (span) span.textContent = `${span.textContent.replace(/…$/, '')}…`;
+        }
+        showWorking();
+
         try {
             const job = await OVJobs.submit({ type: 'img.process', input, files: [selectedFile] });
             OVJobs.remember(job.id);
@@ -391,41 +262,24 @@
 
     function processingText(job) {
         const pct = job.progress && job.progress.percent;
-        if (job.cancel_requested) return 'Cancelling...';
-        if (job.state === 'queued') return 'Waiting for a free slot...';
+        if (job.cancel_requested) return 'Cancelling…';
+        if (job.state === 'queued') return 'Waiting for a free slot…';
         const label = (job.progress && job.progress.message) || 'Processing your image';
-        return pct != null ? `${label}... ${Math.round(pct)}%` : `${label}...`;
-    }
-
-    function cancelButton() {
-        let btn = processingEl.querySelector('.job-cancel');
-        if (!btn) {
-            btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'btn-secondary job-cancel';
-            btn.textContent = 'Cancel';
-            btn.addEventListener('click', () => { if (currentJob) OVJobs.cancel(currentJob).catch(() => {}); });
-            processingEl.appendChild(btn);
-        }
-        return btn;
+        return pct != null ? `${label}… ${Math.round(pct)}%` : `${label}…`;
     }
 
     function followJob(job) {
         currentJob = job.id;
-        optionsPanel.style.display = 'none';
-        resultPanel.style.display = 'none';
-        processingEl.style.display = '';
-        processBtn.disabled = true;
-        const label = processingEl.querySelector('p');
-        const update = (j) => { if (label) label.textContent = processingText(j); };
-        cancelButton().style.display = '';
-        update(job);
+        hideAnswer();
+        showWorking();
         if (watcher) watcher.close();
         watcher = OVJobs.watch(job.id, {
-            onUpdate: update,
+            onUpdate: (j) => {
+                const out = document.querySelector('.ovk-tool-out');
+                if (out) out.querySelector('[data-ovk-working]')?.setAttribute('data-progress', processingText(j));
+            },
             onDone(done) {
                 watcher = null;
-                cancelButton().style.display = 'none';
                 if (done.state === 'succeeded') return showResult(jobResult(done));
                 OVJobs.forget();
                 failProcessing(done.state === 'cancelled' ? null : (done.error && done.error.detail) || 'Processing failed');
@@ -443,11 +297,19 @@
         };
     }
 
+    function resetVerb() {
+        const span = processBtn && processBtn.querySelector('span');
+        if (span) span.textContent = span.textContent.replace(/…$/, '');
+    }
+
     function failProcessing(message) {
-        processingEl.style.display = 'none';
-        optionsPanel.style.display = selectedFile ? '' : 'none';
-        processBtn.disabled = !selectedFile;
-        if (message) alert(`Error: ${message}`);
+        resetVerb();
+        if (processBtn) {
+            processBtn.disabled = !selectedFile;
+            updateVerb();
+        }
+        if (message) fail(message);
+        else hideAnswer();
     }
 
     /** After a reload: pick the job up again from ?job=<id> or this tab's session. */
@@ -457,101 +319,64 @@
         OVJobs.get(id).then(followJob).catch(() => OVJobs.forget());
     }
 
-    // ── Result ───────────────────────────────────────────────
-    function initResult() {
-        anotherBtn.addEventListener('click', () => {
-            if (window.OVJobs) OVJobs.forget();
-            resetUpload();
-            toolTabs.scrollIntoView({ behavior: 'smooth' });
+    // ── The answer ───────────────────────────────────────────
+    function showWorking() {
+        const out = document.querySelector('.ovk-tool-out');
+        if (!out || !kit()) return;
+        out.innerHTML = kit().answer({
+            title: 'Working…',
+            body: '<p data-ovk-working>Your picture is being processed on our server. This page stays open until it is done.</p>',
         });
     }
 
-    function showResult(data) {
-        processingEl.style.display = 'none';
-        resultPanel.style.display = '';
-
-        // Preview image (if it's a previewable type)
-        const previewable = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp', 'image/avif'];
-        if (previewable.includes(data.output.mime)) {
-            const img = document.createElement('img');
-            img.src = data.download.previewUrl || data.download.downloadUrl;
-            img.alt = 'Result';
-            resultPreview.replaceChildren(img);
-        } else {
-            resultPreview.innerHTML = `<div style="font-size:48px;color:var(--accent);padding:24px"><i class="fa-solid fa-file-image"></i></div>`;
-        }
-
-        // Info
-        let infoHtml = `<p>Format: <strong>${data.output.ext.toUpperCase()}</strong> &bull; Size: <strong>${data.output.sizeKB} KB</strong></p>`;
-        if (data.savings) {
-            const pct = data.savings.savedPercent;
-            if (pct > 0) {
-                infoHtml += `<p class="savings">Saved ${pct}% (${formatBytes(data.savings.savedBytes)} smaller)</p>`;
-            } else {
-                infoHtml += `<p>File size unchanged or slightly larger — try a lower quality.</p>`;
-            }
-        }
-        if (data.dimensions) {
-            infoHtml += `<p>${data.dimensions.original.width}x${data.dimensions.original.height} → ${data.dimensions.resized.width}x${data.dimensions.resized.height}</p>`;
-        }
-        if (data.crop) {
-            infoHtml += `<p>Cropped to ${data.crop.width}x${data.crop.height}</p>`;
-        }
-
-        const expires = data.download.expiresIn;
-        const expiresStr = expires >= 3600000 ? `${Math.round(expires / 3600000)}h` : `${Math.round(expires / 60000)}m`;
-        infoHtml += `<p style="color:var(--text-muted);font-size:12px;margin-top:8px">Download expires in ${expiresStr}</p>`;
-
-        resultInfo.innerHTML = infoHtml;
-
-        // Download link
-        downloadBtn.href = data.download.downloadUrl;
-        downloadBtn.download = '';
-
-        resultPanel.scrollIntoView({ behavior: 'smooth' });
+    function hideAnswer() {
+        const out = document.querySelector('.ovk-tool-out');
+        if (out) out.innerHTML = '';
     }
 
-    // ── Subdomains Grid ──────────────────────────────────────
-    function initSubdomains() {
-        const tools = [
-            { host: 'png.openvibe.tools',      name: 'OpenVibePNG',      icon: 'fa-file-image', desc: 'Convert to PNG' },
-            { host: 'jpg.openvibe.tools',      name: 'OpenVibeJPG',      icon: 'fa-file-image', desc: 'Convert to JPG' },
-            { host: 'webp.openvibe.tools',     name: 'OpenVibeWebP',     icon: 'fa-file-image', desc: 'Convert to WebP' },
-            { host: 'avif.openvibe.tools',     name: 'OpenVibeAVIF',     icon: 'fa-file-image', desc: 'Convert to AVIF' },
-            { host: 'heic.openvibe.tools',     name: 'OpenVibeHEIC',     icon: 'fa-file-image', desc: 'HEIC Converter' },
-            { host: 'svg.openvibe.tools',      name: 'OpenVibeSVG',      icon: 'fa-bezier-curve', desc: 'SVG Converter' },
-            { host: 'gif.openvibe.tools',      name: 'OpenVibeGIF',      icon: 'fa-film', desc: 'GIF Converter' },
-            { host: 'ico.openvibe.tools',      name: 'OpenVibeICO',      icon: 'fa-icons', desc: 'ICO Favicon Maker' },
-            { host: 'tiff.openvibe.tools',     name: 'OpenVibeTIFF',     icon: 'fa-file-image', desc: 'Convert to TIFF' },
-            { host: 'bmp.openvibe.tools',      name: 'OpenVibeBMP',      icon: 'fa-file-image', desc: 'Convert to BMP' },
-            { host: 'compress.openvibe.tools', name: 'OpenVibeCompress',  icon: 'fa-compress', desc: 'Compress Images' },
-            { host: 'resize.openvibe.tools',   name: 'OpenVibeResize',    icon: 'fa-up-right-and-down-left-from-center', desc: 'Resize Images' },
-            { host: 'crop.openvibe.tools',     name: 'OpenVibeCrop',      icon: 'fa-crop-simple', desc: 'Crop Images' },
-            { host: 'convert.openvibe.tools',  name: 'OpenVibeConvert',   icon: 'fa-arrows-rotate', desc: 'Format Converter' },
-            { host: 'favicon.openvibe.tools',  name: 'OpenVibeFavicon',   icon: 'fa-icons', desc: 'Favicon Generator' },
-        ];
+    function fail(message) {
+        const out = document.querySelector('.ovk-tool-out');
+        if (!out || !kit()) return;
+        out.innerHTML = kit().answer({ title: 'That did not work', tone: 'bad', body: `<p>${escapeHtml(message)}</p>` });
+    }
 
-        subdomainGrid.innerHTML = tools.map(t => `
-            <a class="subdomain-card" href="https://${t.host}">
-                <span class="sd-icon"><i class="fa-solid ${t.icon}"></i></span>
-                <span class="sd-info">
-                    <span class="sd-name">${t.name}</span>
-                    <span class="sd-desc">${t.desc}</span>
-                </span>
-            </a>
-        `).join('');
+    function showResult(data) {
+        resetVerb();
+        if (processBtn) {
+            processBtn.disabled = false;
+            updateVerb();
+        }
+        const out = data.output || {};
+        const rows = [];
+        if (out.ext) rows.push(['Format', String(out.ext).toUpperCase()]);
+        if (data.dimensions) rows.push(['Size', `${data.dimensions.original.width}×${data.dimensions.original.height} → ${data.dimensions.resized.width}×${data.dimensions.resized.height}`]);
+        if (data.crop) rows.push(['Kept', `${data.crop.width}×${data.crop.height}`]);
+        const expires = data.download && data.download.expiresIn;
+        if (expires) {
+            const mins = Math.max(1, Math.round(expires / 60000));
+            rows.push(['Kept for', mins >= 60 ? `${Math.round(mins / 60)} hour${Math.round(mins / 60) === 1 ? '' : 's'}` : `${mins} minutes`]);
+        }
+        const html = window.OVToolFrame.fileAnswer({
+            title: 'Your picture is ready',
+            before: selectedFile ? selectedFile.size : null,
+            after: out.size != null ? out.size : null,
+            savedPercent: data.savings && data.savings.savedPercent,
+            rows,
+            downloadUrl: data.download && data.download.downloadUrl,
+            filename: data.download && data.download.filename,
+        });
+        window.OVToolFrame.show(html);
+    }
+
+    // ── Result ───────────────────────────────────────────────
+    function initResult() {
+        // Nothing to wire: the answer is drawn in the frame's answer slot.
     }
 
     // ── Helpers ──────────────────────────────────────────────
     function getCookie(name) {
         const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
         return match ? decodeURIComponent(match[1]) : null;
-    }
-
-    function formatBytes(bytes) {
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     }
 
     function escapeHtml(str) {
