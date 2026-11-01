@@ -582,3 +582,5 @@ a:hover { color: var(--accent-hover); }
 .file-details .file-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 4px 0; }
 .file-details .file-row + .file-row { border-top: 1px solid var(--border); }
 .file-details .btn-sm { padding: 4px 10px; font-size: 12px; margin-top: 4px; }
+
+@media (prefers-reduced-motion: reduce) { .option-group, .result-panel, .toast { animation: none; } .spinner { animation: none; opacity: .7; } }

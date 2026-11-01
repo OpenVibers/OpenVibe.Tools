@@ -544,3 +544,5 @@ body {
   .filter-chips { overflow-x: auto; }
   .header-btn { width: 30px; height: 30px; font-size: 12px; }
 }
+
+@media (prefers-reduced-motion: reduce) { .splash-content, .splash-icon, #splash-screen.fade-out, .welcome-icon, .user-marker, #detail-panel, .modal-content, .sp-item:not(.done):not(.error) { animation: none; } .search-progress .spinner { animation: none; opacity: .7; } }

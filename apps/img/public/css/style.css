@@ -477,3 +477,5 @@ body {
     font-size: 14px;
     line-height: 1.5;
 }
+
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; opacity: .7; } }
