@@ -895,3 +895,5 @@ textarea.large {
     .interconnect-banner { flex-direction: column; text-align: center; }
     .interconnect-banner .ic-links { margin-left: 0; }
 }
+
+@media (prefers-reduced-motion: reduce) { .live-dot, .output-flash, .toast { animation: none; } }

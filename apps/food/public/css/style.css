@@ -235,3 +235,5 @@ body { min-height:100%; font-family:var(--font); background:var(--bg); color:var
   .food-table { font-size:11px; }
   .food-table th, .food-table td { padding:6px; }
 }
+
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; opacity: .7; } }

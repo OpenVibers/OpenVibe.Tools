@@ -412,3 +412,5 @@ a:hover { text-decoration: underline; }
     .format-btn { padding: 6px 12px; font-size: 0.8rem; }
     .footer-inner { flex-direction: column; text-align: center; }
 }
+
+@media (prefers-reduced-motion: reduce) { .spinner, .progress-bar.indeterminate { animation: none; opacity: .7; } }

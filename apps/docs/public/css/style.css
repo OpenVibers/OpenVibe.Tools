@@ -474,3 +474,5 @@ body {
     line-height: 1.5;
 }
 .check-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 14px; color: var(--text-secondary); cursor: pointer; }
+
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; opacity: .7; } }
