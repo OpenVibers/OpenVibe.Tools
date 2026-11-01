@@ -25,11 +25,11 @@
         .compare-pane label { display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
         .compare-pane textarea { width: 100%; min-height: 200px; resize: vertical; }
         .diff-output { background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; font-family: var(--font-mono); font-size: 0.88rem; line-height: 1.7; white-space: pre-wrap; min-height: 120px; }
-        .diff-add { background: rgba(34,197,94,0.15); color: #4ade80; text-decoration: none; }
-        .diff-del { background: rgba(239,68,68,0.15); color: #f87171; text-decoration: line-through; }
+        .diff-add { background: rgba(34,197,94,0.15); color: var(--success-text, #4ade80); text-decoration: none; }
+        .diff-del { background: rgba(239,68,68,0.15); color: var(--danger-text, #f87171); text-decoration: line-through; }
         .diff-stats { display: flex; gap: 16px; margin-bottom: 12px; font-size: 0.85rem; font-weight: 600; }
-        .diff-stats .added { color: #4ade80; }
-        .diff-stats .removed { color: #f87171; }
+        .diff-stats .added { color: var(--success-text, #4ade80); }
+        .diff-stats .removed { color: var(--danger-text, #f87171); }
         .diff-stats .unchanged { color: var(--text-muted); }
         @media (max-width: 640px) { .compare-grid { grid-template-columns: 1fr; } }
     </style>
