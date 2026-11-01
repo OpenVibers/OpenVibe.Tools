@@ -32,7 +32,6 @@
 (function(){try{var raw=localStorage.getItem('ov_theme');if(!raw)return;var t=JSON.parse(raw),v=t&&t.variables;if(!v)return;var el=document.documentElement;for(var k in v)if(k.charAt(0)==='-')el.style.setProperty(k,v[k]);if(t.id)el.setAttribute('data-theme',t.id);}catch(_){}})();
 </script>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js@1.12.0/src/toastify.min.css">
@@ -45,7 +44,7 @@
     <div class="loc-search">
       <i class="fa-solid fa-location-dot"></i>
       <input type="text" id="loc-input" placeholder="Enter your city or zip code...">
-      <button id="btn-gps" title="Use GPS"><i class="fa-solid fa-crosshairs"></i></button>
+      <button id="btn-gps" title="Use GPS"><i class="fa-solid fa-location-dot"></i></button>
       <button id="btn-loc-search" class="btn-primary"><i class="fa-solid fa-magnifying-glass"></i> Find Food</button>
     </div>
   </div>
@@ -57,7 +56,7 @@
       <button class="tab active" data-tab="food-banks"><i class="fa-solid fa-hand-holding-heart"></i> Food Banks</button>
       <button class="tab" data-tab="stores"><i class="fa-solid fa-cart-shopping"></i> Stores</button>
       <button class="tab" data-tab="meal-plan"><i class="fa-solid fa-calendar-days"></i> Meal Planner</button>
-      <button class="tab" data-tab="food-db"><i class="fa-solid fa-apple-whole"></i> Food Database</button>
+      <button class="tab" data-tab="food-db"><i class="fa-solid fa-utensils"></i> Food Database</button>
       <button class="tab" data-tab="map"><i class="fa-solid fa-map"></i> Map</button>
     </nav>
 
@@ -117,7 +116,7 @@
             <input type="number" id="mp-days" value="3" min="1" max="7">
           </div>
           <div class="control-group">
-            <label><i class="fa-solid fa-toggle-on"></i> Options</label>
+            <label><i class="fa-solid fa-circle-check"></i> Options</label>
             <div class="toggle-row">
               <label class="toggle"><input type="checkbox" id="mp-camp" checked> <span>Camp-friendly</span></label>
               <label class="toggle"><input type="checkbox" id="mp-shelf"> <span>Shelf-stable only</span></label>
@@ -131,7 +130,7 @@
       <!-- Food Database Panel -->
       <section id="food-db" class="panel">
         <div class="panel-header">
-          <h2><i class="fa-solid fa-apple-whole"></i> Budget Food Database</h2>
+          <h2><i class="fa-solid fa-utensils"></i> Budget Food Database</h2>
           <p class="panel-desc">Browse 80+ budget items with prices from 5 stores, nutrition info, and camp-friendliness ratings</p>
         </div>
         <div class="db-controls">
@@ -141,12 +140,12 @@
           </div>
           <div class="db-filters">
             <button class="chip active" data-group="all">All</button>
-            <button class="chip" data-group="protein"><i class="fa-solid fa-drumstick-bite"></i> Protein</button>
-            <button class="chip" data-group="grains"><i class="fa-solid fa-wheat-awn"></i> Grains</button>
-            <button class="chip" data-group="vegetables"><i class="fa-solid fa-carrot"></i> Veggies</button>
-            <button class="chip" data-group="fruits"><i class="fa-solid fa-apple-whole"></i> Fruits</button>
-            <button class="chip" data-group="dairy"><i class="fa-solid fa-glass-water"></i> Dairy</button>
-            <button class="chip" data-group="fats"><i class="fa-solid fa-oil-can"></i> Fats</button>
+            <button class="chip" data-group="protein"><i class="fa-solid fa-fish"></i> Protein</button>
+            <button class="chip" data-group="grains"><i class="fa-solid fa-seedling"></i> Grains</button>
+            <button class="chip" data-group="vegetables"><i class="fa-solid fa-leaf"></i> Veggies</button>
+            <button class="chip" data-group="fruits"><i class="fa-solid fa-utensils"></i> Fruits</button>
+            <button class="chip" data-group="dairy"><i class="fa-solid fa-mug-saucer"></i> Dairy</button>
+            <button class="chip" data-group="fats"><i class="fa-solid fa-droplet"></i> Fats</button>
           </div>
           <div class="db-toggles">
             <label class="toggle"><input type="checkbox" id="db-camp"> <span>Camp-friendly</span></label>

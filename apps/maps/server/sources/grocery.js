@@ -73,42 +73,42 @@ const STORES = {
 const FOOD_GROUPS = {
   protein: {
     name: 'Protein',
-    icon: 'fa-drumstick-bite',
+    icon: 'fa-fish',
     color: '#9b59b6',
     dailyMin: 50, // grams
     examples: 'Chicken, eggs, beans, peanut butter, canned tuna',
   },
   grains: {
     name: 'Grains',
-    icon: 'fa-wheat-awn',
+    icon: 'fa-seedling',
     color: '#e67e22',
     dailyMin: 170, // grams (6 oz equiv)
     examples: 'Rice, bread, pasta, oatmeal, tortillas',
   },
   vegetables: {
     name: 'Vegetables',
-    icon: 'fa-carrot',
+    icon: 'fa-leaf',
     color: '#27ae60',
     dailyMin: 300, // grams (~2.5 cups)
     examples: 'Carrots, potatoes, canned corn, frozen mixed veggies',
   },
   fruits: {
     name: 'Fruits',
-    icon: 'fa-apple-whole',
+    icon: 'fa-utensils',
     color: '#e74c3c',
     dailyMin: 200, // grams (~2 cups)
     examples: 'Bananas, apples, oranges, canned fruit',
   },
   dairy: {
     name: 'Dairy',
-    icon: 'fa-glass-water',
+    icon: 'fa-mug-saucer',
     color: '#3498db',
     dailyMin: 720, // ml (~3 cups)
     examples: 'Milk, cheese, yogurt',
   },
   fats: {
     name: 'Fats & Oils',
-    icon: 'fa-oil-can',
+    icon: 'fa-droplet',
     color: '#f1c40f',
     dailyMin: 25, // grams
     examples: 'Cooking oil, butter, peanut butter, avocado',
@@ -864,9 +864,9 @@ function formatOSMAddress(tags) {
 
 // ─── Find Food Banks, Soup Kitchens, Community Fridges ─────────────
 const FOOD_BANK_TYPES = {
-  food_bank:     { label: 'Food Bank',        icon: 'fa-boxes-stacked', color: '#ef4444' },
-  soup_kitchen:  { label: 'Soup Kitchen',      icon: 'fa-bowl-food',    color: '#f97316' },
-  food_sharing:  { label: 'Community Fridge',   icon: 'fa-temperature-low', color: '#06b6d4' },
+  food_bank:     { label: 'Food Bank',        icon: 'fa-cubes', color: '#ef4444' },
+  soup_kitchen:  { label: 'Soup Kitchen',      icon: 'fa-utensils',    color: '#f97316' },
+  food_sharing:  { label: 'Community Fridge',   icon: 'fa-snowflake', color: '#06b6d4' },
   give_box:      { label: 'Free Pantry Box',    icon: 'fa-box-open',     color: '#8b5cf6' },
 };
 

@@ -25,7 +25,6 @@
 (function(){try{var raw=localStorage.getItem('ov_theme');if(!raw)return;var t=JSON.parse(raw),v=t&&t.variables;if(!v)return;var el=document.documentElement;for(var k in v)if(k.charAt(0)==='-')el.style.setProperty(k,v[k]);if(t.id)el.setAttribute('data-theme',t.id);}catch(_){}})();
 </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         :root {
             --bg-primary: #0b0c12;
@@ -671,21 +670,21 @@
         net:              { name: 'Network Tools',            icon: 'fa-network-wired',     cat: 'hub',   endpoint: null,        placeholder: 'Enter a domain, IP, or URL…' },
         lookup:           { name: 'Domain & IP Lookup',         icon: 'fa-magnifying-glass',  cat: 'hub',   endpoint: '/lookup',   placeholder: 'Domain, IP, or URL — we\'ll look up everything', btnText: 'Lookup All' },
         // IP / Identity
-        myip:             { name: 'What Is My IP',           icon: 'fa-location-crosshairs', cat: 'ip',  endpoint: '/myip',     placeholder: null, auto: true },
+        myip:             { name: 'What Is My IP',           icon: 'fa-location-dot', cat: 'ip',  endpoint: '/myip',     placeholder: null, auto: true },
         ip:               { name: 'IP Address Lookup',             icon: 'fa-at',                cat: 'ip',    endpoint: '/ip',       placeholder: 'IP address or domain' },
         ipv4:             { name: 'IPv4 Lookup & CIDR Calculator',           icon: 'fa-hashtag',           cat: 'ip',    endpoint: '/ipv4',     placeholder: 'IPv4 address, CIDR block (e.g. 192.168.1.0/24) or domain' },
         ipv6:             { name: 'IPv6 Lookup',           icon: 'fa-code',              cat: 'ip',    endpoint: '/ipv6',     placeholder: 'IPv6 address or domain' },
         geoip:            { name: 'IP Geolocation',          icon: 'fa-earth-americas',    cat: 'ip',    endpoint: '/ip',       placeholder: 'IP address or domain' },
         hostname:         { name: 'Hostname Lookup',       icon: 'fa-server',            cat: 'ip',    endpoint: '/rdns',     placeholder: 'IP address to resolve hostname' },
-        isp:              { name: 'ISP Lookup',            icon: 'fa-building',          cat: 'ip',    endpoint: '/ip',       placeholder: 'IP address or domain' },
+        isp:              { name: 'ISP Lookup',            icon: 'fa-city',          cat: 'ip',    endpoint: '/ip',       placeholder: 'IP address or domain' },
         asn:              { name: 'ASN Lookup',            icon: 'fa-diagram-project',   cat: 'ip',    endpoint: '/ip',       placeholder: 'IP address or domain' },
         rdns:             { name: 'Reverse DNS Lookup',     icon: 'fa-rotate-left',       cat: 'ip',    endpoint: '/rdns',     placeholder: 'IP address for reverse DNS' },
-        whois:            { name: 'Whois Lookup',          icon: 'fa-address-book',      cat: 'ip',    endpoint: '/rdap',     placeholder: 'Domain or IP' },
+        whois:            { name: 'Whois Lookup',          icon: 'fa-address-card',      cat: 'ip',    endpoint: '/rdap',     placeholder: 'Domain or IP' },
         rdap:             { name: 'RDAP Lookup',           icon: 'fa-id-card',           cat: 'ip',    endpoint: '/rdap',     placeholder: 'Domain or IP for RDAP lookup' },
         // DNS
         dns:              { name: 'DNS Lookup',            icon: 'fa-sitemap',           cat: 'dns',   endpoint: '/dns',      placeholder: 'Domain to query' },
         dig:              { name: 'Online dig',            icon: 'fa-terminal',          cat: 'dns',   endpoint: '/dns',      placeholder: 'Domain (dig-style query)',   dnsTypes: true },
-        nslookup:         { name: 'NSLookup',       icon: 'fa-magnifying-glass-arrow-right', cat: 'dns', endpoint: '/dns', placeholder: 'Domain for nslookup' },
+        nslookup:         { name: 'NSLookup',       icon: 'fa-magnifying-glass', cat: 'dns', endpoint: '/dns', placeholder: 'Domain for nslookup' },
         dnspropagation:   { name: 'DNS Propagation Checker', icon: 'fa-globe',            cat: 'dns',   endpoint: '/dnsprop',  placeholder: 'Domain to compare across public resolvers', propTypes: true },
         mx:               { name: 'MX Record Lookup',             icon: 'fa-envelope',          cat: 'dns',   endpoint: '/dns',      placeholder: 'Domain for MX records',     defaultTypes: 'MX' },
         txt:              { name: 'TXT Record Lookup',            icon: 'fa-file-lines',        cat: 'dns',   endpoint: '/dns',      placeholder: 'Domain for TXT records',    defaultTypes: 'TXT' },
@@ -699,7 +698,7 @@
         mtr:              { name: 'MTR Report',            icon: 'fa-chart-line',        cat: 'diag',  endpoint: '/mtr',      placeholder: 'Host for an MTR report (10 probes a hop, from our server)', wait: 'about 15 seconds' },
         port:             { name: 'Port Checker',      icon: 'fa-door-open',         cat: 'diag',  endpoint: '/port',     placeholder: 'Host to scan ports' },
         headers:          { name: 'HTTP Header Checker',        icon: 'fa-list',              cat: 'diag',  endpoint: '/headers',  placeholder: 'URL or domain' },
-        redirects:        { name: 'Redirect Checker',      icon: 'fa-share',             cat: 'diag',  endpoint: '/redirects', placeholder: 'URL to follow redirects' },
+        redirects:        { name: 'Redirect Checker',      icon: 'fa-arrow-up-from-bracket',             cat: 'diag',  endpoint: '/redirects', placeholder: 'URL to follow redirects' },
         ssl:              { name: 'SSL Certificate Checker',            icon: 'fa-lock',              cat: 'diag',  endpoint: '/ssl',      placeholder: 'Domain for SSL check' },
         curl:             { name: 'Online curl',           icon: 'fa-download',          cat: 'diag',  endpoint: '/headers',  placeholder: 'URL' },
         httpstatus:       { name: 'HTTP Status Codes',     icon: 'fa-circle-check',      cat: 'diag',  endpoint: '/headers',  placeholder: 'URL to check' },
@@ -715,7 +714,7 @@
     };
 
     const CATS = {
-        ip: { label: 'IP / Identity / Ownership', icon: 'fa-fingerprint' },
+        ip: { label: 'IP / Identity / Ownership', icon: 'fa-id-card' },
         dns: { label: 'DNS Tools', icon: 'fa-sitemap' },
         diag: { label: 'Active Diagnostics', icon: 'fa-satellite-dish' },
         mail: { label: 'Email & Reputation', icon: 'fa-envelope' },

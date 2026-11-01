@@ -18,18 +18,18 @@ const { haversine, overpassQuery } = require('./utils');
 // HARM REDUCTION CATEGORIES
 // ═══════════════════════════════════════════════════════════════════
 const HR_TYPES = {
-  needle_exchange:    { label: 'Syringe Exchange',         icon: 'fa-syringe',           color: '#dc2626' },
+  needle_exchange:    { label: 'Syringe Exchange',         icon: 'fa-briefcase-medical',           color: '#dc2626' },
   condom_dist:        { label: 'Condom Distribution',      icon: 'fa-heart',             color: '#ec4899' },
   naloxone:           { label: 'Naloxone / Narcan',        icon: 'fa-kit-medical',       color: '#f97316' },
   harm_reduction:     { label: 'Harm Reduction Center',    icon: 'fa-hand-holding-heart', color: '#8b5cf6' },
   addiction_counsel:  { label: 'Addiction Counselling',     icon: 'fa-comments',          color: '#3b82f6' },
-  hiv_testing:        { label: 'HIV / STI Testing',        icon: 'fa-vial',              color: '#ef4444' },
-  sexual_health:      { label: 'Sexual Health Clinic',     icon: 'fa-stethoscope',       color: '#0891b2' },
-  family_planning:    { label: 'Family Planning',          icon: 'fa-baby',              color: '#a855f7' },
-  vending_health:     { label: 'Health Vending Machine',   icon: 'fa-cash-register',     color: '#22c55e' },
+  hiv_testing:        { label: 'HIV / STI Testing',        icon: 'fa-flask-vial',              color: '#ef4444' },
+  sexual_health:      { label: 'Sexual Health Clinic',     icon: 'fa-kit-medical',       color: '#0891b2' },
+  family_planning:    { label: 'Family Planning',          icon: 'fa-child',              color: '#a855f7' },
+  vending_health:     { label: 'Health Vending Machine',   icon: 'fa-money-bill',     color: '#22c55e' },
   outreach:           { label: 'Outreach Program',         icon: 'fa-people-arrows',     color: '#10b981' },
-  rehab:              { label: 'Rehab / Recovery',         icon: 'fa-house-medical',     color: '#6366f1' },
-  social_health:      { label: 'Community Health Services', icon: 'fa-hospital',          color: '#0ea5e9' },
+  rehab:              { label: 'Rehab / Recovery',         icon: 'fa-house',     color: '#6366f1' },
+  social_health:      { label: 'Community Health Services', icon: 'fa-kit-medical',          color: '#0ea5e9' },
 };
 
 // ═══════════════════════════════════════════════════════════════════

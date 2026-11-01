@@ -648,7 +648,7 @@
             { label: 'Format Conversion', icon: 'fa-solid fa-arrows-rotate', ids: ['mp3', 'wav', 'flac', 'ogg', 'm4a', 'aac', 'opus', 'wma', 'aiff', 'ac3'] },
             { label: 'Audio Editing', icon: 'fa-solid fa-scissors', ids: ['trim', 'merge', 'fade', 'loop', 'silence', 'stereo', 'normalize', 'speed', 'reverse'] },
             { label: 'Audio Effects', icon: 'fa-solid fa-wand-magic-sparkles', ids: ['pitch', 'bass', 'equalizer', 'echo', 'reverb', 'chorus', 'distortion', 'compressor', 'bitcrusher', 'voice', 'noise'] },
-            { label: 'Extraction & Analysis', icon: 'fa-solid fa-magnifying-glass-chart', ids: ['extract', 'vocal', 'waveform', 'metadata'] },
+            { label: 'Extraction & Analysis', icon: 'fa-solid fa-magnifying-glass', ids: ['extract', 'vocal', 'waveform', 'metadata'] },
             { label: 'Specialized', icon: 'fa-solid fa-star', ids: ['ringtone', 'podcast'] },
         ];
 

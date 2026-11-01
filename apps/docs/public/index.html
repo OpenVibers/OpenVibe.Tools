@@ -20,7 +20,6 @@
 (function(){try{var raw=localStorage.getItem('ov_theme');if(!raw)return;var t=JSON.parse(raw),v=t&&t.variables;if(!v)return;var el=document.documentElement;for(var k in v)if(k.charAt(0)==='-')el.style.setProperty(k,v[k]);if(t.id)el.setAttribute('data-theme',t.id);}catch(_){}})();
 </script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
@@ -40,8 +39,8 @@
             <button class="tool-tab" data-tool="split"><i class="fa-solid fa-scissors"></i> Split</button>
             <button class="tool-tab" data-tool="compress"><i class="fa-solid fa-compress"></i> Compress</button>
             <button class="tool-tab" data-tool="rotate"><i class="fa-solid fa-rotate"></i> Rotate</button>
-            <button class="tool-tab" data-tool="reorder"><i class="fa-solid fa-sort"></i> Reorder</button>
-            <button class="tool-tab" data-tool="watermark"><i class="fa-solid fa-stamp"></i> Watermark</button>
+            <button class="tool-tab" data-tool="reorder"><i class="fa-solid fa-arrow-down-wide-short"></i> Reorder</button>
+            <button class="tool-tab" data-tool="watermark"><i class="fa-solid fa-signature"></i> Watermark</button>
             <button class="tool-tab" data-tool="img2pdf"><i class="fa-solid fa-file-image"></i> IMG→PDF</button>
             <button class="tool-tab" data-tool="pdf2img"><i class="fa-solid fa-image"></i> PDF→IMG</button>
         </nav>
@@ -208,7 +207,7 @@
                     <i class="fa-solid fa-download"></i> Download
                 </a>
                 <button class="btn btn-secondary" id="another-btn">
-                    <i class="fa-solid fa-arrow-rotate-left"></i> Process Another
+                    <i class="fa-solid fa-rotate-left"></i> Process Another
                 </button>
             </div>
         </section>

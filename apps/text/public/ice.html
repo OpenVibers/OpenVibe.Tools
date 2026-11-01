@@ -18,7 +18,6 @@
 (function(){try{var raw=localStorage.getItem('ov_theme');if(!raw)return;var t=JSON.parse(raw),v=t&&t.variables;if(!v)return;var el=document.documentElement;for(var k in v)if(k.charAt(0)==='-')el.style.setProperty(k,v[k]);if(t.id)el.setAttribute('data-theme',t.id);}catch(_){}})();
 </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="/css/shared.css">
     <script src="/shared/theme-loader.js" defer></script>
     <style>
@@ -117,12 +116,16 @@
         }
         .scenario summary::-webkit-details-marker { display: none; }
         .scenario summary::after {
-            content: '\f054';
-            font-family: 'Font Awesome 6 Free';
-            font-weight: 900;
-            font-size: 0.75rem;
+            /* The OpenVibe chevron (openvibe.design/icons/chevron), painted in the text's colour. */
+            content: '';
+            width: 0.75rem;
+            height: 0.75rem;
+            flex: none;
             margin-left: auto;
             color: var(--text-muted);
+            background-color: currentColor;
+            -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat;
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat;
             transition: transform 0.2s;
         }
         .scenario[open] summary::after { transform: rotate(90deg); }
@@ -187,7 +190,7 @@
         <!-- ═══ TAB: KNOW YOUR RIGHTS ═══ -->
         <div class="tab-content active" id="tab-rights">
             <div class="tool-section">
-                <h2><i class="fas fa-landmark"></i> Your Constitutional Rights</h2>
+                <h2><i class="fas fa-gavel"></i> Your Constitutional Rights</h2>
                 <p style="color:var(--text-secondary); margin-bottom:16px;">Regardless of immigration status, the U.S. Constitution guarantees these rights to all people on U.S. soil.</p>
 
                 <div class="rights-grid">
@@ -200,7 +203,7 @@
                         <p>You have the right to speak with an attorney. If detained, say: <strong>"I want to speak with a lawyer before answering any questions."</strong> You have the right to make a phone call. Immigration detainees must be given a list of free legal service providers.</p>
                     </div>
                     <div class="rights-card">
-                        <h3><i class="fas fa-house-lock"></i> Protection in Your Home</h3>
+                        <h3><i class="fas fa-house"></i> Protection in Your Home</h3>
                         <p>ICE generally <strong>cannot enter your home without a judicial warrant</strong> signed by a judge. An ICE administrative warrant (Form I-200) does NOT give them permission to enter. You are not required to open the door. Ask them to slip the warrant under the door.</p>
                     </div>
                     <div class="rights-card">
@@ -208,7 +211,7 @@
                         <p>You can refuse a search of yourself, your car, or your home. Say clearly: <strong>"I do not consent to a search."</strong> This does not guarantee they won't search, but it protects your legal rights.</p>
                     </div>
                     <div class="rights-card">
-                        <h3><i class="fas fa-file-signature"></i> Don't Sign Anything</h3>
+                        <h3><i class="fas fa-file-pen"></i> Don't Sign Anything</h3>
                         <p><strong>Do not sign any documents</strong> without reading them carefully and speaking to a lawyer first. Signing voluntary departure papers waives your right to appear before an immigration judge and could result in a 10-year bar on re-entry.</p>
                     </div>
                     <div class="rights-card">
@@ -266,7 +269,7 @@
                     </details>
 
                     <details class="scenario">
-                        <summary><i class="fas fa-building"></i> ICE at Your Workplace</summary>
+                        <summary><i class="fas fa-city"></i> ICE at Your Workplace</summary>
                         <div class="scenario-body">
                             <ul>
                                 <li>Your employer should ask to see a <strong>judicial warrant</strong> before allowing ICE into non-public areas.</li>
@@ -292,7 +295,7 @@
                     </details>
 
                     <details class="scenario">
-                        <summary><i class="fas fa-handcuffs"></i> If You Are Detained</summary>
+                        <summary><i class="fas fa-lock"></i> If You Are Detained</summary>
                         <div class="scenario-body">
                             <ul>
                                 <li>Stay calm and repeat: <em>"I wish to remain silent. I want to speak with a lawyer."</em></li>
@@ -348,7 +351,7 @@
         <!-- ═══ TAB: RESOURCES ═══ -->
         <div class="tab-content" id="tab-resources">
             <div class="tool-section">
-                <h2><i class="fas fa-phone-volume"></i> Emergency Hotlines</h2>
+                <h2><i class="fas fa-phone"></i> Emergency Hotlines</h2>
                 <div class="emergency-grid">
                     <div class="emergency-card">
                         <div class="em-icon red"><i class="fas fa-phone"></i></div>
@@ -365,7 +368,7 @@
                         </div>
                     </div>
                     <div class="emergency-card">
-                        <div class="em-icon green"><i class="fas fa-hands-holding-child"></i></div>
+                        <div class="em-icon green"><i class="fas fa-child"></i></div>
                         <div class="em-info">
                             <h4>RAICES Texas</h4>
                             <p><a href="tel:1-800-732-4237">1-800-732-4237</a> — Free legal help</p>
@@ -414,9 +417,9 @@
                 <div class="resource-links">
                     <a class="resource-link" href="https://www.immigrationadvocates.org/legaldirectory/" target="_blank" rel="noopener"><i class="fas fa-search"></i> Find Free Legal Help Near You</a>
                     <a class="resource-link" href="https://www.aclu.org/know-your-rights/immigrants-rights" target="_blank" rel="noopener"><i class="fas fa-shield-halved"></i> ACLU Know Your Rights</a>
-                    <a class="resource-link" href="https://www.raicestexas.org/know-your-rights/" target="_blank" rel="noopener"><i class="fas fa-hands-holding-child"></i> RAICES Texas</a>
+                    <a class="resource-link" href="https://www.raicestexas.org/know-your-rights/" target="_blank" rel="noopener"><i class="fas fa-child"></i> RAICES Texas</a>
                     <a class="resource-link" href="https://unitedwedream.org/our-work/deportation-defense/know-your-rights/" target="_blank" rel="noopener"><i class="fas fa-fist-raised"></i> United We Dream</a>
-                    <a class="resource-link" href="https://www.nilc.org/" target="_blank" rel="noopener"><i class="fas fa-landmark"></i> National Immigration Law Center</a>
+                    <a class="resource-link" href="https://www.nilc.org/" target="_blank" rel="noopener"><i class="fas fa-gavel"></i> National Immigration Law Center</a>
                     <a class="resource-link" href="https://cliniclegal.org/" target="_blank" rel="noopener"><i class="fas fa-scale-balanced"></i> CLINIC Legal</a>
                     <a class="resource-link" href="https://www.informedimmigrant.com/" target="_blank" rel="noopener"><i class="fas fa-book"></i> Informed Immigrant</a>
                 </div>
@@ -426,7 +429,7 @@
                 <h2><i class="fas fa-mobile-screen"></i> Apps & Tools</h2>
                 <div class="rights-grid">
                     <div class="rights-card">
-                        <h3><i class="fab fa-app-store"></i> Know Your Rights App (NAKASEC)</h3>
+                        <h3><i class="fas fa-mobile-screen"></i> Know Your Rights App (NAKASEC)</h3>
                         <p>Mobile app for immigrants to understand their legal rights. Available on iOS.</p>
                         <div class="rights-lang"><span class="lang-tag">English</span><span class="lang-tag">Español</span><span class="lang-tag">한국어</span></div>
                     </div>
