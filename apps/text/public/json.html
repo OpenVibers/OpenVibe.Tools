@@ -34,8 +34,8 @@
         .json-brace { color: var(--text-secondary); }
         .json-error { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); }
         .json-status { font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
-        .json-status.valid { color: #4ade80; }
-        .json-status.invalid { color: #f87171; }
+        .json-status.valid { color: var(--success-text, #4ade80); }
+        .json-status.invalid { color: var(--danger-text, #f87171); }
         .json-meta { display: flex; gap: 16px; margin-top: 8px; font-size: 0.82rem; color: var(--text-muted); font-weight: 500; }
         @media (max-width: 768px) { .json-grid { grid-template-columns: 1fr; } }
     </style>

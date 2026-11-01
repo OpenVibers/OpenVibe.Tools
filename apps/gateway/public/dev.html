@@ -53,7 +53,7 @@ a{color:inherit;text-decoration:none}
 .ab-s{background:var(--bg3);color:var(--tx2);border:1px solid var(--brd)}.ab-s:hover{background:#252738;color:var(--tx)}
 #out{min-height:100px;padding:16px;background:var(--bg2);border:1px solid var(--brd);border-radius:var(--r);font-family:'JetBrains Mono',monospace;font-size:.85rem;white-space:pre-wrap;word-break:break-all;overflow-x:auto;line-height:1.6}
 #out:empty::before{content:'Output will appear here...';color:var(--tx3)}
-#out .err{color:#f87171}#out .ok{color:#34d399}
+#out .err{color:var(--danger-text, #f87171)}#out .ok{color:var(--success-text, #34d399)}
 .dl{display:flex;font-size:.82rem;line-height:1.7}.dl .ln{width:34px;text-align:right;padding:0 6px;color:var(--tx3);user-select:none;flex-shrink:0}
 .dl .lc{flex:1;padding:0 8px;white-space:pre-wrap}
 .dl.da{background:rgba(52,211,153,.1);color:#6ee7b7}.dl.dd{background:rgba(248,113,113,.1);color:#fca5a5}
@@ -81,7 +81,7 @@ a{color:inherit;text-decoration:none}
 .ovk-tool-modes .ovk-seg{flex-wrap:wrap;max-width:100%}
 .ovk-tool-buttons{display:flex;gap:8px;flex-wrap:wrap}
 .ovk-dev-out{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:.86rem/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--text-primary,#f1f4fb)}
-.ovk-dev-out table{border-collapse:collapse;width:100%;font-size:.82rem}.ovk-dev-out td,.ovk-dev-out th{border:1px solid var(--border,rgba(255,255,255,.07));padding:6px 10px;text-align:left}
+.ovk-dev-out table{border-collapse:collapse;width:100%;font-size:.82rem}.ovk-dev-out td,.ovk-dev-out th{border:1px solid var(--border,color-mix(in srgb, var(--text-primary, #fff) 7%, transparent));padding:6px 10px;text-align:left}
 .ov-tool-page .page{padding:0}
 </style>
 <script type="application/ld+json">
