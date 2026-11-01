@@ -43,7 +43,7 @@ const TOOLS = {
         id: 'crop',
         label: 'Crop',
         description: 'Crop images to specific areas or aspect ratios',
-        faIcon: 'fa-crop-simple',
+        faIcon: 'fa-scissors',
         accepts: ['png', 'jpg', 'jpeg', 'webp', 'avif', 'tiff', 'bmp', 'gif', 'heic', 'heif', 'svg'],
         outputs: null, // same as input
         handler: crop,

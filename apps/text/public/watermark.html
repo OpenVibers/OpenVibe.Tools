@@ -18,7 +18,6 @@
 (function(){try{var raw=localStorage.getItem('ov_theme');if(!raw)return;var t=JSON.parse(raw),v=t&&t.variables;if(!v)return;var el=document.documentElement;for(var k in v)if(k.charAt(0)==='-')el.style.setProperty(k,v[k]);if(t.id)el.setAttribute('data-theme',t.id);}catch(_){}})();
 </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="/css/shared.css">
     <script src="/shared/theme-loader.js" defer></script>
     <style>
@@ -56,7 +55,7 @@
             <div>
                 <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
                     <input type="file" id="fileInput" accept="image/*">
-                    <i class="fas fa-cloud-upload-alt" style="font-size: 2rem; color: var(--text-muted); margin-bottom: .5rem; display: block;"></i>
+                    <i class="fas fa-cloud-arrow-up" style="font-size: 2rem; color: var(--text-muted); margin-bottom: .5rem; display: block;"></i>
                     <p style="color: var(--text-secondary); margin: 0;">Click or drag an image here</p>
                 </div>
                 <div class="wm-preview" id="previewArea" style="margin-top: 1.5rem;">
@@ -80,7 +79,7 @@
                 </div>
 
                 <div class="ctrl-group">
-                    <h3><i class="fas fa-crosshairs"></i> Position</h3>
+                    <h3><i class="fas fa-location-dot"></i> Position</h3>
                     <div class="pos-grid" id="posGrid">
                         <button class="pos-btn" data-pos="top-left">↖ Top Left</button>
                         <button class="pos-btn" data-pos="top-center">↑ Top</button>

@@ -31,7 +31,7 @@ const WMO_CODES = {
   73: { description: 'Moderate snow', icon: 'fa-snowflake', cls: 'snow' },
   75: { description: 'Heavy snow', icon: 'fa-snowflake', cls: 'snow' },
   77: { description: 'Snow grains', icon: 'fa-snowflake', cls: 'snow' },
-  80: { description: 'Light showers', icon: 'fa-cloud-sun-rain', cls: 'rain' },
+  80: { description: 'Light showers', icon: 'fa-cloud-rain', cls: 'rain' },
   81: { description: 'Moderate showers', icon: 'fa-cloud-showers-heavy', cls: 'rain' },
   82: { description: 'Violent showers', icon: 'fa-cloud-showers-heavy', cls: 'rain' },
   85: { description: 'Light snow showers', icon: 'fa-snowflake', cls: 'snow' },
@@ -47,7 +47,7 @@ function decodeWMO(code, isDay) {
   let icon = entry.icon;
   if (!isDay && icon === 'fa-sun') icon = 'fa-moon';
   if (!isDay && icon === 'fa-cloud-sun') icon = 'fa-cloud-moon';
-  if (!isDay && icon === 'fa-cloud-sun-rain') icon = 'fa-cloud-moon-rain';
+  if (!isDay && icon === 'fa-cloud-rain') icon = 'fa-cloud-moon';
   return { ...entry, icon };
 }
 

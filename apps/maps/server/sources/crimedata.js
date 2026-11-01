@@ -18,29 +18,29 @@ const { haversine, overpassQuery } = require('./utils');
 // Higher weight = stronger signal of "sketchy" area
 const GRIT_INDICATORS = {
   // Nightlife / vice
-  bar:             { query: '["amenity"="bar"]',                weight: 2, label: 'Bar', icon: 'fa-martini-glass' },
+  bar:             { query: '["amenity"="bar"]',                weight: 2, label: 'Bar', icon: 'fa-mug-hot' },
   nightclub:       { query: '["amenity"="nightclub"]',          weight: 3, label: 'Nightclub', icon: 'fa-music' },
-  pub:             { query: '["amenity"="pub"]',                weight: 1, label: 'Pub', icon: 'fa-beer-mug-empty' },
+  pub:             { query: '["amenity"="pub"]',                weight: 1, label: 'Pub', icon: 'fa-mug-saucer' },
   strip_club:      { query: '["amenity"="stripclub"]',          weight: 4, label: 'Strip Club', icon: 'fa-mask' },
   casino:          { query: '["amenity"="casino"]',             weight: 3, label: 'Casino', icon: 'fa-dice' },
   adult_shop:      { query: '["shop"="erotic"]',                weight: 3, label: 'Adult Shop', icon: 'fa-store' },
   // Commerce grit
-  pawn_shop:       { query: '["shop"="pawnbroker"]',            weight: 3, label: 'Pawn Shop', icon: 'fa-ring' },
+  pawn_shop:       { query: '["shop"="pawnbroker"]',            weight: 3, label: 'Pawn Shop', icon: 'fa-gem' },
   payday_loan:     { query: '["shop"="money_lender"]',          weight: 3, label: 'Payday Lender', icon: 'fa-money-bill' },
-  liquor_store:    { query: '["shop"="alcohol"]',               weight: 2, label: 'Liquor Store', icon: 'fa-wine-bottle' },
+  liquor_store:    { query: '["shop"="alcohol"]',               weight: 2, label: 'Liquor Store', icon: 'fa-flask' },
   tattoo_shop:     { query: '["shop"="tattoo"]',                weight: 1, label: 'Tattoo Parlor', icon: 'fa-pen-nib' },
-  vape_shop:       { query: '["shop"="e-cigarette"]',           weight: 1, label: 'Vape/Smoke Shop', icon: 'fa-smoking' },
-  tobacco_shop:    { query: '["shop"="tobacco"]',               weight: 1, label: 'Tobacco Shop', icon: 'fa-smoking' },
+  vape_shop:       { query: '["shop"="e-cigarette"]',           weight: 1, label: 'Vape/Smoke Shop', icon: 'fa-smog' },
+  tobacco_shop:    { query: '["shop"="tobacco"]',               weight: 1, label: 'Tobacco Shop', icon: 'fa-smog' },
   // Social services (indicates street population density)
   homeless_shelter:{ query: '["social_facility"="shelter"]["social_facility:for"~"homeless|underprivileged"]', weight: 2, label: 'Homeless Shelter', icon: 'fa-house-chimney' },
   food_bank:       { query: '["social_facility"="food_bank"]',  weight: 1, label: 'Food Bank', icon: 'fa-utensils' },
   // Law enforcement (indicates high-incident areas)
-  police:          { query: '["amenity"="police"]',             weight: 1, label: 'Police Station', icon: 'fa-building-shield' },
+  police:          { query: '["amenity"="police"]',             weight: 1, label: 'Police Station', icon: 'fa-shield-halved' },
   // Transportation (transient hubs)
-  bus_station:     { query: '["amenity"="bus_station"]',        weight: 1, label: 'Bus Station', icon: 'fa-bus' },
+  bus_station:     { query: '["amenity"="bus_station"]',        weight: 1, label: 'Bus Station', icon: 'fa-train' },
   // Abandoned / sketchy structures
-  abandoned:       { query: '["abandoned"="yes"]',              weight: 3, label: 'Abandoned Building', icon: 'fa-building-circle-xmark' },
-  disused:         { query: '["disused"="yes"]["building"]',    weight: 2, label: 'Disused Building', icon: 'fa-building' },
+  abandoned:       { query: '["abandoned"="yes"]',              weight: 3, label: 'Abandoned Building', icon: 'fa-circle-xmark' },
+  disused:         { query: '["disused"="yes"]["building"]',    weight: 2, label: 'Disused Building', icon: 'fa-city' },
 };
 
 // ── Curated WA Sketchy / High-Activity Zones ────────────────────────

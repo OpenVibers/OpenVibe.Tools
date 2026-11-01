@@ -17,7 +17,6 @@
 (function(){try{var raw=localStorage.getItem('ov_theme');if(!raw)return;var t=JSON.parse(raw),v=t&&t.variables;if(!v)return;var el=document.documentElement;for(var k in v)if(k.charAt(0)==='-')el.style.setProperty(k,v[k]);if(t.id)el.setAttribute('data-theme',t.id);}catch(_){}})();
 </script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
@@ -90,7 +89,7 @@
                     <i class="fa-solid fa-download"></i> Save File
                 </a>
                 <button class="btn btn-secondary" id="new-btn">
-                    <i class="fa-solid fa-arrow-rotate-left"></i> Download Another
+                    <i class="fa-solid fa-rotate-left"></i> Download Another
                 </button>
             </div>
         </section>
@@ -99,7 +98,7 @@
         <section class="error-section" id="error-section" style="display:none">
             <div class="error-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
             <p id="error-msg"></p>
-            <button class="btn btn-secondary" id="retry-btn"><i class="fa-solid fa-arrow-rotate-left"></i> Try Again</button>
+            <button class="btn btn-secondary" id="retry-btn"><i class="fa-solid fa-rotate-left"></i> Try Again</button>
         </section>
     </div>
 

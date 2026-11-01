@@ -20,7 +20,6 @@
 (function(){try{var raw=localStorage.getItem('ov_theme');if(!raw)return;var t=JSON.parse(raw),v=t&&t.variables;if(!v)return;var el=document.documentElement;for(var k in v)if(k.charAt(0)==='-')el.style.setProperty(k,v[k]);if(t.id)el.setAttribute('data-theme',t.id);}catch(_){}})();
 </script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
@@ -45,10 +44,10 @@
             <button class="tool-tab" data-tool="normalize"><i class="fa-solid fa-sliders"></i> Normalize</button>
             <button class="tool-tab" data-tool="fade"><i class="fa-solid fa-volume-low"></i> Fade</button>
             <button class="tool-tab" data-tool="bass"><i class="fa-solid fa-volume-high"></i> Bass</button>
-            <button class="tool-tab" data-tool="equalizer"><i class="fa-solid fa-bars-staggered"></i> EQ</button>
+            <button class="tool-tab" data-tool="equalizer"><i class="fa-solid fa-sliders"></i> EQ</button>
             <button class="tool-tab" data-tool="voice"><i class="fa-solid fa-user-astronaut"></i> Voice FX</button>
             <button class="tool-tab" data-tool="echo"><i class="fa-solid fa-tower-broadcast"></i> Echo</button>
-            <button class="tool-tab" data-tool="reverb"><i class="fa-solid fa-church"></i> Reverb</button>
+            <button class="tool-tab" data-tool="reverb"><i class="fa-solid fa-house-chimney"></i> Reverb</button>
             <button class="tool-tab" data-tool="extract"><i class="fa-solid fa-music"></i> Extract</button>
             <button class="tool-tab" data-tool="ringtone"><i class="fa-solid fa-bell"></i> Ringtone</button>
         </nav>
@@ -303,7 +302,7 @@
                     <i class="fa-solid fa-download"></i> Download
                 </a>
                 <button class="btn btn-secondary" id="another-btn">
-                    <i class="fa-solid fa-arrow-rotate-left"></i> Process Another
+                    <i class="fa-solid fa-rotate-left"></i> Process Another
                 </button>
             </div>
         </section>
@@ -332,7 +331,7 @@
                     <span class="cross-info"><span class="cross-name">OpenVibe.Live</span><span class="cross-desc">Live streaming platform</span></span>
                 </a>
                 <a class="cross-card" href="https://openvibe.games">
-                    <span class="cross-icon"><i class="fa-solid fa-dragon"></i></span>
+                    <span class="cross-icon"><i class="fa-solid fa-gamepad"></i></span>
                     <span class="cross-info"><span class="cross-name">Scraplandia</span><span class="cross-desc">Multiplayer RPG</span></span>
                 </a>
                 <a class="cross-card" href="https://maps.openvibe.tools">

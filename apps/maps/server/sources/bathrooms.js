@@ -21,17 +21,17 @@ const BATHROOM_TYPES = {
   public: { icon: 'fa-restroom', label: 'Public Restroom', color: '#3b82f6' },
   park: { icon: 'fa-tree', label: 'Park Restroom', color: '#22c55e' },
   library: { icon: 'fa-book', label: 'Library', color: '#8b5cf6' },
-  gas_station: { icon: 'fa-gas-pump', label: 'Gas Station', color: '#f59e0b' },
+  gas_station: { icon: 'fa-store', label: 'Gas Station', color: '#f59e0b' },
   restaurant: { icon: 'fa-utensils', label: 'Restaurant/Café', color: '#ef4444' },
   mall: { icon: 'fa-store', label: 'Store/Mall', color: '#ec4899' },
-  transit: { icon: 'fa-bus', label: 'Transit Station', color: '#06b6d4' },
-  community: { icon: 'fa-building', label: 'Community Building', color: '#6366f1' },
-  shower: { icon: 'fa-shower', label: 'Shower Facility', color: '#14b8a6' },
-  gym_shower: { icon: 'fa-dumbbell', label: 'Gym Shower', color: '#8b5cf6' },
+  transit: { icon: 'fa-train', label: 'Transit Station', color: '#06b6d4' },
+  community: { icon: 'fa-city', label: 'Community Building', color: '#6366f1' },
+  shower: { icon: 'fa-faucet', label: 'Shower Facility', color: '#14b8a6' },
+  gym_shower: { icon: 'fa-weight-hanging', label: 'Gym Shower', color: '#8b5cf6' },
   pool_shower: { icon: 'fa-person-swimming', label: 'Pool/Sports Shower', color: '#0ea5e9' },
   hot_spring: { icon: 'fa-hot-tub-person', label: 'Hot Spring', color: '#f97316' },
   water: { icon: 'fa-faucet-drip', label: 'Drinking Water', color: '#0ea5e9' },
-  unknown: { icon: 'fa-toilet', label: 'Restroom', color: '#94a3b8' },
+  unknown: { icon: 'fa-restroom', label: 'Restroom', color: '#94a3b8' },
 };
 
 // ─── Classify bathroom type from tags/name ─────────────────────────

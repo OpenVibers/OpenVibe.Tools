@@ -42,7 +42,7 @@ async function getBulkElevation(coords) {
 function classifyElevation(elev) {
   if (elev === null) return { class: 'unknown', label: 'Unknown', icon: 'fa-question' };
   if (elev < 100) return { class: 'lowland', label: 'Lowland/Valley', icon: 'fa-water', note: 'Near sea level. May flood in winter.' };
-  if (elev < 500) return { class: 'foothills', label: 'Foothills', icon: 'fa-hill-rockslide', note: 'Moderate elevation. Good year-round camping.' };
+  if (elev < 500) return { class: 'foothills', label: 'Foothills', icon: 'fa-mountain', note: 'Moderate elevation. Good year-round camping.' };
   if (elev < 1500) return { class: 'mountain', label: 'Mountain', icon: 'fa-mountain', note: 'Mountain terrain. Snow possible Oct-May.' };
   if (elev < 2500) return { class: 'alpine', label: 'High Mountain', icon: 'fa-mountain-sun', note: 'High altitude. Snow likely Nov-Jun. Be prepared for weather.' };
   return { class: 'alpine-extreme', label: 'Alpine/Extreme', icon: 'fa-mountain-sun', note: 'Very high altitude. Extreme conditions. Summer access only.' };

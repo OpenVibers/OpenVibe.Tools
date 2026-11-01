@@ -60,7 +60,7 @@ const DOMAIN_MAP = {
     },
     'svg.openvibe.tools': {
         toolId: 'svg', brandName: 'OpenVibeSVG', defaultOp: 'convert', defaultFormat: 'png',
-        faIcon: 'fa-bezier-curve',
+        faIcon: 'fa-shapes',
         seoTitle: 'OpenVibeSVG — Convert SVG Images Online',
         seoDescription: 'Convert SVG to PNG, JPG, WebP. Convert bitmap images to SVG vector traces. Online SVG converter.',
     },
@@ -104,7 +104,7 @@ const DOMAIN_MAP = {
     },
     'crop.openvibe.tools': {
         toolId: 'crop', brandName: 'OpenVibeCrop', defaultOp: 'crop',
-        faIcon: 'fa-crop-simple',
+        faIcon: 'fa-scissors',
         seoTitle: 'OpenVibeCrop — Crop Images Online',
         seoDescription: 'Crop images by custom dimensions or preset aspect ratios (16:9, 4:3, 1:1). Online image cropper.',
     },

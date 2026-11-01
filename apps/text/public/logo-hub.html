@@ -18,7 +18,6 @@
 (function(){try{var raw=localStorage.getItem('ov_theme');if(!raw)return;var t=JSON.parse(raw),v=t&&t.variables;if(!v)return;var el=document.documentElement;for(var k in v)if(k.charAt(0)==='-')el.style.setProperty(k,v[k]);if(t.id)el.setAttribute('data-theme',t.id);}catch(_){}})();
 </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="/css/shared.css">
     <script src="/shared/theme-loader.js" defer></script>
 </head>
@@ -53,7 +52,7 @@
 
         <!-- Tools grid -->
         <div class="section-header">
-            <i class="fas fa-tools"></i>
+            <i class="fas fa-screwdriver-wrench"></i>
             <h2>Design Tools</h2>
         </div>
         <div class="tool-grid">
@@ -70,7 +69,7 @@
                 <span class="card-domain">wordmark.openvibe.tools</span>
             </a>
             <a href="https://badge.openvibe.tools" class="tool-card">
-                <div class="card-icon"><i class="fas fa-certificate"></i></div>
+                <div class="card-icon"><i class="fas fa-ranking-star"></i></div>
                 <h3>Badge & Sticker Maker</h3>
                 <p>Create rounded badges, stickers, and labels. Choose background shapes, colors, and text styles.</p>
                 <span class="card-domain">badge.openvibe.tools</span>

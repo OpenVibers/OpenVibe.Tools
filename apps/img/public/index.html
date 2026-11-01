@@ -20,7 +20,6 @@
 (function(){try{var raw=localStorage.getItem('ov_theme');if(!raw)return;var t=JSON.parse(raw),v=t&&t.variables;if(!v)return;var el=document.documentElement;for(var k in v)if(k.charAt(0)==='-')el.style.setProperty(k,v[k]);if(t.id)el.setAttribute('data-theme',t.id);}catch(_){}})();
 </script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
@@ -39,7 +38,7 @@
             <button class="tool-tab active" data-tool="convert"><i class="fa-solid fa-arrows-rotate"></i> Convert</button>
             <button class="tool-tab" data-tool="compress"><i class="fa-solid fa-compress"></i> Compress</button>
             <button class="tool-tab" data-tool="resize"><i class="fa-solid fa-up-right-and-down-left-from-center"></i> Resize</button>
-            <button class="tool-tab" data-tool="crop"><i class="fa-solid fa-crop-simple"></i> Crop</button>
+            <button class="tool-tab" data-tool="crop"><i class="fa-solid fa-scissors"></i> Crop</button>
         </nav>
 
         <!-- Upload Zone -->
@@ -152,7 +151,7 @@
                     <i class="fa-solid fa-download"></i> Download
                 </a>
                 <button class="btn btn-secondary" id="another-btn">
-                    <i class="fa-solid fa-arrow-rotate-left"></i> Process Another
+                    <i class="fa-solid fa-rotate-left"></i> Process Another
                 </button>
             </div>
         </section>
