@@ -43,7 +43,7 @@
             padding: 7px 16px; border-radius: 20px;
             background: var(--bg-secondary); border: 1px solid var(--border);
             color: var(--text-secondary); cursor: pointer; font-size: 0.82rem;
-            font-weight: 600; transition: all 0.2s; font-family: 'Inter', sans-serif;
+            font-weight: 600; transition: all var(--ov-dur-2, 0.2s); font-family: 'Inter', sans-serif;
         }
         .vibe-pill:hover { border-color: var(--accent); color: var(--text-primary); }
         .vibe-pill.active { background: var(--accent); color: #0b0c12; border-color: var(--accent); }
@@ -55,7 +55,7 @@
         .slang-card {
             background: var(--bg-secondary); border: 1px solid var(--border);
             border-radius: 12px; padding: 18px 20px;
-            transition: border-color 0.2s;
+            transition: border-color var(--ov-dur-2, 0.2s);
         }
         .slang-card:hover { border-color: var(--border-accent); }
 
@@ -104,7 +104,7 @@
             background: var(--bg-secondary); border: 1px solid var(--border);
             color: var(--text-secondary); cursor: pointer; font-size: 0.82rem;
             font-weight: 700; display: flex; align-items: center; justify-content: center;
-            transition: all 0.15s; font-family: 'Inter', sans-serif;
+            transition: all var(--ov-dur-2, 0.15s); font-family: 'Inter', sans-serif;
         }
         .alpha-btn:hover { border-color: var(--accent); color: var(--accent); }
         .alpha-btn.active { background: var(--accent); color: #0b0c12; border-color: var(--accent); }

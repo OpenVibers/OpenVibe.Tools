@@ -86,7 +86,7 @@ body {
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
-    transition: all .15s;
+    transition: all var(--ov-dur-2, .15s);
     display: flex;
     align-items: center;
     gap: 6px;
@@ -112,7 +112,7 @@ body {
     padding: 48px 24px;
     text-align: center;
     cursor: pointer;
-    transition: all .2s;
+    transition: all var(--ov-dur-2, .2s);
     background: var(--bg-secondary);
 }
 .upload-area:hover, .upload-area.dragover {
@@ -209,7 +209,7 @@ body {
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
-    transition: all .12s;
+    transition: all var(--ov-dur-1, .12s);
 }
 .format-btn:hover, .aspect-btn:hover {
     border-color: var(--accent-dark);
@@ -260,7 +260,7 @@ body {
     font-size: 14px;
     width: 120px;
     outline: none;
-    transition: border-color .15s;
+    transition: border-color var(--ov-dur-2, .15s);
 }
 .num-input:focus, .select-input:focus {
     border-color: var(--accent);
@@ -299,7 +299,7 @@ body {
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    transition: all .15s;
+    transition: all var(--ov-dur-2, .15s);
     text-decoration: none;
 }
 .btn-primary {
@@ -334,7 +334,7 @@ body {
     border-top: 4px solid var(--accent);
     border-radius: 50%;
     margin: 0 auto 16px;
-    animation: spin 1.4s ease-out infinite;
+    animation: spin 1.4s var(--ov-ease-out, ease-out) infinite;
 }
 @keyframes spin { from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--spin-c, var(--accent, #3b82f6)) 50%, transparent); } to { box-shadow: 0 0 0 10px transparent; } }   /* "spin" pulses out now: nothing spins (design lint, plan L45) */
 
@@ -403,7 +403,7 @@ body {
     border-radius: var(--radius-md);
     text-decoration: none;
     color: var(--text-primary);
-    transition: all .15s;
+    transition: all var(--ov-dur-2, .15s);
 }
 .subdomain-card:hover {
     border-color: var(--accent-dark);

@@ -210,7 +210,7 @@ a:hover { color: var(--accent-hover); }
     padding: 28px 24px;
     margin-bottom: 24px;
 }
-.option-group { animation: fadeIn .25s ease; }
+.option-group { animation: fadeIn var(--ov-dur-2, .25s) var(--ov-ease-out, ease); }
 .option-label {
     display: block;
     font-size: .9rem;
@@ -361,7 +361,7 @@ a:hover { color: var(--accent-hover); }
     height: 48px;
     border: 4px solid var(--accent); --spin-c: var(--accent);
     border-radius: 50%;
-    animation: spin 1.4s ease-out infinite;
+    animation: spin 1.4s var(--ov-ease-out, ease-out) infinite;
     margin: 0 auto 16px;
 }
 @keyframes spin { from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--spin-c, var(--accent, #3b82f6)) 50%, transparent); } to { box-shadow: 0 0 0 10px transparent; } }   /* "spin" pulses out now: nothing spins (design lint, plan L45) */
@@ -375,7 +375,7 @@ a:hover { color: var(--accent-hover); }
     padding: 32px 24px;
     text-align: center;
     margin-bottom: 24px;
-    animation: fadeIn .35s ease;
+    animation: fadeIn var(--ov-dur-3, .35s) var(--ov-ease-out, ease);
 }
 .result-panel h2 {
     color: var(--success-text, var(--success));
@@ -550,7 +550,7 @@ a:hover { color: var(--accent-hover); }
     font-size: .9rem;
     box-shadow: var(--shadow);
     z-index: 9999;
-    animation: slideUp .3s ease;
+    animation: slideUp var(--ov-dur-3, .3s) var(--ov-ease-out, ease);
 }
 .toast.error { border-color: var(--error); }
 .toast.success { border-color: var(--success); }

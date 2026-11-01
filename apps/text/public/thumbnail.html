@@ -37,11 +37,11 @@
         .ctrl-row input[type="color"] { width: 36px; height: 30px; border: 1px solid var(--border); background: var(--bg-secondary); border-radius: 8px; cursor: pointer; padding: 2px; }
         .ctrl-row input[type="range"] { flex: 1; }
         .ctrl-row .val { min-width: 32px; text-align: right; font-size: .78rem; color: var(--text-muted); font-family: monospace; }
-        .upload-btn { width: 100%; padding: .75rem; border-radius: 12px; border: 2px dashed var(--border); background: var(--bg-tertiary); color: var(--text-secondary); cursor: pointer; text-align: center; transition: all .2s; font-size: .9rem; }
+        .upload-btn { width: 100%; padding: .75rem; border-radius: 12px; border: 2px dashed var(--border); background: var(--bg-tertiary); color: var(--text-secondary); cursor: pointer; text-align: center; transition: all var(--ov-dur-2, .2s); font-size: .9rem; }
         .upload-btn:hover { border-color: var(--accent); color: var(--accent); }
         .upload-btn input { display: none; }
         .size-pills { display: flex; gap: .4rem; flex-wrap: wrap; }
-        .size-pill { padding: .35rem .7rem; border-radius: 16px; border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-secondary); font-size: .75rem; cursor: pointer; transition: all .15s; }
+        .size-pill { padding: .35rem .7rem; border-radius: 16px; border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-secondary); font-size: .75rem; cursor: pointer; transition: all var(--ov-dur-2, .15s); }
         .size-pill:hover, .size-pill.active { border-color: var(--accent); color: var(--accent); background: rgba(192,150,92,0.1); }
         @media (max-width: 768px) { .thumb-layout { grid-template-columns: 1fr; } }
     </style>

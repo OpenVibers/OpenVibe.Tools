@@ -302,7 +302,7 @@ textarea.large {
     border-radius: 50%;
     background: var(--success, #4ade80);
     box-shadow: 0 0 6px rgba(74, 222, 128, 0.4);
-    animation: livePulse 2s ease-in-out infinite;
+    animation: livePulse 2s var(--ov-ease-in-out, ease-in-out) infinite;
     flex-shrink: 0;
 }
 
@@ -330,7 +330,7 @@ textarea.large {
 
 /* Brief highlight flash on the output area when Generate is clicked */
 .output-flash {
-    animation: outputFlash 0.6s ease;
+    animation: outputFlash var(--ov-dur-4, 0.6s) var(--ov-ease-out, ease);
 }
 
 @keyframes outputFlash {
@@ -694,7 +694,7 @@ textarea.large {
     font-size: 0.9rem;
     box-shadow: var(--shadow-lg);
     z-index: 10000;
-    animation: toastIn 0.3s ease, toastOut 0.3s ease 2.5s forwards;
+    animation: toastIn var(--ov-dur-3, 0.3s) var(--ov-ease-out, ease), toastOut var(--ov-dur-3, 0.3s) var(--ov-ease-out, ease) 2.5s forwards;
     backdrop-filter: blur(12px);
 }
 

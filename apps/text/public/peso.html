@@ -65,7 +65,7 @@
             background: var(--accent); border: 3px solid var(--bg-primary);
             color: #0b0c12; font-size: 1rem; cursor: pointer;
             display: flex; align-items: center; justify-content: center;
-            transition: transform 0.3s, background 0.2s;
+            transition: transform var(--ov-dur-3, 0.3s), background var(--ov-dur-2, 0.2s);
             margin: -8px 0;
             z-index: 2;
         }
@@ -93,7 +93,7 @@
             padding: 8px 16px; border-radius: 8px;
             background: var(--bg-secondary); border: 1px solid var(--border);
             color: var(--text-secondary); cursor: pointer; font-size: 0.85rem;
-            font-weight: 500; transition: all 0.2s; font-family: 'Inter', sans-serif;
+            font-weight: 500; transition: all var(--ov-dur-2, 0.2s); font-family: 'Inter', sans-serif;
         }
         .quick-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
 

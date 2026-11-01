@@ -64,7 +64,7 @@
         #showcase-section.visible { display: block; }
         
         .showcase-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 16px; margin: 40px 0; max-width: 800px; margin-left: auto; margin-right: auto; }
-        .showcase-tool { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; border-radius: 16px; background: var(--bg-card); border: 1px solid var(--border-light); cursor: pointer; transition: all 0.3s ease; gap: 10px; animation: float ease-in-out infinite; }
+        .showcase-tool { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; border-radius: 16px; background: var(--bg-card); border: 1px solid var(--border-light); cursor: pointer; transition: all var(--ov-dur-3, 0.3s) var(--ov-ease-out, ease); gap: 10px; animation: float var(--ov-ease-in-out, ease-in-out) infinite; }
         .showcase-tool:nth-child(1) { animation-delay: 0s; animation-duration: 3s; }
         .showcase-tool:nth-child(2) { animation-delay: 0.15s; animation-duration: 3.3s; }
         .showcase-tool:nth-child(3) { animation-delay: 0.3s; animation-duration: 3.6s; }
@@ -78,7 +78,7 @@
         .showcase-tool-label { font-size: 0.8rem; font-weight: 700; text-align: center; color: var(--text-secondary); }
         
         .quick-examples { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 32px 0; max-width: 800px; margin-left: auto; margin-right: auto; }
-        .example-btn { padding: 12px 16px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border); text-align: center; text-decoration: none; color: var(--text-secondary); font-size: 0.8rem; font-weight: 700; transition: all 0.25s ease; animation: fadeInScale 0.5s ease both; cursor: pointer; }
+        .example-btn { padding: 12px 16px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border); text-align: center; text-decoration: none; color: var(--text-secondary); font-size: 0.8rem; font-weight: 700; transition: all var(--ov-dur-2, 0.25s) var(--ov-ease-out, ease); animation: fadeInScale var(--ov-dur-4, 0.5s) var(--ov-ease-out, ease) both; cursor: pointer; }
         .example-btn:nth-child(1) { animation-delay: 0.1s; }
         .example-btn:nth-child(2) { animation-delay: 0.2s; }
         .example-btn:nth-child(3) { animation-delay: 0.3s; }
@@ -86,7 +86,7 @@
         .example-btn:hover { border-color: rgba(139,92,246,0.4); color: var(--accent-light); background: rgba(139,92,246,0.08); }
         
         .stats-section { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 32px; max-width: 600px; margin-left: auto; margin-right: auto; }
-        .stat-card { padding: 16px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border); text-align: center; animation: fadeInScale 0.6s ease both; }
+        .stat-card { padding: 16px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border); text-align: center; animation: fadeInScale var(--ov-dur-4, 0.6s) var(--ov-ease-out, ease) both; }
         .stat-card:nth-child(1) { animation-delay: 0.2s; }
         .stat-card:nth-child(2) { animation-delay: 0.3s; }
         .stat-card:nth-child(3) { animation-delay: 0.4s; }
@@ -95,7 +95,7 @@
         .stat-card-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 4px; }
         
         .search-wrapper { max-width: 600px; margin: 0 auto 32px; }
-        .search-wrapper input { width: 100%; padding: 16px 20px; border-radius: 12px; border: 1px solid var(--border-light); background: var(--bg-card); color: var(--text-primary); font-family: inherit; font-size: 0.95rem; outline: none; transition: all 0.25s ease; }
+        .search-wrapper input { width: 100%; padding: 16px 20px; border-radius: 12px; border: 1px solid var(--border-light); background: var(--bg-card); color: var(--text-primary); font-family: inherit; font-size: 0.95rem; outline: none; transition: all var(--ov-dur-2, 0.25s) var(--ov-ease-out, ease); }
         .search-wrapper input:focus { border-color: rgba(139,92,246,0.4); background: var(--bg-hover); }
         
         .note { text-align: center; padding: 40px 20px 0; color: var(--text-muted); font-size: 0.9rem; border-top: 1px solid var(--border); margin-top: 60px; }
