@@ -33,7 +33,7 @@
         .control-row select { flex: 1; }
         .control-row .val { min-width: 36px; text-align: right; font-size: .8rem; color: var(--text-muted); font-family: monospace; }
         .preset-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; }
-        .preset-btn { padding: .5rem .25rem; font-size: .7rem; border-radius: 10px; cursor: pointer; border: 2px solid var(--border); background: var(--bg-tertiary); color: var(--text-primary); text-align: center; transition: all .2s; }
+        .preset-btn { padding: .5rem .25rem; font-size: .7rem; border-radius: 10px; cursor: pointer; border: 2px solid var(--border); background: var(--bg-tertiary); color: var(--text-primary); text-align: center; transition: all var(--ov-dur-2, .2s); }
         .preset-btn:hover, .preset-btn.active { border-color: var(--accent); background: rgba(192,150,92,0.1); }
         .canvas-wrap { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; text-align: center; }
         .canvas-wrap canvas { max-width: 100%; height: auto; border-radius: 8px; background-image: linear-gradient(45deg, #1a1a1a 25%, transparent 25%), linear-gradient(-45deg, #1a1a1a 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #1a1a1a 75%), linear-gradient(-45deg, transparent 75%, #1a1a1a 75%); background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0; }

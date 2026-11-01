@@ -31,7 +31,7 @@
             font-size: 1rem;
             font-family: 'Inter', sans-serif;
             outline: none;
-            transition: border-color 0.2s;
+            transition: border-color var(--ov-dur-2, 0.2s);
         }
         .phrase-search:focus { border-color: var(--accent); }
         .search-wrap {
@@ -51,7 +51,7 @@
             padding: 7px 16px; border-radius: 20px;
             background: var(--bg-secondary); border: 1px solid var(--border);
             color: var(--text-secondary); cursor: pointer; font-size: 0.82rem;
-            font-weight: 600; transition: all 0.2s; font-family: 'Inter', sans-serif;
+            font-weight: 600; transition: all var(--ov-dur-2, 0.2s); font-family: 'Inter', sans-serif;
         }
         .cat-pill:hover { border-color: var(--accent); color: var(--text-primary); }
         .cat-pill.active { background: var(--accent); color: #0b0c12; border-color: var(--accent); }
@@ -64,7 +64,7 @@
             background: var(--bg-secondary);
             border: 1px solid var(--border);
             border-radius: 10px;
-            transition: border-color 0.2s;
+            transition: border-color var(--ov-dur-2, 0.2s);
             cursor: pointer;
         }
         .phrase-item:hover { border-color: var(--border-accent); }
@@ -75,7 +75,7 @@
         .phrase-copy {
             background: none; border: 1px solid var(--border); border-radius: 6px;
             color: var(--text-muted); cursor: pointer; padding: 6px 10px; font-size: 0.78rem;
-            transition: all 0.2s; font-family: 'Inter', sans-serif;
+            transition: all var(--ov-dur-2, 0.2s); font-family: 'Inter', sans-serif;
         }
         .phrase-copy:hover { color: var(--accent); border-color: var(--accent); }
 
