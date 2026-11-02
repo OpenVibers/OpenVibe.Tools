@@ -110,6 +110,7 @@ details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px
 .fold-h>h2{margin:0;flex:1 1 auto}
 .fold-h:focus-within{outline:2px solid var(--accent,#3b82f6);outline-offset:2px}
 .fold-mark{flex:none}
+.fold-n{flex:none;font-size:.82rem;font-weight:600;color:var(--text-muted,#7386a3);font-variant-numeric:tabular-nums}
 .fold-count{margin-left:4px;font-size:13px;font-weight:650;color:var(--text-muted,#7d8aa0);font-variant-numeric:tabular-nums;vertical-align:middle}
 .fold-mark::after{content:'+';font-size:22px;font-weight:400;color:var(--text-muted,#7d8aa0)}
 .fold-toggle:checked~.fold-h .fold-mark::after{content:'\\2212'}
@@ -120,7 +121,7 @@ details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px
 .fold-block{margin-top:40px}
 .fold-toggle{display:none}
 .fold-h{min-height:0;margin-bottom:6px;cursor:default}
-.fold-mark{display:none}
+.fold-mark,.fold-n{display:none}
 .fold-body{display:block}
 }
 .fam-all{margin:10px 0 0;font-size:14px}.fam-all a{font-weight:650;text-decoration:none}
