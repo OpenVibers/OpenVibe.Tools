@@ -268,11 +268,13 @@ function familyItems(rec) {
 
 /** "People also use": the tools next to this one in the family. */
 function relatedFor(rec) {
-    const at = TOOLS.findIndex((t) => t.id === rec.id);
+    // The hub is the converter, so the converter is not "also" there.
+    const self = rec.id === 'hub' ? 'convert' : rec.id;
+    const at = TOOLS.findIndex((t) => t.id === self);
     const out = [];
     for (let i = 1; out.length < 3 && i < TOOLS.length + 1; i++) {
         const other = TOOLS[(at + i) % TOOLS.length];
-        if (other.id !== rec.id) out.push(other);
+        if (other.id !== self && other.id !== 'hub') out.push(other);
     }
     return out.map((t) => kit.row({ href: `https://${t.host}/`, title: t.name, sub: t.task }));
 }
