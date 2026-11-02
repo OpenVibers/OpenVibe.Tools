@@ -19,6 +19,8 @@ const seo = require('openvibe-shared/seo');
 const icons = require('openvibe-shared/icons');
 const appIcon = require('openvibe-shared/app-icon');
 const registry = require('../registry');
+const { seoFor } = require('../seo/catalog');
+const guardLimits = require('../../../_shared/guard/limits');
 const { foldBlock } = require('../short');
 
 const SITE = 'https://openvibe.tools';
@@ -79,6 +81,10 @@ section{padding:clamp(24px,4vw,44px) 0 0}
 .hosts li{display:flex;gap:10px;align-items:center;padding:9px 12px;border:1px solid var(--border,rgba(255,255,255,.08));border-radius:10px;flex-wrap:wrap}
 .hosts li.primary{border-color:var(--accent,#3b82f6);background:var(--accent-glow,rgba(59,130,246,.1))}
 .hosts .tag{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted,#7d8aa0);margin-left:auto}.hosts li.primary .tag{color:var(--text-primary,#e6e9ef)}
+.facts{list-style:none;padding:0;margin:14px 0 18px;max-width:820px;border:1px solid var(--border,rgba(255,255,255,.08));border-radius:14px;background:var(--bg-secondary,#111826);overflow:hidden}
+.facts li{display:flex;gap:10px;flex-wrap:wrap;padding:10px 14px;border-top:1px solid var(--border,rgba(255,255,255,.08));font-size:14px;line-height:1.5;color:var(--text-secondary,#a8b3c4);overflow-wrap:anywhere}
+.facts li:first-child{border-top:0}.facts b{flex:none;min-width:104px;color:var(--text-primary,#e6edf7);font-weight:650}
+@media (max-width:420px){.facts b{min-width:0;display:block;width:100%}}
 .kw{display:flex;flex-wrap:wrap;gap:6px;padding:0;list-style:none}.kw li{font-size:12.5px;padding:3px 9px;border-radius:999px;background:var(--bg-secondary,#111826);color:var(--text-secondary,#a8b3c4)}
 details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px 0;max-width:820px}summary{cursor:pointer;font-weight:650}details p{color:var(--text-secondary,#a8b3c4);margin:8px 0 0}
 .az{columns:4 220px;column-gap:24px;padding:0;list-style:none}.az li{break-inside:avoid;padding:3px 0}.az a{text-decoration:none}.az small{color:var(--text-muted,#7d8aa0)}
@@ -283,9 +289,62 @@ function search(q) {
 const descriptorOf = (id) => require('../registry/descriptors').snapshot().tools.find((d) => d.id === id) || null;
 const shq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
 const mb = (bytes) => `${Math.round(bytes / 1048576)} MB`;
-/** "Use it from code" on a tool's page: the one request that runs it, who may call it, what it takes. */
-function apiSection(t) {
+const hours = (sec) => { const h = Math.round((sec / 3600) * 10) / 10; return `${h} hour${h === 1 ? '' : 's'}`; };
+const period = (s) => (/[.!?]$/.test(String(s)) ? String(s) : `${s}.`);
+// The catalogue's FAQ, when a question names a common mistake rather than product information. A tool
+// without one leaves the "what trips people up" line out (no invented caveat).
+const PITFALL_RE = /(fail|error|wrong|missing|nothing|no effect|no reply|blocked|reject|refus|closed|breaks?|broke|bounc|exceed|\bold\b|\bdiffer\b|different answer|stop working|\bnot\b)/i;
+const pitfallOf = (rec) => ((rec && rec.faq) || []).find(([q]) => !/^should\b/i.test(String(q)) && PITFALL_RE.test(String(q))) || null;
+
+/**
+ * The three facts every tool page states before the button: what the limits are (authored in the tool's
+ * descriptor and the guard's quota table), where the file goes, and the price. A browser-side tool never
+ * reaches the guard, so it has no daily cap; a server run is charged to the session tier on a satellite
+ * page (its page mints ov_tools_jobs) or the address tier on an inline gateway route.
+ */
+function factsSection(t) {
     const d = descriptorOf(t.id);
+    if (!d) return '';
+    const limits = [];
+    if (d.files) {
+        if (d.files.maxBytes) limits.push(`${mb(d.files.maxBytes)} per file`);
+        if (d.files.max) limits.push(d.files.min && d.files.min !== d.files.max ? `${d.files.min} to ${d.files.max} files` : `${d.files.max} file${d.files.max === 1 ? '' : 's'} at a time`);
+    } else if (t.external || d.execution !== 'client') {
+        limits.push('No file upload');
+    }
+    if (d.limits && d.limits.maxDurationSec) limits.push(`Up to ${hours(d.limits.maxDurationSec)}`);
+    if (d.limits && d.limits.maxPages) limits.push(`Up to ${d.limits.maxPages} pages`);
+    if (d.execution === 'client') {
+        limits.push('No daily limit on the page');
+    } else if (!t.external && d.quotaClass) {
+        const tier = d.execution === 'job' ? 'session' : 'anonymous';
+        const quotas = guardLimits.quotas();
+        const q = quotas[d.quotaClass] && quotas[d.quotaClass][tier];
+        const perDay = q && q.perDay ? Math.floor(q.perDay / (d.cost || 1)) : 0;
+        if (perDay > 0) limits.push(`Up to ${perDay.toLocaleString('en-US')} runs a day`);
+    }
+    // The file/result retention is the job TTLs in apps/_shared/jobs/http.js; an inline lookup stores
+    // nothing, and a browser tool has already kept everything on the device.
+    let where;
+    if (t.external) {
+        let host = ''; try { host = new URL(t.external).hostname; } catch { /* not a URL: say only where it is */ }
+        where = host ? `Runs on ${host}, our sister site.` : 'Runs on another OpenVibe site.';
+    } else if (d.execution === 'client') {
+        where = 'Runs in your browser; nothing is uploaded.';
+    } else if (d.execution === 'job') {
+        const kept = 'after 1 hour, or after 24 hours when signed in';
+        where = d.files ? `Your file goes to our server and is deleted with the result ${kept}.` : `Runs on our server; the result is deleted ${kept}.`;
+    } else {
+        where = `Runs on our server; no file is uploaded.${t.id === 'webhook' ? ' Request bins are kept in memory for 1 hour.' : ''}`;
+    }
+    const cost = t.external || !limits.length ? 'Free.' : 'Free, with the limits above. No account needed.';
+    return `<ul class="facts" aria-label="Limits, where it runs and cost">
+${limits.length ? `<li><b>Limits</b> ${esc(limits.join(' · '))}</li>` : ''}
+<li><b>Where it runs</b> ${esc(where)}</li><li><b>Cost</b> ${esc(cost)}</li></ul>`;
+}
+
+/** "Use it from code" on a tool's page: the one request that runs it, who may call it, what it takes. */
+function apiSection(t, d = descriptorOf(t.id)) {
     if (!d) return '';
     if (!d.api) return `<section aria-labelledby="api-h"><div class="sec-h"><h2 id="api-h">Use it from code</h2></div><p class="sec-p">${esc(t.name)} runs on its page only and has no API. <a href="/developers">The Tools API</a> covers the tools you can call from code.</p></section>`;
     const ex = (d.examples || [])[0] || {};
@@ -462,17 +521,28 @@ ${f.faq && f.faq.length ? `<section><div class="sec-h"><h2>Questions</h2></div>$
 function pageTool(t) {
     const { tools, families } = registry.get();
     const f = families.find(x => x.id === t.family);
+    const d = descriptorOf(t.id);
     const url = `${SITE}/tool/${t.id}`;
-    const related = tools.filter(x => x.family === t.family && x.id !== t.id).slice(0, 8);
+    const related = tools.filter(x => x.family === t.family && x.id !== t.id).slice(0, 6);
     const hosts = [...(t.hosts.short ? [[t.hosts.short, 'Easiest to remember']] : []), [t.hosts.canonical, t.hosts.short ? 'Search-friendly address' : 'Primary'], ...(t.hosts.mirrors || []).map(a => [a, 'Mirror']), ...t.hosts.aliases.map(a => [a, 'Redirects here'])];
+    // The catalogue's own words: its meta description says what the tool is for, and its first FAQ about
+    // a failure or confusion says what trips people up. Satellite-only tools have no FAQ, so that line is left out.
+    const rec = seoFor(t.id);
+    const purpose = rec && rec.desc ? rec.desc : t.tagline;
+    const pitfall = pitfallOf(rec);
+    const people = t.keywords && t.keywords.length ? `<section><div class="sec-h"><h2>People also call this</h2></div>
+<p class="sec-p"><b>What it's for:</b> ${esc(period(purpose))}</p>
+${pitfall ? `<p class="sec-p"><b>What trips people up:</b> <strong>${esc(pitfall[0])}</strong> ${esc(pitfall[1])}</p>` : ''}
+<ul class="kw">${t.keywords.map(k => `<li>${esc(k)}</li>`).join('')}</ul></section>` : '';
     const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> › ${f && f.path ? `<a href="${esc(f.path)}">${esc(f.name)}</a> › ` : ''}${esc(t.name)}</nav>
 <div class="page-h">${icon(t.icon, 56)}<h1>${esc(t.name)}</h1></div><p class="lead">${esc(t.description)}</p>
+${factsSection(t)}
 ${t.status === 'unavailable' ? `<p class="lead"><strong>Not available yet.</strong> ${esc(t.unavailable || '')}</p>` : `<a class="cta" href="${esc(t.url)}">Open ${esc(t.name)}</a>`}
 <section><div class="sec-h"><h2>Where to find it</h2></div><p class="sec-p">Every address below opens the same tool. The first address is the one to bookmark and share.</p>
 <ul class="hosts">${hosts.map(([h, tag], i) => `<li${i === 0 ? ' class="primary"' : ''}><a href="https://${esc(h)}/"${i === 0 ? '' : ' rel="nofollow"'}>${esc(h)}</a><span class="tag">${tag}</span></li>`).join('')}</ul></section>
-${t.keywords && t.keywords.length ? `<section><div class="sec-h"><h2>People also call this</h2></div><ul class="kw">${t.keywords.map(k => `<li>${esc(k)}</li>`).join('')}</ul></section>` : ''}
-${apiSection(t)}
-${related.length ? `<section><div class="sec-h"><h2>Related tools</h2>${f && f.path ? `<a class="more" href="${esc(f.path)}">All ${esc(f.name)}</a>` : ''}</div><div class="grid">${related.map(toolCard).join('')}</div></section>` : ''}`;
+${people}
+${apiSection(t, d)}
+${related.length ? `<section><div class="sec-h"><h2>Similar tools</h2>${f && f.path ? `<a class="more" href="${esc(f.path)}">All ${esc(f.name)}</a>` : ''}</div><div class="grid">${related.map(toolCard).join('')}</div></section>` : ''}`;
     return shell({ families, agent: true, body, head: head({ title: `${t.name}: ${t.tagline}`, description: t.description, canonical: url, keywords: (t.keywords || []).join(', '),
         jsonLd: [seo.jsonLd.breadcrumbs([{ name: 'Tools', url: SITE + '/' }, ...(f && f.path ? [{ name: f.name, url: SITE + f.path }] : []), { name: t.name, url }]),
             seo.jsonLd.softwareApp({ name: t.name, url: t.url, description: t.description, category: 'UtilitiesApplication', keywords: t.keywords })] }) });
