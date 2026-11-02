@@ -18,14 +18,13 @@
 (function(){try{var raw=localStorage.getItem('ov_theme');if(!raw)return;var t=JSON.parse(raw),v=t&&t.variables;if(!v)return;var el=document.documentElement;for(var k in v)if(k.charAt(0)==='-')el.style.setProperty(k,v[k]);if(t.id)el.setAttribute('data-theme',t.id);}catch(_){}})();
 </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="/css/shared.css">
     <script src="/shared/theme-loader.js" defer></script>
 </head>
 <body>
     <div class="tool-wrap">
         <div class="page-header">
-            <h1><i class="fas fa-braille"></i> Braille Translator</h1>
+            <h1><i class="fas fa-grip"></i> Braille Translator</h1>
             <p class="subtitle">Convert text to Braille Unicode dots and decode Braille back to text.</p>
         </div>
 
@@ -45,7 +44,7 @@
         </div>
 
         <div class="tool-section">
-            <h2><i class="fas fa-braille"></i> Output</h2>
+            <h2><i class="fas fa-grip"></i> Output</h2>
             <div id="output" class="output-box mono" style="font-size: 1.4rem; letter-spacing: 0.2em;"></div>
             <div class="btn-row">
                 <button class="btn btn-primary" onclick="OpenVibeUI.copyText(document.getElementById('output').textContent)"><i class="fas fa-copy"></i> Copy</button>

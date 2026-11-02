@@ -50,13 +50,13 @@ const DOMAIN_MAP = {
     },
     'reorderpdf.openvibe.tools': {
         toolId: 'reorder', brandName: 'ReorderPDF', defaultOp: 'reorder',
-        faIcon: 'fa-sort',
+        faIcon: 'fa-arrow-down-wide-short',
         seoTitle: 'ReorderPDF — Rearrange PDF Pages Online',
         seoDescription: 'Drag and drop to reorder pages in your PDF. Remove unwanted pages. Online PDF page organizer.',
     },
     'watermarkpdf.openvibe.tools': {
         toolId: 'watermark', brandName: 'WatermarkPDF', defaultOp: 'watermark',
-        faIcon: 'fa-stamp',
+        faIcon: 'fa-signature',
         seoTitle: 'WatermarkPDF — Add Watermarks to PDFs Online',
         seoDescription: 'Add text or image watermarks to PDF documents. Customize position, opacity, rotation, and font. Online.',
     },
@@ -68,7 +68,7 @@ const DOMAIN_MAP = {
     },
     'unlockpdf.openvibe.tools': {
         toolId: 'unlock', brandName: 'UnlockPDF', defaultOp: 'unlock',
-        faIcon: 'fa-lock-open',
+        faIcon: 'fa-unlock',
         seoTitle: 'UnlockPDF — Remove PDF Password Online',
         seoDescription: 'Remove password protection from PDFs. Unlock PDF files for editing and printing. Online.',
     },

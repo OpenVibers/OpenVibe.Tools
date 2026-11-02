@@ -18,7 +18,6 @@
 (function(){try{var raw=localStorage.getItem('ov_theme');if(!raw)return;var t=JSON.parse(raw),v=t&&t.variables;if(!v)return;var el=document.documentElement;for(var k in v)if(k.charAt(0)==='-')el.style.setProperty(k,v[k]);if(t.id)el.setAttribute('data-theme',t.id);}catch(_){}})();
 </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="/css/shared.css">
     <script src="/shared/theme-loader.js" defer></script>
     <style>
@@ -26,11 +25,11 @@
         .compare-pane label { display: block; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
         .compare-pane textarea { width: 100%; min-height: 200px; resize: vertical; }
         .diff-output { background: var(--bg-input); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; font-family: var(--font-mono); font-size: 0.88rem; line-height: 1.7; white-space: pre-wrap; min-height: 120px; }
-        .diff-add { background: rgba(34,197,94,0.15); color: #4ade80; text-decoration: none; }
-        .diff-del { background: rgba(239,68,68,0.15); color: #f87171; text-decoration: line-through; }
+        .diff-add { background: rgba(34,197,94,0.15); color: var(--success-text, #4ade80); text-decoration: none; }
+        .diff-del { background: rgba(239,68,68,0.15); color: var(--danger-text, #f87171); text-decoration: line-through; }
         .diff-stats { display: flex; gap: 16px; margin-bottom: 12px; font-size: 0.85rem; font-weight: 600; }
-        .diff-stats .added { color: #4ade80; }
-        .diff-stats .removed { color: #f87171; }
+        .diff-stats .added { color: var(--success-text, #4ade80); }
+        .diff-stats .removed { color: var(--danger-text, #f87171); }
         .diff-stats .unchanged { color: var(--text-muted); }
         @media (max-width: 640px) { .compare-grid { grid-template-columns: 1fr; } }
     </style>
@@ -38,7 +37,7 @@
 <body>
     <div class="tool-wrap" style="max-width: 1000px;">
         <div class="page-header">
-            <h1><i class="fas fa-code-compare"></i> Text Compare</h1>
+            <h1><i class="fas fa-arrows-left-right"></i> Text Compare</h1>
             <p class="subtitle">Paste two texts side by side and see the differences highlighted line by line.</p>
         </div>
 

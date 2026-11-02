@@ -195,11 +195,11 @@ out center body;`;
           stealthRating = 2;
         } else if (tags.amenity === 'rest_area' || tags.highway === 'rest_area') {
           type = 'Rest Area';
-          icon = 'fa-bed';
+          icon = 'fa-moon';
           stealthRating = 3;
         } else if (tags.tourism === 'caravan_site') {
           type = 'RV/Caravan Site';
-          icon = 'fa-caravan';
+          icon = 'fa-car';
           stealthRating = 3;
         }
 

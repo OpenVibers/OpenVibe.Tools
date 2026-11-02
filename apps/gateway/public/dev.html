@@ -25,7 +25,6 @@
 (function(){try{var raw=localStorage.getItem('ov_theme');if(!raw)return;var t=JSON.parse(raw),v=t&&t.variables;if(!v)return;var el=document.documentElement;for(var k in v)if(k.charAt(0)==='-')el.style.setProperty(k,v[k]);if(t.id)el.setAttribute('data-theme',t.id);}catch(_){}})();
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <style>
 :root{--bg:var(--bg-primary,#0b0c12);--bg2:var(--bg-secondary,#12131c);--bg3:var(--bg-tertiary,#1a1b28);--card:var(--bg-card,rgba(22,24,36,.85));--tx:var(--text-primary,#f1f4fb);--tx2:var(--text-secondary,#a0a8c4);--tx3:var(--text-muted,#5e6580);--ac:var(--accent,#a78bfa);--acl:var(--accent-light,#c4b5fd);--brd:var(--border,rgba(255,255,255,.07));--r:16px}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -33,7 +32,7 @@ html{background:var(--bg)}
 body{min-height:100vh;font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--tx);-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 .bg-glow{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
-.bg-glow::before,.bg-glow::after{content:'';position:absolute;border-radius:50%;filter:blur(120px);opacity:.35;animation:gd 20s ease-in-out infinite alternate}
+.bg-glow::before,.bg-glow::after{content:'';position:absolute;border-radius:50%;filter:blur(120px);opacity:.35;animation:gd 20s var(--ov-ease-in-out, ease-in-out) infinite alternate}
 .bg-glow::before{width:500px;height:500px;top:-10%;left:20%;background:radial-gradient(circle,rgba(167,139,250,.3),transparent 70%)}
 .bg-glow::after{width:400px;height:400px;bottom:10%;right:10%;background:radial-gradient(circle,rgba(99,102,241,.2),transparent 70%);animation-delay:-10s}
 @keyframes gd{0%{transform:translate(0,0) scale(1)}100%{transform:translate(40px,-30px) scale(1.15)}}
@@ -43,18 +42,18 @@ a{color:inherit;text-decoration:none}
 .hero h1{font-size:clamp(1.7rem,4vw,2.6rem);font-weight:800;letter-spacing:-.03em;margin-bottom:6px}
 .hero p{color:var(--tx2);font-size:.95rem}
 .modes{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
-.mb{padding:7px 15px;border-radius:8px;background:var(--bg3);color:var(--tx2);font-size:.82rem;font-weight:600;cursor:pointer;border:1px solid var(--brd);transition:.15s}
+.mb{padding:7px 15px;border-radius:8px;background:var(--bg3);color:var(--tx2);font-size:.82rem;font-weight:600;cursor:pointer;border:1px solid var(--brd);transition:var(--ov-dur-2, .15s)}
 .mb:hover{background:#252738;color:var(--tx)}.mb.on{background:var(--ac);color:#fff;border-color:var(--ac)}
 .io{display:flex;gap:12px;margin-bottom:12px}
-.io textarea{flex:1;min-height:200px;padding:14px;background:var(--bg2);color:var(--tx);border:1px solid var(--brd);border-radius:var(--r);font-family:'JetBrains Mono',monospace;font-size:.85rem;resize:vertical;outline:none;transition:border .2s}
+.io textarea{flex:1;min-height:200px;padding:14px;background:var(--bg2);color:var(--tx);border:1px solid var(--brd);border-radius:var(--r);font-family:'JetBrains Mono',monospace;font-size:.85rem;resize:vertical;outline:none;transition:border var(--ov-dur-2, .2s)}
 .io textarea:focus{border-color:var(--ac)}.io textarea::placeholder{color:var(--tx3)}
 .acts{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
-.ab{padding:8px 18px;border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;transition:.15s;border:none}
+.ab{padding:8px 18px;border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;transition:var(--ov-dur-2, .15s);border:none}
 .ab-go{background:var(--ac);color:#fff}.ab-go:hover{filter:brightness(1.15)}
 .ab-s{background:var(--bg3);color:var(--tx2);border:1px solid var(--brd)}.ab-s:hover{background:#252738;color:var(--tx)}
 #out{min-height:100px;padding:16px;background:var(--bg2);border:1px solid var(--brd);border-radius:var(--r);font-family:'JetBrains Mono',monospace;font-size:.85rem;white-space:pre-wrap;word-break:break-all;overflow-x:auto;line-height:1.6}
 #out:empty::before{content:'Output will appear here...';color:var(--tx3)}
-#out .err{color:#f87171}#out .ok{color:#34d399}
+#out .err{color:var(--danger-text, #f87171)}#out .ok{color:var(--success-text, #34d399)}
 .dl{display:flex;font-size:.82rem;line-height:1.7}.dl .ln{width:34px;text-align:right;padding:0 6px;color:var(--tx3);user-select:none;flex-shrink:0}
 .dl .lc{flex:1;padding:0 8px;white-space:pre-wrap}
 .dl.da{background:rgba(52,211,153,.1);color:#6ee7b7}.dl.dd{background:rgba(248,113,113,.1);color:#fca5a5}
@@ -65,15 +64,15 @@ a{color:inherit;text-decoration:none}
 .og-card img{width:100%;max-height:260px;object-fit:cover}.og-body{padding:14px}
 .og-dm{font-size:.75rem;color:var(--tx3);text-transform:uppercase}.og-tt{font-weight:700;margin:4px 0}.og-ds{color:var(--tx2);font-size:.85rem}
 .hg{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-bottom:20px}
-.tc{display:flex;align-items:center;gap:14px;padding:16px;background:var(--card);border:1px solid var(--brd);border-radius:var(--r);cursor:pointer;transition:.2s}
+.tc{display:flex;align-items:center;gap:14px;padding:16px;background:var(--card);border:1px solid var(--brd);border-radius:var(--r);cursor:pointer;transition:var(--ov-dur-2, .2s)}
 .tc:hover{background:var(--bg3);border-color:rgba(167,139,250,.3);transform:translateY(-2px)}
 .tc-i{width:42px;height:42px;border-radius:10px;background:rgba(167,139,250,.12);display:flex;align-items:center;justify-content:center;color:var(--ac);font-size:1.1rem;flex-shrink:0}
 .tc-n{font-weight:700;font-size:.9rem}.tc-d{color:var(--tx2);font-size:.78rem;margin-top:2px}
 .ch{display:flex;align-items:center;gap:10px;margin:28px 0 14px;color:var(--ac);font-weight:700;font-size:1rem}
 .rel{display:flex;gap:8px;flex-wrap:wrap;margin-top:24px;padding-top:18px;border-top:1px solid var(--brd)}
-.rel a{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;background:var(--bg3);color:var(--tx2);font-size:.78rem;font-weight:600;border:1px solid var(--brd);transition:.15s}
+.rel a{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;background:var(--bg3);color:var(--tx2);font-size:.78rem;font-weight:600;border:1px solid var(--brd);transition:var(--ov-dur-2, .15s)}
 .rel a:hover{color:var(--ac);border-color:rgba(167,139,250,.3)}
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--bg3);color:var(--tx);padding:10px 24px;border-radius:10px;font-size:.85rem;font-weight:600;border:1px solid var(--brd);opacity:0;transition:.3s;z-index:9999;pointer-events:none}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--bg3);color:var(--tx);padding:10px 24px;border-radius:10px;font-size:.85rem;font-weight:600;border:1px solid var(--brd);opacity:0;transition:var(--ov-dur-3, .3s);z-index:9999;pointer-events:none}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 @media(max-width:640px){.io{flex-direction:column}.hg{grid-template-columns:1fr}}
 /* The tool frame: the brand is the site ("Tools"), not the subdomain's name. A framed page's box comes from the server. */
@@ -82,7 +81,7 @@ a{color:inherit;text-decoration:none}
 .ovk-tool-modes .ovk-seg{flex-wrap:wrap;max-width:100%}
 .ovk-tool-buttons{display:flex;gap:8px;flex-wrap:wrap}
 .ovk-dev-out{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:.86rem/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--text-primary,#f1f4fb)}
-.ovk-dev-out table{border-collapse:collapse;width:100%;font-size:.82rem}.ovk-dev-out td,.ovk-dev-out th{border:1px solid var(--border,rgba(255,255,255,.07));padding:6px 10px;text-align:left}
+.ovk-dev-out table{border-collapse:collapse;width:100%;font-size:.82rem}.ovk-dev-out td,.ovk-dev-out th{border:1px solid var(--border,color-mix(in srgb, var(--text-primary, #fff) 7%, transparent));padding:6px 10px;text-align:left}
 .ov-tool-page .page{padding:0}
 </style>
 <script type="application/ld+json">
@@ -178,12 +177,12 @@ html:{n:'HTML Formatter',i:'fa-file-code',c:'data',d:'HTML formatter, minifier &
 base64:{n:'Base64 Encoder & Decoder',i:'fa-lock',c:'enc',d:'Base64 encode & decode',p:'Hello, World!',m:['Encode','Decode']},
 url:{n:'URL Encoder & Decoder',i:'fa-link',c:'enc',d:'URL encode, decode & parser',p:'https://openvibe.tools/search?q=hello world&lang=en#results',m:['Encode','Decode','Parse']},
 jwt:{n:'JWT Decoder',i:'fa-key',c:'enc',d:'JWT decoder \u2014 header, payload & expiry',p:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkhvYm8iLCJpYXQiOjE1MTYyMzkwMjJ9.4S5J5Z5mSp5F8Kv3K5qFJpQ5Y5jF5p5t5m5k5e5h5d4',m:['Decode']},
-uuid:{n:'UUID Generator',i:'fa-fingerprint',c:'enc',d:'UUID v4 generator & validator',p:'',m:['Generate','Bulk 10','Bulk 100','Validate']},
+uuid:{n:'UUID Generator',i:'fa-id-card',c:'enc',d:'UUID v4 generator & validator',p:'',m:['Generate','Bulk 10','Bulk 100','Validate']},
 hash:{n:'Hash Generator',i:'fa-hashtag',c:'enc',d:'SHA-256, SHA-1 & SHA-512 hash generator',p:'Hello, World!',m:['SHA-256','SHA-1','SHA-512']},
-hex:{n:'Hex Converter',i:'fa-barcode',c:'enc',d:'Hex encoder / decoder',p:'Hello',m:['To Hex','From Hex']},
+hex:{n:'Hex Converter',i:'fa-code',c:'enc',d:'Hex encoder / decoder',p:'Hello',m:['To Hex','From Hex']},
 entities:{n:'String Escape Tool',i:'fa-shield-halved',c:'enc',d:'HTML, JS & URL escape / unescape',p:'<script>alert("hello")<\/script>',m:['HTML Enc','HTML Dec','JS Esc','JS Unesc','URL Enc','URL Dec']},
 timestamp:{n:'Unix Timestamp Converter',i:'fa-clock',c:'time',d:'Unix timestamp \u2194 date converter',p:'',m:['Now','To Date','To Unix']},
-cron:{n:'Cron Expression Parser',i:'fa-calendar-check',c:'time',d:'Cron expression parser & next runs',p:'*/15 9-17 * * 1-5',m:['Parse']},
+cron:{n:'Cron Expression Parser',i:'fa-calendar-days',c:'time',d:'Cron expression parser & next runs',p:'*/15 9-17 * * 1-5',m:['Parse']},
 beautify:{n:'Code Beautifier',i:'fa-wand-magic-sparkles',c:'qual',d:'Beautify JS, CSS, HTML & JSON',p:'{"a":1,"b":[2,3],"c":{"d":true}}',m:['JSON','HTML','CSS']},
 jsminify:{n:"JavaScript Minifier",i:'fa-compress',c:'qual',d:"Shrink JavaScript with a real parser, not regex",p:"function greet(name) {\n  // say hello\n  const message = \"Hello, \" + name + \"!\";\n  console.log(message);\n  return message;\n}\ngreet(\"OpenVibe\");",m:["Minify", "Minify + mangle", "Whitespace only"]},
 jsformat:{n:"JavaScript Beautifier",i:'fa-wand-magic-sparkles',c:'qual',d:"Turn minified or messy JavaScript into readable code",p:"function greet(n){const m=\"Hello, \"+n+\"!\";console.log(m);return m}greet(\"OpenVibe\");",m:["Beautify"]},
@@ -198,10 +197,10 @@ jsonstringify:{n:"JSON Stringify",i:'fa-quote-right',c:'data',d:"Turn JSON into 
 html2md:{n:"HTML to Markdown",i:'fa-right-left',c:'data',d:"Convert HTML into clean Markdown",p:"\u003ch1>Hello World\u003c/h1>\n<p>This is <strong>bold</strong>, <em>italic</em> and a <a href=\"https://openvibe.network\">link</a>.</p>\n<ul><li>Item one</li><li>Item two</li></ul>\n<pre><code>code block</code></pre>",m:["Convert"]},
 md2html:{n:"Markdown to HTML",i:'fa-right-left',c:'data',d:"Convert Markdown into HTML you can paste anywhere",p:"# Hello World\n\nThis is **bold** and *italic* with a [link](https://openvibe.network).\n\n- Item one\n- Item two\n\n> A quote\n\n`inline code`",m:["To HTML", "Preview"]},
 minify:{n:'Code Minifier',i:'fa-compress',c:'qual',d:'Minify JS, CSS, HTML & JSON',p:'{\n  "name": "openvibe",\n  "version": 1\n}',m:['JSON','HTML','CSS']},
-codediff:{n:'Diff Checker',i:'fa-code-compare',c:'qual',d:'Side-by-side text diff checker',p:'Line one\nLine two\nLine three\nLine four',p2:'Line one\nLine 2 modified\nLine three\nLine five\nLine six',dual:1,m:['Compare']},
+codediff:{n:'Diff Checker',i:'fa-arrows-left-right',c:'qual',d:'Side-by-side text diff checker',p:'Line one\nLine two\nLine three\nLine four',p2:'Line one\nLine 2 modified\nLine three\nLine five\nLine six',dual:1,m:['Compare']},
 regex:{n:'Regex Tester',i:'fa-magnifying-glass',c:'qual',d:'Regex tester with match highlighting',p:'\\b[A-Z][a-z]+\\b',p2:'Hello World from OpenVibe.Tools today',dual:1,m:['Test']},
 slugify:{n:'Slug Generator',i:'fa-link',c:'qual',d:'URL slug generator',p:'Hello World! This is a Test -- 2024',m:['Generate']},
-lorem:{n:'Lorem Ipsum Generator',i:'fa-paragraph',c:'qual',d:'Lorem ipsum generator',p:'',m:['1 Para','3 Para','5 Para','10 Sent','50 Words']},
+lorem:{n:'Lorem Ipsum Generator',i:'fa-align-left',c:'qual',d:'Lorem ipsum generator',p:'',m:['1 Para','3 Para','5 Para','10 Sent','50 Words']},
 curlconvert:{n:'Online curl',i:'fa-terminal',c:'http',d:'Parse curl \u2192 fetch, Python, Node.js',p:"curl -X POST https://api.example.com/users -H 'Content-Type: application/json' -H 'Authorization: Bearer tok123' -d '{\"name\":\"openvibe\"}'",m:['To fetch','To Python','To Node','Parsed']},
 webhook:{n:'Webhook Tester',i:'fa-satellite-dish',c:'http',d:'Webhook request inspector bin',p:'',m:['Create Bin']},
 color:{n:'Color Converter',i:'fa-palette',c:'fe',d:'Color picker & HEX/RGB/HSL converter',p:'#a78bfa',m:['Convert']},
@@ -287,7 +286,7 @@ function showTool(){
     if(!framed){
         let ah='<button class="ab ab-go" onclick="run()"><i class="fa-solid fa-play"></i> Run</button>';
         ah+='<button class="ab ab-s" onclick="copyOut()"><i class="fa-solid fa-copy"></i> Copy</button>';
-        ah+='<button class="ab ab-s" onclick="saveAsPaste(this)" title="Save the output as an unlisted paste on OpenVibe.Community"><i class="fa-solid fa-note-sticky"></i> Save as paste</button>';
+        ah+='<button class="ab ab-s" onclick="saveAsPaste(this)" title="Save the output as an unlisted paste on OpenVibe.Community"><i class="fa-solid fa-paste"></i> Save as paste</button>';
         ah+='<button class="ab ab-s" onclick="clr()"><i class="fa-solid fa-trash"></i> Clear</button>';
         ah+='<button class="ab ab-s" onclick="sample()"><i class="fa-solid fa-flask"></i> Sample</button>';
         $('acts').innerHTML=ah;
@@ -550,5 +549,6 @@ function sample(){const t=T[ACT];if(t?.p){$('in1').value=t.p;if(t.p2&&$('in2'))$
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000)}
 </script>
   <script src="https://openvibe.live/live-notify.js" async></script>
+  <style>@media (prefers-reduced-motion: reduce) { .bg-glow::before, .bg-glow::after { animation: none; } }</style>
 </body>
 </html>

@@ -27,9 +27,12 @@ try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' }); } catch {
     fs.writeFileSync(hls, `#EXTM3U\n#EXT-X-TARGETDURATION:10\n#EXTINF:2,\nfile://${secret}\n#EXT-X-ENDLIST\n`);
     const concat = path.join(data, 'evil.ffconcat');
     fs.writeFileSync(concat, "ffconcat version 1.0\nfile 'secret.wav'\n");
-    // The attack is real on this ffmpeg: unhardened, the playlist reads the local file.
-    const plain = execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=format_name,duration', '-of', 'csv=p=0', hls]).toString();
-    assert.match(plain, /hls/, 'without the whitelists ffprobe follows the playlist');
+    // The attack is real on an older ffmpeg: unhardened, the playlist reads the local file. A newer one (the CI runner's
+    // since 2026-10-31) refuses the local segment by itself ("extension none mismatches allowed extensions"); then
+    // there is nothing to prove here, and the checks below still hold the tools' own whitelists and caps.
+    let plain = '';
+    try { plain = execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=format_name,duration', '-of', 'csv=p=0', hls], { stdio: ['ignore', 'pipe', 'ignore'] }).toString(); } catch { plain = ''; }
+    if (plain) assert.match(plain, /hls/, 'without the whitelists ffprobe follows the playlist');
 
     const { jobContext, runTool, runSync, limitsFor } = require('../server/process');
     const { getTool } = require('../server/tools');

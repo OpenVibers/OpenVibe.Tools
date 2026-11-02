@@ -71,7 +71,7 @@
         </div>
         ${b.description ? `<div class="card-desc">${esc(b.description)}</div>` : ''}
         <div class="card-actions">
-          ${b.lat && b.lon ? `<a class="card-btn" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(b.lat)},${encodeURIComponent(b.lon)}" target="_blank"><i class="fa-solid fa-diamond-turn-right"></i> Directions</a>` : ''}
+          ${b.lat && b.lon ? `<a class="card-btn" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(b.lat)},${encodeURIComponent(b.lon)}" target="_blank"><i class="fa-solid fa-route"></i> Directions</a>` : ''}
           ${site ? `<a class="card-btn" href="${esc(site)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-globe"></i> Website</a>` : ''}
         </div>
       </div>`; }).join('');
@@ -101,7 +101,7 @@
             ${s.phone ? `<span><i class="fa-solid fa-phone"></i> ${esc(s.phone)}</span>` : ''}
           </div>
           <div class="card-actions">
-            ${s.lat && s.lon ? `<a class="card-btn" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(s.lat)},${encodeURIComponent(s.lon)}" target="_blank"><i class="fa-solid fa-diamond-turn-right"></i> Directions</a>` : ''}
+            ${s.lat && s.lon ? `<a class="card-btn" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(s.lat)},${encodeURIComponent(s.lon)}" target="_blank"><i class="fa-solid fa-route"></i> Directions</a>` : ''}
           </div>
         </div>`;
       }).join('');

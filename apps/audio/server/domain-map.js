@@ -122,7 +122,7 @@ const DOMAIN_MAP = {
     },
     'loop.openvibe.tools': {
         toolId: 'loop', brandName: 'OpenVibeLoop', defaultOp: 'loop',
-        faIcon: 'fa-repeat',
+        faIcon: 'fa-arrows-rotate',
         seoTitle: 'OpenVibeLoop — Loop Audio Online',
         seoDescription: 'Loop audio files a set number of times. Create repeated versions of any sound. Online audio looper.',
     },
@@ -134,7 +134,7 @@ const DOMAIN_MAP = {
     },
     'equalizer.openvibe.tools': {
         toolId: 'equalizer', brandName: 'OpenVibeEQ', defaultOp: 'equalizer',
-        faIcon: 'fa-bars-staggered',
+        faIcon: 'fa-sliders',
         seoTitle: 'OpenVibeEQ — Online Audio Equalizer',
         seoDescription: 'Apply equalizer presets to audio files. Boost bass, treble, vocals and more. Online EQ tool.',
     },
@@ -174,7 +174,7 @@ const DOMAIN_MAP = {
     },
     'podcast.openvibe.tools': {
         toolId: 'podcast', brandName: 'OpenVibePodcast', defaultOp: 'podcast',
-        faIcon: 'fa-podcast',
+        faIcon: 'fa-microphone',
         seoTitle: 'OpenVibePodcast — Optimize Audio for Podcasts Online',
         seoDescription: 'Optimize audio for podcast publishing. Normalize loudness, compress dynamics, convert to podcast-ready format.',
     },
@@ -186,7 +186,7 @@ const DOMAIN_MAP = {
     },
     'noise.openvibe.tools': {
         toolId: 'noise', brandName: 'OpenVibeNoise', defaultOp: 'noise',
-        faIcon: 'fa-broom',
+        faIcon: 'fa-eraser',
         seoTitle: 'OpenVibeNoise — Reduce Background Noise Online',
         seoDescription: 'Remove background noise from audio recordings. Clean up interviews, podcasts, and voice memos. Online tool.',
     },
@@ -204,7 +204,7 @@ const DOMAIN_MAP = {
     },
     'reverb.openvibe.tools': {
         toolId: 'reverb', brandName: 'OpenVibeReverb', defaultOp: 'reverb',
-        faIcon: 'fa-church',
+        faIcon: 'fa-house-chimney',
         seoTitle: 'OpenVibeReverb — Add Reverb to Audio Online',
         seoDescription: 'Add room reverb, hall, cathedral, and plate reverb effects to audio. Online reverb tool.',
     },

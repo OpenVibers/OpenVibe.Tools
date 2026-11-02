@@ -18,7 +18,6 @@
 (function(){try{var raw=localStorage.getItem('ov_theme');if(!raw)return;var t=JSON.parse(raw),v=t&&t.variables;if(!v)return;var el=document.documentElement;for(var k in v)if(k.charAt(0)==='-')el.style.setProperty(k,v[k]);if(t.id)el.setAttribute('data-theme',t.id);}catch(_){}})();
 </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="/css/shared.css">
     <script src="/shared/theme-loader.js" defer></script>
     <style>
@@ -38,11 +37,11 @@
         .ctrl-row input[type="color"] { width: 36px; height: 30px; border: 1px solid var(--border); background: var(--bg-secondary); border-radius: 8px; cursor: pointer; padding: 2px; }
         .ctrl-row input[type="range"] { flex: 1; }
         .ctrl-row .val { min-width: 32px; text-align: right; font-size: .78rem; color: var(--text-muted); font-family: monospace; }
-        .upload-btn { width: 100%; padding: .75rem; border-radius: 12px; border: 2px dashed var(--border); background: var(--bg-tertiary); color: var(--text-secondary); cursor: pointer; text-align: center; transition: all .2s; font-size: .9rem; }
+        .upload-btn { width: 100%; padding: .75rem; border-radius: 12px; border: 2px dashed var(--border); background: var(--bg-tertiary); color: var(--text-secondary); cursor: pointer; text-align: center; transition: all var(--ov-dur-2, .2s); font-size: .9rem; }
         .upload-btn:hover { border-color: var(--accent); color: var(--accent); }
         .upload-btn input { display: none; }
         .size-pills { display: flex; gap: .4rem; flex-wrap: wrap; }
-        .size-pill { padding: .35rem .7rem; border-radius: 16px; border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-secondary); font-size: .75rem; cursor: pointer; transition: all .15s; }
+        .size-pill { padding: .35rem .7rem; border-radius: 16px; border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-secondary); font-size: .75rem; cursor: pointer; transition: all var(--ov-dur-2, .15s); }
         .size-pill:hover, .size-pill.active { border-color: var(--accent); color: var(--accent); background: rgba(192,150,92,0.1); }
         @media (max-width: 768px) { .thumb-layout { grid-template-columns: 1fr; } }
     </style>
@@ -73,7 +72,7 @@
                     <h3><i class="fas fa-image"></i> Background</h3>
                     <label class="upload-btn" id="uploadBtn">
                         <input type="file" id="fileInput" accept="image/*">
-                        <i class="fas fa-cloud-upload-alt"></i> Upload Background Image
+                        <i class="fas fa-cloud-arrow-up"></i> Upload Background Image
                     </label>
                     <div class="ctrl-row" style="margin-top: .75rem;">
                         <label>BG Color</label>

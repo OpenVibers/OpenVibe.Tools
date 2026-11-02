@@ -24,15 +24,15 @@ const { haversine, overpassQuery } = require('./utils');
 // ── Cover Type Definitions ──────────────────────────────────────────
 const COVER_TYPES = {
   covered_walkway:  { label: 'Covered Walkway',    icon: 'fa-road',             color: '#6366f1', stealth: 2 },
-  arcade:           { label: 'Arcade / Colonnade',  icon: 'fa-archway',          color: '#8b5cf6', stealth: 2 },
-  canopy:           { label: 'Canopy / Awning',     icon: 'fa-tent-arrow-down-to-line', color: '#f59e0b', stealth: 2 },
-  carport:          { label: 'Carport',             icon: 'fa-car-side',         color: '#64748b', stealth: 3 },
+  arcade:           { label: 'Arcade / Colonnade',  icon: 'fa-door-open',          color: '#8b5cf6', stealth: 2 },
+  canopy:           { label: 'Canopy / Awning',     icon: 'fa-campground', color: '#f59e0b', stealth: 2 },
+  carport:          { label: 'Carport',             icon: 'fa-square-parking',         color: '#64748b', stealth: 3 },
   porch:            { label: 'Building Porch',      icon: 'fa-house-chimney',    color: '#f97316', stealth: 2 },
   covered_market:   { label: 'Covered Market',      icon: 'fa-store',            color: '#ec4899', stealth: 1 },
-  covered_seating:  { label: 'Covered Seating',     icon: 'fa-chair',            color: '#14b8a6', stealth: 1 },
+  covered_seating:  { label: 'Covered Seating',     icon: 'fa-couch',            color: '#14b8a6', stealth: 1 },
   covered_platform: { label: 'Covered Platform',    icon: 'fa-train',            color: '#06b6d4', stealth: 1 },
   grandstand:       { label: 'Grandstand / Bleachers', icon: 'fa-flag',          color: '#3b82f6', stealth: 3 },
-  loading_dock:     { label: 'Loading Dock / Bay',  icon: 'fa-warehouse',        color: '#94a3b8', stealth: 3 },
+  loading_dock:     { label: 'Loading Dock / Bay',  icon: 'fa-box-open',        color: '#94a3b8', stealth: 3 },
   covered_area:     { label: 'Covered Area',        icon: 'fa-cloud-rain',       color: '#22c55e', stealth: 2 },
   curated:          { label: 'Known Cover Spot',    icon: 'fa-umbrella',         color: '#a855f7', stealth: 3 },
 };

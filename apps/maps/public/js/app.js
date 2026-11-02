@@ -74,7 +74,7 @@
     return 'default';
   }
   function typeIcon(tc) {
-    return { dispersed:'fa-tree',campground:'fa-campground',forest:'fa-leaf',urban:'fa-city',services:'fa-hands-helping',
+    return { dispersed:'fa-tree',campground:'fa-campground',forest:'fa-leaf',urban:'fa-city',services:'fa-handshake',
       water:'fa-faucet-drip',bridge:'fa-bridge',cover:'fa-umbrella',shelter:'fa-house-chimney',restroom:'fa-restroom',
       woods:'fa-tree',sketch:'fa-skull-crossbones',default:'fa-map-pin' }[tc]||'fa-map-pin';
   }
@@ -420,7 +420,7 @@
       toast(`Found ${state.locations.length} locations near ${query}`);
 
     } catch (err) {
-      setStatus(`<i class="fa-solid fa-exclamation-triangle"></i> ${esc(err.message)}`);
+      setStatus(`<i class="fa-solid fa-triangle-exclamation"></i> ${esc(err.message)}`);
       toast(err.message, 'error');
       $('#results-list').innerHTML = `<div class="muted-text"><i class="fa-solid fa-triangle-exclamation"></i> ${esc(err.message)}</div>`;
     } finally {
@@ -551,12 +551,12 @@
       ${loc.amenities?.length?`<div class="detail-section"><h3><i class="fa-solid fa-list-check"></i> Amenities</h3><div class="result-tags">${loc.amenities.map(a=>`<span class="result-tag"><i class="fa-solid fa-check"></i> ${esc(a)}</span>`).join('')}</div></div>`:''}
       <div class="detail-section"><h3><i class="fa-solid fa-link"></i> Actions</h3>
         <div class="detail-actions">
-          <a class="detail-btn" href="https://www.google.com/maps/dir/?api=1&destination=${num(loc.lat)},${num(loc.lon)}" target="_blank"><i class="fa-solid fa-diamond-turn-right"></i> Directions</a>
+          <a class="detail-btn" href="https://www.google.com/maps/dir/?api=1&destination=${num(loc.lat)},${num(loc.lon)}" target="_blank"><i class="fa-solid fa-route"></i> Directions</a>
           <a class="detail-btn" href="https://www.google.com/maps/@${num(loc.lat)},${num(loc.lon)},15z" target="_blank"><i class="fa-solid fa-map"></i> Google Maps</a>
           <button class="detail-btn" id="btn-copy-coords"><i class="fa-solid fa-copy"></i> Copy Coords</button>
         </div>
       </div>
-      <div class="detail-section"><h3><i class="fa-solid fa-note-sticky"></i> Notes</h3>
+      <div class="detail-section"><h3><i class="fa-solid fa-paste"></i> Notes</h3>
         <div class="detail-note-area">
           <textarea id="detail-note" placeholder="Your notes...">${esc(noteText)}</textarea>
           <button class="detail-btn primary" id="btn-save-note"><i class="fa-solid fa-floppy-disk"></i> Save</button>
@@ -618,7 +618,7 @@
     if (!w || !state.searchCenter) { c.innerHTML = '<p class="muted-text">Search for a location first.</p>'; show($('#weather-modal')); return; }
     let html = '<div class="detail-section">';
     if (w.current) {
-      html += `<h3><i class="fa-solid fa-temperature-half"></i> Current Conditions</h3>`;
+      html += `<h3><i class="fa-solid fa-sun"></i> Current Conditions</h3>`;
       if (w.current.temperature != null) html += `<div class="detail-info-row"><span class="label">Temperature</span><span class="value">${Math.round(w.current.temperature)}°F</span></div>`;
       if (w.current.description) html += `<div class="detail-info-row"><span class="label">Conditions</span><span class="value">${esc(w.current.description)}</span></div>`;
       if (w.current.windSpeed != null) html += `<div class="detail-info-row"><span class="label">Wind</span><span class="value">${w.current.windSpeed} mph</span></div>`;
@@ -855,7 +855,7 @@
       <li><strong>City/County Parks</strong> — Camping usually prohibited.</li>
       <li><strong>Private Land</strong> — Need owner permission.</li>
       <li><strong>Walmart/Rest Stops</strong> — Varies by location.</li></ul></div>`,
-    gear: `<div class="detail-section"><h3><i class="fa-solid fa-backpack"></i> Gear Checklist</h3><ul>
+    gear: `<div class="detail-section"><h3><i class="fa-solid fa-briefcase"></i> Gear Checklist</h3><ul>
       <li><strong>Shelter:</strong> Dark bivy/tarp/tent</li>
       <li><strong>Sleep:</strong> 20°F bag + insulated pad</li>
       <li><strong>Light:</strong> Red headlamp</li>
@@ -866,7 +866,7 @@
       <li><strong>First Aid:</strong> Kit + emergency blanket + whistle</li>
       <li><strong>Tools:</strong> Multi-tool, paracord 50ft, trash bags</li>
       <li><strong>Comms:</strong> Charged phone + battery. PLB for remote</li></ul></div>`,
-    safety: `<div class="detail-section"><h3><i class="fa-solid fa-shield-heart"></i> Safety</h3><ul>
+    safety: `<div class="detail-section"><h3><i class="fa-solid fa-shield"></i> Safety</h3><ul>
       <li><strong>Tell someone</strong> your plans</li>
       <li><strong>Wildlife:</strong> Hang food 200ft from camp in bear country</li>
       <li><strong>Rivers</strong> rise fast with rain</li>

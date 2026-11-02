@@ -15,16 +15,16 @@ const CATEGORIES = {
   'Informal Campsite': { type: 'Informal Camp', stealth: 4, icon: 'fa-campground' },
   'Established Campground': { type: 'Campground', stealth: 2, icon: 'fa-campground' },
   'Overnight Parking': { type: 'Overnight Parking', stealth: 3, icon: 'fa-parking' },
-  'Rest Area': { type: 'Rest Area', stealth: 2, icon: 'fa-bed' },
-  'Gas Station': { type: 'Services', stealth: 1, icon: 'fa-gas-pump' },
+  'Rest Area': { type: 'Rest Area', stealth: 2, icon: 'fa-moon' },
+  'Gas Station': { type: 'Services', stealth: 1, icon: 'fa-store' },
   'Water': { type: 'Water Source', stealth: 0, icon: 'fa-faucet-drip' },
-  'Dump Station': { type: 'Services', stealth: 0, icon: 'fa-dumpster' },
-  'Propane': { type: 'Services', stealth: 0, icon: 'fa-fire-flame-simple' },
+  'Dump Station': { type: 'Services', stealth: 0, icon: 'fa-trash' },
+  'Propane': { type: 'Services', stealth: 0, icon: 'fa-fire' },
   'Mechanic': { type: 'Services', stealth: 0, icon: 'fa-wrench' },
   'Wifi': { type: 'Services', stealth: 0, icon: 'fa-wifi' },
   'Laundry': { type: 'Services', stealth: 0, icon: 'fa-shirt' },
-  'Hostel': { type: 'Shelter', stealth: 1, icon: 'fa-bed' },
-  'Hotel': { type: 'Shelter', stealth: 1, icon: 'fa-hotel' },
+  'Hostel': { type: 'Shelter', stealth: 1, icon: 'fa-moon' },
+  'Hotel': { type: 'Shelter', stealth: 1, icon: 'fa-couch' },
 };
 
 /**

@@ -18,9 +18,9 @@ const { haversine, OVERPASS_URL, overpassQuery } = require('./utils');
 // ═══════════════════════════════════════════════════════════════════
 const RESOURCE_TYPES = {
   library:        { label: 'Library',           icon: 'fa-book',               color: '#8b5cf6' },
-  shower:         { label: 'Public Shower',     icon: 'fa-shower',             color: '#06b6d4' },
+  shower:         { label: 'Public Shower',     icon: 'fa-faucet',             color: '#06b6d4' },
   laundry:        { label: 'Laundromat',        icon: 'fa-shirt',              color: '#f59e0b' },
-  community:      { label: 'Community Center',  icon: 'fa-people-roof',        color: '#ec4899' },
+  community:      { label: 'Community Center',  icon: 'fa-people-group',        color: '#ec4899' },
   water:          { label: 'Drinking Water',    icon: 'fa-faucet-drip',        color: '#3b82f6' },
   food_bank:      { label: 'Food Bank',         icon: 'fa-utensils',           color: '#ef4444' },
   social:         { label: 'Social Services',   icon: 'fa-hand-holding-heart', color: '#10b981' },
@@ -30,19 +30,19 @@ const RESOURCE_TYPES = {
   bottle_return:     { label: 'Bottle Return',     icon: 'fa-recycle',            color: '#22c55e' },
   clinic:            { label: 'Free Clinic',       icon: 'fa-kit-medical',        color: '#dc2626' },
   homeless_shelter:  { label: 'Homeless Shelter',   icon: 'fa-house-chimney',      color: '#7c3aed' },
-  hospital:          { label: 'Hospital / ER',      icon: 'fa-hospital',           color: '#be123c' },
-  pharmacy:          { label: 'Pharmacy',           icon: 'fa-prescription',       color: '#0891b2' },
+  hospital:          { label: 'Hospital / ER',      icon: 'fa-kit-medical',           color: '#be123c' },
+  pharmacy:          { label: 'Pharmacy',           icon: 'fa-suitcase-medical',       color: '#0891b2' },
   post_office:       { label: 'Post Office',        icon: 'fa-envelope',           color: '#4338ca' },
   thrift_store:      { label: 'Thrift / Free Store', icon: 'fa-shirt',             color: '#a16207' },
   public_bookcase:   { label: 'Little Free Library', icon: 'fa-book-open',          color: '#92400e' },
   water_point:       { label: 'Water Point (Tank)',   icon: 'fa-faucet',             color: '#0284c7' },
-  place_of_worship:  { label: 'Church / Worship',     icon: 'fa-church',             color: '#6366f1' },
-  bus_station:       { label: 'Bus / Transit Stop',   icon: 'fa-bus',                color: '#0ea5e9' },
-  gas_station:       { label: 'Gas Station',          icon: 'fa-gas-pump',           color: '#f43f5e' },
-  clothing_bank:     { label: 'Clothing Bank',        icon: 'fa-vest',               color: '#d946ef' },
+  place_of_worship:  { label: 'Church / Worship',     icon: 'fa-house-chimney',             color: '#6366f1' },
+  bus_station:       { label: 'Bus / Transit Stop',   icon: 'fa-train',                color: '#0ea5e9' },
+  gas_station:       { label: 'Gas Station',          icon: 'fa-store',           color: '#f43f5e' },
+  clothing_bank:     { label: 'Clothing Bank',        icon: 'fa-shirt',               color: '#d946ef' },
   day_shelter:       { label: 'Day Shelter / Drop-In',icon: 'fa-sun',                color: '#fb923c' },
   pet_friendly:      { label: 'Pet-Friendly Shelter', icon: 'fa-paw',                color: '#84cc16' },
-  warming_center:    { label: 'Warming / Cooling',    icon: 'fa-temperature-half',   color: '#ef4444' },
+  warming_center:    { label: 'Warming / Cooling',    icon: 'fa-sun',   color: '#ef4444' },
 };
 
 // ═══════════════════════════════════════════════════════════════════

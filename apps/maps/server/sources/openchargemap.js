@@ -89,7 +89,7 @@ async function search(lat, lon, radiusMiles, apiKey) {
           distanceMiles: Math.round(dist * 10) / 10,
           type: 'EV Charging',
           source: 'OpenChargeMap',
-          sourceIcon: 'fa-charging-station',
+          sourceIcon: 'fa-bolt',
           reservable: false,
           url: `https://openchargemap.org/site/poi/details/${s.ID}`,
           fee: isFree ? 'Free' : (s.UsageCost || 'Check station'),
