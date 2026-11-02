@@ -104,6 +104,7 @@ details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px
 .fold-h>h2{margin:0;flex:1 1 auto}
 .fold-h:focus-within{outline:2px solid var(--accent,#3b82f6);outline-offset:2px}
 .fold-mark{flex:none}
+.fold-count{margin-left:4px;font-size:13px;font-weight:650;color:var(--text-muted,#7d8aa0);font-variant-numeric:tabular-nums;vertical-align:middle}
 .fold-mark::after{content:'+';font-size:22px;font-weight:400;color:var(--text-muted,#7d8aa0)}
 .fold-toggle:checked~.fold-h .fold-mark::after{content:'\\2212'}
 .fold-body{display:none}
@@ -181,18 +182,19 @@ details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px
 .flow .flow-out{border-color:var(--accent,#3b82f6);color:var(--text-primary,#e6edf7);font-weight:600}
 .flow .flow-arrow{border:0;background:none;padding:0;color:var(--text-muted,#7d8aa0)}
 .job{padding:clamp(24px,4vw,36px) 0 0}
-.job-pick,.job-pick-h{display:none}
-@supports selector(:has(*)){@media (max-width:640px){
-.job-pick-h{display:flex;margin-top:30px}
-.job-pick{display:flex;gap:8px;overflow-x:auto;margin:10px -16px 0;padding:2px 16px 4px;scrollbar-width:none;overscroll-behavior-x:contain}.job-pick::-webkit-scrollbar{display:none}
-.job-pick input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
-.job-pick label{display:inline-flex;align-items:center;flex:none;min-height:44px;padding:0 15px;border-radius:999px;border:1px solid var(--border,rgba(255,255,255,.1));color:var(--text-secondary,#a8b3c4);font-size:13.5px;font-weight:650;white-space:nowrap;cursor:pointer}
-.job-pick input:checked+label{color:var(--text-primary,#e6edf7);border-color:var(--accent,#3b82f6);background:color-mix(in srgb,var(--accent,#3b82f6) 12%,transparent)}
-.job-pick input:focus-visible+label{outline:2px solid var(--accent,#3b82f6);outline-offset:2px}
-.jobs .job{display:none;padding-top:14px}.jobs .job .sec-h{display:none}
-.jobs:has(#jp-files:checked) #job-files,.jobs:has(#jp-text:checked) #job-text,.jobs:has(#jp-audio:checked) #job-audio,.jobs:has(#jp-media:checked) #job-media,.jobs:has(#jp-data:checked) #job-data,.jobs:has(#jp-web:checked) #job-web,.jobs:has(#jp-places:checked) #job-places{display:block}
-.jobs .job:target{display:block}
-}}
+.jobs-h{display:none}
+.sec-count{font-size:13px;font-weight:650;color:var(--text-muted,#7d8aa0);white-space:nowrap;font-variant-numeric:tabular-nums}
+/* Phones (the owner's rule, 2026-10-31: never hide content to shorten): every job stays on the page, and a job with
+   more than four tools shows them as a sideways rail of two rows, so the page stays short and nothing is hidden. */
+@media (max-width:640px){
+.jobs-h{display:flex;margin-top:30px}
+.jobs .job{padding-top:22px}
+.jobs .job .sec-p{margin:2px 0 0;font-size:13.5px}
+.jobs .job .tiles:has(>.tile:nth-child(5)){grid-template-columns:none;grid-template-rows:repeat(2,auto);grid-auto-flow:column;grid-auto-columns:calc((100% - 16px) / 2.3);overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scroll-padding-inline:16px;margin:12px -16px 0;padding:0 16px 2px;scrollbar-width:none}
+.jobs .job .tiles:has(>.tile:nth-child(5))::-webkit-scrollbar{display:none}
+.jobs .job .tiles>.tile{scroll-snap-align:start}
+.jobs .job .group-links{margin-top:10px}
+}
 .job .sec-h{margin-bottom:4px}
 .job .tiles{margin-top:14px}
 .group-links{display:flex;flex-wrap:wrap;gap:6px 18px;margin:12px 0 0;font-size:13.5px;font-weight:600}
@@ -332,16 +334,13 @@ const JOB_GROUPS = [
     { id: 'places', name: 'Maps and food', line: 'Find water, shelter, supplies and an affordable meal nearby.', families: ['places'] },
 ];
 /**
- * The job sections as one block. On a phone (640 px and under) a row of chips picks one job at a time, so the home
- * stays short (the owner's short-pages rule, 2026-10-30): radio inputs and :has(), no script, and every section stays
- * in the page for crawlers. A wider screen, or a browser without :has(), shows every section and no chips. A link to
- * #job-x still opens that section (:target).
+ * The job sections as one block. Every section stays on the page at every width (the owner's rule, 2026-10-31: never
+ * hide content to shorten). On a phone a job with more than four tools shows them as a sideways rail of two rows (CSS
+ * above), under one "Tools by job" heading that links the full list.
  */
-function jobsBlock(sections, jobs) {
+function jobsBlock(sections) {
     if (!sections.length) return '';
-    const shown = jobs.filter((j) => sections.some((h) => h.includes(`id="job-${j.id}"`)));
-    const chips = shown.map((j, i) => `<input type="radio" name="job-pick" id="jp-${j.id}" value="${j.id}"${i === 0 ? ' checked' : ''}><label for="jp-${j.id}">${esc(j.name)}</label>`).join('');
-    return `<div class="jobs"><div class="sec-h job-pick-h"><h2>Tools by job</h2><a class="more" href="/all-tools">All tools</a></div><div class="job-pick" role="radiogroup" aria-label="Tools by job">${chips}</div>${sections.join('')}</div>`;
+    return `<div class="jobs"><div class="sec-h jobs-h"><h2>Tools by job</h2><a class="more" href="/all-tools">All tools</a></div>${sections.join('')}</div>`;
 }
 const QUICK_LINKS = [['mergepdf', 'merge a PDF'], ['fancy', 'fancy text'], ['compress', 'compress an image'], ['json', 'format JSON'], ['dns', 'check DNS']];
 const FAMILY_SHORT = { img: 'image tools', docs: 'PDF tools', text: 'text tools', codes: 'barcode tools', audio: 'audio tools', media: 'video tools', dev: 'developer tools', net: 'network tools', places: 'map tools' };
@@ -409,15 +408,15 @@ ${startCard('dns', (t) => `<span class="start-name">${esc(t.name)}<small>${host(
 </div></section>
 ${opened.length >= 4 ? foldBlock({
         id: 'top',
-        head: '<h2 id="top-h">Most opened this week</h2>',
+        head: `<h2 id="top-h">Most opened this week <span class="fold-count">${opened.length}</span></h2>`,
         html: `<section aria-labelledby="top-h"><p class="sec-p">How many people opened each tool in the last seven days, counted once per person a day.</p><div class="grid">${opened.map(openedCard).join('')}</div></section>`,
     }) : ''}
 ${jobsBlock(JOB_GROUPS.map((job) => {
         const list = job.families.flatMap((fid) => tools.filter((t) => t.family === fid));
         if (!list.length) return '';
         const groupFamilies = job.families.map((fid) => families.find((f) => f.id === fid)).filter((f) => f && f.path && tools.some((t) => t.family === f.id));
-        return `<section class="job" id="job-${job.id}" aria-labelledby="job-${job.id}-h"><div class="sec-h"><h2 id="job-${job.id}-h">${esc(job.name)}</h2></div><p class="sec-p">${esc(job.line)}</p><div class="tiles">${pick(list).map(tile).join('')}</div><p class="group-links">${groupFamilies.map((f) => { const n = tools.filter((t) => t.family === f.id).length; const label = FAMILY_SHORT[f.id] || f.name.toLowerCase(); return `<a href="${esc(f.path)}">${n === 1 ? `The ${label.replace(/s$/, '')}` : `All ${n} ${label}`} →</a>`; }).join('')}</p></section>`;
-    }).filter(Boolean), JOB_GROUPS)}
+        return `<section class="job" id="job-${job.id}" aria-labelledby="job-${job.id}-h"><div class="sec-h"><h2 id="job-${job.id}-h">${esc(job.name)}</h2><span class="sec-count">${list.length} ${list.length === 1 ? 'tool' : 'tools'}</span></div><p class="sec-p">${esc(job.line)}</p><div class="tiles">${pick(list).map(tile).join('')}</div><p class="group-links">${groupFamilies.map((f) => { const n = tools.filter((t) => t.family === f.id).length; const label = FAMILY_SHORT[f.id] || f.name.toLowerCase(); return `<a href="${esc(f.path)}">${n === 1 ? `The ${label.replace(/s$/, '')}` : `All ${n} ${label}`} →</a>`; }).join('')}</p></section>`;
+    }).filter(Boolean))}
 <section class="fold" aria-labelledby="dev-h"><details><summary><h2 id="dev-h">Use any tool from code</h2></summary><div class="sec-h"><a class="more" href="/developers">Developer guide</a></div><p class="sec-p">${withApi} of the ${tools.length} tools take one request each, the same engines the pages use. Each tool's page shows its own request.</p>
 <div class="dev"><pre tabindex="0"><code>curl -X POST ${SITE}/api/v1/tools/jsonminify/run \\
   -H 'Content-Type: application/json' \\
@@ -434,7 +433,7 @@ ${foldBlock({
 <div><b>For developers</b><p>Run any tool from code: see <a href="/developers">the Tools API</a> (<a href="/api/v1/openapi.json">OpenAPI</a>). The catalog is public JSON at <a href="/api/catalog.json">/api/catalog.json</a>, with a plain-text map at <a href="/llms.txt">/llms.txt</a>.</p></div></div></details></section>
 ${foldBlock({
         id: 'faq',
-        head: '<h2 id="faq-h">Questions</h2>',
+        head: `<h2 id="faq-h">Questions <span class="fold-count">${HOME_FAQ.length}</span></h2>`,
         html: `<section aria-labelledby="faq-h">${HOME_FAQ.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</section>`,
     })}`;
     return shell({ families, agent: true, body, head: head({

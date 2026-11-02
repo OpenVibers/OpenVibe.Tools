@@ -19,7 +19,7 @@ const site = require('../server/pages/site');
         // The folds that are on the home: the parts a reader rarely needs.
         for (const [id, title] of [['shipped', 'Recently shipped on OpenVibe.Tools'], ['faq', 'Questions'], ['net', 'The rest of OpenVibe']]) {
             const re = new RegExp(`<div class="fold-block" id="fold-${id}"><input class="fold-toggle" type="checkbox" id="fold-${id}-open">`
-                + `<label class="fold-h" for="fold-${id}-open"><h2[^>]*>[^<]*${title}[^<]*</h2>.*?<div class="fold-body">`);
+                + `<label class="fold-h" for="fold-${id}-open"><h2[^>]*>[^<]*${title}[^<]*(?:<span class="fold-count">\\d+</span>)?</h2>.*?<div class="fold-body">`);
             assert.ok(re.test(home), `the ${title} fold is on the home`);
         }
         // The parts themselves are in the page, not removed: every question and every site in the network.
@@ -27,10 +27,12 @@ const site = require('../server/pages/site');
         assert.match(home, /<summary>Do I need an account\?<\/summary>/, 'the questions keep their own summaries');
         assert.match(home, /class="net"/, 'the rest of OpenVibe is in the page');
         assert.match(home, /data-ov-shipped="list"/, 'what shipped is in the page');
-        // What the home keeps: the search, the good places to start and the job chips.
+        // What the home keeps: the search, the good places to start and the jobs.
         assert.match(home, /<form class="search"/, 'the search is where it was');
         assert.match(home, /<h2 id="start-h">Good places to start<\/h2>/, 'the good places to start are where they were');
-        assert.match(home, /<div class="job-pick" role="radiogroup" aria-label="Tools by job">/, 'the job chips are where they were');
+        assert.match(home, /<div class="jobs"><div class="sec-h jobs-h"><h2>Tools by job<\/h2>/, 'the jobs are where they were');
+        // A fold says what it holds (the owner's rule, 2026-10-31: folds show their count).
+        assert.match(home, /<h2 id="faq-h">Questions <span class="fold-count">\d+<\/span><\/h2>/, 'the questions fold shows its count');
         // The CSS: the fold is closed on a phone and open where there is room.
         const css = home.slice(home.indexOf('/* The fold (the owner'));
         assert.ok(css.length > 0, 'the fold rules are on the page');
