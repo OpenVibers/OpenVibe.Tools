@@ -1,7 +1,7 @@
 'use strict';
-// The home's job sections as one block (the owner's short-pages rule, 2026-10-30): on a phone a row of chips picks one
-// job at a time, with radio inputs and :has() and no script; every section stays in the page; a wider screen, or a
-// browser without :has(), shows them all and no chips.
+// The home's job sections as one block. The owner's rule (2026-10-31): never hide content to shorten a page. Every job
+// section is shown at every width, each says how many tools it has, and on a phone a job with more than four tools is a
+// sideways rail of two rows. No chips, no radio inputs, no section hidden.
 const assert = require('assert');
 const http = require('http');
 const express = require('express');
@@ -19,16 +19,17 @@ const site = require('../server/pages/site');
         assert.ok(block.startsWith('<div class="jobs">'), 'the jobs block is on the home');
         const sections = block.match(/<section class="job" id="job-([a-z]+)"/g).map((s) => /job-([a-z]+)/.exec(s)[1]);
         assert.ok(sections.length >= 5, `the job sections are all in the page (${sections.length})`);
-        assert.match(block, /<div class="job-pick" role="radiogroup" aria-label="Tools by job">/);
-        const radios = [...block.matchAll(/<input type="radio" name="job-pick" id="jp-([a-z]+)" value="\1"( checked)?><label for="jp-\1">[^<]+<\/label>/g)];
-        assert.deepStrictEqual(radios.map((m) => m[1]), sections, 'one chip per section, in the same order');
-        assert.deepStrictEqual(radios.filter((m) => m[2]).map((m) => m[1]), [sections[0]], 'the first job is picked');
-        // The CSS: the chips and their heading only under 640 px and only with :has(); one rule shows each picked section.
-        const css = home.slice(home.indexOf('.job-pick,.job-pick-h{display:none}'));
-        assert.ok(css.startsWith('.job-pick,.job-pick-h{display:none}'), 'hidden by default');
-        assert.match(css, /^\.job-pick,\.job-pick-h\{display:none\}\n@supports selector\(:has\(\*\)\)\{@media \(max-width:640px\)\{/);
-        for (const id of sections) assert.ok(css.includes(`.jobs:has(#jp-${id}:checked) #job-${id}`), `${id} shows when its chip is picked`);
-        assert.match(css, /\.job-pick label\{[^}]*min-height:44px/, 'a chip is a 44 px target');
+        assert.doesNotMatch(home, /type="radio"|job-pick|jp-/, 'no chips pick one job at a time');
+        assert.match(block, /^<div class="jobs"><div class="sec-h jobs-h"><h2>Tools by job<\/h2><a class="more" href="\/all-tools">All tools<\/a><\/div>/);
+        for (const id of sections) {
+            const sec = block.slice(block.indexOf(`<section class="job" id="job-${id}"`));
+            const m = /<span class="sec-count">(\d+) tools?<\/span>/.exec(sec.slice(0, sec.indexOf('</div>')));
+            assert.ok(m && Number(m[1]) > 0, `${id} says how many tools it has`);
+        }
+        // The CSS: no rule hides a job section, and the rail is the phone's layout for a job of five tools or more.
+        assert.doesNotMatch(home, /\.jobs? \.job\{display:none/, 'no job section is hidden');
+        assert.match(home, /@media \(max-width:640px\)\{\n\.jobs-h\{display:flex/);
+        assert.match(home, /\.jobs \.job \.tiles:has\(>\.tile:nth-child\(5\)\)\{[^}]*grid-auto-flow:column[^}]*overflow-x:auto/, 'a rail scrolls sideways');
         console.log('home jobs: all checks passed');
     } finally {
         srv.close();
