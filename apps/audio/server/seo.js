@@ -15,8 +15,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const serve = require('openvibe-shared/serve');
 const { canonicalHostFor, ownHost } = require('../../_shared/host-role');
 const { DOMAIN_MAP } = require('./domain-map');
+const { frameFor } = require('./frame');
 
 const PUBLIC = path.join(__dirname, '..', 'public');
 const HUB_HOST = 'audio.openvibe.tools';
@@ -89,10 +91,15 @@ function renderIndex(ctx, host, canonicalHost) {
         `<meta name="twitter:title" content="${esc(title)}">`,
         `<meta name="twitter:description" content="${esc(desc)}">`,
         `<meta name="twitter:image" content="${image}">`,
+        // The shared tool frame's look (openvibe-shared >= 4.57.1), from this app's own pin.
+        `<link rel="stylesheet" href="${serve.url('kit.css')}">`,
+        `<link rel="stylesheet" href="${serve.url('kit-data.css')}">`,
         ...ld.map(b => `<script type="application/ld+json">${JSON.stringify(b).replace(/</g, '\\u003c')}</script>`),
     ].join('\n');
 
-    const out = html.replace(/<\/head>/i, `${head}\n</head>`);
+    const out = html.replace(/<\/head>/i, `${head}\n</head>`)
+        // The frame itself: the head, the box, the answer slot, the family, the folds and "People also use".
+        .replace('<!--OVK:FRAME-->', frameFor(host) || '');
     if (_cache.size > 100) _cache.clear();
     _cache.set(key, out);
     return out;

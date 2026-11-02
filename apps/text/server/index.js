@@ -144,6 +144,12 @@ app.use(express.static(path.join(__dirname, '..', 'public'), {
     },
 }));
 
+// The tool frame's browser glue (apps/_shared/public/tool-frame.js): one copy for every app.
+app.get('/js/tool-frame.js', (_req, res) => {
+    res.set('Cache-Control', 'no-cache');
+    res.sendFile(path.join(__dirname, '..', '..', '_shared', 'public', 'tool-frame.js'));
+});
+
 // ── Hostname-based routing ───────────────────────────────────
 // Pages are stamped with a canonical + structured data on the way out (server/seo.js). Several
 // hosts deliberately share one file (smallcaps/fancy, glitch/zalgo); without a canonical those

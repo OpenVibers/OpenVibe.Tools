@@ -310,6 +310,12 @@ app.get(['/', '/index.html'], (req, res) => {
     if (req.path !== '/') return res.redirect(301, '/');
     return seo.sendIndex(req, res);
 });
+
+// The tool frame's browser glue (apps/_shared/public/tool-frame.js).
+app.get('/js/tool-frame.js', (_req, res) => {
+    res.set('Cache-Control', 'no-cache');
+    res.sendFile(path.join(__dirname, '..', '..', '_shared', 'public', 'tool-frame.js'));
+});
 app.use((req, res) => {
     if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'Not found' });
     res.status(404).set('Cache-Control', 'no-cache').type('html')

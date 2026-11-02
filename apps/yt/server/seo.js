@@ -13,6 +13,8 @@
 const fs = require('fs');
 const path = require('path');
 const { canonicalHostFor, requestHost, isLocalHost } = require('../../_shared/host-role');
+const serve = require('openvibe-shared/serve');
+const { frameFor } = require('./frame');
 
 const PUBLIC = path.join(__dirname, '..', 'public');
 
@@ -107,6 +109,9 @@ function headTags(canonicalHost) {
         `<meta name="twitter:title" content="${esc(TITLE)}">`,
         `<meta name="twitter:description" content="${esc(DESCRIPTION)}">`,
         `<meta name="twitter:image" content="${image}">`,
+        // The shared tool frame's look (openvibe-shared >= 4.57.1), from this app's own pin.
+        `<link rel="stylesheet" href="${serve.url('kit.css')}">`,
+        `<link rel="stylesheet" href="${serve.url('kit-data.css')}">`,
         ...ld.map(ldScript),
     ].join('\n    ');
 }
@@ -129,7 +134,11 @@ function baseHtml() {
 
 function renderIndex(canonicalHost) {
     if (process.env.NODE_ENV !== 'development' && _cache.has(canonicalHost)) return _cache.get(canonicalHost);
-    const out = baseHtml().replace('<!--OV:HEAD-->', headTags(canonicalHost)).replace('<!--OV:CONTENT-->', contentBlock());
+    const out = baseHtml()
+        .replace('<!--OV:HEAD-->', headTags(canonicalHost))
+        .replace('<!--OV:CONTENT-->', contentBlock())
+        // The frame itself: the head, the box, the answer slot, the family, the folds and "People also use".
+        .replace('<!--OVK:FRAME-->', frameFor(canonicalHost));
     if (_cache.size > 50) _cache.clear();
     _cache.set(canonicalHost, out);
     return out;

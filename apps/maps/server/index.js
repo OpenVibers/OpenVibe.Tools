@@ -20,7 +20,7 @@ const http = require('./egress');
 // ── Analytics ────────────────────────────────────────────────
 const { AnalyticsTrackerPg } = require('openvibe-shared/analytics/pg'); // ADR-021: no IP/user id, route templates, raw rows pruned after 30 days, Sec-GPC/DNT not recorded
 const { requireInternalAccess } = require('../../_shared/internal-token');
-const { hostGuard, stampedPage } = require('../../_shared/host-role');
+const { hostGuard } = require('../../_shared/host-role');
 const { createToolsApi, exceptRegistry } = require('../../_shared/tools/http');
 const { createLocalRegistry, requiresStatus } = require('../../_shared/tools/local');
 const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
@@ -119,8 +119,16 @@ app.use(analytics.middleware());
 // page's canonical / og:url / JSON-LD follow it; aliases are redirected; other hosts go to the tools index.
 const HOST = 'maps.openvibe.tools';
 app.use(hostGuard({ knows: (h) => h === HOST }));
-const sendIndex = stampedPage(path.join(__dirname, '..', 'public', 'index.html'), HOST);
+// The page with the shared tool frame around it (openvibe-shared >= 4.57.1): the head, the box, the
+// answer slot, the family, the folds and "People also use".
+const { sendIndex } = require('./frame');
 app.get(['/', '/index.html'], sendIndex);
+
+// The tool frame's browser glue (apps/_shared/public/tool-frame.js).
+app.get('/js/tool-frame.js', (_req, res) => {
+    res.set('Cache-Control', 'no-cache');
+    res.sendFile(path.join(__dirname, '..', '..', '_shared', 'public', 'tool-frame.js'));
+});
 
 // ── Static files ───────────────────────────────────────────
 app.use(express.static(path.join(__dirname, '..', 'public'), {

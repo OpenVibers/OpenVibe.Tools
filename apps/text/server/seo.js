@@ -19,8 +19,10 @@
 const fs = require('fs');
 const path = require('path');
 const { canonicalHostFor, ownHost } = require('../../_shared/host-role');
+const { frameAround } = require('./frame');
 
 const PUBLIC = path.join(__dirname, '..', 'public');
+let HOSTNAME_MAP = {};
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 /** file → the first hostname that serves it; that host is the canonical one. */
@@ -38,7 +40,7 @@ const _cache = new Map();
  * Read a page and stamp in canonical, social tags and JSON-LD.
  * Falls back to the untouched file if anything goes wrong — SEO extras must never break serving.
  */
-function renderPage(file, primaryHost) {
+function renderPage(file, primaryHost, hostnameMap) {
     const key = `${file}::${primaryHost}`;
     if (_cache.has(key)) return _cache.get(key);
 
@@ -89,7 +91,13 @@ function renderPage(file, primaryHost) {
         return !new RegExp(`(?:rel|property|name)=["']${m[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["']`, 'i').test(html);
     }).join('\n');
 
-    const out = html.replace(/<\/head>/i, `${wanted}\n</head>`);
+    let out = html.replace(/<\/head>/i, `${wanted}\n</head>`);
+
+    // The shared tool frame around the page (openvibe-shared >= 4.57.1): the head, the box, the
+    // answer slot, the family, the folds and "People also use". The page's own editor and its live
+    // output stay where they are.
+    out = frameAround(out, primaryHost, { file, hostnameMap: hostnameMap || HOSTNAME_MAP });
+
     if (_cache.size > 100) _cache.clear();
     _cache.set(key, out);
     return out;
@@ -97,6 +105,7 @@ function renderPage(file, primaryHost) {
 
 /** Express handler factory: serves the host's page with its SEO tags applied. */
 function pageSender(hostnameMap) {
+    HOSTNAME_MAP = hostnameMap;
     const primary = buildPrimaryHosts(hostnameMap);
     const has = (h) => Object.prototype.hasOwnProperty.call(hostnameMap, h);
     return function sendPage(req, res) {
@@ -104,7 +113,7 @@ function pageSender(hostnameMap) {
         const file = (has(hostname) && hostnameMap[hostname]) || 'index.html';
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Vary', 'X-OV-Canonical-Host');
-        const rendered = renderPage(file, canonicalHostFor(req, primary.get(file) || hostname));
+        const rendered = renderPage(file, canonicalHostFor(req, primary.get(file) || hostname), hostnameMap);
         if (!rendered) return res.sendFile(path.join(PUBLIC, file));
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
         res.send(rendered);

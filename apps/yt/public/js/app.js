@@ -393,12 +393,16 @@
                 apiBase: 'https://openvibe.network',
                 history: { type: 'tool', title: 'YT.OpenVibe' },
                 silentLogin: 'https://openvibe.tools/auth/login?silent=1&next={url}',
+                // The brand is the site ("Tools"), not the subdomain's name: the same brand every
+                // framed tool page carries (owner ask 11).
+                brand: { subLabel: 'Tools', name: 'OpenVibe.Tools' },
             });
         }
         if (typeof OpenVibeFooter !== 'undefined') {
             try {
                 OpenVibeFooter.init({
                     service: 'yt', variant: 'compact', mount: '#ov-footer', apiBase: 'https://openvibe.network',
+                    brandName: 'OpenVibe.Tools',
                     links: [{ heading: 'YT.OpenVibe', items: [
                         { name: 'Video downloader', url: 'https://yt.openvibe.tools' },
                         { name: 'Audio converter', url: 'https://audio.openvibe.tools' },

@@ -120,8 +120,11 @@ app.use(analytics.middleware());
 const HOST = 'food.openvibe.tools';
 app.use(hostGuard({ knows: (h) => h === HOST }));
 // The page is OpenVibe.Food's now; the JSON routes below stay for whoever calls them.
-const FOOD_URL = (process.env.OV_FOOD_PUBLIC_URL || 'https://openvibe.food').replace(/\/+$/, '');
-const toFood = (req, res) => res.redirect(301, `${FOOD_URL}/`);
+// Where the page went: OpenVibe.Food (openvibe.food). Set OV_FOOD_PUBLIC_URL to an empty value to keep
+// the food finder's own page here (the frame around it, the same frame every other tool page has).
+const FOOD_URL = (process.env.OV_FOOD_PUBLIC_URL === '' ? '' : (process.env.OV_FOOD_PUBLIC_URL || 'https://openvibe.food')).replace(/\/+$/, '');
+const { sendIndex: sendFoodPage } = require('./frame');
+const toFood = (req, res) => (FOOD_URL ? res.redirect(301, `${FOOD_URL}/`) : sendFoodPage(req, res));
 app.get(['/', '/index.html'], toFood);
 
 // Static files
@@ -166,6 +169,12 @@ app.get('/api/internal/analytics', internalAccess, async (req, res) => {
 app.get('/api/internal/analytics/bots', internalAccess, async (req, res) => {
     try { res.json({ ok: true, bots: await analytics.getBotAnalysis(Math.min(parseInt(req.query.days) || 30, 365)) }); }
     catch (err) { res.status(500).json({ ok: false, error: err.message }); }
+});
+
+// The tool frame's browser glue (apps/_shared/public/tool-frame.js).
+app.get('/js/tool-frame.js', (_req, res) => {
+    res.set('Cache-Control', 'no-cache');
+    res.sendFile(path.join(__dirname, '..', '..', '_shared', 'public', 'tool-frame.js'));
 });
 
 // What used to be the page's own paths go to OpenVibe.Food as well (the API answers JSON 404s).

@@ -300,6 +300,12 @@ app.use(express.static(path.join(__dirname, '..', 'public'), {
     },
 }));
 
+// The tool frame's browser glue (apps/_shared/public/tool-frame.js): one copy for every file app.
+app.get('/js/tool-frame.js', (_req, res) => {
+    res.set('Cache-Control', 'no-cache');
+    res.sendFile(path.join(__dirname, '..', '..', '_shared', 'public', 'tool-frame.js'));
+});
+
 // SPA fallback — every host gets index.html stamped with its own title, canonical, social
 // tags and structured data (server/seo.js); the raw file carries only the hub's.
 const { sendIndex } = require('./seo');
