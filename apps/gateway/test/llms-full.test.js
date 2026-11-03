@@ -48,6 +48,18 @@ function serve(app) {
         assert.ok(!body.includes('/auth/') && !body.includes('/search') && !body.includes('Disallow'), 'no private paths');
         // llms.txt points at the full document.
         assert.ok(idx.includes('/llms-full.txt'), 'llms.txt lists llms-full.txt');
+        // AGT-5: each of the site's own pages at its Markdown twin, the twin-less /developers marked (HTML), an
+        // Optional section last. A tool on another subdomain keeps its URL.
+        assert.ok(idx.includes('[Developer guide](https://openvibe.tools/developers) (HTML)'), 'the twin-less guide keeps its URL');
+        assert.ok(idx.includes('[Sitemap](https://openvibe.tools/sitemap.xml)'), 'the sitemap is listed in Optional');
+        assert.match(idx, /\n## Optional\n/);
+        assert.strictEqual(idx.lastIndexOf('\n## '), idx.indexOf('\n## Optional'), 'Optional is the last section');
+        const own = [...idx.matchAll(/\]\((https:\/\/openvibe\.tools[^)\s]*)\)( \(HTML\))?/g)];
+        assert.ok(own.length >= 4, String(own.length));
+        for (const [, url, html] of own) {
+            const p = new URL(url).pathname;
+            assert.ok(p.endsWith('.md') || /\.[a-z0-9]+$/.test(p) || p.startsWith('/api/') || html, `${url} is a twin, a file or marked (HTML)`);
+        }
     } finally { srv.close(); }
 
     // ── IndexNow key file ───────────────────────────────────
