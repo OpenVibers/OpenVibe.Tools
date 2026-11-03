@@ -48,9 +48,11 @@ function serve(app) {
         assert.ok(!body.includes('/auth/') && !body.includes('/search') && !body.includes('Disallow'), 'no private paths');
         // llms.txt points at the full document.
         assert.ok(idx.includes('/llms-full.txt'), 'llms.txt lists llms-full.txt');
-        // AGT-5: each of the site's own pages at its Markdown twin, the twin-less /developers marked (HTML), an
+        // AGT-5: each of the site's own pages at its Markdown twin (the developer guide has one since 11-03), an
         // Optional section last. A tool on another subdomain keeps its URL.
-        assert.ok(idx.includes('[Developer guide](https://openvibe.tools/developers) (HTML)'), 'the twin-less guide keeps its URL');
+        assert.ok(idx.includes('[Developer guide](https://openvibe.tools/developers.md)'), 'the guide links its twin');
+        const devTwin = await require('../server/pages/agent-pages').createAgentPages().renderPublicPage('/developers');
+        assert.ok(devTwin && /Tools API for developers/.test(devTwin.html), 'and the twin renders the guide');
         assert.ok(idx.includes('[Sitemap](https://openvibe.tools/sitemap.xml)'), 'the sitemap is listed in Optional');
         assert.match(idx, /\n## Optional\n/);
         assert.strictEqual(idx.lastIndexOf('\n## '), idx.indexOf('\n## Optional'), 'Optional is the last section');
