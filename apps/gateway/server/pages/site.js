@@ -660,20 +660,36 @@ function sitemapEntries() {
 // /llms-full.txt carries the same pages with their full description. One source, so the two can
 // never disagree about what is public. The noindex search page and the site's own /tool/*,
 // /developers and /updates pages were never in llms.txt and stay out of both.
+// AGT-5: the site's own pages go in first, at their Markdown twins; every tool is on another subdomain.
 function llmsSections() {
     const { tools, families } = registry.get();
-    return families.filter(f => f.path).map(f => ({
-        title: f.name,
-        links: tools.filter(t => t.family === f.id).map(t => ({ title: t.name, url: t.url, note: t.tagline, text: t.description || t.tagline })),
-    }));
+    return [
+        { title: 'This site', links: [
+            { title: NAME, url: SITE + '/', note: 'the home page, and the week\'s most opened tools', text: 'The home page of OpenVibe.Tools: the tool families and the week\'s most opened tools.' },
+            { title: 'Every tool', url: SITE + '/all-tools', note: 'the whole catalogue on one page, by family', text: 'Every online tool OpenVibe.Tools serves, grouped by family, on one page.' },
+        ] },
+        ...families.filter(f => f.path).map(f => ({
+            title: f.name,
+            links: tools.filter(t => t.family === f.id).map(t => ({ title: t.name, url: t.url, note: t.tagline, text: t.description || t.tagline })),
+        })),
+    ];
 }
 function llmsSummary() {
     const { tools } = registry.get();
     return `${tools.length} online tools for files, text, code and networks. Open source and community-run. A machine-readable catalog is at ${SITE}/api/catalog.json.`;
 }
 function llmsTxtBody() {
-    return seo.llmsTxt({ name: NAME, summary: llmsSummary(),
-        sections: [{ title: 'API', links: [{ title: 'Developer guide', url: SITE + '/developers', note: 'run any tool from code' }, { title: 'OpenAPI 3.1', url: SITE + '/api/v1/openapi.json' }, { title: 'Tool registry (JSON)', url: SITE + '/api/v1/tools' }, { title: 'Full text (llms-full.txt)', url: SITE + '/llms-full.txt', note: 'the public pages below as one plain-text document' }] }].concat(llmsSections()) });
+    // AGT-5: each of this site's own pages is linked at its Markdown twin (markdown: true, base: SITE). Every tool
+    // is on another subdomain, so its link keeps its URL; /developers has no twin yet (llms-twins-probe, 11-03), so
+    // it keeps its URL and says (HTML). The API stays in a main section: it is what an agent came for.
+    return seo.llmsTxt({ name: NAME, markdown: true, base: SITE, summary: llmsSummary(),
+        sections: [{ title: 'API', links: [{ title: 'Developer guide', url: SITE + '/developers', html: true, note: 'run any tool from code' }, { title: 'OpenAPI 3.1', url: SITE + '/api/v1/openapi.json' }, { title: 'Tool registry (JSON)', url: SITE + '/api/v1/tools' }] }].concat(llmsSections()),
+        // llmstxt.org's "## Optional": what an agent may skip when it needs a shorter context.
+        optional: [
+            { title: 'Full text (llms-full.txt)', url: SITE + '/llms-full.txt', note: 'the public pages above as one plain-text document' },
+            { title: 'Sitemap', url: SITE + '/sitemap.xml' },
+            { title: 'robots.txt', url: SITE + '/robots.txt' },
+        ] });
 }
 // /llms-full.txt: the same header and summary as /llms.txt, then every public page llms.txt lists
 // with its text, under the same sections. The 512 KB ceiling keeps the answer a document, not a
