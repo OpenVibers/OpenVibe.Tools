@@ -20,4 +20,7 @@ assert.strictEqual(ids.length, new Set(ids).size, 'operation ids are unique');
 assert.ok(doc.paths['/api/v1/tools'] && doc.paths['/api/v1/jobs/{id}/events'], 'registry and jobs facade are documented');
 const json = doc.paths['/api/v1/tools/jsonminify/run'].post.requestBody.content['application/json'];
 assert.deepStrictEqual(json.schema.properties.input.required, ['text'], 'the tool input schema is inline');
+// SEO-3: /openapi.json, where agents look first, redirects to this document.
+const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'server', 'index.js'), 'utf8');
+assert.match(src, /app\.get\('\/openapi\.json', \(req, res\) => res\.redirect\(308, '\/api\/v1\/openapi\.json'\)\);/);
 console.log(`openapi: ${withApi.length} run paths, all checks passed`);

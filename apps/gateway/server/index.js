@@ -34,6 +34,8 @@ const { createGuard, TRUST_PROXY } = require('../../_shared/guard');
 const { createNetworkSender } = require('openvibe-sdk/account-data');   // ADR-033: Tools' part of an export, back to Network
 
 const app = express();
+// SEO-3: /openapi.json, where agents look first, is the gateway's own document (server/openapi.js).
+app.get('/openapi.json', (req, res) => res.redirect(308, '/api/v1/openapi.json'));
 // Network's sign-out-everywhere cutoffs for every Tools app (./revocation-events.js): before any body parser.
 app.post('/internal/events', ...require('./revocation-events').handler());
 // What this deploy runs (ADR-016); the shared navbar's release-watch polls it on every tool host.
