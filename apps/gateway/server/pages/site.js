@@ -683,7 +683,7 @@ function llmsTxtBody() {
     // is on another subdomain, so its link keeps its URL; /developers has no twin yet (llms-twins-probe, 11-03), so
     // it keeps its URL and says (HTML). The API stays in a main section: it is what an agent came for.
     return seo.llmsTxt({ name: NAME, markdown: true, base: SITE, summary: llmsSummary(),
-        sections: [{ title: 'API', links: [{ title: 'Developer guide', url: SITE + '/developers', html: true, note: 'run any tool from code' }, { title: 'OpenAPI 3.1', url: SITE + '/api/v1/openapi.json' }, { title: 'Tool registry (JSON)', url: SITE + '/api/v1/tools' }] }].concat(llmsSections()),
+        sections: [{ title: 'API', links: [{ title: 'Developer guide', url: SITE + '/developers', note: 'run any tool from code' }, { title: 'OpenAPI 3.1', url: SITE + '/api/v1/openapi.json' }, { title: 'Tool registry (JSON)', url: SITE + '/api/v1/tools' }] }].concat(llmsSections()),
         // llmstxt.org's "## Optional": what an agent may skip when it needs a shorter context.
         optional: [
             { title: 'Full text (llms-full.txt)', url: SITE + '/llms-full.txt', note: 'the public pages above as one plain-text document' },
@@ -736,4 +736,4 @@ function createSiteRouter({ opens = null } = {}) {
 
 const renderNotFound = () => pageSearch('').replace('<h1>Search tools</h1>', '<h1>That page is not here</h1>').replace(/<title>[^<]*<\/title>/, '<title>Page not found | OpenVibe.Tools</title>');
 
-module.exports = { createSiteRouter, pageIndex, pageFamily, pageTool, pageAll, search, sitemapEntries, renderNotFound, SITE, NAME };
+module.exports = { createSiteRouter, pageIndex, pageFamily, pageTool, pageAll, pageDevelopers, search, sitemapEntries, renderNotFound, SITE, NAME };
