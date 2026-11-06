@@ -18,9 +18,11 @@ service is an OAuth2 **client** (`client_id: tools`), not a provider.
   `/api/pastes/*` is forwarded to OpenVibe.Community (`OV_COMMUNITY_INTERNAL_URL`)
   with the visitor's `ov_token`.
 - **Session layer** — `/auth/login`, `/auth/callback`, `/auth/logout`,
-  `/auth/me`, `/auth/refresh`. Sets the shared `ov_token` cookie on
-  `.openvibe.tools` so every satellite subdomain can read it and verify it
-  offline against the Network's public key (JWKS).
+  `/auth/me`, `/auth/refresh`, `/auth/health`. The OAuth half (the authorize
+  URL with PKCE S256, the code / refresh / FedCM grants and the client check)
+  is `openvibe-sdk/sso`'s; the cookies stay the gateway's own. Sets the shared
+  `ov_token` cookie on `.openvibe.tools` so every satellite subdomain can read
+  it and verify it offline against the Network's public key (JWKS).
 
 ## Architecture
 

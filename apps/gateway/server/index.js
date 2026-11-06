@@ -216,7 +216,8 @@ app.use(guard.identify);
 app.use(require('../../_shared/usage').usagePages({ snapshot: toolRegistry.snapshot }));
 app.use('/api/', guard.apiQuota);
 // /auth/me is the navbar's who-is-signed-in read on every page, so it is not counted with sign-ins: 60 page views in 15 minutes made a signed-in visitor look signed out.
-app.use('/auth/', rateLimit({ windowMs: 15 * 60_000, max: 60, skip: (req) => req.path === '/me', keyGenerator: (req) => guard.caller(req).ipKey }));
+// /auth/health is a monitor's read of the OAuth client, not a sign-in attempt: it must answer even when the limit is spent.
+app.use('/auth/', rateLimit({ windowMs: 15 * 60_000, max: 60, skip: (req) => req.path === '/me' || req.path === '/health', keyGenerator: (req) => guard.caller(req).ipKey }));
 
 // ── Tool registry (ADR-027, capability tools.tool.read) ──────
 // GET /api/v1/tools (tools.tool-list@1), /api/v1/tools/:id (tools.tool@1), /api/v1/tools/:id/schema.
