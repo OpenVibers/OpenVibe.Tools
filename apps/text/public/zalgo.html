@@ -19,6 +19,7 @@
 </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/shared.css">
+    <link rel="stylesheet" href="/shared/kit.css">
     <script src="/shared/theme-loader.js" defer></script>
 </head>
 <body>
@@ -59,7 +60,7 @@
             <div class="btn-row">
                 <button class="btn btn-primary" onclick="copyOutput()"><i class="fas fa-copy"></i> Copy</button>
                 <button class="btn btn-secondary" onclick="regenerate()"><i class="fas fa-rotate"></i> Regenerate</button>
-                <button class="btn btn-ghost" onclick="OpenVibeUI.shareText(lastOutput)"><i class="fas fa-arrow-up-from-bracket"></i> Share</button>
+                <button class="ovk-btn ovk-btn--quiet" id="zalgo-share" type="button" data-ov-share-sheet data-title="Zalgo text on Text.OpenVibe" data-url="https://text.openvibe.tools/zalgo.html"><svg class="ovk-i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20V9M7 14l5-5 5 5M5 4h14"/></svg><span>Share</span></button>
             </div>
         </div>
 
@@ -85,6 +86,8 @@
         OpenVibeUI.initPage();
         const intensityNames = ['low', 'medium', 'high', 'insane'];
         let lastOutput = '';
+        // The one Share sheet (openvibe-shared 4.114.0) sends the generated text with the page's link.
+        document.getElementById('zalgo-share').addEventListener('click', function () { this.dataset.text = lastOutput; });
 
         function getOpts() {
             return {

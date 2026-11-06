@@ -116,19 +116,6 @@ function downloadText(text, filename = 'openvibetext-output.txt') {
     URL.revokeObjectURL(url);
 }
 
-// ── Share via Web Share API ──────────────────────────────────
-async function shareText(text, title = 'Text.OpenVibe') {
-    if (navigator.share) {
-        try {
-            await navigator.share({ title, text });
-        } catch (e) {
-            // User cancelled
-        }
-    } else {
-        copyText(text);
-    }
-}
-
 // ── Shared chrome: navbar + footer ───────────────────────────
 // Every page loads navbar.js / footer.js from openvibe.network; this is the one place that
 // boots them, so a page only needs a <div id="ov-footer" data-related="Name|url;…"> mount.
@@ -315,7 +302,6 @@ root.OpenVibeUI = {
     updateOutputCard,
     escapeHtml,
     downloadText,
-    shareText,
     initPage,
 };
 
