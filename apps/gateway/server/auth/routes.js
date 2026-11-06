@@ -6,15 +6,24 @@
 // The identity provider is OpenVibe.Network (https://openvibe.network).
 // This gateway is registered there as OAuth client `tools`.
 //
+// The OAuth half is openvibe-sdk/sso's (createSsoClient): the authorize URL
+// with PKCE (S256), the code / refresh / FedCM grants and GET /auth/health.
+// The session half stays this gateway's own, because the cookies belong to
+// the whole *.openvibe.tools zone (the SDK's cookies are host-only) and every
+// satellite reads ov_token from JavaScript.
+//
 //   GET  /auth/login     → redirect to Network /oauth/authorize
 //                          (?silent=1 adds prompt=none: no login UI, the
 //                          Network answers login_required when nobody is
 //                          signed in there). A browser that already holds a
 //                          valid ov_token skips the Network and goes to next.
-//   GET  /auth/callback  → server-side code exchange, set cookies
+//   GET  /auth/callback  → server-side code exchange (with the PKCE
+//                          verifier), set cookies
 //   POST /auth/fedcm     → browser-native FedCM sign-in: the page posts the
 //                          Network's assertion JWT + its nonce, we exchange it
 //                          (jwt-bearer grant) and set the same cookies
+//   GET  /auth/health    → does the Network accept this OAuth client?
+//                          503 only when it refuses it
 //   GET  /auth/logout    → clear cookies (+ best-effort refresh revoke)
 //   GET  /auth/me        → offline-verify ov_token, return profile
 //   POST /auth/refresh   → rotate tokens via refresh_token grant
@@ -28,18 +37,27 @@
 //                One year, JS-readable, Domain=.openvibe.tools. The shared
 //                navbar reads it: only when it says 'account' does a page
 //                with no session attempt ONE silent (prompt=none) login.
+//   ov_oauth_state / _next / _silent / _verifier — the sign-in flow's own
+//                cookies: Domain=.openvibe.tools, Path=/auth, httpOnly,
+//                10 minutes. The verifier is the PKCE verifier; the state is
+//                compared with it in constant time.
 // ═══════════════════════════════════════════════════════════════
 
 const express = require('express');
 const crypto = require('crypto');
-const { OpenVibeAuthClient } = require('openvibe-shared/auth-client');
+const { createSsoClient, failurePage, fedcmNonceMatches, claimsToUser } = require('openvibe-sdk/sso');
+const { verifyUserToken } = require('openvibe-sdk/auth');
 
 const ACCESS_COOKIE = 'ov_token';
 const REFRESH_COOKIE = 'ov_refresh';
 const STATE_COOKIE = 'ov_oauth_state';
+const VERIFIER_COOKIE = 'ov_oauth_verifier';
 const NEXT_COOKIE = 'ov_oauth_next';
 const SILENT_COOKIE = 'ov_oauth_silent';
 const SSO_HINT_COOKIE = 'ov_sso_hint';
+
+// The audience the Network's user tokens carry for this site (the guard checks the same one).
+const AUDIENCE = 'openvibe.tools';
 
 // Origin of the identity provider's own "sign you in everywhere" chain. The Network hops
 // through /auth/login?silent=1&next=https://openvibe.network/sso/fanout?… and back, so
@@ -93,27 +111,13 @@ function fedcmCors(req, res, next) {
 }
 
 /**
- * Read a JWT's payload WITHOUT checking its signature. Only used to compare the FedCM
- * assertion's nonce with the one the page posted; the Network verifies the signature when
- * the assertion is exchanged. Returns null when the token is not a three-part JWT.
+ * Compare two strings in constant time (the state must match the browser that started the
+ * flow). The length is not secret, so unequal lengths answer false at once.
  */
-function decodeJwtPayload(token) {
-    if (typeof token !== 'string') return null;
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    try {
-        const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-        return payload && typeof payload === 'object' ? payload : null;
-    } catch {
-        return null;
-    }
-}
-
-/** Constant-time string comparison; unequal lengths short-circuit (the length is not secret). */
-function safeEqual(a, b) {
-    if (typeof a !== 'string' || typeof b !== 'string' || !a || !b) return false;
-    if (a.length !== b.length) return false;
-    return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+function sameString(a, b) {
+    const x = Buffer.from(String(a || ''));
+    const y = Buffer.from(String(b || ''));
+    return x.length === y.length && x.length > 0 && crypto.timingSafeEqual(x, y);
 }
 
 /**
@@ -122,14 +126,9 @@ function safeEqual(a, b) {
  * GET /api/.well-known/jwks and verify JWTs locally on every request.
  */
 function createAuthClient(config) {
-    const client = new OpenVibeAuthClient({
-        clientId: config.oauth.clientId,
-        clientSecret: config.oauth.clientSecret,
-        redirectUri: config.oauth.redirectUri,
-        publicKey: null, // filled by ensureKey()
-        authBase: config.networkUrl,
-        internalBase: config.networkInternalUrl,
-    });
+    // The Network's RS256 public key (PEM). The guard verifies signed-in visitors with it
+    // (auth.client.publicKey) and /api/ready reports whether it loaded.
+    const client = { publicKey: null };
 
     let lastFetch = 0;
     const gapMs = config.keyRetryMs || 30_000;
@@ -156,11 +155,20 @@ function createAuthClient(config) {
         return null;
     }
 
-    /** Offline JWT verification. Returns decoded claims or null. */
+    /**
+     * Offline JWT verification (openvibe-sdk/auth): the signature, the issuer, the audience
+     * and the expiry. A service, app, module or node token — and any typed token (a FedCM
+     * assertion, an export ticket) — is never a person's session, whatever it names.
+     */
     async function verify(token) {
         if (!token) return null;
         await ensureKey();
-        return client.verifyToken(token);
+        if (!client.publicKey) return null;
+        try {
+            return await verifyUserToken(token, { publicKey: client.publicKey, issuer: config.networkUrl, audience: AUDIENCE });
+        } catch {
+            return null;
+        }
     }
 
     // Warm the key cache at boot, and keep trying every 30 s until it loads (non-fatal if Network is down). After the
@@ -186,6 +194,24 @@ function extractToken(req) {
 
 function createAuthRoutes(config, auth) {
     const router = express.Router();
+
+    // The OAuth half is the SDK's: the authorize URL (PKCE S256 + state), the code, refresh
+    // and FedCM grants, and the client check behind GET /auth/health. The cookies below stay
+    // this gateway's own — they belong to the whole *.openvibe.tools zone.
+    const sso = createSsoClient({
+        site: 'tools',
+        siteName: 'OpenVibe.Tools',
+        baseUrl: config.baseUrl,
+        clientId: config.oauth.clientId,
+        clientSecret: config.oauth.clientSecret,
+        redirectUri: config.oauth.redirectUri,
+        scope: config.oauth.scope,
+        networkUrl: config.networkUrl,
+        networkInternalUrl: config.networkInternalUrl,
+        issuer: config.networkUrl,
+        audience: AUDIENCE,
+        secureCookies: config.cookies.secure,
+    });
 
     const accessCookieOpts = () => ({
         domain: config.cookies.domain || undefined,
@@ -276,66 +302,34 @@ function createAuthRoutes(config, auth) {
         return `${base}${sep}${encodeURIComponent(key)}=${encodeURIComponent(value)}${hash}`;
     }
 
-    /** Exchange at the Network — internal URL first, public as fallback. */
-    async function tokenGrant(body) {
-        let lastErr = null;
-        for (const base of [config.networkInternalUrl, config.networkUrl]) {
-            if (!base) continue;
-            try {
-                const res = await fetch(`${base}/oauth/token`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        client_id: config.oauth.clientId,
-                        client_secret: config.oauth.clientSecret,
-                        ...body,
-                    }),
-                    signal: AbortSignal.timeout(10_000),
-                });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) {
-                    const err = new Error(data.error_description || data.error || `token grant failed (${res.status})`);
-                    err.status = res.status;
-                    err.code = typeof data.error === 'string' ? data.error : null;
-                    err.description = typeof data.error_description === 'string' ? data.error_description : null;
-                    throw err;
-                }
-                return data;
-            } catch (err) {
-                lastErr = err;
-                // 4xx = the grant itself is bad; retrying against another base won't help
-                if (err.status && err.status < 500) throw err;
-            }
-        }
-        throw lastErr || new Error('Network unreachable');
-    }
-
     // ── GET /auth/login ──────────────────────────────────────
     router.get('/login', async (req, res) => {
         // Silent mode (?silent=1): the shared navbar uses it when a page has no session but
         // the browser carries an ov_sso_hint=account cookie. prompt=none tells the Network to
         // answer without any UI — a code if the user is signed in there, login_required if not.
         const silent = String(req.query.silent || '') === '1';
+        const next = sanitizeNext(req.query.next);
         if (silent) {
             // Already signed in here (a valid ov_token rode along)? Then the round trip to the
             // Network would only hand back the session this browser already has: go straight
             // to the page that asked.
             const existing = req.cookies?.[ACCESS_COOKIE];
             if (existing && await auth.verify(existing)) {
-                return res.redirect(sanitizeNext(req.query.next));
+                return res.redirect(next);
             }
         }
-        let { url, state } = auth.client.getAuthorizationUrl(config.oauth.scope);
-        if (silent) url += '&prompt=none';
+        // The SDK's authorize URL: state + PKCE (S256). The verifier goes into a flow cookie
+        // of its own and comes back with the code.
+        const started = sso.authorizeUrl({ silent });
         // Domain-wide: a login can start on net./dev./pastes. but the OAuth
         // redirect_uri is pinned to the apex — the callback must see these cookies.
-        res.cookie(STATE_COOKIE, state, flowCookieOpts());
-        const next = sanitizeNext(req.query.next);
+        res.cookie(STATE_COOKIE, started.state, flowCookieOpts());
+        res.cookie(VERIFIER_COOKIE, started.verifier, flowCookieOpts());
         if (next !== '/') res.cookie(NEXT_COOKIE, next, flowCookieOpts());
         else clearFlowCookie(res, NEXT_COOKIE);
         if (silent) res.cookie(SILENT_COOKIE, '1', flowCookieOpts());
         else clearFlowCookie(res, SILENT_COOKIE);
-        res.redirect(url);
+        res.redirect(started.url);
     });
 
     // ── GET /auth/callback ───────────────────────────────────
@@ -350,6 +344,7 @@ function createAuthRoutes(config, auth) {
                 const next = sanitizeNext(req.cookies?.[NEXT_COOKIE]);
                 clearFlowCookie(res, NEXT_COOKIE);
                 clearFlowCookie(res, STATE_COOKIE);
+                clearFlowCookie(res, VERIFIER_COOKIE);
                 return res.redirect(withParam(next, 'sso', 'none'));
             }
             return res.redirect(`/?auth_error=${encodeURIComponent(error)}`);
@@ -357,19 +352,22 @@ function createAuthRoutes(config, auth) {
         if (!code) return res.status(400).send('Missing authorization code');
 
         const expectedState = req.cookies?.[STATE_COOKIE];
+        const verifier = req.cookies?.[VERIFIER_COOKIE];
         clearFlowCookie(res, STATE_COOKIE);
-        if (!expectedState || !state || !crypto.timingSafeEqual(
-            Buffer.from(String(state).padEnd(64).slice(0, 64)),
-            Buffer.from(String(expectedState).padEnd(64).slice(0, 64))
-        )) {
+        clearFlowCookie(res, VERIFIER_COOKIE);
+        // The state cookie is required, not only compared when it is there: without it a
+        // crafted link could sign a visitor into somebody else's account. The comparison is
+        // in constant time, and the PKCE verifier must come from the same flow.
+        if (!expectedState || !state || !verifier || !sameString(state, expectedState)) {
             return res.status(400).send('OAuth state mismatch — please try signing in again.');
         }
 
         try {
-            const data = await tokenGrant({
+            const data = await sso.tokenGrant({
                 grant_type: 'authorization_code',
                 redirect_uri: config.oauth.redirectUri,
-                code,
+                code: String(code),
+                code_verifier: verifier,
             });
             setSessionCookies(res, data.access_token, data.refresh_token);
             setSsoHint(res, 'account');
@@ -377,9 +375,30 @@ function createAuthRoutes(config, auth) {
             clearFlowCookie(res, NEXT_COOKIE);
             return res.redirect(next);
         } catch (err) {
+            if (err.status === 401 || err.error === 'invalid_client' || err.error === 'unauthorized_client') {
+                // The Network refuses our client (a wrong id or secret): a configuration
+                // problem, not the person's account — say so plainly.
+                console.error(`[Auth] the Network refuses this site's OAuth client (${err.error || err.status}): check OV_OAUTH_CLIENT_ID / OV_OAUTH_CLIENT_SECRET`);
+                const next = sanitizeNext(req.cookies?.[NEXT_COOKIE]);
+                return res.status(500).type('html').send(failurePage({
+                    siteName: 'OpenVibe.Tools',
+                    title: "Sign-in isn't working on OpenVibe.Tools right now",
+                    text: 'This is a problem on our side, not with your account, and it has been logged. Please try again a little later.',
+                    retryHref: `/auth/login${next && next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`,
+                    backHref: next || '/',
+                }));
+            }
             console.error('[Auth] Code exchange failed:', err.message);
             return res.status(502).send('Sign-in failed — could not reach the OpenVibe.Network. Please try again.');
         }
+    });
+
+    // ── GET /auth/health ─────────────────────────────────────
+    // Does the Network accept this site's OAuth client? 503 only when it refuses it.
+    router.get('/health', async (_req, res) => {
+        const client = await sso.checkClient();
+        res.set('Cache-Control', 'no-store');
+        return res.status(client === 'invalid' ? 503 : 200).json({ ok: client !== 'invalid', client });
     });
 
     // ── POST /auth/fedcm ─────────────────────────────────────
@@ -403,14 +422,12 @@ function createAuthRoutes(config, auth) {
         // Nonce binding: the assertion must carry the very nonce this page generated, or it
         // was minted for a different request. Signature-less decode is enough for that — the
         // Network verifies the signature when we exchange it.
-        const claims = decodeJwtPayload(token);
-        if (!claims) return res.status(400).json({ error: 'invalid_request', error_description: 'Token is not a JWT' });
-        if (!safeEqual(String(claims.nonce ?? ''), nonce)) {
+        if (!fedcmNonceMatches(token, nonce)) {
             return res.status(400).json({ error: 'invalid_request', error_description: 'Nonce mismatch' });
         }
 
         try {
-            const data = await tokenGrant({ grant_type: JWT_BEARER_GRANT, assertion: token });
+            const data = await sso.tokenGrant({ grant_type: JWT_BEARER_GRANT, assertion: token });
             if (!data.access_token) {
                 return res.status(401).json({ error: 'invalid_grant', error_description: 'The OpenVibe.Network issued no access token' });
             }
@@ -419,18 +436,15 @@ function createAuthRoutes(config, auth) {
             let user = data.user || null;
             if (!user) {
                 const verified = await auth.verify(data.access_token);
-                if (verified) {
-                    const { iat, exp, aud, iss, ...rest } = verified;
-                    user = rest;
-                }
+                if (verified) user = claimsToUser(verified);
             }
             return res.json({ ok: true, user });
         } catch (err) {
             if (err.status && err.status < 500) {
                 // The Network refused the assertion (expired, wrong audience, unknown user…).
                 return res.status(401).json({
-                    error: err.code || 'invalid_grant',
-                    error_description: err.description || err.message,
+                    error: err.error || 'invalid_grant',
+                    error_description: err.error_description || err.message,
                 });
             }
             console.error('[Auth] FedCM exchange failed:', err.message);
@@ -471,8 +485,7 @@ function createAuthRoutes(config, auth) {
         if (!token) return res.json({ user: null });   // signed out: 200 with no user (as Blog, Community, Wiki), not a 401 in every signed-out visitor's console
         const claims = await auth.verify(token);
         if (!claims) return res.json({ user: null });   // an expired token is signed out too; the navbar refreshes through /auth/refresh
-        const { iat, exp, aud, iss, ...user } = claims;
-        res.json({ user, expires_at: exp ? exp * 1000 : null });
+        res.json({ user: claimsToUser(claims), expires_at: claims.exp ? claims.exp * 1000 : null });
     });
 
     // ── POST /auth/refresh ───────────────────────────────────
@@ -481,15 +494,10 @@ function createAuthRoutes(config, auth) {
         const refresh = req.cookies?.[REFRESH_COOKIE];
         if (!refresh) return res.status(401).json({ error: 'No refresh token' });
         try {
-            const data = await tokenGrant({ grant_type: 'refresh_token', refresh_token: refresh });
+            const data = await sso.tokenGrant({ grant_type: 'refresh_token', refresh_token: refresh });
             setSessionCookies(res, data.access_token, data.refresh_token);
             const claims = await auth.verify(data.access_token);
-            let user = null;
-            if (claims) {
-                const { iat, exp, aud, iss, ...rest } = claims;
-                user = rest;
-            }
-            return res.json({ token: data.access_token, user });
+            return res.json({ token: data.access_token, user: claims ? claimsToUser(claims) : null });
         } catch (err) {
             if (err.status && err.status < 500) {
                 clearSessionCookies(res);
