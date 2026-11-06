@@ -1132,7 +1132,7 @@
         }
         const actions = [
             kit.iconButton({ type: 'button', icon: 'copy', label: 'Copy result', attrs: { 'data-ovk-copy': `#${ANSWER_ID}` } }),
-            kit.share({ title: o.title || document.title, url: `${location.origin}${location.pathname}?q=${encodeURIComponent((document.getElementById('search-input') || {}).value || '')}`, text: o.badge && o.badge.text ? String(o.badge.text) : '', small: true }),
+            kit.share({ title: o.title || document.title, url: `${location.origin}${location.pathname}?q=${encodeURIComponent((document.getElementById('search-input') || {}).value || '')}`, text: o.badge && o.badge.text ? String(o.badge.text) : '' }),
             ...(o.actions || []),
         ];
         out.innerHTML = kit.answer({ id: ANSWER_ID, title: o.title || '', badge: o.badge || null, rows: o.rows || [], body: o.body || '', next: o.next || [], tone: o.tone || '', actions });
