@@ -110,12 +110,14 @@ function fakeDb({ failFirst = false } = {}) {
                 assert.ok(home.includes('5 people this week') && home.includes('1 person this week'), 'each with its count');
             } finally { srv2.close(); }
 
-            const page = await (await fetch(`${base}/tool/dns`)).text();
+            // /tool/<id> is a 301 to the tool's primary host; the about page itself is still the site's renderer
+            // (and its .md twin), so read that rather than follow the redirect off this host.
+            const page = site.pageTool(registry.get().tools.find((t) => t.id === 'dns'));
             assert.ok(page.includes('Use it from code') && page.includes('https://openvibe.tools/api/v1/tools/dns/run'), 'a tool page names its request');
             assert.ok(page.includes('/api/v1/tools/dns/schema'), 'and its input schema');
             const file = registry.get().tools.find((t) => t.id === 'mergepdf');
             if (file) {
-                const pdf = await (await fetch(`${base}/tool/mergepdf`)).text();
+                const pdf = site.pageTool(file);
                 assert.ok(pdf.includes('-F &#39;file=@document-1.pdf&#39;') || pdf.includes("-F 'file=@document-1.pdf'"), 'a file tool shows a multipart upload');
             }
         } finally { srv.close(); }

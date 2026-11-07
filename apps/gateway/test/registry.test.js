@@ -27,6 +27,7 @@ assert.equal(r('x.com').kind, 'unknown', 'override for an unknown tool is ignore
 assert.equal(r('openvibe.tools').kind, 'apex', 'the apex cannot be claimed');
 assert.ok(site.sitemapEntries().some(u => u.loc === 'https://youtubedownloadonline.com/'), 'sitemap uses the canonical host');
 assert.ok(!site.sitemapEntries().some(u => u.loc === 'https://yt.openvibe.tools/'), 'short hosts stay out of the sitemap');
+assert.ok(!site.sitemapEntries().some(u => u.loc.includes('/tool/')), 'the /tool/<id> pointer is not a second sitemap page');
 registry.setOverrides([]);
 assert.equal(registry.catalog().tools.find(t => t.id === 'yt').hosts.canonical, 'youtube-downloader.openvibe.tools');
 
