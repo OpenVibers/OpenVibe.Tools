@@ -101,7 +101,8 @@ app.use(helmet({
             imgSrc: ["'self'", "data:", "blob:", jobsRuntime.mediaOrigin()],     // job result previews are 302s to Media
             mediaSrc: ["'self'", "blob:", jobsRuntime.mediaOrigin()],
             // openvibe.events: release notifications (release-watch's EventSource, openvibe-shared 2.13.0).
-            connectSrc: ["'self'", "https://openvibe.network", "https://*.openvibe.tools", "https://openvibe.events"],
+            // The navbar's Messages count asks Chat (openvibe-shared 4.130.0).
+            connectSrc: ["'self'", "https://openvibe.chat", "https://openvibe.network", "https://*.openvibe.tools", "https://openvibe.events"],
             workerSrc: ["'self'", "blob:"],
             scriptSrcAttr: ["'unsafe-inline'"],
         },

@@ -90,7 +90,8 @@ app.use(helmet({
       fontSrc: ["'self'", 'fonts.gstatic.com'],
       imgSrc: ["'self'", 'data:', 'image.tmdb.org', '*.tile.openstreetmap.org', '*.basemaps.cartocdn.com', 'server.arcgisonline.com'],
       // openvibe.events: release notifications (release-watch's EventSource, openvibe-shared 2.13.0).
-      connectSrc: ["'self'", 'nominatim.openstreetmap.org', 'https://openvibe.network', 'https://openvibe.events'],
+      // The navbar's Messages count asks Chat (openvibe-shared 4.130.0).
+      connectSrc: ["'self'", 'https://openvibe.chat', 'nominatim.openstreetmap.org', 'https://openvibe.network', 'https://openvibe.events'],
       scriptSrcAttr: ["'unsafe-inline'"],
     },
   },
