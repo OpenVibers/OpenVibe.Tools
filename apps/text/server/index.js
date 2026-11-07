@@ -69,7 +69,8 @@ app.use(helmet({
             fontSrc: ["'self'", "fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "blob:"],
             // openvibe.events: release notifications (release-watch's EventSource, openvibe-shared 2.13.0).
-            connectSrc: ["'self'", "https://openvibe.network", "https://api.exchangerate-api.com", "https://openvibe.events"],
+            // The navbar's Messages count asks Chat (openvibe-shared 4.130.0).
+            connectSrc: ["'self'", "https://openvibe.chat", "https://openvibe.network", "https://api.exchangerate-api.com", "https://openvibe.events"],
             frameSrc: ["'none'"],
             scriptSrcAttr: ["'unsafe-inline'"],
         },
