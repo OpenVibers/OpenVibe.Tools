@@ -3,7 +3,7 @@
 // openvibe.tools, server-rendered from the registry.
 //   /                 index: search, families, popular tools
 //   /<family-path>    one family: every tool, intro, FAQ
-//   /tool/<id>        one tool: what it does, where it lives (primary host + mirrors), related
+//   /tool/<id>        301 to the tool's primary host (one canonical address per tool)
 //   /all-tools        A–Z
 //   /search?q=        results (works as a plain form; JS only makes it instant)
 //   /sitemap.xml /robots.txt /llms.txt /llms-full.txt /api/catalog.json
@@ -552,7 +552,7 @@ function pageAll() {
     const { tools, families } = registry.get();
     const sorted = [...tools].sort((a, b) => a.name.localeCompare(b.name));
     const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> › All tools</nav><div class="page-h">${icon('tools', 56)}<h1>All ${tools.length} tools, A to Z</h1></div>
-${searchForm('')}<section><ul class="az">${sorted.map(t => `<li><a href="${esc(t.url)}">${esc(t.name)}</a> <small><a href="/tool/${esc(t.id)}" aria-label="About ${esc(t.name)}">about</a></small></li>`).join('')}</ul></section>`;
+${searchForm('')}<section><ul class="az">${sorted.map(t => `<li><a href="${esc(t.url)}">${esc(t.name)}</a> <small><a href="${esc(t.url)}" aria-label="About ${esc(t.name)}">about</a></small></li>`).join('')}</ul></section>`;
     return shell({ families, agent: true, body, head: head({ title: `All ${tools.length} Online Tools, A to Z`, description: 'The complete list of tools on OpenVibe.Tools: converters, downloaders, PDF and image tools, text utilities, developer tools and network diagnostics.', canonical: SITE + '/all-tools',
         jsonLd: [seo.jsonLd.breadcrumbs([{ name: 'Tools', url: SITE + '/' }, { name: 'All tools', url: SITE + '/all-tools' }])] }) });
 }
@@ -651,7 +651,7 @@ function sitemapEntries() {
     return [{ loc: SITE + '/', changefreq: 'daily', priority: 1 }, { loc: SITE + '/all-tools', changefreq: 'weekly', priority: 0.8 }, { loc: SITE + '/developers', changefreq: 'weekly', priority: 0.7 }, { loc: SITE + '/updates', changefreq: 'daily', priority: 0.4 },
         ...families.filter(f => f.path).map(f => ({ loc: SITE + f.path, changefreq: 'weekly', priority: 0.9 })),
         ...families.filter(f => f.hosts).map(f => ({ loc: f.url, changefreq: 'weekly', priority: 0.9 })),
-        ...tools.filter(t => !t.external).flatMap(t => [{ loc: t.url, changefreq: 'weekly', priority: 0.8 }, { loc: `${SITE}/tool/${t.id}`, changefreq: 'monthly', priority: 0.5 }]),
+        ...tools.filter(t => !t.external).map(t => ({ loc: t.url, changefreq: 'weekly', priority: 0.8 })),
     ].map(u => Object.assign({ lastmod: today }, u));
 }
 
@@ -702,6 +702,22 @@ function llmsFullBody() {
 
 function createSiteRouter({ opens = null } = {}) {
     const router = express.Router();
+    // One canonical address per tool: its primary host. The directory's /tool/<id> page is only a pointer, so it
+    // 301s there (query kept) instead of competing with the tool's own self-canonical page. Its Markdown twin keeps
+    // the same canonical, so HTML, twin, sitemap and llms.txt all name one URL.
+    router.get('/tool/:id.md', (req, res, next) => {
+        const t = registry.get().tools.find((x) => x.id === req.params.id);
+        if (!t) return next();
+        const { markdownTwin } = require('openvibe-shared/agent-layer');
+        const body = markdownTwin({ html: pageTool(t), canonical: t.url });
+        return res.set('Content-Type', 'text/markdown; charset=utf-8').set('Cache-Control', 'public, max-age=300').send(body);
+    });
+    router.get('/tool/:id', (req, res, next) => {
+        const t = registry.get().tools.find((x) => x.id === req.params.id);
+        if (!t) return next();
+        const q = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+        return res.redirect(301, `${t.url}${q}`);
+    });
     // Markdown twin and agent manifest requests go to openvibe-shared/agent-layer, mounted after this router.
     router.use((req, res, next) => {
         const p = String(req.path || '');
@@ -724,7 +740,6 @@ function createSiteRouter({ opens = null } = {}) {
     });
     router.get('/all-tools', (req, res) => send(req, res, '/all-tools', pageAll));
     router.get('/search', (req, res) => { res.set('Cache-Control', 'no-store'); res.type('html').send(pageSearch(String(req.query.q || '').slice(0, 80))); });
-    router.get('/tool/:id', (req, res, next) => { const t = registry.get().tools.find(x => x.id === req.params.id); return t ? send(req, res, '/tool/' + t.id, () => pageTool(t)) : next(); });
     router.get('/sitemap.xml', (req, res) => send(req, res, 'sitemap', () => seo.sitemapXml(sitemapEntries()), 'application/xml; charset=utf-8'));
     router.get('/robots.txt', (req, res) => send(req, res, 'robots', () => seo.robotsTxt({ sitemaps: [SITE + '/sitemap.xml'], disallow: ['/api/', '/auth/'], allow: ['/api/catalog.json'], allowAI: true }) + `# Agent manifest: ${SITE}/.well-known/agent.json\n`, 'text/plain; charset=utf-8'));
     router.get('/llms.txt', (req, res) => send(req, res, 'llms', llmsTxtBody, 'text/plain; charset=utf-8'));

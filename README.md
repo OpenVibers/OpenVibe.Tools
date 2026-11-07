@@ -100,7 +100,7 @@ Domains; the gateway merges those overrides every minute. New custom domain on t
 `sudo deploy/scripts/add-custom-domain.sh <domain>`.
 
 Public, cacheable outputs on the apex: `/` (every tool by family, planned tools as placeholders),
-`/<family>-tools`, `/tool/<id>`, `/all-tools`, `/search?q=`, `/sitemap.xml`, `/robots.txt`,
+`/<family>-tools`, `/all-tools`, `/search?q=`, `/sitemap.xml`, `/robots.txt` (and `/tool/<id>`, which 301s to the tool's primary host),
 `/llms.txt`, `/api/catalog.json`, `/terms`, `/privacy`, `/dmca`. All of it renders without JavaScript.
 
 Deploy with `deploy/scripts/deploy.sh`: it runs `ovhost deploy tools` (OpenVibe.Host, strategy
