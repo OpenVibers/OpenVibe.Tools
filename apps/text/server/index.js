@@ -64,13 +64,13 @@ app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "fonts.googleapis.com", "https://openvibe.network"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "fonts.googleapis.com", "https://openvibe.network", "https://static.cloudflareinsights.com"],
             styleSrc: ["'self'", "'unsafe-inline'", "fonts.googleapis.com", "fonts.gstatic.com"],
             fontSrc: ["'self'", "fonts.gstatic.com"],
             imgSrc: ["'self'", "data:", "blob:"],
             // openvibe.events: release notifications (release-watch's EventSource, openvibe-shared 2.13.0).
             // The navbar's Messages count asks Chat (openvibe-shared 4.130.0).
-            connectSrc: ["'self'", "https://openvibe.chat", "https://openvibe.network", "https://api.exchangerate-api.com", "https://openvibe.events"],
+            connectSrc: ["'self'", "https://openvibe.chat", "https://openvibe.network", "https://api.exchangerate-api.com", "https://openvibe.events", "https://cloudflareinsights.com"],
             frameSrc: ["'none'"],
             scriptSrcAttr: ["'unsafe-inline'"],
         },
