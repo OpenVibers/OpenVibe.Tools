@@ -10,12 +10,12 @@ const { measure, check, format } = require('openvibe-shared/perf-budget');
 const { startApp } = require('../../_shared/test/spawn');
 
 const BUDGETS = {
-    htmlRawKB: 225,       // 208.9 measured with all 184 crawlable tool rows; room for populated ranking rows
-    htmlBrotliKB: 29,      // 26.8 measured with the complete category ItemLists
+    htmlRawKB: 225,       // 206 measured with all 184 crawlable tool rows; room for populated ranking rows
+    htmlBrotliKB: 29,      // 26.5 measured with the complete category ItemLists
     jsFiles: 6,           // 5
-    jsRawKB: 360,         // measured with the home's kit files (kit-web.js, kit.css) added to the Frame
-    jsBrotliKB: 86,       // measured with openvibe-shared 4.163.0
-    cssFiles: 1,          // 0
+    jsRawKB: 365,         // 361.2: the Frame plus the kit's behaviour file (kit-web.js) for the drifting strip, 2026-11-09
+    jsBrotliKB: 88,       // 86.2 with openvibe-shared 4.163.0, 2026-11-09
+    cssFiles: 1,          // 1: the kit's stylesheet
     externalFiles: 3,     // 1 in production
 };
 
