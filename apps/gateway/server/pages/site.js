@@ -273,6 +273,8 @@ function score(t, terms) {
     for (const w of terms) { if (name.includes(w)) s += 5; if (t.id === w) s += 4; if ((t.keywords || []).some(k => k.includes(w))) s += 3; else if (hay.includes(w)) s += 1; else if (!name.includes(w)) return 0; }
     return s;
 }
+// The words a person does not need in a tool request ("I want to merge some PDFs"): they only blur the scoring.
+const ASK_STOP = ['i','a','an','the','my','your','to','want','need','please','help','me','can','you','with','which','tool','do','how','make','some','for','of','find','near','nearby','around'];
 function search(q) {
     const terms = String(q || '').toLowerCase().split(/[^a-z0-9.+#]+/).filter(Boolean).slice(0, 8);
     if (!terms.length) return [];
@@ -721,13 +723,25 @@ function createSiteRouter({ opens = null, discovery = null } = {}) {
         const activity = discovery ? await discovery.snapshot().catch(() => ({ available: false })) : { available: false };
         send(req, res, '/', () => pageIndex(top, activity), undefined, (opens ? opens.version() : '') + JSON.stringify(activity));
     });
+    // "Ask Vibe which tool": a description in, the right tool out. The words are normalised, then the catalogue's
+    // own scoring picks the candidates. One clear winner (at least half again the runner-up) opens the tool; anything
+    // close, or nothing at all, goes to the server-rendered search with the same words — never a wrong tool.
     router.get('/ask-tool', (req, res) => {
-        const q = String(req.query.q || '').slice(0,160).toLowerCase()
-            .replace(/\b(shrink|smaller|reduce)\b/g, 'compress').replace(/\b(pdfs|pictures|images)\b/g, w => w === 'pdfs' ? 'pdf' : 'image')
-            .split(/[^a-z0-9]+/).filter(w => w && !['i','a','an','the','my','your','to','want','need','please','help','me','can','you','with','which','tool','do','how'].includes(w)).join(' ');
-        const matches = search(q).filter(t => t.status !== 'unavailable');
-        res.set('Cache-Control','no-store');
-        if (matches.length === 1) return res.redirect(302, matches[0].url);
+        const raw = String(req.query.q || '').slice(0, 160).toLowerCase();
+        const q = raw
+            .replace(/'s\b/g, '')
+            .replace(/\b(shrink|smaller|reduce|lighten)\b/g, 'compress')
+            .replace(/\b(pdfs|documents|doc)\b/g, 'pdf')
+            .replace(/\b(pictures|picture|photo|photos|pic)\b/g, 'image')
+            .replace(/\b(vids|clips)\b/g, 'video')
+            .split(/[^a-z0-9]+/).filter(w => w && !ASK_STOP.includes(w)).join(' ');
+        res.set('Cache-Control', 'no-store');
+        const terms = q.split(/[^a-z0-9.+#]+/).filter(Boolean).slice(0, 8);
+        const ranked = terms.length
+            ? registry.get().tools.map(t => [score(t, terms), t]).filter(x => x[0] > 0 && x[1].status !== 'unavailable')
+                .sort((a, b) => b[0] - a[0] || a[1].name.localeCompare(b[1].name))
+            : [];
+        if (ranked.length && (ranked.length === 1 || ranked[0][0] >= ranked[1][0] * 1.5)) return res.redirect(302, ranked[0][1].url);
         return res.redirect(302, '/search?q=' + encodeURIComponent(q));
     });
     router.get('/all-tools', (req, res) => send(req, res, '/all-tools', pageAll));
