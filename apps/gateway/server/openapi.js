@@ -56,6 +56,21 @@ function openapi(snapshot, site) {
         '/api/v1/jobs/{id}/files/{n}': { get: { operationId: 'jobFile', summary: 'Download result file n', tags: ['jobs'], security: [{ bearer: [] }, {}], parameters: [jobParam, { name: 'n', in: 'path', required: true, schema: { type: 'integer', minimum: 0 } }], responses: { 200: { description: 'The file' }, 404: problem } } },
         '/api/v1/jobs/{id}/retry': { post: { operationId: 'retryJob', summary: 'Retry a failed job', tags: ['jobs'], security: [{ bearer: [] }, {}], parameters: [jobParam], responses: { 200: { description: 'The new job', content: { 'application/json': { schema: ref('job') } } }, 409: problem } } },
     };
+    for (const kind of ['popular', 'trending']) paths[`/api/v1/tools/${kind}`] = { get: {
+        operationId: kind === 'popular' ? 'popularTools' : 'trendingTools', tags: ['registry'],
+        summary: kind === 'popular' ? 'Tools ranked by successful API uses over seven days' : 'Tools with rising successful API use',
+        description: 'Public aggregate counts; no inputs or actors. Cache hits count, idempotent replays do not. UTC hourly buckets; current hour is partial. Week compares the last 168 buckets with the preceding 168. Refreshed every minute.',
+        parameters: [{ name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 50, default: 12 } },
+            { name: 'window', in: 'query', schema: { type: 'string', enum: kind === 'popular' ? ['week'] : ['hour','week'], default: 'week' } }],
+        responses: { 200: { description: 'Ranked tools; empty when no use is recorded', content: { 'application/json': { schema: {
+            type: 'object', required: ['metric','window','updated_at','uses_today','tools','count'],
+            properties: { metric: { const: 'successful_api_runs' }, window: { enum: ['hour','week'] }, updated_at: { type: 'string', format: 'date-time' }, uses_today: { type: 'integer', minimum: 0 }, count: { type: 'integer' },
+                tools: { type: 'array', items: { type: 'object', required: ['id','name','description','family','icon','url','uses'], properties: {
+                    ...Object.fromEntries(['id','name','description','family','icon'].map(k => [k, { type: 'string' }])), url: { type: 'string', format: 'uri' }, uses: { type: 'integer', minimum: 1 }, previous_uses: { type: 'integer', minimum: 0 }, increase: { type: 'integer', minimum: 1 },
+                } } },
+            },
+        } } } }, 400: { description: 'Invalid limit or window' }, 503: { description: 'Usage unavailable; never presented as zero' } },
+    } };
     // Every code as an image URL (server/codes/image.js): no account, the same URL always draws the same image.
     const q = (name, description, schema = { type: 'string' }) => ({ name, in: 'query', required: false, description, schema });
     paths['/api/codes'] = { get: { operationId: 'listCodeSymbologies', summary: 'Every barcode and QR symbology the image URLs draw, with an example each', tags: ['codes'], responses: { 200: { description: '{ usage, aliases, symbologies: [{ id, name, example }] }' } } } };

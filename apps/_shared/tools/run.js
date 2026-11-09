@@ -195,6 +195,7 @@ const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
  * @param {Function} [o.parseJson]                 JSON body parser middleware, when the app has not run one
  * @param {object} [o.jobs]                        a satellite's jobs: { system: () => system, receive: (d) => middleware,
  *                                                 fetchSibling: (ref, req) → file | null }
+ * @param {(tool: string) => Promise<void>} [o.onSuccess] optional inline success counter; replays bypass it
  * @param {object} [o.log]
  */
 function createRunApi(o) {
@@ -309,6 +310,9 @@ function createRunApi(o) {
             }
         }
         if (replayKey) replays.set(replayKey, { hash: reqHash, body }, REPLAY_TTL_MS);
+        if (body.state === 'succeeded' && o.onSuccess) {
+            try { await o.onSuccess(d.id); } catch { log.warn('[tools] discovery count unavailable'); }
+        }
         return send(res, 200, body);
     }
 

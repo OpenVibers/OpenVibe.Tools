@@ -1,0 +1,58 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const express = require('express');
+const { testDb, closeAllTestDbs } = require('../../_shared/test/testdb');
+const { recordUse } = require('../../_shared/tools/discovery-usage');
+const { createDiscovery } = require('../server/registry/discovery');
+const registry = require('../server/registry');
+const { createToolsApi } = require('../../_shared/tools/http');
+const site = require('../server/pages/site');
+(async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ov-discovery-'));
+    let srv;
+    try {
+        const db = await testDb(tmp);
+        const hour = 3600000;
+        let now = Date.parse('2026-11-09T10:30:00Z');
+        const add = async (id, offset, n) => { for (let i = 0; i < n; i++) await recordUse(db, id, now + offset * hour); };
+        await add('dns', 0, 4); await add('dns', -1, 1); await add('dns', -168, 2);
+        await add('json', -1, 6); await add('json', 0, 1); await add('json', -168, 10);
+        await add('missing-tool', 0, 20); await add('whois', -336, 99); await add('whois', 1, 99);
+        await assert.rejects(db.tx(async t => { await recordUse(t, 'dns', now); throw new Error('rollback'); }), /rollback/);
+        const service = createDiscovery({ db, registry, now: () => now });
+        const s = await service.snapshot();
+        assert.equal(s.uses_today, 12, 'UTC today excludes stale, future and unknown tools');
+        assert.deepEqual(s.popular.map(t => [t.id,t.uses]), [['json',7],['dns',5]]);
+        assert.deepEqual(s.hour.map(t => [t.id,t.increase]), [['dns',3]]);
+        assert.deepEqual(s.week.map(t => [t.id,t.increase]), [['dns',3]]);
+        assert.ok(s.newest.every(t => t.added_at === '2026-10-25'));
+        await add('dns', 0, 1);
+        assert.equal((await service.snapshot()).uses_today, 12, 'one-minute memo');
+        now += 60001;
+        assert.equal((await service.snapshot()).uses_today, 13);
+        const app = express();
+        app.use(service.router());
+        app.use(createToolsApi({ snapshot: () => ({ tools: [], updated_at: new Date(now).toISOString() }) }));
+        app.use(site.createSiteRouter({ discovery: service }));
+        srv = app.listen(0, '127.0.0.1'); await new Promise(r => srv.once('listening', r));
+        const base = `http://127.0.0.1:${srv.address().port}`;
+        let r = await fetch(base + '/api/v1/tools/trending?window=hour&limit=1');
+        assert.equal(r.status,200); assert.equal(r.headers.get('access-control-allow-origin'), '*');
+        assert.equal((await r.json()).tools[0].id, 'dns');
+        for (const q of ['limit=0','limit=51','limit=no','window=day']) assert.equal((await fetch(base + '/api/v1/tools/trending?' + q)).status,400);
+        const html = await (await fetch(base + '/')).text();
+        assert.match(html, /13<\/b> successful uses today/); assert.match(html, /↗ \+4/);
+        r = await fetch(base + '/ask-tool?q=I%20want%20to%20merge%20PDFs', { redirect: 'manual' });
+        assert.equal(r.status,302); assert.ok(r.headers.get('location').includes('pdf'));
+        r = await fetch(base + '/ask-tool?q=unknownzz', { redirect: 'manual' });
+        assert.equal(r.headers.get('location'), '/search?q=unknownzz');
+        const bad = createDiscovery({ db: { many: async () => { throw Error('down'); } }, registry });
+        const badApp = express(); badApp.use(bad.router());
+        const failSrv = badApp.listen(0,'127.0.0.1'); await new Promise(r => failSrv.once('listening',r));
+        try { r = await fetch(`http://127.0.0.1:${failSrv.address().port}/api/v1/tools/popular`); assert.equal(r.status,503); assert.equal(r.headers.get('cache-control'),'no-store'); } finally { failSrv.close(); }
+        console.log('discovery: PostgreSQL windows, transactions, cache, routing and errors passed');
+    } finally { if (srv) srv.close(); await closeAllTestDbs(); fs.rmSync(tmp,{ recursive:true,force:true }); }
+})().catch(e => { console.error(e); process.exit(1); });

@@ -73,6 +73,10 @@ function checkProblem(r, status, code, where) {
         let r = await run('jsonminify', { input: { text: '{ "a": [1, 2] }' } });
         assert.strictEqual(r.status, 200, r.text);
         checkRun(r.body, 'jsonminify');
+        const ranked = await call('/api/v1/tools/popular', { method: 'GET' });
+        assert.strictEqual(ranked.status, 200, ranked.text);
+        assert.strictEqual(ranked.body.tools.find(t => t.id === 'jsonminify').uses, 1);
+        assert.strictEqual(ranked.body.metric, 'successful_api_runs');
         assert.deepStrictEqual([r.body.state, r.body.tool, r.body.result], ['succeeded', 'jsonminify', { text: '{"a":[1,2]}' }]);
         assert.strictEqual(r.h.get('cache-control'), 'no-store');
         assert.ok(Number.isInteger(r.body.took_ms));

@@ -30,7 +30,7 @@ const site = require('../server/pages/site');
         // What the home keeps: the search, the good places to start and the jobs.
         assert.match(home, /<form class="search"/, 'the search is where it was');
         assert.match(home, /<h2 id="start-h">Good places to start<\/h2>/, 'the good places to start are where they were');
-        assert.match(home, /<div class="jobs"><div class="sec-h jobs-h"><h2>Tools by job<\/h2>/, 'the jobs are where they were');
+        assert.match(home, /<div class="jobs"><div class="sec-h jobs-h"><h2>Tools by category<\/h2>/, 'the full category directory remains on the home');
         // A fold says what it holds (the owner's rule, 2026-10-31: folds show their count).
         assert.match(home, /<h2 id="faq-h">Questions <span class="fold-count">\d+<\/span><\/h2>/, 'the questions fold shows its count');
         // The CSS: the fold is closed on a phone and open where there is room.

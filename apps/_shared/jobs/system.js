@@ -130,6 +130,11 @@ function createJobSystem(o) {
         const row = await store.get(id);
         await announce.finished(t, row);
         await usage.finished(row);
+        if (row.state === 'succeeded' && row.tool) {
+            // The public discovery count never breaks a job: a failed counter write is logged and dropped.
+            try { await require('../tools/discovery-usage').recordUse(t, row.tool); }
+            catch (err) { log.warn('[jobs] discovery count unavailable: ' + (err && err.message ? err.message : 'unknown')); }
+        }
     }
 
     const types = new Map();

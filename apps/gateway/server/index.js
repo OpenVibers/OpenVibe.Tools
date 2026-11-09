@@ -228,6 +228,8 @@ app.use('/auth/', rateLimit({ windowMs: 15 * 60_000, max: 60, skip: (req) => req
 // guard's quotas on runs and on the jobs facade's submits, and the admin analytics route.
 const actorLimits = require('../../_shared/actor-limits').createToolsLimits({ app: 'gateway', createActorLimiter: require('openvibe-sdk/limits').createActorLimiter, guard, registry: obs.registry });
 app.use(actorLimits.registryReads);
+const discovery = require('./registry/discovery').createDiscovery({ db: toolsDb.db, registry });
+app.use(discovery.router());
 app.use(createToolsApi({ snapshot: toolRegistry.snapshot }));
 
 // The launcher's recent tools: a signed-in person's tools.usage module (every device), otherwise this
@@ -292,6 +294,7 @@ const { createJobsFacade, createJobIndex } = require('./run/jobs-facade');
 const { ajvFrom } = require('../../_shared/tools/run');
 const jobIndex = createJobIndex();
 const runApi = createGatewayRun({
+    onSuccess: (id) => require('../../_shared/tools/discovery-usage').recordUse(toolsDb.db, id),
     guard, contracts: require('openvibe-contracts'), toolRegistry, routers: { net: netRouter, dev: devRouter },
     ports: () => SATELLITES, parseJson: jsonBody, jobIndex, ...ajvFrom(require),
 });
@@ -461,7 +464,7 @@ app.use(require('./codes/image').router());
 // sitemap.xml, robots.txt, llms.txt and /api/catalog.json (server/pages/site.js).
 // This site's own pinned copy of the OpenVibe Frame's browser files (/shared, openvibe-shared/serve) is
 // mounted with the release routes: apps/_shared/release.js.
-app.use(require('./pages/site').createSiteRouter({ opens: toolOpens }));
+app.use(require('./pages/site').createSiteRouter({ opens: toolOpens, discovery }));
 
 // Net tool subdomains → net.html SPA
 app.use((req, res, next) => {

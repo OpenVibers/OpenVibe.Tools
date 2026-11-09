@@ -169,3 +169,26 @@
     }).catch(function () { /* optional */ });
     var q0 = new URL(location.href).searchParams.get('q'); if (q0) { input.value = q0; show(q0, false); }
 })();
+
+// Keep one server-rendered phrase for reduced motion; changes never enter an aria-live region.
+(function () {
+    const el = document.getElementById('tool-headline');
+    if (!el) return;
+    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let phrases; try { phrases = JSON.parse(el.dataset.phrases); } catch { return; }
+    if (!Array.isArray(phrases) || phrases.length < 2) return;
+    let i = 0, timer, paused = false;
+    const control = document.getElementById('headline-motion');
+    const update = () => {
+        clearInterval(timer);
+        if (control) control.hidden = motion.matches;
+        if (!motion.matches && !paused && !document.hidden) timer = setInterval(() => {
+            i = (i + 1) % phrases.length; el.textContent = phrases[i] + '.';
+        }, 4500);
+        if (motion.matches) { i = 0; el.textContent = phrases[0] + '.'; }
+    };
+    if (control) control.addEventListener('click', () => { paused = !paused; control.textContent = paused ? 'Resume headline' : 'Pause headline'; update(); });
+    motion.addEventListener('change', update);
+    document.addEventListener('visibilitychange', update);
+    update();
+})();
