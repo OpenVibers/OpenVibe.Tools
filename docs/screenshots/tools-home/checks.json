@@ -1,0 +1,371 @@
+{
+  "url": "http://127.0.0.1:8794/",
+  "note": "Local preview of the gateway; the counts come from real local API runs. The failed requests are the local origin asking openvibe.network for a theme, which its CORS refuses.",
+  "results": [
+    {
+      "width": 390,
+      "theme": "vibe",
+      "scheme": "dark",
+      "docW": 390,
+      "chips": [
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        }
+      ],
+      "links": 257,
+      "bg": "rgb(10, 15, 28)",
+      "fg": "rgb(230, 237, 247)",
+      "small": [
+        "Fancy text",
+        "Title case",
+        "Words and characters"
+      ],
+      "drift": "drift",
+      "categoryRows": 184,
+      "pageHeight": 17919,
+      "errors": [],
+      "consoleErrors": [
+        "Access to fetch at 'https://openvibe.network/api/themes/me/active' from origin 'http://127.0.0.1:8794' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+        "Failed to load resource: net::ERR_FAILED",
+        "Access to fetch at 'https://openvibe.network/api/frame?host=127.0.0.1' from origin 'http://127.0.0.1:8794' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+        "Failed to load resource: net::ERR_FAILED"
+      ],
+      "failed": [
+        "https://openvibe.network/api/themes/me/active — net::ERR_FAILED",
+        "https://openvibe.network/api/frame?host=127.0.0.1 — net::ERR_FAILED"
+      ]
+    },
+    {
+      "width": 390,
+      "theme": "paper",
+      "scheme": "light",
+      "docW": 390,
+      "chips": [
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        }
+      ],
+      "links": 257,
+      "bg": "rgb(250, 248, 245)",
+      "fg": "rgb(44, 36, 22)",
+      "small": [
+        "Fancy text",
+        "Title case",
+        "Words and characters"
+      ],
+      "drift": "drift",
+      "categoryRows": 184,
+      "pageHeight": 17919,
+      "errors": [],
+      "consoleErrors": [
+        "Access to fetch at 'https://openvibe.network/api/themes/me/active' from origin 'http://127.0.0.1:8794' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+        "Failed to load resource: net::ERR_FAILED",
+        "Access to fetch at 'https://openvibe.network/api/frame?host=127.0.0.1' from origin 'http://127.0.0.1:8794' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+        "Failed to load resource: net::ERR_FAILED"
+      ],
+      "failed": [
+        "https://openvibe.network/api/themes/me/active — net::ERR_FAILED",
+        "https://openvibe.network/api/frame?host=127.0.0.1 — net::ERR_FAILED"
+      ]
+    },
+    {
+      "width": 1280,
+      "theme": "vibe",
+      "scheme": "dark",
+      "docW": 1280,
+      "chips": [
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        }
+      ],
+      "links": 257,
+      "bg": "rgb(10, 15, 28)",
+      "fg": "rgb(230, 237, 247)",
+      "small": [
+        "Fancy text",
+        "Title case",
+        "Words and characters"
+      ],
+      "drift": "drift",
+      "categoryRows": 184,
+      "pageHeight": 18660,
+      "errors": [],
+      "consoleErrors": [
+        "Access to fetch at 'https://openvibe.network/api/themes/me/active' from origin 'http://127.0.0.1:8794' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+        "Failed to load resource: net::ERR_FAILED",
+        "Access to fetch at 'https://openvibe.network/api/frame?host=127.0.0.1' from origin 'http://127.0.0.1:8794' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+        "Failed to load resource: net::ERR_FAILED"
+      ],
+      "failed": [
+        "https://openvibe.network/api/themes/me/active — net::ERR_FAILED",
+        "https://openvibe.network/api/frame?host=127.0.0.1 — net::ERR_FAILED"
+      ]
+    },
+    {
+      "width": 1280,
+      "theme": "paper",
+      "scheme": "light",
+      "docW": 1280,
+      "chips": [
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        },
+        {
+          "h": 44,
+          "icon": true,
+          "underline": "none"
+        }
+      ],
+      "links": 257,
+      "bg": "rgb(250, 248, 245)",
+      "fg": "rgb(44, 36, 22)",
+      "small": [
+        "Fancy text",
+        "Title case",
+        "Words and characters"
+      ],
+      "drift": "drift",
+      "categoryRows": 184,
+      "pageHeight": 18660,
+      "errors": [],
+      "consoleErrors": [
+        "Access to fetch at 'https://openvibe.network/api/themes/me/active' from origin 'http://127.0.0.1:8794' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+        "Failed to load resource: net::ERR_FAILED",
+        "Access to fetch at 'https://openvibe.network/api/frame?host=127.0.0.1' from origin 'http://127.0.0.1:8794' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.",
+        "Failed to load resource: net::ERR_FAILED"
+      ],
+      "failed": [
+        "https://openvibe.network/api/themes/me/active — net::ERR_FAILED",
+        "https://openvibe.network/api/frame?host=127.0.0.1 — net::ERR_FAILED"
+      ]
+    }
+  ],
+  "reducedMotion": {
+    "first": "restyle your text.",
+    "second": "restyle your text.",
+    "static": true
+  }
+}

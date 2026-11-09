@@ -14,7 +14,8 @@
     "start:yt": "npm --prefix apps/yt start",
     "start:audio": "npm --prefix apps/audio start",
     "start:text": "npm --prefix apps/text start",
-    "start:docs": "npm --prefix apps/docs start"
+    "start:docs": "npm --prefix apps/docs start",
+    "test:discovery": "node test/run.js gateway/test/home-jobs gateway/test/tool-opens gateway/test/discovery gateway/test/run-api _shared/test/job-usage gateway/test/perf-budget"
   },
   "license": "MIT",
   "engines": {

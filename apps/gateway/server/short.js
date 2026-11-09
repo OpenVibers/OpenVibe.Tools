@@ -37,13 +37,13 @@ function foldMeta(body, cls = '') {
     return text ? `<span${cls ? ` class="${cls}"` : ''}>${text}</span>` : '';
 }
 
-function foldBlock({ id, head, html, bare = false }) {
+function foldBlock({ id, head, html, bare = false, count = null }) {   // count: the title row's count in words (else counted from the html)
     const key = `fold-${esc(id)}`;
     // The class is `fold-block`, not `fold`: this site already has a `fold` of its own (the <details> fold in the
     // developer block), and the two must not share their rules.
     return `<div class="fold-block${bare ? ' fold-bare' : ''}" id="${key}">`
         + `<input class="fold-toggle" type="checkbox" id="${key}-open">`
-        + `<label class="fold-h" for="${key}-open">${str(head)}${foldMeta(str(html), 'fold-n')}<span class="fold-mark" aria-hidden="true"></span></label>`
+        + `<label class="fold-h" for="${key}-open">${str(head)}${count != null ? `<span class="fold-n">${esc(count)}</span>` : foldMeta(str(html), 'fold-n')}<span class="fold-mark" aria-hidden="true"></span></label>`
         + `<div class="fold-body">${str(html)}</div></div>`;
 }
 

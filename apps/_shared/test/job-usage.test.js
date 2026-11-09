@@ -101,6 +101,7 @@ function define(system) {
         const failedId = await run({ project: PRJ, type: 'test.boom', traceId: TRACE, files: [{ buffer: Buffer.from('x'), name: SECRET_FILE, mime: 'text/plain' }] }, 'failed');
         await run({ project: PRJ, env: 'sandbox' }, 'succeeded');
         await run({ project: PRJ, tool: 'image-resize' }, 'succeeded');
+        assert.deepStrictEqual(await db.many('SELECT tool, sum(uses)::int AS uses FROM tool_usage_hourly GROUP BY tool'), [{ tool: 'image-resize', uses: 1 }], 'public discovery counts the successful tool job, not unlabelled or failed jobs');
         await run({ project: null, owner: `user:${USER}` }, 'succeeded');   // a person's job: no project, not counted
         assert.strictEqual((await system.get(failedId)).trace_id, TRACE, 'the submit request\'s trace id is kept with the job');
         const { job: held } = await system.submit({ owner: `app:${APP}`, type: 'test.upper', input: { hold: true }, project: PRJ });

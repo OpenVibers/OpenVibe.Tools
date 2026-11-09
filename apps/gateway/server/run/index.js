@@ -145,6 +145,7 @@ function createGatewayRun(o) {
         snapshot: () => o.toolRegistry.snapshot(),
         validate: createInputValidator(o.Ajv, o.addFormats),
         parseJson: o.parseJson,
+        onSuccess: o.onSuccess,
         runs(d) {
             const k = kind(d);
             return k === 'engine' || k === 'route' ? 'inline' : null;
