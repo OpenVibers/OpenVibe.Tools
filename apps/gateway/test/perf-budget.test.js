@@ -13,8 +13,8 @@ const BUDGETS = {
     htmlRawKB: 225,       // 208.9 measured with all 184 crawlable tool rows; room for populated ranking rows
     htmlBrotliKB: 29,      // 26.8 measured with the complete category ItemLists
     jsFiles: 6,           // 5
-    jsRawKB: 360,         // 358.9 measured: existing Frame plus kit-web drift and headline controls
-    jsBrotliKB: 86,       // 85.6 measured with openvibe-shared 4.161.0
+    jsRawKB: 360,         // measured with the home's kit files (kit-web.js, kit.css) added to the Frame
+    jsBrotliKB: 86,       // measured with openvibe-shared 4.163.0
     cssFiles: 1,          // 0
     externalFiles: 3,     // 1 in production
 };
