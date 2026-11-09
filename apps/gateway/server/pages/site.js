@@ -118,6 +118,17 @@ details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px
 .fold-body{display:none}
 .fold-toggle:checked~.fold-body{display:block}
 .fold-block:not(.fold-bare) .fold-body .ov-shipped-home h3{display:none}
+/* Categories as folds (11-09): the icon and the name are the fold's title; its count sits beside them. */
+.job .fold-block{margin-top:10px}.job .fold-h .sec-h{display:flex;align-items:center;gap:10px;flex:1 1 auto;min-width:0;margin:0}.job .fold-h h2{margin:0}
+.job{border-top:1px solid var(--border,rgba(255,255,255,.08));padding-top:4px}
+/* The headline's pause: a small round icon beside the words, not a line of its own. */
+.hm-title{display:flex;align-items:flex-start;gap:10px}.hm-title h1{flex:1 1 auto;min-width:0}.hm-title .hm-motion{margin-top:8px;flex:none}
+.hm-motion{display:inline-grid;place-items:center;width:36px;height:36px;margin:-4px 0 0;padding:0;border:0;border-radius:50%;vertical-align:middle;cursor:pointer;
+background:color-mix(in srgb,var(--text-primary,#e8ecf3) 8%,transparent);color:var(--text-secondary,#a8b3c4)}
+.hm-motion::after{content:"";position:absolute;inset:-4px}.hm-motion{position:relative}
+.hm-motion svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.hm-motion .hm-play{display:none;fill:currentColor;stroke:none}.hm-motion.is-paused .hm-pause{display:none}.hm-motion.is-paused .hm-play{display:block}
+.hm-motion:focus-visible{outline:2px solid var(--accent,#3b82f6);outline-offset:2px}
 @media (min-width:641px){
 .fold-block{margin-top:40px}
 .fold-toggle{display:none}
@@ -431,8 +442,7 @@ ${rankedSection('Trending this week', activity.week, { trend: true, note: 'Risin
 ${activity.newest && activity.newest.length ? `<section><h2>Newest tools</h2>${rows(activity.newest)}</section>` : ''}`;
     const body = `<div class="hero hero-split">
 <div class="hero-copy"><p class="kicker">Open source · community-run · no account needed to start</p>
-<h1>Small tools that <span id="tool-headline" data-phrases="${esc(JSON.stringify(headlines))}">${esc(headline)}.</span></h1>
-<button id="headline-motion" class="ovk-btn ovk-btn--ghost" type="button" hidden>Pause headline</button>
+<div class="hm-title"><h1>Small tools that <span id="tool-headline" data-phrases="${esc(JSON.stringify(headlines))}">${esc(headline)}.</span></h1><button id="headline-motion" class="hm-motion" type="button" aria-label="Pause the headline" title="Pause the headline" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path class="hm-pause" d="M9 6v12M15 6v12"/><path class="hm-play" d="M8 5.5v13l11-6.5z"/></svg></button></div>
 <p class="hero-sub">Convert a file, merge a PDF, format JSON, check DNS: ${tools.length} tools that open in the browser and get out of your way. Free, and no sign-up to look.</p>
 ${searchForm('')}
 <nav class="quick-strip" data-ovk-scroll="drift" aria-label="${rankedIds.length ? 'Popular tools' : 'Explore tools'}">${quick.join('')}</nav></div>
@@ -458,7 +468,13 @@ ${opened.length >= 4 ? foldBlock({
 <div class="jobs"><div class="sec-h jobs-h"><h2>Tools by category</h2><a class="more" href="/all-tools">All tools</a></div>${families.map(f => {
         const list = tools.filter(t => t.family === f.id);
         if (!list.length) return '';
-        return `<section class="job" id="job-${esc(f.id)}" aria-labelledby="job-${esc(f.id)}-h"><div class="sec-h">${icon(f.icon, 28)}<h2 id="job-${esc(f.id)}-h">${esc(f.name)}</h2><span class="sec-count">${list.length} tools</span></div><p class="sec-p">${esc(f.tagline)}</p><ul class="ovk-list">${list.map(t => kit.row({ href: t.url, mark: icon(t.icon, 28), title: t.name, sub: t.tagline })).join('')}</ul>${f.path ? `<a class="more" href="${esc(f.path)}">More about ${esc(f.name)}</a>` : ''}</section>`;
+        // Each category is a counted fold (the owner's short-pages rule): every tool stays in the page as a static link for
+        // readers and crawlers, open where there is room and closed on a phone (184 tools made the phone home 18 000 px).
+        return `<section class="job" id="job-${esc(f.id)}" aria-labelledby="job-${esc(f.id)}-h">${foldBlock({
+            id: `job-${f.id}`, count: `${list.length} ${list.length === 1 ? 'tool' : 'tools'}`,
+            head: `<span class="sec-h">${icon(f.icon, 28)}<h2 id="job-${esc(f.id)}-h">${esc(f.name)}</h2></span>`,
+            html: `<p class="sec-p">${esc(f.tagline)}</p><ul class="ovk-list">${list.map(t => kit.row({ href: t.url, mark: icon(t.icon, 28), title: t.name, sub: t.tagline })).join('')}</ul>${f.path ? `<a class="more" href="${esc(f.path)}">More about ${esc(f.name)}</a>` : ''}`,
+        })}</section>`;
     }).join('')}</div>
 <section class="fold" aria-labelledby="dev-h"><details><summary><h2 id="dev-h">Use any tool from code</h2></summary><div class="sec-h"><a class="more" href="/developers">Developer guide</a></div><p class="sec-p">${withApi} of the ${tools.length} tools take one request each, the same engines the pages use. Each tool's page shows its own request.</p>
 <div class="dev"><pre tabindex="0"><code>curl -X POST ${SITE}/api/v1/tools/jsonminify/run \\

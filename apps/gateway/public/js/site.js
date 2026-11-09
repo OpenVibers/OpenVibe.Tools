@@ -187,7 +187,12 @@
         }, 4500);
         if (motion.matches) { i = 0; el.textContent = phrases[0] + '.'; }
     };
-    if (control) control.addEventListener('click', () => { paused = !paused; control.textContent = paused ? 'Resume headline' : 'Pause headline'; update(); });
+    if (control) control.addEventListener('click', () => {
+        paused = !paused;
+        const say = paused ? 'Play the headline' : 'Pause the headline';
+        control.setAttribute('aria-label', say); control.title = say; control.classList.toggle('is-paused', paused);
+        update();
+    });
     motion.addEventListener('change', update);
     document.addEventListener('visibilitychange', update);
     update();
