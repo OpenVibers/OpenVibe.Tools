@@ -17,7 +17,7 @@
   },
   "domain": "openvibe.tools and *.openvibe.tools",
   "contracts": "openvibe-contracts v0.338.0 (the gateway, img, audio and docs apps' package.json; the root package.json pins none)",
-  "sdk": "openvibe-sdk v0.117.0 (the gateway's package.json; the other apps are still on v0.67.0)",
+  "sdk": "openvibe-sdk v0.123.0 (the gateway's package.json; the other apps are still on v0.67.0)",
   "shared": "openvibe-shared v4.172.0 (each app's package.json; the root package.json pins none)",
   "capabilities": [
     "tools.job.create",
