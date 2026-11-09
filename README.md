@@ -4,6 +4,9 @@
 
 **Free online tools** — [openvibe.tools](https://openvibe.tools). Hundreds of tools that each do one job well (images, text, audio, docs, maps and video), open by API.
 
+**Live site:** https://openvibe.tools · **API docs:** https://openvibe.services · **For AI:** https://openvibe.tools/llms.txt
+**Run it:** `npm ci && npm run install:all && npm run start:gateway` (Node 22 or newer) · **Tests:** `npm test`
+
 Part of the [OpenVibe network](https://openvibe.network); [help](https://openvibe.help) and the [developer API](https://openvibe.services).
 
 ## Purpose
