@@ -27,6 +27,8 @@ const site = require('../server/pages/site');
             assert.match(m[2], /^(https:\/\/[a-z0-9.-]+\/|\/tool\/[a-z0-9-]+)/, `phrase ${i} links to a tool`);
             assert.match(m[4], /^[a-z][^<]{3,48}\.$/, `phrase ${i} reads as the end of the sentence: "${m[4]}"`);
             assert.ok(!/^help with /.test(m[4]), 'no form-letter fallback');
+            // "Small tools that one reputation report for a domain or IP." (the owner, 2026-11-10): a phrase is a doing, never a thing.
+            assert.ok(!/^(one|a|an|the|your|every|all)\b/.test(m[4]) && !/[?!]\.$/.test(m[4]), `phrase ${i} starts with a doing word: "${m[4]}"`);
             if (i) assert.ok(/aria-hidden="true"/.test(m[3]) && /tabindex="-1"/.test(m[3]), 'a phrase that is not showing is out of the tab order and unread');
         });
         assert.strictEqual(new Set(links.map((m) => m[2])).size, links.length, 'each phrase is a different tool');
