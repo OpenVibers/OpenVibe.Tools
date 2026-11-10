@@ -76,6 +76,7 @@ function rawGet(port, p, headers = {}) {
 
     await check('ratchet: every file that makes an outbound request itself is reviewed', () => {
         const REVIEWED = {
+            'worker/server/index.js': 'operator-configured HTTPS gateway only; fixed status/connect paths, never job input',
             'gateway/server/auth/routes.js': 'Network JWKS, OAuth token and revoke (configured)',
             'gateway/server/index.js': 'OpenVibe.Community paste API (configured; paths held to /api/pastes) and the satellites on loopback',
             'gateway/server/net/routes.js': 'visitor-chosen hosts, through the egress guard',

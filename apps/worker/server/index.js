@@ -7,7 +7,7 @@ async function main() {
     const gateway = new URL(process.env.TOOLS_GATEWAY || 'https://openvibe.tools');
     if (gateway.protocol !== 'https:' || gateway.username || gateway.password || gateway.pathname !== '/' || gateway.search || gateway.hash) throw new Error('gateway must be an HTTPS origin');
     if (dry) {
-        const r = await fetch(new URL('/api/v1/workers/status', gateway), { signal: AbortSignal.timeout(15000) });
+        const r = await fetch(new URL('/api/v1/workers/status', gateway), { signal: AbortSignal.timeout(15000), redirect: 'error' });
         const body = await r.json();
         if (!r.ok || body.protocol !== 1 || body.dry_run !== true) throw new Error('worker protocol unavailable');
         console.log('dry-run: production protocol 1 reachable; accepts_real_jobs=false');
