@@ -172,12 +172,12 @@
 })();
 
 // The headline's phrases are links already in the page; this shows them in turn, once through, then rests on the
-// first. The button pauses, or plays it again. Reduced motion keeps the first. Never an aria-live region.
+// first. The button pauses, or plays it again. Motion off keeps the first; Calm rotates as usual. Never an aria-live region.
 (function () {
     const el = document.getElementById('tool-headline');
     const items = el ? Array.from(el.querySelectorAll('.hm-ph')) : [];
     if (items.length < 2) return;
-    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const still = () => document.documentElement.getAttribute('data-ov-motion') === 'off';
     const control = document.getElementById('headline-motion');
     let i = 0, timer = 0, paused = false, rested = false;
     const show = (n) => {
@@ -190,8 +190,8 @@
     };
     const update = () => {
         clearInterval(timer); timer = 0;
-        if (control) control.hidden = motion.matches;
-        if (motion.matches) { show(0); return; }
+        if (control) control.hidden = still();
+        if (still()) { show(0); return; }
         if (!paused && !rested && !document.hidden) timer = setInterval(() => {
             if (el.matches(':hover') || el.contains(document.activeElement)) return;
             const next = (i + 1) % items.length;
@@ -203,7 +203,7 @@
         control.setAttribute('aria-label', say); control.title = say; control.classList.toggle('is-paused', paused || rested);
     };
     if (control) control.addEventListener('click', () => { if (rested) rested = paused = false; else paused = !paused; update(); });
-    motion.addEventListener('change', update);
+    window.addEventListener('ov:display', update);
     document.addEventListener('visibilitychange', update);
     update();
 })();

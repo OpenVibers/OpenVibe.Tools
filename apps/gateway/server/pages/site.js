@@ -127,7 +127,7 @@ details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px
 transition:opacity var(--ov-dur-3,.32s) var(--ov-ease-out,ease-out),transform var(--ov-dur-3,.32s) var(--ov-ease-out,ease-out),visibility 0s linear var(--ov-dur-3,.32s)}
 .hm-ph.is-on{opacity:1;visibility:visible;transform:none;transition-delay:0s}.hm-ph.is-out{transform:translateY(-.35em)}
 .hm-ph:hover,.hm-ph:focus-visible{text-decoration:underline;text-decoration-thickness:.06em;text-underline-offset:.12em}
-@media (prefers-reduced-motion:reduce){.hm-ph{transition:none;transform:none}}
+html[data-ov-motion=off] .hm-ph{transform:none}
 /* The strip of tools drifts, so its ends fade: a chip cut by a hard edge looked broken. */
 .quick-strip{-webkit-mask-image:linear-gradient(90deg,transparent,#000 22px,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(90deg,transparent,#000 22px,#000 calc(100% - 22px),transparent);padding-inline:14px;margin-inline:-14px;max-width:calc(100% + 28px)}
 /* The headline's pause: a small round icon beside the words, not a line of its own. */
@@ -222,7 +222,6 @@ background:color-mix(in srgb,var(--text-primary,#e8ecf3) 8%,transparent);color:v
 /* The home on phones (2026-10-29): the examples are one row that scrolls sideways (all four still there), and four of the most
    opened tools show (the families below and the A to Z list hold the rest). */
 @media (max-width:599px){.start-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-inline:16px;scrollbar-width:none;gap:10px;margin:0 -16px;padding:0 16px 4px}.start-grid::-webkit-scrollbar{display:none}.start-grid>*{flex:0 0 84%;min-width:0;scroll-snap-align:start}section[aria-labelledby="top-h"] .grid>:nth-child(n+5){display:none}}
-@media (prefers-reduced-motion:reduce){.tool{transition:none}}
 ${icons.CSS}
 /* Touch targets on phones (fleet audit, 2026-10-29): touch pointers only. */
 @media (pointer: coarse) {

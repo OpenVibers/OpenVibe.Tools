@@ -574,4 +574,4 @@ html, body { height: auto; min-height: 100%; overflow: auto; }
 /* The page is the shared tool frame: it starts under the navbar, not behind it. */
 #app { padding-top: calc(var(--ovk-nav-h, 52px) + 8px); }
 .ovk-page { padding-top: 12px; }
-@media (prefers-reduced-motion: reduce) { .splash-content, .splash-icon, #splash-screen.fade-out, .welcome-icon, .user-marker, #detail-panel, .modal-content, .sp-item:not(.done):not(.error) { animation: none; } .search-progress .spinner { animation: none; opacity: .7; } }
+html[data-ov-motion=off] .search-progress .spinner{opacity: .7}
