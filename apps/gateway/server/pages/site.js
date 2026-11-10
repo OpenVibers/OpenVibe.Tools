@@ -121,6 +121,11 @@ details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px
 /* Categories as folds (11-09): the icon and the name are the fold's title; its count sits beside them. */
 .job .fold-block{margin-top:10px}.job .fold-h .sec-h{display:flex;align-items:center;gap:10px;flex:1 1 auto;min-width:0;margin:0}.job .fold-h h2{margin:0}
 .job{border-top:1px solid var(--border,rgba(255,255,255,.08));padding-top:4px}
+// The doing words a tool's tagline may start with to finish "Small tools that …" (see clause() in the home).
+const HEADLINE_VERBS = new Set(('add build calculate change check clean compare compress convert count create crop decode design detect draw edit '
+    + 'encode estimate explore extract find fix flip format generate get look make map measure merge minify mix pick plan play '
+    + 'preview read record remove rename resize roll rotate save scan search see send share shorten sign split strip test time '
+    + 'track translate trim turn validate verify watch write').split(' '));
 /* The headline's last words change: each phrase is a link to its tool, all stacked in one cell (as tall as the
    tallest, so nothing below moves). The one showing rises in; the one leaving lifts away. Once through, then it rests. */
 .hm-rot{display:grid}.hm-ph{grid-area:1/1;color:var(--accent-light,var(--accent,#60a5fa));text-decoration:none;opacity:0;visibility:hidden;transform:translateY(.35em);
@@ -436,15 +441,18 @@ function pageIndex(top = [], activity = { available: false }) {
     const rankedIds = (activity.popular || []).map(t => t.id);
     const quickTools = [...new Set([...rankedIds, ...POPULAR, ...available.map(t => t.id)])].map(id => byId.get(id)).filter(t => t && t.status !== 'unavailable').slice(0, 12);
     const quick = quickTools.map(t => kit.button({ href: t.url, label: t.name, kind: 'quiet' }).replace('<span>', icon(t.icon, 20) + '<span>'));
-    const phrases = { yt: 'save a video', logo: 'make a logo', ssl: 'check a TLS certificate', trim: 'trim your audio', regex: 'test a regular expression', maps: 'find places nearby', food: 'find a meal nearby', mergepdf: 'merge your PDFs', dns: "check a domain’s DNS", compress: 'shrink an image', json: 'format your JSON', jsonminify: 'minify your JSON', fancy: 'restyle your text', whois: 'look up a domain', convert: 'convert your images', resize: 'resize your images', mp3: 'convert your audio' };
+    const phrases = { reputation: 'check a domain or IP address', yt: 'save a video', logo: 'make a logo', ssl: 'check a TLS certificate', trim: 'trim your audio', regex: 'test a regular expression', maps: 'find places nearby', food: 'find a meal nearby', mergepdf: 'merge your PDFs', dns: "check a domain’s DNS", compress: 'shrink an image', json: 'format your JSON', jsonminify: 'minify your JSON', fancy: 'restyle your text', whois: 'look up a domain', convert: 'convert your images', resize: 'resize your images', mp3: 'convert your audio' };
     // A tool with no hand-written phrase speaks in its own tagline: its first clause, as the end of "Small tools
     // that …" ("Look up DNS records for any domain: A, AAAA…" → "look up DNS records for any domain"). An acronym
     // keeps its capitals. "help with <name>" was the old fallback, and read like a form letter.
+    // Only a clause that starts with a doing word finishes the sentence (the owner, 2026-11-10, on "Small tools that one
+    // reputation report for a domain or IP": "the wording is kind of awkward"); a tagline that names a thing instead is
+    // skipped, never bent into the sentence. A question or an exclamation ends the clause too.
     const clause = (t) => {
-        let s = String(t.tagline || '').split(/[:;.(]|, | — | - /)[0].trim();
+        let s = String(t.tagline || '').split(/[:;.(?!]|, | — | - /)[0].trim();
         if (s.split(/\s+/).length < 2 || s.length > 46) return null;
         if (/^[A-Z][a-z]/.test(s)) s = s[0].toLowerCase() + s.slice(1);
-        return s;
+        return HEADLINE_VERBS.has(s.split(/\s+/)[0]) ? s : null;
     };
     const spoken = quickTools.map(t => [t, phrases[t.id] || clause(t)]).filter(([, p]) => p).slice(0, 6);
     // Every phrase is in the page as a link to its tool, stacked in one grid cell: the cell is as tall as the tallest,
