@@ -17,6 +17,19 @@ function createStore(db) {
             await db.prepare('UPDATE tools_worker_routing SET enabled=?,worker_order=? WHERE id=1').run(enabled, JSON.stringify(order));
             return { enabled, order };
         },
+        async drain(id, draining) {
+            if (!/^wrk_[a-f0-9]{24}$/.test(id) || typeof draining !== 'boolean') throw new Error('invalid drain');
+            const row = await db.prepare('UPDATE tools_workers SET draining=? WHERE id=? AND revoked=FALSE RETURNING id,draining').get(draining, id);
+            if (!row) throw new Error('unknown worker');
+            return row;
+        },
+        async revoke(id) {
+            if (!/^wrk_[a-f0-9]{24}$/.test(id)) throw new Error('invalid worker');
+            const row = await db.prepare('UPDATE tools_workers SET revoked=TRUE,draining=TRUE WHERE id=? RETURNING id').get(id);
+            if (!row) throw new Error('unknown worker');
+            return row;
+        },
+        daily: day => db.prepare('SELECT worker_id,jobs FROM tools_worker_daily WHERE day=?').all(day),
         lookup: id => db.prepare('SELECT id,token_hash,location,draining FROM tools_workers WHERE id=? AND revoked=FALSE').get(id),
         list: () => db.prepare('SELECT id,label,location,draining,revoked,created_at FROM tools_workers ORDER BY created_at').all(),
         routing: () => db.prepare('SELECT enabled,worker_order FROM tools_worker_routing WHERE id=1').get(),

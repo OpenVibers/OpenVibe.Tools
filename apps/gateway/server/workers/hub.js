@@ -83,6 +83,6 @@ function createHub({ WebSocketServer, store, now = Date.now, heartbeatMs = 15000
             c.ws.send(JSON.stringify({ type: 'job', id, jobType: job.type, input: job.input, files: job.files }));
         });
     }
-    return { upgrade, connections, dispatch, stats: () => [...connections.values()].map(({ id, location, draining, capabilities, slots, free, load, latency_ms }) => ({ id, location, draining, capabilities, slots, free, load, latency_ms })), close() { clearInterval(sweep); for (const c of connections.values()) c.ws.terminate(); wss.close(); } };
+    return { upgrade, connections, dispatch, stats: () => [...connections.values()].map(({ id, location, draining, capabilities, slots, free, load, latency_ms, pending }) => ({ id, location, draining, capabilities, slots, free: Math.max(0, Math.min(free, slots - pending.size)), load, latency_ms, active_jobs: pending.size })), close() { clearInterval(sweep); for (const c of connections.values()) c.ws.terminate(); wss.close(); } };
 }
 module.exports = { createHub };
