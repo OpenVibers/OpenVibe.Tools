@@ -1,10 +1,19 @@
 'use strict';
 const crypto = require('node:crypto');
 const { MAX_FRAME, TYPES, verify } = require('../../../worker/server/protocol');
-function createHub({ WebSocketServer, store, now = Date.now }) {
+function createHub({ WebSocketServer, store, now = Date.now, heartbeatMs = 15000, staleMs = 45000 }) {
     const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME, perMessageDeflate: false });
     const connections = new Map(), nonces = new Map();
     async function upgrade(req, socket, head) {
+        if (req.url === '/api/v1/workers/dry-run') {
+            wss.handleUpgrade(req, socket, head, ws => {
+                ws.on('error', () => {});
+                ws.send(JSON.stringify({ protocol: 1, dry_run: true, accepts_real_jobs: false }), () => ws.close());
+                const deadline = setTimeout(() => ws.terminate(), 3000); deadline.unref();
+                ws.once('close', () => clearTimeout(deadline));
+            });
+            return true; // Never registered, authenticated as a worker, or offered work.
+        }
         if (req.url !== '/api/v1/workers/connect') return false;
         const deny = () => { socket.end('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); };
         try {
@@ -20,6 +29,8 @@ function createHub({ WebSocketServer, store, now = Date.now }) {
                 if (old) old.ws.terminate();
                 const c = { id, location: worker.location, draining: worker.draining, ws, last: now(), pending: new Map(), capabilities: [], tools: [], slots: 0, free: 0, load: 0, latency_ms: null };
                 connections.set(id, c);
+                const activity = () => { c.last = now(); };
+                socket.on('data', activity); // A slow result may span several heartbeat intervals.
                 ws.on('error', () => {});
                 ws.on('message', raw => {
                     let m;
@@ -38,6 +49,7 @@ function createHub({ WebSocketServer, store, now = Date.now }) {
                     } else ws.close(1008);
                 });
                 ws.on('close', () => {
+                    socket.removeListener('data', activity);
                     if (connections.get(id) === c) connections.delete(id);
                     for (const p of c.pending.values()) { clearTimeout(p.timer); p.reject(Object.assign(new Error('worker disconnected'), { code: 'worker.disconnected' })); }
                     c.pending.clear();
@@ -50,12 +62,13 @@ function createHub({ WebSocketServer, store, now = Date.now }) {
     const sweep = setInterval(async () => {
         for (const c of connections.values()) {
             try {
+                c.ws.send(JSON.stringify({ type: 'heartbeat' }));
                 const row = await store.lookup(c.id);
-                if (!row || now() - c.last > 45000) c.ws.terminate();
+                if (!row || now() - c.last > staleMs) c.ws.terminate();
                 else c.draining = row.draining;
             } catch { c.ws.terminate(); }
         }
-    }, 15000);
+    }, heartbeatMs);
     sweep.unref();
     function dispatch(c, job, signal) {
         return new Promise((resolve, reject) => {

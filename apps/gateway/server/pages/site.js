@@ -687,6 +687,17 @@ function send(req, res, key, render, type, extra) {
     res.send(e.html);
 }
 
+function pageWorkers() {
+    return shell({ families: registry.get().families, head: head({ title: 'Run Tools on your own machine', description: 'Install an outbound Tools worker on Ubuntu.', canonical: SITE + '/workers' }), body: `<main><h1>Run Tools on your own machine</h1>
+<p>A worker transforms uploaded image, PDF and audio files. It opens an outbound encrypted connection; no inbound port or public home address is needed. URL-fetching jobs stay on the host. File transfers are limited to 16 MiB per input set and output set.</p>
+<p>On Ubuntu, use the <a href="/worker/install.sh">installer</a> and the <a href="https://github.com/OpenVibers/OpenVibe.Tools/blob/main/apps/worker/README.md">setup instructions</a>. The owner creates a worker credential once, then enables routing separately in the Tools owner console. Keep the credential in a private file, never a command argument.</p>
+<p>The service defaults to two slots, two CPU cores and a 2 GiB memory limit. A daily timer checks the deployed release and installs updates. Draining a worker stops new assignments; running jobs finish.</p>
+<h2>Check without accepting jobs</h2>
+<pre><code>bash install.sh --dry-run --prefix /tmp/tools-worker-check-new</code></pre>
+<p>Dry mode checks HTTPS and the outbound WebSocket without a credential, registration or real jobs. It requires Node 22 or newer and creates no system service.</p>
+<p><a href="/developers#worker-routing">API routing and receipts</a></p></main>` });
+}
+
 function sitemapEntries() {
     const { tools, families } = registry.get();
     const today = new Date().toISOString().slice(0, 10);
@@ -770,6 +781,7 @@ function createSiteRouter({ opens = null, discovery = null } = {}) {
     const apexOnly = (req, res, next) => (!req.ovHost || req.ovHost.kind === 'apex' || (req.ovHost.kind === 'unknown' && !req.ovHost.inZone) ? next() : next('router'));
     router.use(apexOnly);
     router.get('/api/v1/openapi.json', (req, res) => { res.set('Access-Control-Allow-Origin', '*'); send(req, res, 'openapi', () => JSON.stringify(require('../openapi').openapi(require('../registry/descriptors').snapshot(), SITE)), 'application/json; charset=utf-8'); });
+    router.get('/workers', (req, res) => send(req, res, 'workers', pageWorkers));
     router.get('/developers', (req, res) => send(req, res, 'developers', pageDevelopers));
     // What shipped on OpenVibe.Tools: the shared update log every OpenVibe site has.
     router.get('/updates', (req, res) => send(req, res, 'updates', pageUpdates));
@@ -815,4 +827,4 @@ function createSiteRouter({ opens = null, discovery = null } = {}) {
 
 const renderNotFound = () => pageSearch('').replace('<h1>Search tools</h1>', '<h1>That page is not here</h1>').replace(/<title>[^<]*<\/title>/, '<title>Page not found | OpenVibe.Tools</title>');
 
-module.exports = { headlineClause, createSiteRouter, pageIndex, pageFamily, pageTool, pageAll, pageDevelopers, search, sitemapEntries, renderNotFound, SITE, NAME };
+module.exports = { headlineClause, createSiteRouter, pageIndex, pageFamily, pageTool, pageAll, pageDevelopers, pageWorkers, search, sitemapEntries, renderNotFound, SITE, NAME };

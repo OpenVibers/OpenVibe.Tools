@@ -1,0 +1,34 @@
+[Unit]
+Description=OpenVibe Tools outbound worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=openvibe-tools-worker
+WorkingDirectory=/var/lib/openvibe-tools-worker
+EnvironmentFile=/etc/openvibe-tools-worker/config
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=DATA_DIR=/var/lib/openvibe-tools-worker/data
+LoadCredential=token:/etc/openvibe-tools-worker/token
+Environment=TOOLS_WORKER_TOKEN_FILE=%d/token
+ExecStart=/usr/bin/env node /opt/openvibe-tools-worker/current/apps/worker/server/index.js
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+UMask=0077
+MemoryMax=2G
+CPUQuota=200%
+TasksMax=128
+
+[Install]
+WantedBy=multi-user.target

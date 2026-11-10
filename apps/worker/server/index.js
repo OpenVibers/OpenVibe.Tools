@@ -10,7 +10,20 @@ async function main() {
         const r = await fetch(new URL('/api/v1/workers/status', gateway), { signal: AbortSignal.timeout(15000), redirect: 'error' });
         const body = await r.json();
         if (!r.ok || body.protocol !== 1 || body.dry_run !== true) throw new Error('worker protocol unavailable');
-        console.log('dry-run: production protocol 1 reachable; accepts_real_jobs=false');
+        const WebSocket = require('../../gateway/node_modules/ws');
+        const endpoint = new URL('/api/v1/workers/dry-run', gateway); endpoint.protocol = 'wss:';
+        await new Promise((resolve, reject) => {
+            const ws = new WebSocket(endpoint, { handshakeTimeout: 15000, maxPayload: 1024, perMessageDeflate: false });
+            const timer = setTimeout(() => { ws.terminate(); reject(new Error('dry handshake timeout')); }, 15000);
+            ws.on('error', reject);
+            ws.once('message', raw => {
+                try { const m = JSON.parse(String(raw)); if (m.protocol !== 1 || m.accepts_real_jobs !== false || m.dry_run !== true) throw new Error('invalid dry handshake'); resolve(); }
+                catch (err) { reject(err); }
+                finally { clearTimeout(timer); ws.close(); }
+            });
+            ws.once('close', () => { clearTimeout(timer); reject(new Error('dry handshake closed')); });
+        });
+        console.log('dry-run: production protocol 1 and outbound WebSocket reachable; accepts_real_jobs=false');
         return;
     }
     const token = fs.readFileSync(process.env.TOOLS_WORKER_TOKEN_FILE, 'utf8').trim();
