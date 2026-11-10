@@ -299,10 +299,10 @@
     query = query.trim();
     const btn = $('#btn-search');
     btn.classList.add('loading');
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Searching...</span>';
-    setStatus(`<i class="fa-solid fa-spinner fa-spin"></i> Searching "${esc(query)}"...`);
+    btn.innerHTML = '<span class="ov-mark" data-state="busy" data-size="16" data-tone="ink" aria-hidden="true"></span><span>Searching...</span>';
+    setStatus(`<span class="ov-mark" data-state="busy" data-size="16" data-tone="ink" aria-hidden="true"></span> Searching "${esc(query)}"...`);
     hide($('#welcome-card'));
-    $('#results-list').innerHTML = '<div class="search-progress"><div class="spinner"></div><p>Geocoding location...</p></div>';
+    $('#results-list').innerHTML = '<div class="search-progress"><span class="ov-mark" data-state="busy" data-size="32" aria-hidden="true"></span><p>Geocoding location...</p></div>';
 
     // Reset state
     state.locations = [];
@@ -329,7 +329,7 @@
       state.map.setView([lat, lon], 11, { animate: false });
 
       // Placeholder for source progress — will be replaced once sources manifest arrives
-      $('#results-list').innerHTML = '<div class="search-progress"><div class="spinner"></div><p>Connecting to sources...</p></div>';
+      $('#results-list').innerHTML = '<div class="search-progress"><span class="ov-mark" data-state="busy" data-size="32" aria-hidden="true"></span><p>Connecting to sources...</p></div>';
 
       const t0 = Date.now();
 
@@ -690,7 +690,7 @@
 
   async function loadFoodBanks() {
     const c = $('#food-banks');
-    c.innerHTML = '<div class="search-progress"><div class="spinner"></div><p>Finding food banks...</p></div>';
+    c.innerHTML = '<div class="search-progress"><span class="ov-mark" data-state="busy" data-size="32" aria-hidden="true"></span><p>Finding food banks...</p></div>';
     try {
       const {lat,lon} = state.searchCenter;
       const res = await fetch(`${API}/api/food-banks?lat=${lat}&lon=${lon}&radius=10`);
@@ -712,7 +712,7 @@
   async function loadStores() {
     const c = $('#stores');
     if (!state.searchCenter) { c.innerHTML = '<p class="muted-text">Search a location first.</p>'; return; }
-    c.innerHTML = '<div class="search-progress"><div class="spinner"></div><p>Finding stores...</p></div>';
+    c.innerHTML = '<div class="search-progress"><span class="ov-mark" data-state="busy" data-size="32" aria-hidden="true"></span><p>Finding stores...</p></div>';
     try {
       const {lat,lon} = state.searchCenter;
       const res = await fetch(`${API}/api/stores?lat=${lat}&lon=${lon}`);
@@ -745,7 +745,7 @@
     const days = parseInt($('#mp-days')?.value) || 3;
     const camp = $('#mp-camp')?.checked;
     const rc = $('#meal-plan-results');
-    rc.innerHTML = '<div class="search-progress"><div class="spinner"></div><p>Optimizing meals...</p></div>';
+    rc.innerHTML = '<div class="search-progress"><span class="ov-mark" data-state="busy" data-size="32" aria-hidden="true"></span><p>Optimizing meals...</p></div>';
     try {
       const res = await fetch(`${API}/api/meal-plan?budget=${budget}&days=${days}&campFriendly=${camp}&randomize=true`);
       const plan = await res.json();
@@ -772,7 +772,7 @@
 
   async function loadFoodDb() {
     const c = $('#food-db');
-    c.innerHTML = '<div class="search-progress"><div class="spinner"></div><p>Loading food database...</p></div>';
+    c.innerHTML = '<div class="search-progress"><span class="ov-mark" data-state="busy" data-size="32" aria-hidden="true"></span><p>Loading food database...</p></div>';
     try {
       const res = await fetch(`${API}/api/foods`);
       const foods = await res.json();

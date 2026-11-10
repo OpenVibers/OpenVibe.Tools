@@ -87,7 +87,7 @@ function boxFor() {
             ${frame.verbButton('Fetch the video', { id: 'fetch-btn', icon: 'search' })}
         </div>
         <p class="ovk-try"><span>Try</span><a href="?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Daqz-KE-bpKQ" data-ovk-try="https://www.youtube.com/watch?v=aqz-KE-bpKQ" data-ovk-name="url" data-ovk-for="#url-input">Big Buck Bunny</a></p>
-        <section class="loading" id="loading" style="display:none"><div class="spinner"></div><p>Fetching video info…</p></section>
+        <section class="loading" id="loading" style="display:none"><span class="ov-mark" data-state="busy" data-size="32" aria-hidden="true"></span><p>Fetching video info…</p></section>
         <section class="video-card" id="video-card" style="display:none">
             <div class="video-thumb" id="video-thumb"></div>
             <div class="video-info" id="video-info"></div>
