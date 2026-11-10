@@ -163,7 +163,6 @@ background:color-mix(in srgb,var(--text-primary,#e8ecf3) 8%,transparent);color:v
 .fam-all{margin:10px 0 0;font-size:14px}.fam-all a{font-weight:650;text-decoration:none}
 .perks{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}.perks div{padding:16px;border-radius:14px;border:1px solid var(--border,rgba(255,255,255,.08));background:var(--bg-secondary,#111826)}.perks p{margin:6px 0 0;color:var(--text-secondary,#a8b3c4);font-size:14px}
 @media (max-width:560px){.jump{top:52px}}
-#ov-footer{margin-top:56px}
 .tool .opens{color:var(--text-secondary,#a8b3c4);font-weight:600}
 .api-box{max-width:820px}.api-box pre{background:var(--bg-secondary,#111826);border:1px solid var(--border,rgba(255,255,255,.08));border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.5}
 .api-facts{list-style:none;padding:0;margin:0 0 12px;display:flex;flex-direction:column;gap:6px;color:var(--text-secondary,#a8b3c4)}.api-facts code{overflow-wrap:anywhere}
