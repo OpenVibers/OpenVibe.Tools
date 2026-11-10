@@ -13,8 +13,8 @@ const BUDGETS = {
     htmlRawKB: 225,       // 206 measured with all 184 crawlable tool rows; room for populated ranking rows
     htmlBrotliKB: 29,      // 26.5 measured with the complete category ItemLists
     jsFiles: 6,           // 5
-    jsRawKB: 370.3,       // 370.3: measured 370.2 KB raw with openvibe-shared 4.186.0 (2026-11-10: the mark's Working and Thinking states, the Dock and the menu as one sheet, bare controls styled by the loader); 369.4: measured 369.2 with Shared 4.184.0; server-nav hydration marker and atomic replacement, 2026-11-10
-    jsBrotliKB: 88.8,     // 88.8: measured 88.7 KB brotli with openvibe-shared 4.186.0 (2026-11-10: the mark's Working and Thinking states, the Dock and the menu as one sheet, bare controls styled by the loader); 88.5: measured 88.4 with Shared 4.184.0; server-nav hydration marker and atomic replacement, 2026-11-10
+    jsRawKB: 387,        // 387: measured 386.5 KB raw with openvibe-shared 4.190.0 (2026-11-10: the site name's dropdown, the footer's online strip, the balances pill); 370.3: measured 370.2 KB raw with openvibe-shared 4.186.0 (2026-11-10: the mark's Working and Thinking states, the Dock and the menu as one sheet, bare controls styled by the loader); 369.4: measured 369.2 with Shared 4.184.0; server-nav hydration marker and atomic replacement, 2026-11-10
+    jsBrotliKB: 93,       // 93: measured 92.7 KB brotli with openvibe-shared 4.190.0 (2026-11-10: the site name's dropdown, the footer's online strip, the balances pill); 88.8: measured 88.7 KB brotli with openvibe-shared 4.186.0 (2026-11-10: the mark's Working and Thinking states, the Dock and the menu as one sheet, bare controls styled by the loader); 88.5: measured 88.4 with Shared 4.184.0; server-nav hydration marker and atomic replacement, 2026-11-10
     cssFiles: 1,          // 1: the kit's stylesheet
     externalFiles: 3,     // 1 in production
 };
