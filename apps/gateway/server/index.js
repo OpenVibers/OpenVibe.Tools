@@ -332,18 +332,7 @@ app.locals.config = config;
 
 app.use('/auth', createAuthRoutes(config, auth));
 const workerOwner = require('./workers/owner').ownerGuard({ verify: token => auth.verify(token), extractToken, origin: new URL(config.baseUrl).origin });
-app.get('/api/v1/owner/worker-routing', workerOwner, async (_req, res) => {
-    try { const r = await workerStore.routing(); res.json({ enabled: r.enabled, order: JSON.parse(r.worker_order) }); }
-    catch { res.status(503).json({ error: 'Worker registry unavailable' }); }
-});
-app.put('/api/v1/owner/worker-routing', workerOwner, express.json({ limit: '4kb' }), async (req, res) => {
-    try { res.json(await workerStore.setRouting(req.body || {})); }
-    catch { res.status(400).json({ error: 'Invalid worker routing' }); }
-});
-app.post('/api/v1/owner/workers', workerOwner, express.json({ limit: '4kb' }), async (req, res) => {
-    try { res.status(201).json(await workerStore.mint(req.body || {})); }
-    catch { res.status(400).json({ error: 'Could not create worker' }); }
-});
+app.use('/api/v1/owner', require('./workers/admin').createAdmin({ express, guard: workerOwner, store: workerStore, hub: workerHub, ports: SATELLITES }));
 
 
 /** 401 unless a valid ov_token is presented. */

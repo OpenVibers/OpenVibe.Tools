@@ -8,7 +8,7 @@ URL-fetching jobs (including YouTube, maps and network tools), SVG inputs, and t
 
 Use Ubuntu 22.04 or newer. The installer installs ffmpeg, qpdf and Poppler, and Node 22 if Node 22+ is missing. On either Dell Precision 3620, start with the default two slots; the systemd unit limits work to two CPU cores and 2 GiB RAM. Home upload is the bottleneck: keep URL-fetching traffic on the host.
 
-1. In the owner's Network console, OpenVibe.Tools settings, create a worker labelled for this machine with location `home`. Copy its id and one-time token. Only the token hash remains in the gateway database. The worker controls are being added in the owner-view part of this rollout; the owner API is `POST /api/v1/owner/workers`.
+1. In the owner's Network console, OpenVibe.Tools settings, create a worker labelled for this machine with location `home`. Copy its id and one-time token. Only the token hash remains in the gateway database. The owner API is `POST /api/v1/owner/workers`.
 2. Save the token in a private file on the tower (mode 600). Do not put it in a command, shell history, repository or log.
 3. Download and inspect the installer, then run it with the id and the **path** to that file:
 
