@@ -65,6 +65,9 @@ let auth = null;   // created below; the key check reads it at request time
 // what it would refuse.
 // The one `tools` database and the shared Valkey (plan T8, decisions 3 and 4).
 const toolsDb = require('../../_shared/db').openToolsDb({ createDb: require('openvibe-sdk/db').createDb, service: 'tools-gateway' });
+const workerStore = require('./workers/store').createStore(toolsDb.db);
+const workerHub = require('./workers/hub').createHub({ WebSocketServer: require('ws').WebSocketServer, store: workerStore });
+app.get('/api/v1/workers/status', (_req, res) => res.json({ protocol: 1, dry_run: true, transport: 'outbound-websocket', accepts: ['img.process', 'docs.process', 'audio.process'] }));
 const toolsValkey = require('../../_shared/db').openToolsValkey({ createValkey: require('openvibe-sdk/valkey').createValkey });
 // The account export and deletion (ADR-033, ./account-data.js): what Tools holds about a person, and the erasure
 // of it. The network sender posts Tools' part of an export back to Network with Tools' own token.
@@ -312,6 +315,12 @@ app.locals.auth = auth;
 app.locals.config = config;
 
 app.use('/auth', createAuthRoutes(config, auth));
+const workerOwner = require('./workers/owner').ownerGuard({ verify: token => auth.verify(token), extractToken, origin: new URL(config.baseUrl).origin });
+app.post('/api/v1/owner/workers', workerOwner, express.json({ limit: '4kb' }), async (req, res) => {
+    try { res.status(201).json(await workerStore.mint(req.body || {})); }
+    catch { res.status(400).json({ error: 'Could not create worker' }); }
+});
+
 
 /** 401 unless a valid ov_token is presented. */
 async function requireAuth(req, res, next) {
@@ -574,6 +583,8 @@ const server = app.listen(...(socketActivated ? [{ fd: 3 }] : [config.port, conf
     console.log(`║  Pastes:  ${config.communityUrl.padEnd(32)}║`);
     console.log(`╚════════════════════════════════════════════╝\n`);
 });
+server.on('upgrade', (req, socket, head) => { workerHub.upgrade(req, socket, head).then(handled => { if (!handled) socket.destroy(); }, () => socket.destroy()); });
+
 
 // ── Stop (roadmap WS-P lifecycle; apps/_shared/graceful.js) ──
 // SIGTERM: the catalog, services and satellite pollers and the search indexer stop; the server stops
@@ -595,6 +606,7 @@ require('../../_shared/graceful').gracefulStop({
     close: [
         () => require('../../_shared/usage').stopRecorder(800),
         () => runApi.pool.close(),
+        () => workerHub.close(),
         () => guard.close(),
         async () => { await telemetryRetention.stop(); await telemetry.stop(); },
         () => toolOpens.stop(),
