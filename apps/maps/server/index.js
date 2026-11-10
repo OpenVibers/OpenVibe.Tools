@@ -85,7 +85,8 @@ app.use(helmet({
       // The navbar's Messages count asks Chat (openvibe-shared 4.130.0).
       connectSrc: ["'self'", "https://openvibe.chat", "nominatim.openstreetmap.org", "api.weather.gov", "api.open-meteo.com", "*.tile.openstreetmap.org", "*.basemaps.cartocdn.com", "server.arcgisonline.com", "https://openvibe.network", "https://openvibe.events", "https://cloudflareinsights.com"],
       fontSrc: ["'self'", "fonts.gstatic.com", "cdn.jsdelivr.net"],
-      frameSrc: ["'none'"],
+      // The navbar checks Network's session in a hidden /sso/check frame on typed arrivals.
+      frameSrc: ["https://openvibe.network"],
       scriptSrcAttr: ["'unsafe-inline'"],
     },
   },
