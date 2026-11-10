@@ -244,12 +244,13 @@ function createJobSystem(o) {
     // Developer-app sandbox jobs: fewer at a time, kept briefly, results never leave this server.
     const SANDBOX_MAX_ACTIVE = Math.max(1, o.sandboxMaxActivePerOwner || 2);
     const SANDBOX_TTL_MS = 30 * 60 * 1000;
-    async function submit({ owner, type, input = {}, files = [], idempotencyKey = null, ttlMs = HOUR, env = 'production', ipKey = null, tool = null, project = null, traceId = null }) {
+    async function submit({ owner, type, input = {}, files = [], idempotencyKey = null, ttlMs = HOUR, env = 'production', ipKey = null, tool = null, project = null, traceId = null, prefer = 'auto' }) {
         if (env !== 'sandbox') env = 'production';
         if (env === 'sandbox') ttlMs = Math.min(ttlMs, SANDBOX_TTL_MS);
         if (stopped) throw new JobError(503, 'tools.job.unavailable', 'The job system is shutting down');
         const discard = () => Promise.all(files.map(f => (f.path ? fsp.unlink(f.path).catch(() => {}) : null)));
         try {
+            if (!['auto', 'home', 'host'].includes(prefer)) throw new JobError(400, 'tools.job.invalid', 'prefer must be auto, home or host');
             if (!owner) throw new JobError(401, 'tools.job.no_owner', 'No owner for this job');
             const def = types.get(type);
             if (!def) throw new JobError(400, 'tools.job.unknown_type', `Unknown job type "${type}". Known: ${[...types.keys()].join(', ')}`);
@@ -264,7 +265,7 @@ function createJobSystem(o) {
             // Hash the request so a reused key with a different request is caught.
             const fileHashes = [];
             for (const f of files) fileHashes.push(f.buffer ? crypto.createHash('sha256').update(f.buffer).digest('hex') : await sha256File(f.path));
-            const requestHash = crypto.createHash('sha256').update(canonical({ type, input, files: fileHashes })).digest('hex');
+            const requestHash = crypto.createHash('sha256').update(canonical({ type, input, files: fileHashes, ...(prefer !== 'auto' && { prefer }) })).digest('hex');
 
             if (idempotencyKey != null) {
                 const prior = await store.byIdempotencyKey(owner, String(idempotencyKey));
@@ -290,7 +291,7 @@ function createJobSystem(o) {
             try {
                 await store.tx(async (t) => {
                     await store.insert({
-                        id, type, type_version: def.version, owner, input_json: JSON.stringify(input), files_json: JSON.stringify(stored),
+                        id, type, type_version: def.version, owner, execution_prefer: prefer, input_json: JSON.stringify(input), files_json: JSON.stringify(stored),
                         idempotency_key: idempotencyKey == null ? null : String(idempotencyKey), request_hash: requestHash,
                         max_attempts: def.maxAttempts, ttl_ms: ttlMs, now: Date.now(), env,
                         ip_key: String(owner).startsWith('session:') && ipKey ? String(ipKey) : null,
@@ -367,6 +368,7 @@ function createJobSystem(o) {
         const def = types.get(row.type);
         const outDir = path.join(jobDir(row.id), 'out');
         let outcome;
+        const execution = { worker: 'host', location: 'host', took_ms: 0, attempts: [] };
         const timer = setTimeout(() => { if (!entry.reason) { entry.reason = 'timeout'; entry.ctrl.abort(new Error('timeout')); } }, def.timeoutMs);
         if (timer.unref) timer.unref();
         try {
@@ -375,12 +377,12 @@ function createJobSystem(o) {
             // would not see an abort that fired before it registered its listener.
             if (entry.reason) throw new Error(entry.reason);
             const files = store.parse(row.files_json, []).map(f => ({ name: f.name, mime: f.mime, size: f.size, sha256: f.sha256, path: f._path }));
-            const out = await def.run({
+            const out = await require('./placement').executePlaced({ row, def, receipt: execution, loadAttempts: () => store.execution(row.id, Number(row.attempts)), context: {
                 job: { id: row.id, type: row.type, attempt: Number(row.attempts), owner: row.owner },
                 input: store.parse(row.input_json, {}), files, outDir,
                 signal: entry.ctrl.signal,
                 progress: progressFn(row.id, entry),
-            });
+            } });
             if (stopped) return;
             if (entry.reason) throw new Error(entry.reason);
             const result = await storeResult(row, out || {}, entry);
@@ -403,8 +405,15 @@ function createJobSystem(o) {
         }
         let recorded = false;
         try {
+            if (!execution.attempts.length) execution.attempts = await store.execution(row.id, Number(row.attempts));
+            if (execution.attempts.length) {
+                for (const a of execution.attempts) if (a.state === 'running') a.state = outcome.state === 'cancelled' ? 'cancelled' : 'failed';
+                const last = execution.attempts.at(-1);
+                Object.assign(execution, { worker: last.worker, location: last.location, took_ms: execution.attempts.reduce((n, a) => n + a.took_ms, 0) });
+            }
+            if (outcome?.error) outcome.error.execution = execution;
             // The end state and its tools.job.succeeded|failed event commit together (or neither does).
-            await store.tx(async (t) => { if (await store.finish(row.id, outcome)) await ended(t, row.id); });
+            await store.tx(async (t) => { if (await store.finish(row.id, outcome)) { await store.recordExecution(row.id, Number(row.attempts), execution.attempts); await ended(t, row.id); } });
             recorded = true;
             await emit(row.id, EVENT_FOR[outcome.state]);
         } catch (err) {
@@ -529,7 +538,7 @@ function createJobSystem(o) {
                 await store.insert({
                     id: next, type: row.type, type_version: def.version, owner: row.owner, input_json: row.input_json, files_json: JSON.stringify(stored),
                     idempotency_key: null, request_hash: row.request_hash, max_attempts: def.maxAttempts, ttl_ms: row.ttl_ms, now: Date.now(),
-                    env: row.env, retry_of: row.id, ip_key: row.ip_key || null, tool: row.tool || null, project_id: row.project_id || null,
+                    env: row.env, execution_prefer: row.execution_prefer, retry_of: row.id, ip_key: row.ip_key || null, tool: row.tool || null, project_id: row.project_id || null,
                 });
                 await announce.created(t, await store.get(next));
             });

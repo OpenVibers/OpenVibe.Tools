@@ -410,6 +410,7 @@ function createRunApi(o) {
             let row, replayed;
             try {
                 const out = await system.submit({
+                    prefer: req.headers['x-tools-prefer'] || 'auto',
                     owner, type: d.run.job.type, input: contracts.tools.jobInput(d, input),
                     files: files.map(f => ({ path: f.path, buffer: f.buffer, name: f.originalname || f.name, mime: f.mimetype || f.mime, size: f.size })),
                     idempotencyKey: key, ttlMs: who.kind === 'session' ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000,
@@ -440,6 +441,7 @@ function createRunApi(o) {
         if (!m) return next();
         if (req.method === 'OPTIONS') return next();   // the app's CORS answers preflights
         if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return problem(req, res, 405, 'method_not_allowed', 'POST a tools.run-request@1 to run a tool.'); }
+        if (req.headers['x-tools-prefer'] && !['auto', 'home', 'host'].includes(req.headers['x-tools-prefer'])) return problem(req, res, 400, 'tools.run.invalid', 'X-Tools-Prefer must be auto, home or host.');
         const t0 = Date.now();
         counts.runs++;
         const snap = o.snapshot();

@@ -28,8 +28,8 @@ function createStore(db, { app } = {}) {
     if (!db || typeof db.prepare !== 'function') throw new TypeError('createStore needs an openvibe-sdk/db handle');
     if (!app) throw new TypeError('createStore needs app');
     const q = {
-        insert: db.prepare(`INSERT INTO tool_jobs (id, app, type, type_version, owner, state, input_json, files_json, idempotency_key, request_hash, max_attempts, ttl_ms, created_at, updated_at, env, retry_of, ip_key, tool, project_id, trace_id)
-            VALUES (@id, @app, @type, @type_version, @owner, 'queued', @input_json, @files_json, @idempotency_key, @request_hash, @max_attempts, @ttl_ms, @now, @now, @env, @retry_of, @ip_key, @tool, @project_id, @trace_id)`),
+        insert: db.prepare(`INSERT INTO tool_jobs (id, app, type, type_version, owner, state, input_json, files_json, idempotency_key, request_hash, max_attempts, ttl_ms, created_at, updated_at, env, retry_of, ip_key, tool, project_id, trace_id, execution_prefer)
+            VALUES (@id, @app, @type, @type_version, @owner, 'queued', @input_json, @files_json, @idempotency_key, @request_hash, @max_attempts, @ttl_ms, @now, @now, @env, @retry_of, @ip_key, @tool, @project_id, @trace_id, @execution_prefer)`),
         markRetried: db.prepare("UPDATE tool_jobs SET retried_by = @next, updated_at = @now WHERE id = @id AND app = @app AND state = 'failed' AND retried_by IS NULL"),
         get: db.prepare('SELECT * FROM tool_jobs WHERE id = ? AND app = ?'),
         byIdem: db.prepare('SELECT * FROM tool_jobs WHERE app = @app AND owner = @owner AND idempotency_key = @idempotency_key'),
@@ -82,7 +82,14 @@ function createStore(db, { app } = {}) {
         db,
         app,
         TERMINAL, STATES,
-        async insert(row) { await q.insert.run({ app, retry_of: null, ip_key: null, tool: null, project_id: null, trace_id: null, ...row }); },
+        async execution(id, jobAttempt) {
+            const rows = await db.prepare('SELECT worker_id,location,took_ms,state,at FROM tool_worker_attempts WHERE job_id=? AND job_attempt=? ORDER BY attempt').all(id, jobAttempt);
+            return rows.map(a => ({ worker: a.worker_id, location: a.location, took_ms: a.state === 'running' ? Math.max(0, Date.now() - Number(a.at)) : Number(a.took_ms), state: a.state }));
+        },
+        async recordExecution(id, jobAttempt, attempts) {
+            for (const [i, a] of attempts.entries()) await db.prepare('INSERT INTO tool_worker_attempts (job_id,job_attempt,attempt,worker_id,location,took_ms,state,at) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT (job_id,job_attempt,attempt) DO UPDATE SET worker_id=excluded.worker_id,location=excluded.location,took_ms=excluded.took_ms,state=excluded.state,at=excluded.at').run(id, jobAttempt, i, a.worker, a.location, a.took_ms, a.state, Date.now());
+        },
+        async insert(row) { await q.insert.run({ app, retry_of: null, ip_key: null, tool: null, project_id: null, trace_id: null, execution_prefer: 'auto', ...row }); },
         byResultMedia: async (owner, mediaId) => q.byResultMedia.all({ app, owner, like: `%"media_id":"${String(mediaId).replace(/[%"\\]/g, '')}"%` }),
         markRetried: async (id, next, now = Date.now()) => (await q.markRetried.run({ app, id, next, now })).changes === 1,
         get: async (id) => (await q.get.get(id, app)) || null,

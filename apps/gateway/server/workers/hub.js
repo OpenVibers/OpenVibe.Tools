@@ -18,15 +18,16 @@ function createHub({ WebSocketServer, store, now = Date.now }) {
             wss.handleUpgrade(req, socket, head, ws => {
                 const old = connections.get(id);
                 if (old) old.ws.terminate();
-                const c = { id, location: worker.location, draining: worker.draining, ws, last: now(), pending: new Map(), capabilities: [], slots: 0, free: 0, load: 0, latency_ms: null };
+                const c = { id, location: worker.location, draining: worker.draining, ws, last: now(), pending: new Map(), capabilities: [], tools: [], slots: 0, free: 0, load: 0, latency_ms: null };
                 connections.set(id, c);
                 ws.on('error', () => {});
                 ws.on('message', raw => {
                     let m;
                     try { m = JSON.parse(String(raw)); } catch { ws.close(1008); return; }
                     if (m.type === 'status') {
-                        if (!Array.isArray(m.capabilities) || m.capabilities.some(x => !TYPES.includes(x)) || !Number.isInteger(m.slots) || m.slots < 1 || m.slots > 8 || !Number.isInteger(m.free) || m.free < 0 || m.free > m.slots || !Number.isFinite(m.load) || m.load < 0) { ws.close(1008); return; }
-                        Object.assign(c, { capabilities: m.dry ? [] : [...new Set(m.capabilities)], slots: m.slots, free: m.dry ? 0 : m.free, load: m.load, last: now() });
+                        if (m.tools === undefined) m.tools = []; // Older protocol-1 workers stay connected but receive no jobs.
+                        if (!Array.isArray(m.tools) || m.tools.length > 128 || m.tools.some(t => typeof t !== 'string' || !/^(img|docs|audio)\.process:[a-z0-9-]{1,40}$/.test(t)) || !Array.isArray(m.capabilities) || m.capabilities.some(x => !TYPES.includes(x)) || !Number.isInteger(m.slots) || m.slots < 1 || m.slots > 8 || !Number.isInteger(m.free) || m.free < 0 || m.free > m.slots || !Number.isFinite(m.load) || m.load < 0) { ws.close(1008); return; }
+                        Object.assign(c, { tools: m.dry ? [] : m.tools, capabilities: m.dry ? [] : [...new Set(m.capabilities)], slots: m.slots, free: m.dry ? 0 : m.free, load: m.load, last: now() });
                         ws.send(JSON.stringify({ type: 'heartbeat' })); // Also keeps the reverse proxy's upstream read deadline alive.
                     } else if (m.type === 'result') {
                         const p = c.pending.get(m.id);
