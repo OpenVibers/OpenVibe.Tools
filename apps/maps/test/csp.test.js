@@ -9,6 +9,7 @@ const { startApp } = require('../../_shared/test/spawn');
     try {
         const csp = (await fetch(`${maps.base}/`)).headers.get('content-security-policy') || '';
         assert.match(csp, /img-src[^;]*https:\/\/openvibe\.media(?:[ ;]|$)/, csp);
+        assert.match(csp, /(?:^|;)frame-src https:\/\/openvibe\.network(?:;|$)/, 'only Network may supply the silent session frame');
         console.log('  ✓ img-src allows https://openvibe.media');
     } finally {
         maps.kill('SIGTERM');
