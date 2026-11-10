@@ -139,6 +139,15 @@ function gateway(net, { clientSecret = CLIENT_SECRET } = {}) {
         const { app, auth } = gateway(net);
         gw = await serve(app);
 
+        const guest = await fetch(`${gw.base}/auth/login?silent=1&next=${encodeURIComponent('https://maps.openvibe.tools/')}`, {
+            redirect: 'manual', headers: { Cookie: 'ov_sso_hint=guest' },
+        });
+        assert.strictEqual(guest.status, 302);
+        assert.strictEqual(guest.headers.get('location'), 'https://maps.openvibe.tools/', 'guest handoff never visits Network');
+        assert.strictEqual(guest.headers.get('set-cookie'), null, 'no flow or session is created for a guest');
+        const explicit = await fetch(`${gw.base}/auth/login`, { redirect: 'manual', headers: { Cookie: 'ov_sso_hint=guest' } });
+        assert.strictEqual(new URL(explicit.headers.get('location')).pathname, '/oauth/authorize', 'an explicit login still works');
+
         // ── GET /auth/login: the authorize URL with a PKCE S256 challenge ──
         const login = await fetch(`${gw.base}/auth/login?next=%2Ftools%3Fa%3D1`, { redirect: 'manual' });
         assert.strictEqual(login.status, 302, 'the login redirects');
