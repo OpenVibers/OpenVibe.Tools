@@ -262,7 +262,6 @@ function shell({ head, body, families, agent = false }) {
 ${head}
 ${appIcon.headTags({ site: 'tools', iconBase: '/assets' })}
 <link rel="alternate" type="application/json" href="${SITE}/api/catalog.json" title="Tool catalog">
-<link rel="preconnect" href="https://openvibe.network">
 <script src="${ovServe.url('theme-loader.js')}" defer></script>
 <link rel="stylesheet" href="${ovServe.url('kit.css')}">
 <style>${CSS}</style></head><body>${spriteSvg}
