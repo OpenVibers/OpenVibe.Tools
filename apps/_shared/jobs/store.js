@@ -82,8 +82,12 @@ function createStore(db, { app } = {}) {
         db,
         app,
         TERMINAL, STATES,
+        async execution(id, jobAttempt) {
+            const rows = await db.prepare('SELECT worker_id,location,took_ms,state,at FROM tool_worker_attempts WHERE job_id=? AND job_attempt=? ORDER BY attempt').all(id, jobAttempt);
+            return rows.map(a => ({ worker: a.worker_id, location: a.location, took_ms: a.state === 'running' ? Math.max(0, Date.now() - Number(a.at)) : Number(a.took_ms), state: a.state }));
+        },
         async recordExecution(id, jobAttempt, attempts) {
-            for (const [i, a] of attempts.entries()) await db.prepare('INSERT INTO tool_worker_attempts (job_id,job_attempt,attempt,worker_id,location,took_ms,state,at) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING').run(id, jobAttempt, i, a.worker, a.location, a.took_ms, a.state, Date.now());
+            for (const [i, a] of attempts.entries()) await db.prepare('INSERT INTO tool_worker_attempts (job_id,job_attempt,attempt,worker_id,location,took_ms,state,at) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT (job_id,job_attempt,attempt) DO UPDATE SET worker_id=excluded.worker_id,location=excluded.location,took_ms=excluded.took_ms,state=excluded.state,at=excluded.at').run(id, jobAttempt, i, a.worker, a.location, a.took_ms, a.state, Date.now());
         },
         async insert(row) { await q.insert.run({ app, retry_of: null, ip_key: null, tool: null, project_id: null, trace_id: null, execution_prefer: 'auto', ...row }); },
         byResultMedia: async (owner, mediaId) => q.byResultMedia.all({ app, owner, like: `%"media_id":"${String(mediaId).replace(/[%"\\]/g, '')}"%` }),

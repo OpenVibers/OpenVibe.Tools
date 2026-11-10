@@ -377,7 +377,7 @@ function createJobSystem(o) {
             // would not see an abort that fired before it registered its listener.
             if (entry.reason) throw new Error(entry.reason);
             const files = store.parse(row.files_json, []).map(f => ({ name: f.name, mime: f.mime, size: f.size, sha256: f.sha256, path: f._path }));
-            const out = await require('./placement').executePlaced({ row, def, receipt: execution, context: {
+            const out = await require('./placement').executePlaced({ row, def, receipt: execution, loadAttempts: () => store.execution(row.id, Number(row.attempts)), context: {
                 job: { id: row.id, type: row.type, attempt: Number(row.attempts), owner: row.owner },
                 input: store.parse(row.input_json, {}), files, outDir,
                 signal: entry.ctrl.signal,
@@ -403,9 +403,15 @@ function createJobSystem(o) {
         } finally {
             clearTimeout(timer);
         }
-        if (outcome?.error) outcome.error.execution = execution;
         let recorded = false;
         try {
+            if (!execution.attempts.length) execution.attempts = await store.execution(row.id, Number(row.attempts));
+            if (execution.attempts.length) {
+                for (const a of execution.attempts) if (a.state === 'running') a.state = outcome.state === 'cancelled' ? 'cancelled' : 'failed';
+                const last = execution.attempts.at(-1);
+                Object.assign(execution, { worker: last.worker, location: last.location, took_ms: execution.attempts.reduce((n, a) => n + a.took_ms, 0) });
+            }
+            if (outcome?.error) outcome.error.execution = execution;
             // The end state and its tools.job.succeeded|failed event commit together (or neither does).
             await store.tx(async (t) => { if (await store.finish(row.id, outcome)) { await store.recordExecution(row.id, Number(row.attempts), execution.attempts); await ended(t, row.id); } });
             recorded = true;

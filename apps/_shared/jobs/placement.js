@@ -14,11 +14,16 @@ async function requestPlacement(id, signal, fetchImpl = fetch) {
     for await (const chunk of r.body) { size += chunk.length; if (size > MAX_FRAME) throw new Error('placement response too large'); chunks.push(chunk); }
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
-async function executePlaced({ row, def, context, receipt, request = requestPlacement, now = Date.now }) {
+async function executePlaced({ row, def, context, receipt, request = requestPlacement, loadAttempts = async () => [], now = Date.now }) {
     let placement = { mode: 'host', attempts: [] };
     if (TYPES.includes(row.type) && row.execution_prefer !== 'host') {
         try { placement = await request(row.id, context.signal); }
-        catch { if (context.signal.aborted) throw new Error('cancelled'); }
+        catch {
+            placement.attempts = (await loadAttempts()).map(a => ({ ...a, state: a.state === 'running' ? (context.signal.aborted ? 'cancelled' : 'disconnected') : a.state }));
+            receipt.attempts = placement.attempts;
+            if (context.signal.aborted) throw new Error('cancelled');
+            if (placement.attempts.length >= 2) placement.mode = 'failed';
+        }
     }
     receipt.attempts = placement.attempts || [];
     if (placement.mode === 'failed') {

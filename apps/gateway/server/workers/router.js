@@ -21,7 +21,7 @@ function createRouter({ hub, store, db, now = Date.now }) {
         const config = await store.routing();
         if (!config?.enabled) return host([]);
         if (active.has(id)) throw new Error('job already dispatched');
-        const row = await db.prepare('SELECT id,type,state,input_json,files_json,execution_prefer FROM tool_jobs WHERE id=?').get(id);
+        const row = await db.prepare('SELECT id,type,state,input_json,files_json,execution_prefer,attempts FROM tool_jobs WHERE id=?').get(id);
         if (!row || row.state !== 'running' || !TYPES.includes(row.type) || row.execution_prefer === 'host') return host([]);
         const input = JSON.parse(row.input_json), source = JSON.parse(row.files_json);
         let order; try { order = JSON.parse(config.worker_order); } catch { return host([]); }
@@ -50,7 +50,10 @@ function createRouter({ hub, store, db, now = Date.now }) {
                 const started = now();
                 const attempt = { worker: worker.id, location: worker.location, took_ms: 0, state: 'failed' };
                 attempts.push(attempt);
+                // Commit the assignment before sending bytes so cancellation/restart receipts retain its location.
+                await db.prepare('INSERT INTO tool_worker_attempts (job_id,job_attempt,attempt,worker_id,location,took_ms,state,at) VALUES (?,?,?,?,?,0,?,?) ON CONFLICT DO NOTHING').run(id, Number(row.attempts), n, worker.id, worker.location, 'running', started);
                 try {
+                    if (signal.aborted) throw new Error('cancelled');
                     const reply = await hub.dispatch(worker, { type: row.type, input, files }, signal);
                     attempt.took_ms = now() - started;
                     if (!reply.ok) return reply.error === 'worker.transfer_limit' && n === 0 ? host(attempts) : { mode: 'failed', attempts };
@@ -66,8 +69,10 @@ function createRouter({ hub, store, db, now = Date.now }) {
                     return { mode: 'remote', result, attempts };
                 } catch (err) {
                     attempt.took_ms = now() - started;
-                    attempt.state = signal.aborted ? 'cancelled' : 'disconnected';
+                    attempt.state = signal.aborted ? 'cancelled' : err.code === 'worker.disconnected' ? 'disconnected' : 'failed';
                     if (signal.aborted || err.code !== 'worker.disconnected') return { mode: 'failed', attempts };
+                } finally {
+                    await db.prepare('UPDATE tool_worker_attempts SET took_ms=?,state=?,at=? WHERE job_id=? AND job_attempt=? AND attempt=? AND state=?').run(attempt.took_ms, attempt.state, now(), id, Number(row.attempts), n, 'running');
                 }
             }
             return { mode: 'failed', attempts };

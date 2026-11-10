@@ -18,14 +18,14 @@ const worker = (id, free = 2, latency_ms = 10) => ({ id, location: 'home', free,
     try {
         const png = await require('../../img/node_modules/sharp')({ create: { width: 1, height: 1, channels: 3, background: 'red' } }).png().toBuffer();
         const file = path.join(dir, 'input.png'); await fs.writeFile(file, png);
-        const row = { id: 'test', type: 'img.process', state: 'running', input_json: '{"tool":"convert"}', files_json: JSON.stringify([{ name: 'input.png', _path: file }]), execution_prefer: 'auto' };
+        const row = { id: 'test', type: 'img.process', state: 'running', input_json: '{"tool":"convert"}', files_json: JSON.stringify([{ name: 'input.png', _path: file }]), execution_prefer: 'auto', attempts: 1 };
         let enabled = false, seen = [];
         const hub = { connections, dispatch: async (w, job) => {
             seen.push(w.id); assert.deepEqual(Object.keys(job).sort(), ['files', 'input', 'type']);
             if (w.id === 'a') throw Object.assign(new Error('gone'), { code: 'worker.disconnected' });
             return { ok: true, result: { files: [], data: { converted: true } } };
         } };
-        const router = createRouter({ hub, store: { routing: async () => ({ enabled, worker_order: '["home","host"]' }) }, db: { prepare: () => ({ get: async () => row }) } });
+        const router = createRouter({ hub, store: { routing: async () => ({ enabled, worker_order: '["home","host"]' }) }, db: { prepare: () => ({ get: async () => row, run: async () => {} }) } });
         const signal = new AbortController().signal;
         assert.equal((await router.route('test', signal)).mode, 'host'); assert.deepEqual(seen, []);
         enabled = true;
@@ -48,6 +48,10 @@ const worker = (id, free = 2, latency_ms = 10) => ({ id, location: 'home', free,
         let clock = 0; const retried = {};
         await executePlaced({ row, def: { run: async () => ({}) }, context: { signal, outDir: dir }, receipt: retried, now: () => ++clock, request: async () => ({ mode: 'host', attempts: [{ worker: 'a', location: 'home', took_ms: 30, state: 'disconnected' }] }) });
         assert.equal(retried.took_ms, 31); assert.equal(retried.attempts.length, 2);
+        const recovered = {};
+        await executePlaced({ row, def: { run: async () => ({}) }, context: { signal, outDir: dir }, receipt: recovered, request: async () => { throw new Error('gateway restart'); }, loadAttempts: async () => [{ worker: 'a', location: 'home', took_ms: 20, state: 'running' }] });
+        assert.deepEqual(recovered.attempts.map(a => a.worker), ['a', 'host']);
+        assert.equal(recovered.attempts[0].state, 'disconnected');
         const remote = await executePlaced({ row, def: {}, context: { signal, outDir: dir }, receipt: {}, request: async () => ({ mode: 'remote', attempts: [{ worker: 'b', location: 'home', took_ms: 12, state: 'succeeded' }], result: { files: [{ name: '../../safe.png', mime: 'image/png', bytes: png.toString('base64') }], data: {} } }) });
         assert.equal(remote.files[0].name, 'safe.png'); assert.equal(path.dirname(remote.files[0].path), dir); assert.equal(remote.data.execution.worker, 'b');
         console.log('routing: owner order, capacity reservation, latency, drain, default-off, one retry, host fallback, fetch exclusion and receipts passed');
