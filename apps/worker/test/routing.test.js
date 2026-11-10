@@ -1,0 +1,50 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const os = require('node:os');
+const path = require('node:path');
+const { choose, createRouter } = require('../../gateway/server/workers/router');
+const { executePlaced } = require('../../_shared/jobs/placement');
+const worker = (id, free = 2, latency_ms = 10) => ({ id, location: 'home', free, slots: 2, latency_ms, pending: new Map(), draining: false, capabilities: ['img.process'], tools: ['img.process:convert'] });
+(async () => {
+    const a = worker('a'), b = worker('b', 1, 1), connections = new Map([['a', a], ['b', b]]);
+    assert.equal(choose(connections, ['home', 'host'], 'img.process', 'convert').id, 'a');
+    a.pending.set('busy', {}); assert.equal(choose(connections, ['home', 'host'], 'img.process', 'convert').id, 'b');
+    assert.equal(choose(connections, ['a', 'home', 'host'], 'img.process', 'convert').id, 'a');
+    assert.equal(choose(connections, ['host', 'home'], 'img.process', 'convert'), null);
+    a.draining = true; b.draining = true; assert.equal(choose(connections, ['home'], 'img.process', 'convert'), null);
+    a.draining = false; b.draining = false; a.pending.clear();
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'tools-routing-test-'));
+    try {
+        const png = await require('../../img/node_modules/sharp')({ create: { width: 1, height: 1, channels: 3, background: 'red' } }).png().toBuffer();
+        const file = path.join(dir, 'input.png'); await fs.writeFile(file, png);
+        const row = { id: 'test', type: 'img.process', state: 'running', input_json: '{"tool":"convert"}', files_json: JSON.stringify([{ name: 'input.png', _path: file }]), execution_prefer: 'auto' };
+        let enabled = false, seen = [];
+        const hub = { connections, dispatch: async (w, job) => {
+            seen.push(w.id); assert.deepEqual(Object.keys(job).sort(), ['files', 'input', 'type']);
+            if (w.id === 'a') throw Object.assign(new Error('gone'), { code: 'worker.disconnected' });
+            return { ok: true, result: { files: [], data: { converted: true } } };
+        } };
+        const router = createRouter({ hub, store: { routing: async () => ({ enabled, worker_order: '["home","host"]' }) }, db: { prepare: () => ({ get: async () => row }) } });
+        const signal = new AbortController().signal;
+        assert.equal((await router.route('test', signal)).mode, 'host'); assert.deepEqual(seen, []);
+        enabled = true;
+        const out = await router.route('test', signal);
+        assert.equal(out.mode, 'remote'); assert.deepEqual(seen, ['a', 'b']);
+        assert.deepEqual(out.attempts.map(a => a.state), ['disconnected', 'succeeded']);
+        seen = []; connections.delete('b');
+        const fallback = await router.route('test', signal); assert.equal(fallback.mode, 'host'); assert.equal(fallback.attempts.length, 1);
+        connections.set('b', b); hub.dispatch = async w => { seen.push(w.id); throw Object.assign(new Error('gone'), { code: 'worker.disconnected' }); };
+        seen = []; assert.equal((await router.route('test', signal)).mode, 'failed'); assert.equal(seen.length, 2);
+        row.type = 'yt.download'; seen = []; assert.equal((await router.route('test', signal)).mode, 'host'); assert.equal(seen.length, 0);
+        row.type = 'img.process'; row.execution_prefer = 'host'; assert.equal((await router.route('test', signal)).mode, 'host');
+        const receipt = {};
+        const result = await executePlaced({ row, def: { run: async () => ({ files: [], data: { local: true } }) }, context: { signal, outDir: dir }, receipt, request: async () => { throw new Error('must not dispatch preferred host'); } });
+        assert.equal(result.data.execution.worker, 'host'); assert.equal(receipt.attempts[0].state, 'succeeded');
+        assert(Number.isFinite(receipt.took_ms));
+        row.execution_prefer = 'auto';
+        const remote = await executePlaced({ row, def: {}, context: { signal, outDir: dir }, receipt: {}, request: async () => ({ mode: 'remote', attempts: [{ worker: 'b', location: 'home', took_ms: 12, state: 'succeeded' }], result: { files: [{ name: '../../safe.png', mime: 'image/png', bytes: png.toString('base64') }], data: {} } }) });
+        assert.equal(remote.files[0].name, 'safe.png'); assert.equal(path.dirname(remote.files[0].path), dir); assert.equal(remote.data.execution.worker, 'b');
+        console.log('routing: owner order, capacity reservation, latency, drain, default-off, one retry, host fallback, fetch exclusion and receipts passed');
+    } finally { await fs.rm(dir, { recursive: true, force: true }); }
+})().catch(e => { console.error(e); process.exitCode = 1; });

@@ -28,8 +28,8 @@ function createStore(db, { app } = {}) {
     if (!db || typeof db.prepare !== 'function') throw new TypeError('createStore needs an openvibe-sdk/db handle');
     if (!app) throw new TypeError('createStore needs app');
     const q = {
-        insert: db.prepare(`INSERT INTO tool_jobs (id, app, type, type_version, owner, state, input_json, files_json, idempotency_key, request_hash, max_attempts, ttl_ms, created_at, updated_at, env, retry_of, ip_key, tool, project_id, trace_id)
-            VALUES (@id, @app, @type, @type_version, @owner, 'queued', @input_json, @files_json, @idempotency_key, @request_hash, @max_attempts, @ttl_ms, @now, @now, @env, @retry_of, @ip_key, @tool, @project_id, @trace_id)`),
+        insert: db.prepare(`INSERT INTO tool_jobs (id, app, type, type_version, owner, state, input_json, files_json, idempotency_key, request_hash, max_attempts, ttl_ms, created_at, updated_at, env, retry_of, ip_key, tool, project_id, trace_id, execution_prefer)
+            VALUES (@id, @app, @type, @type_version, @owner, 'queued', @input_json, @files_json, @idempotency_key, @request_hash, @max_attempts, @ttl_ms, @now, @now, @env, @retry_of, @ip_key, @tool, @project_id, @trace_id, @execution_prefer)`),
         markRetried: db.prepare("UPDATE tool_jobs SET retried_by = @next, updated_at = @now WHERE id = @id AND app = @app AND state = 'failed' AND retried_by IS NULL"),
         get: db.prepare('SELECT * FROM tool_jobs WHERE id = ? AND app = ?'),
         byIdem: db.prepare('SELECT * FROM tool_jobs WHERE app = @app AND owner = @owner AND idempotency_key = @idempotency_key'),
@@ -82,7 +82,10 @@ function createStore(db, { app } = {}) {
         db,
         app,
         TERMINAL, STATES,
-        async insert(row) { await q.insert.run({ app, retry_of: null, ip_key: null, tool: null, project_id: null, trace_id: null, ...row }); },
+        async recordExecution(id, jobAttempt, attempts) {
+            for (const [i, a] of attempts.entries()) await db.prepare('INSERT INTO tool_worker_attempts (job_id,job_attempt,attempt,worker_id,location,took_ms,state,at) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT DO NOTHING').run(id, jobAttempt, i, a.worker, a.location, a.took_ms, a.state, Date.now());
+        },
+        async insert(row) { await q.insert.run({ app, retry_of: null, ip_key: null, tool: null, project_id: null, trace_id: null, execution_prefer: 'auto', ...row }); },
         byResultMedia: async (owner, mediaId) => q.byResultMedia.all({ app, owner, like: `%"media_id":"${String(mediaId).replace(/[%"\\]/g, '')}"%` }),
         markRetried: async (id, next, now = Date.now()) => (await q.markRetried.run({ app, id, next, now })).changes === 1,
         get: async (id) => (await q.get.get(id, app)) || null,

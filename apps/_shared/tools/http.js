@@ -38,7 +38,7 @@ function openCors(res) {
 // along); first-party pages keep the app's own credentialed CORS.
 const RUN_OR_JOBS_RE = /^\/api\/v1\/(?:tools\/[a-z][a-z0-9-]{0,39}\/run|jobs(?:\/.*)?)\/?$/;
 const isPublicApiPath = (p) => RUN_OR_JOBS_RE.test(String(p || ''));
-const API_HEADERS = 'Authorization, Content-Type, Idempotency-Key, Last-Event-ID, Cache-Control, traceparent, X-OpenVibe-Request-Id';
+const API_HEADERS = 'X-Tools-Prefer, Authorization, Content-Type, Idempotency-Key, Last-Event-ID, Cache-Control, traceparent, X-OpenVibe-Request-Id';
 const API_EXPOSE = 'Location, Idempotent-Replayed, Retry-After, RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset, X-OpenVibe-Request-Id, traceparent, Content-Disposition, Deprecation, Sunset, Link';
 
 /**

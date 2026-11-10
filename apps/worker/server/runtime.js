@@ -7,21 +7,25 @@ const { MAX_BYTES, TYPES, bytes } = require('./protocol');
 const { detect } = require('../../_shared/guard/sniff');
 const { poolFromEnv } = require('../../_shared/jobs/pool');
 function definitions() {
-    const defs = new Map(), pools = [];
+    const defs = new Map(), pools = [], tools = [];
+    const hasAudio = ['ffmpeg', 'ffprobe'].every(bin => require('node:child_process').spawnSync(bin, ['-version'], { stdio: 'ignore', timeout: 3000 }).status === 0);
     for (const app of ['img', 'docs', 'audio']) {
         try {
+            if (app === 'audio' && !hasAudio) continue;
+            const catalog = require(`../../${app}/server/tools`);
+            tools.push(...catalog.listTools().filter(t => t.available !== false).map(t => `${app}.process:${t.id}`));
             const process = require(`../../${app}/server/process`);
             const pool = app === 'audio' ? null : poolFromEnv(app, path.resolve(__dirname, `../../${app}/server/worker.js`), { size: 1, maxQueue: 0 });
             if (pool) pools.push(pool);
             process.defineJobs({ define: def => defs.set(def.type, def), JobError: Error }, pool);
         } catch { /* A missing dependency removes this capability, rather than accepting work it cannot run. */ }
     }
-    return { defs, close: () => Promise.all(pools.map(p => p.close())) };
+    return { defs, tools, close: () => Promise.all(pools.map(p => p.close())) };
 }
 function createRuntime({ slots = 2, dry = false, registry = definitions(), root = os.tmpdir() } = {}) {
     if (!Number.isInteger(slots) || slots < 1 || slots > 8) throw new Error('slots must be 1..8');
     const active = new Map();
-    function status() { return { capabilities: dry ? [] : [...registry.defs.keys()].filter(k => TYPES.includes(k)), slots, free: dry ? 0 : slots - active.size, load: os.loadavg()[0], dry }; }
+    function status() { return { tools: dry ? [] : (registry.tools || []), capabilities: dry ? [] : [...registry.defs.keys()].filter(k => TYPES.includes(k)), slots, free: dry ? 0 : slots - active.size, load: os.loadavg()[0], dry }; }
     async function run(job) {
         const def = registry.defs.get(job.type);
         if (dry || !TYPES.includes(job.type) || !def || active.size >= slots || active.has(job.id) || !/^[a-f0-9]{32}$/.test(job.id || '')) throw new Error('job refused');

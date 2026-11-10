@@ -6,4 +6,6 @@ A single Node 22 process reuses the image, PDF and audio satellite job handlers 
 
 Only img.process, docs.process and audio.process are supported. Each job is capped at 16 MiB of input and output; larger jobs remain on the host. Input types are sniffed again on the worker. SVG and URL-fetching jobs are refused. Tool options are validated by the same satellite definitions. The gateway retains job ownership, quotas and result storage. No caller token crosses the worker channel.
 
-Worker routing is default-off. This first part installs the channel and execution runtime; routing and owner controls follow separately.
+Worker routing is default-off. The owner can configure it with GET/PUT `/api/v1/owner/worker-routing` (`{ enabled, order: ["home", "host"] }`); writes require the same-origin owner session. Order entries can also name a worker id. Within a group the gateway uses free slots, then recent latency. A disconnected job gets one attempt elsewhere, including the host when no second worker is available.
+
+Run requests accept `X-Tools-Prefer: auto|home|host`. `host` keeps the work on the host; `home` is advisory and respects the owner's order. Completed jobs include `result.data.execution` with worker id, location, duration and attempts. Failed/cancelled jobs carry the same receipt in `error.execution`. Inputs over 16 MiB, SVG, unavailable tools and all fetch-based jobs stay on the host. Workers advertise individual operations, so missing ffmpeg/qpdf/poppler remove affected capabilities.

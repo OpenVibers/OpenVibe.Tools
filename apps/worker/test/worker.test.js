@@ -46,7 +46,7 @@ const { createHub } = require('../../gateway/server/workers/hub');
     const url = `ws://127.0.0.1:${server.address().port}/api/v1/workers/connect`;
     const ws = new WebSocket(url, { headers });
     await once(ws, 'open');
-    ws.send(JSON.stringify({ type: 'status', capabilities: ['img.process'], slots: 1, free: 1, load: 0 }));
+    ws.send(JSON.stringify({ type: 'status', tools: ['img.process:convert'], capabilities: ['img.process'], slots: 1, free: 1, load: 0 }));
     await new Promise(r => setTimeout(r, 30));
     assert.equal(hub.stats()[0].free, 1);
     const replay = new WebSocket(url, { headers });

@@ -67,7 +67,22 @@ let auth = null;   // created below; the key check reads it at request time
 const toolsDb = require('../../_shared/db').openToolsDb({ createDb: require('openvibe-sdk/db').createDb, service: 'tools-gateway' });
 const workerStore = require('./workers/store').createStore(toolsDb.db);
 const workerHub = require('./workers/hub').createHub({ WebSocketServer: require('ws').WebSocketServer, store: workerStore });
-app.get('/api/v1/workers/status', (_req, res) => res.json({ protocol: 1, dry_run: true, transport: 'outbound-websocket', accepts: ['img.process', 'docs.process', 'audio.process'] }));
+const workerRouter = require('./workers/router').createRouter({ hub: workerHub, store: workerStore, db: toolsDb.db });
+app.post('/api/internal/workers/dispatch', (req, res, next) => {
+    if (!require('../../_shared/internal-token').loopbackOnly(req)) return res.sendStatus(404);
+    next();
+}, express.json({ limit: '1kb' }), async (req, res) => {
+    if (!/^job_[0-9A-HJKMNP-TV-Z]{26}$/.test(req.body?.job_id || '')) return res.sendStatus(400);
+    const ctrl = new AbortController();
+    res.on('close', () => { if (!res.writableFinished) ctrl.abort(); });
+    try { res.json(await workerRouter.route(req.body.job_id, ctrl.signal)); }
+    catch { if (!res.headersSent) res.status(503).json({ error: 'Worker placement unavailable' }); }
+});
+
+app.get('/api/v1/workers/status', async (_req, res) => {
+    try { res.json({ protocol: 1, dry_run: true, transport: 'outbound-websocket', accepts: ['img.process', 'docs.process', 'audio.process'], routing_enabled: !!(await workerStore.routing())?.enabled, strategy: 'owner-order/free-slots/recent-latency', fallback: 'host' }); }
+    catch { res.status(503).json({ error: 'Worker registry unavailable' }); }
+});
 const toolsValkey = require('../../_shared/db').openToolsValkey({ createValkey: require('openvibe-sdk/valkey').createValkey });
 // The account export and deletion (ADR-033, ./account-data.js): what Tools holds about a person, and the erasure
 // of it. The network sender posts Tools' part of an export back to Network with Tools' own token.
@@ -316,6 +331,14 @@ app.locals.config = config;
 
 app.use('/auth', createAuthRoutes(config, auth));
 const workerOwner = require('./workers/owner').ownerGuard({ verify: token => auth.verify(token), extractToken, origin: new URL(config.baseUrl).origin });
+app.get('/api/v1/owner/worker-routing', workerOwner, async (_req, res) => {
+    try { const r = await workerStore.routing(); res.json({ enabled: r.enabled, order: JSON.parse(r.worker_order) }); }
+    catch { res.status(503).json({ error: 'Worker registry unavailable' }); }
+});
+app.put('/api/v1/owner/worker-routing', workerOwner, express.json({ limit: '4kb' }), async (req, res) => {
+    try { res.json(await workerStore.setRouting(req.body || {})); }
+    catch { res.status(400).json({ error: 'Invalid worker routing' }); }
+});
 app.post('/api/v1/owner/workers', workerOwner, express.json({ limit: '4kb' }), async (req, res) => {
     try { res.status(201).json(await workerStore.mint(req.body || {})); }
     catch { res.status(400).json({ error: 'Could not create worker' }); }
