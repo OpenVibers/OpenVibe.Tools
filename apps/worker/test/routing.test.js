@@ -36,6 +36,8 @@ const worker = (id, free = 2, latency_ms = 10) => ({ id, location: 'home', free,
         const fallback = await router.route('test', signal); assert.equal(fallback.mode, 'host'); assert.equal(fallback.attempts.length, 1);
         connections.set('b', b); hub.dispatch = async w => { seen.push(w.id); throw Object.assign(new Error('gone'), { code: 'worker.disconnected' }); };
         seen = []; assert.equal((await router.route('test', signal)).mode, 'failed'); assert.equal(seen.length, 2);
+        hub.dispatch = async () => ({ ok: false, error: 'worker.transfer_limit' });
+        assert.equal((await router.route('test', signal)).mode, 'host', 'expanded audio/PDF outputs retry on the host');
         row.type = 'yt.download'; seen = []; assert.equal((await router.route('test', signal)).mode, 'host'); assert.equal(seen.length, 0);
         row.type = 'img.process'; row.execution_prefer = 'host'; assert.equal((await router.route('test', signal)).mode, 'host');
         const receipt = {};
@@ -43,6 +45,9 @@ const worker = (id, free = 2, latency_ms = 10) => ({ id, location: 'home', free,
         assert.equal(result.data.execution.worker, 'host'); assert.equal(receipt.attempts[0].state, 'succeeded');
         assert(Number.isFinite(receipt.took_ms));
         row.execution_prefer = 'auto';
+        let clock = 0; const retried = {};
+        await executePlaced({ row, def: { run: async () => ({}) }, context: { signal, outDir: dir }, receipt: retried, now: () => ++clock, request: async () => ({ mode: 'host', attempts: [{ worker: 'a', location: 'home', took_ms: 30, state: 'disconnected' }] }) });
+        assert.equal(retried.took_ms, 31); assert.equal(retried.attempts.length, 2);
         const remote = await executePlaced({ row, def: {}, context: { signal, outDir: dir }, receipt: {}, request: async () => ({ mode: 'remote', attempts: [{ worker: 'b', location: 'home', took_ms: 12, state: 'succeeded' }], result: { files: [{ name: '../../safe.png', mime: 'image/png', bytes: png.toString('base64') }], data: {} } }) });
         assert.equal(remote.files[0].name, 'safe.png'); assert.equal(path.dirname(remote.files[0].path), dir); assert.equal(remote.data.execution.worker, 'b');
         console.log('routing: owner order, capacity reservation, latency, drain, default-off, one retry, host fallback, fetch exclusion and receipts passed');

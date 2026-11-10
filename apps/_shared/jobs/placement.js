@@ -22,11 +22,13 @@ async function executePlaced({ row, def, context, receipt, request = requestPlac
     }
     receipt.attempts = placement.attempts || [];
     if (placement.mode === 'failed') {
-        Object.assign(receipt, receipt.attempts.at(-1));
+        const last = receipt.attempts.at(-1);
+        Object.assign(receipt, { worker: last.worker, location: last.location, took_ms: receipt.attempts.reduce((n, a) => n + a.took_ms, 0) });
         throw new Error('The remote worker could not complete this job');
     }
     if (placement.mode === 'remote') {
-        Object.assign(receipt, receipt.attempts.at(-1));
+        const last = receipt.attempts.at(-1);
+        Object.assign(receipt, { worker: last.worker, location: last.location, took_ms: receipt.attempts.reduce((n, a) => n + a.took_ms, 0) });
         const files = [];
         for (const [i, f] of placement.result.files.entries()) {
             const local = path.join(context.outDir, `remote-${i}`);
@@ -46,7 +48,7 @@ async function executePlaced({ row, def, context, receipt, request = requestPlac
     } finally {
         attempt.took_ms = now() - started;
         if (context.signal.aborted) attempt.state = 'cancelled';
-        receipt.took_ms = attempt.took_ms;
+        receipt.took_ms = receipt.attempts.reduce((n, a) => n + a.took_ms, 0);
     }
 }
 module.exports = { executePlaced, requestPlacement };

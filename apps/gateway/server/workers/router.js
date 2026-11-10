@@ -53,7 +53,7 @@ function createRouter({ hub, store, db, now = Date.now }) {
                 try {
                     const reply = await hub.dispatch(worker, { type: row.type, input, files }, signal);
                     attempt.took_ms = now() - started;
-                    if (!reply.ok) return { mode: 'failed', attempts };
+                    if (!reply.ok) return reply.error === 'worker.transfer_limit' && n === 0 ? host(attempts) : { mode: 'failed', attempts };
                     const result = reply.result;
                     if (!result || !Array.isArray(result.files) || result.files.length > 50 || !result.data || typeof result.data !== 'object' || Array.isArray(result.data)) throw new Error('invalid worker result');
                     let size = 0;

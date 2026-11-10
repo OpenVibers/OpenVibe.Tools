@@ -33,7 +33,7 @@ async function main() {
             try {
                 const result = await runtime.run({ id: m.id, type: m.jobType, input: m.input, files: m.files });
                 if (ws === connection) send({ type: 'result', id: m.id, ok: true, result });
-            } catch { if (ws === connection) send({ type: 'result', id: m.id, ok: false, error: 'worker job failed' }); }
+            } catch (err) { if (ws === connection) send({ type: 'result', id: m.id, ok: false, error: err.code === 'worker.transfer_limit' ? 'worker.transfer_limit' : 'worker job failed' }); }
             status();
         });
         ws.on('error', () => {}); // Never log a credential or server-supplied error.

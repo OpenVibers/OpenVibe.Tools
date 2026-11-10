@@ -61,7 +61,7 @@ function createRuntime({ slots = 2, dry = false, registry = definitions(), root 
             total = 0;
             for (const f of result.files || []) {
                 const size = (await fs.stat(f.path)).size; total += size;
-                if (total > MAX_BYTES) throw new Error('result exceeds worker transfer limit');
+                if (total > MAX_BYTES) throw Object.assign(new Error('result exceeds worker transfer limit'), { code: 'worker.transfer_limit' });
                 output.push({ name: path.basename(f.name), mime: f.mime, bytes: (await fs.readFile(f.path)).toString('base64') });
             }
             return { files: output, data: result.data || {} };
