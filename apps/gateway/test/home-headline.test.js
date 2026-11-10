@@ -32,10 +32,11 @@ const site = require('../server/pages/site');
         assert.strictEqual(new Set(links.map((m) => m[2])).size, links.length, 'each phrase is a different tool');
         assert.ok(!home.includes('data-phrases='), 'the phrases are links in the page, not a data attribute');
 
-        // The swap is CSS on shared timing, still under reduced motion; the script goes once through, then rests.
+        // The swap is CSS on shared timing, played under Calm and held only with motion off; the script goes once through, then rests.
         assert.match(home, /\.hm-rot\{display:grid\}\.hm-ph\{grid-area:1\/1;/, 'the phrases share one cell, so nothing below moves');
-        assert.match(home, /@media \(prefers-reduced-motion:reduce\)\{\.hm-ph\{transition:none;transform:none\}\}/);
+        assert.match(home, /html\[data-ov-motion=off\] \.hm-ph\{transform:none\}/);
         const js = fs.readFileSync(path.join(__dirname, '..', 'public', 'js', 'site.js'), 'utf8');
+        assert.ok(js.includes("getAttribute('data-ov-motion') === 'off'"), 'only motion off holds the first phrase');
         assert.ok(js.includes('if (next === 0) { rested = true;'), 'once through, then it rests');
         assert.ok(js.includes("el.matches(':hover') || el.contains(document.activeElement)"), 'it never changes under a pointer or the focus');
         console.log(`home-headline: ${links.length} phrases, each a link to its tool; one shows; once through, then still`);

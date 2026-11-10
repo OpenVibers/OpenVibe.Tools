@@ -591,4 +591,4 @@ a:hover { color: var(--accent-hover); }
 
 /* The page is the shared tool frame: it starts under the navbar, not behind it. */
 .ovk-page { padding-top: calc(var(--ovk-nav-h, 52px) + 12px); }
-@media (prefers-reduced-motion: reduce) { .option-group, .result-panel, .toast { animation: none; } .spinner { animation: none; opacity: .7; } }
+html[data-ov-motion=off] .spinner{opacity: .7}

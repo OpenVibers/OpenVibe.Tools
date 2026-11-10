@@ -912,4 +912,3 @@ textarea.large {
 
 /* The page is the shared tool frame: its head starts under the navbar, not behind it. */
 .ovk-tool-head { margin-top: calc(var(--ovk-nav-h, 52px) + 12px); }
-@media (prefers-reduced-motion: reduce) { .live-dot, .output-flash, .toast { animation: none; } }
