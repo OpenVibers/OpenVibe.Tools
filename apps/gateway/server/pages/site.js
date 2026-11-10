@@ -267,7 +267,7 @@ ${appIcon.headTags({ site: 'tools', iconBase: '/assets' })}
 <script src="${ovServe.url('theme-loader.js')}" defer></script>
 <link rel="stylesheet" href="${ovServe.url('kit.css')}">
 <style>${CSS}</style></head><body>${spriteSvg}
-<div id="navbar-mount"></div><noscript><style>#navbar-mount{display:none}</style><header class="topbar"><a href="${SITE}/">${NAME}</a><nav>${families.filter(f => f.path).map(f => `<a href="${esc(f.path)}">${esc(f.name)}</a>`).join('')}<a href="/all-tools">All tools</a></nav></header></noscript>
+${frame.serverNav({ name: NAME, service: 'tools', home: `${SITE}/` })}
 <main class="wrap">${body}
 ${foldBlock({
         id: 'net',
