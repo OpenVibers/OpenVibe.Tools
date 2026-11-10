@@ -33,7 +33,7 @@ function runPath(t) {
                 `Runs as a ${t.execution === 'job' ? `job (${t.run && t.run.job ? t.run.job.type : 'job'}): 202 with the job unless it finishes within wait_ms` : 'direct call'}; timeout ${t.limits.timeoutMs} ms.`,
                 t.egress ? 'Reaches out to the host you name; throttled per target.' : null].filter(Boolean).join(' '),
             security,
-            parameters: [{ name: 'Idempotency-Key', in: 'header', required: false, schema: { type: 'string', maxLength: 200 } }],
+            parameters: [{ name: 'X-Tools-Prefer', in: 'header', required: false, description: 'host keeps work on the host; home is advisory and respects owner order. Fetch-based jobs always stay on the host.', schema: { type: 'string', enum: ['auto', 'home', 'host'], default: 'auto' } }, { name: 'Idempotency-Key', in: 'header', required: false, schema: { type: 'string', maxLength: 200 } }],
             requestBody: { required: true, content: body },
             responses: {
                 200: { description: 'Finished (tools.run@1: state succeeded)', content: { 'application/json': { schema: ref('run') } } },
@@ -87,6 +87,7 @@ function openapi(snapshot, site) {
         responses: { 200: { description: 'The image', content: { 'image/svg+xml': {}, 'image/png': {} } }, 422: { description: 'Why the text cannot be drawn (text/plain)' }, 429: { description: 'Too many requests (Retry-After)' } },
     } };
     for (const t of tools) paths[t.run.path] = runPath(t);
+    paths['/api/v1/jobs/{id}'].get.description = 'Read the owned job. Completed jobs include result.data.execution; failed/cancelled jobs include error.execution (ToolsExecutionReceipt).';
     return {
         openapi: '3.1.0',
         info: {
@@ -96,7 +97,7 @@ function openapi(snapshot, site) {
         },
         servers: [{ url: site }],
         tags: [{ name: 'registry' }, { name: 'jobs' }, ...[...new Set([...tools.map((t) => t.family), 'codes'])].sort().map((f) => ({ name: f }))],
-        components: { securitySchemes: { bearer: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', description: 'A Network service or app token for audience openvibe.tools (tools.tool.run; tools.net.probe for probes)' } } },
+        components: { schemas: { ToolsExecutionReceipt: { type: 'object', description: 'Durable jobs: result.data.execution on success, error.execution on failure or cancellation. Times include all attempts, excluding final result storage.', required: ['worker', 'location', 'took_ms', 'attempts'], properties: { worker: { type: 'string' }, location: { enum: ['home', 'host'] }, took_ms: { type: 'integer', minimum: 0 }, attempts: { type: 'array', items: { type: 'object', required: ['worker', 'location', 'took_ms', 'state'], properties: { worker: { type: 'string' }, location: { enum: ['home', 'host'] }, took_ms: { type: 'integer', minimum: 0 }, state: { enum: ['succeeded', 'failed', 'cancelled', 'disconnected'] } } } } } } }, securitySchemes: { bearer: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', description: 'A Network service or app token for audience openvibe.tools (tools.tool.run; tools.net.probe for probes)' } } },
         paths,
     };
 }

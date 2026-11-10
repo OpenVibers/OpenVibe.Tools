@@ -655,6 +655,15 @@ const out = await tools.run('jsonminify', { text: '{ "a": 1 }' });
 const job = await tools.run('png', { format: 'png' }, { files: [fileBlob] });
 const done = await job.wait();   // any tool, sync or job`)}
 <p class="sec-p">The SDK is <a href="https://github.com/OpenVibers/OpenVibe.SDK">openvibe-sdk</a> (this site pins v0.67.0). It retries on 429 after <code>Retry-After</code> and generates idempotency keys for you.</p></section>
+<section id="worker-routing"><h2>Where jobs run</h2>
+<p>Send <code>X-Tools-Prefer: auto</code>, <code>home</code> or <code>host</code> on a run request. <code>host</code> keeps work on the host. <code>home</code> is advisory and respects the owner's routing order. Worker routing is off until the owner enables it. URL-fetching jobs always stay on the host.</p>
+<p>File jobs can use an eligible worker, ranked by the owner's order, free slots and recent latency. A disconnected job gets one retry elsewhere; without a worker, the host runs it.</p>
+<p>Read <code>result.data.execution</code> on a completed job, or <code>error.execution</code> on failure/cancellation: worker id, location, total execution milliseconds and each attempt. Poll the same job with <code>tools.jobs.get(id)</code>.</p>
+${code(`const run = await tools.run('png', {}, { files: [fileBlob], prefer: 'host' });
+const done = await run.wait();
+const job = await tools.jobs.get(done.job.id);
+job.result.data.execution;`)}
+<p>The <code>prefer</code> SDK option is staged for the next SDK release. Until that release, send the HTTP header directly. The <a href="/api/v1/openapi.json">OpenAPI document</a> includes the header and receipt schema.</p></section>
 <section><div class="sec-h"><h2>Access and limits</h2></div>
 <ul><li><b>Anonymous</b>: most tools, on the lowest quota tier, per address. Tools that handle files people should not share anonymously (audio, PDF) need a browser session or a token.</li>
 <li><b>Apps and services</b>: a token from <a href="https://openvibe.network">OpenVibe.Network</a> for audience <code>openvibe.tools</code> with <code>tools.tool.run</code> (developer sandbox apps get it by default) raises the tier.</li>

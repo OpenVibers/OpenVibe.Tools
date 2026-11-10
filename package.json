@@ -19,7 +19,8 @@
     "test:worker": "node apps/worker/test/worker.test.js",
     "test:suite": "node --unhandled-rejections=strict test/run.js",
     "test:worker-security": "node apps/gateway/test/security-ssrf.test.js",
-    "test:routing": "node apps/worker/test/routing.test.js && node apps/worker/test/worker.test.js && node apps/_shared/test/jobs.test.js && node apps/gateway/test/security-ssrf.test.js"
+    "test:routing": "node apps/worker/test/routing.test.js && node apps/worker/test/worker.test.js && node apps/_shared/test/jobs.test.js && node apps/gateway/test/security-ssrf.test.js",
+    "test:worker-docs": "node apps/gateway/test/openapi.test.js"
   },
   "license": "MIT",
   "engines": {
