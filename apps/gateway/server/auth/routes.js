@@ -317,6 +317,9 @@ function createAuthRoutes(config, auth) {
             if (existing && await auth.verify(existing)) {
                 return res.redirect(next);
             }
+            // A cross-site handoff link can reach this route without running the destination navbar first.
+            // Its explicit sign-out still wins; an interactive login (without silent=1) remains available.
+            if (req.cookies?.[SSO_HINT_COOKIE] === 'guest') return res.redirect(next);
         }
         // The SDK's authorize URL: state + PKCE (S256). The verifier goes into a flow cookie
         // of its own and comes back with the code.
