@@ -121,6 +121,15 @@ details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px
 /* Categories as folds (11-09): the icon and the name are the fold's title; its count sits beside them. */
 .job .fold-block{margin-top:10px}.job .fold-h .sec-h{display:flex;align-items:center;gap:10px;flex:1 1 auto;min-width:0;margin:0}.job .fold-h h2{margin:0}
 .job{border-top:1px solid var(--border,rgba(255,255,255,.08));padding-top:4px}
+/* The headline's last words change: each phrase is a link to its tool, all stacked in one cell (as tall as the
+   tallest, so nothing below moves). The one showing rises in; the one leaving lifts away. Once through, then it rests. */
+.hm-rot{display:grid}.hm-ph{grid-area:1/1;color:var(--accent-light,var(--accent,#60a5fa));text-decoration:none;opacity:0;visibility:hidden;transform:translateY(.35em);
+transition:opacity var(--ov-dur-3,.32s) var(--ov-ease-out,ease-out),transform var(--ov-dur-3,.32s) var(--ov-ease-out,ease-out),visibility 0s linear var(--ov-dur-3,.32s)}
+.hm-ph.is-on{opacity:1;visibility:visible;transform:none;transition-delay:0s}.hm-ph.is-out{transform:translateY(-.35em)}
+.hm-ph:hover,.hm-ph:focus-visible{text-decoration:underline;text-decoration-thickness:.06em;text-underline-offset:.12em}
+@media (prefers-reduced-motion:reduce){.hm-ph{transition:none;transform:none}}
+/* The strip of tools drifts, so its ends fade: a chip cut by a hard edge looked broken. */
+.quick-strip{-webkit-mask-image:linear-gradient(90deg,transparent,#000 22px,#000 calc(100% - 22px),transparent);mask-image:linear-gradient(90deg,transparent,#000 22px,#000 calc(100% - 22px),transparent);padding-inline:14px;margin-inline:-14px;max-width:calc(100% + 28px)}
 /* The headline's pause: a small round icon beside the words, not a line of its own. */
 .hm-title{display:flex;align-items:flex-start;gap:10px}.hm-title h1{flex:1 1 auto;min-width:0}.hm-title .hm-motion{margin-top:8px;flex:none}
 .hm-motion{display:inline-grid;place-items:center;width:36px;height:36px;margin:-4px 0 0;padding:0;border:0;border-radius:50%;vertical-align:middle;cursor:pointer;
@@ -430,8 +439,21 @@ function pageIndex(top = [], activity = { available: false }) {
     const quickTools = [...new Set([...rankedIds, ...POPULAR, ...available.map(t => t.id)])].map(id => byId.get(id)).filter(t => t && t.status !== 'unavailable').slice(0, 12);
     const quick = quickTools.map(t => kit.button({ href: t.url, label: t.name, kind: 'quiet' }).replace('<span>', icon(t.icon, 20) + '<span>'));
     const phrases = { yt: 'save a video', logo: 'make a logo', ssl: 'check a TLS certificate', trim: 'trim your audio', regex: 'test a regular expression', maps: 'find places nearby', food: 'find a meal nearby', mergepdf: 'merge your PDFs', dns: "check a domain’s DNS", compress: 'shrink an image', json: 'format your JSON', jsonminify: 'minify your JSON', fancy: 'restyle your text', whois: 'look up a domain', convert: 'convert your images', resize: 'resize your images', mp3: 'convert your audio' };
-    const headlines = quickTools.slice(0, 6).map(t => phrases[t.id] || `help with ${t.name.toLowerCase()}`);
-    const headline = headlines[0] || 'finish the job';
+    // A tool with no hand-written phrase speaks in its own tagline: its first clause, as the end of "Small tools
+    // that …" ("Look up DNS records for any domain: A, AAAA…" → "look up DNS records for any domain"). An acronym
+    // keeps its capitals. "help with <name>" was the old fallback, and read like a form letter.
+    const clause = (t) => {
+        let s = String(t.tagline || '').split(/[:;.(]|, | — | - /)[0].trim();
+        if (s.split(/\s+/).length < 2 || s.length > 46) return null;
+        if (/^[A-Z][a-z]/.test(s)) s = s[0].toLowerCase() + s.slice(1);
+        return s;
+    };
+    const spoken = quickTools.map(t => [t, phrases[t.id] || clause(t)]).filter(([, p]) => p).slice(0, 6);
+    // Every phrase is in the page as a link to its tool, stacked in one grid cell: the cell is as tall as the tallest,
+    // so the swap never moves the page, and each tool is a plain link a crawler reads. One shows at a time.
+    const headlineHtml = spoken.length
+        ? `<span class="hm-rot" id="tool-headline">${spoken.map(([t, p], i) => `<a class="hm-ph${i ? '' : ' is-on'}" href="${esc(t.url)}"${go(t)}${i ? ' aria-hidden="true" tabindex="-1"' : ''}>${esc(p)}.</a>`).join('')}</span>`
+        : '<span class="hm-rot">finish the job.</span>';
     const rows = (items, trend = false) => `<ul class="ovk-list">${items.slice(0,6).map(t => { const n = Number(t.uses || 0); return kit.row({ href: t.url, mark: icon(t.icon, 28), title: t.name, sub: t.description, meta: t.added_at ? `Added ${t.added_at}` : `${n.toLocaleString('en-US')} ${n === 1 ? 'use' : 'uses'}`, trail: trend ? `<span aria-label="Up ${t.increase} uses">↗ +${t.increase}</span>` : '' }); }).join('')}</ul>`;
     // One ranking as a section of its own: the heading, the line that says what the numbers mean, then the rows.
     const rankedSection = (title, items, { trend = false, note = '' } = {}) => `<section><h2>${title}</h2>${note ? `<p class="sec-p">${note}</p>` : ''}${items && items.length ? rows(items, trend) : `<p class="sec-p">${activity.available ? 'No recorded activity in this window yet.' : 'Usage is temporarily unavailable.'}</p>`}</section>`;
@@ -442,7 +464,7 @@ ${rankedSection('Trending this week', activity.week, { trend: true, note: 'Risin
 ${activity.newest && activity.newest.length ? `<section><h2>Newest tools</h2>${rows(activity.newest)}</section>` : ''}`;
     const body = `<div class="hero hero-split">
 <div class="hero-copy"><p class="kicker">Open source · community-run · no account needed to start</p>
-<div class="hm-title"><h1>Small tools that <span id="tool-headline" data-phrases="${esc(JSON.stringify(headlines))}">${esc(headline)}.</span></h1><button id="headline-motion" class="hm-motion" type="button" aria-label="Pause the headline" title="Pause the headline" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path class="hm-pause" d="M9 6v12M15 6v12"/><path class="hm-play" d="M8 5.5v13l11-6.5z"/></svg></button></div>
+<div class="hm-title"><h1>Small tools that ${headlineHtml}</h1><button id="headline-motion" class="hm-motion" type="button" aria-label="Pause the headline" title="Pause the headline" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path class="hm-pause" d="M9 6v12M15 6v12"/><path class="hm-play" d="M8 5.5v13l11-6.5z"/></svg></button></div>
 <p class="hero-sub">Convert a file, merge a PDF, format JSON, check DNS: ${tools.length} tools that open in the browser and get out of your way. Free, and no sign-up to look.</p>
 ${searchForm('')}
 <nav class="quick-strip" data-ovk-scroll="drift" aria-label="${rankedIds.length ? 'Popular tools' : 'Explore tools'}">${quick.join('')}</nav></div>
