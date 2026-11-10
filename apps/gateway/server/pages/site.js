@@ -21,6 +21,21 @@ const kit = require('openvibe-shared/kit');
 const appIcon = require('openvibe-shared/app-icon');
 const registry = require('../registry');
 const { seoFor } = require('../seo/catalog');
+
+// The doing words a tool's tagline may start with to finish "Small tools that …" (see clause() in the home).
+const HEADLINE_VERBS = new Set(('add build calculate change check clean compare compress convert count create crop decode design detect draw edit '
+    + 'encode estimate explore extract find fix flip format generate get look make map measure merge minify mix pick plan play '
+    + 'preview read record remove rename resize roll rotate save scan search see send share shorten sign split strip test time '
+    + 'track translate trim turn validate verify watch write').split(' '));
+/** A tool's own words for the end of "Small tools that …": the first clause of its tagline, only when it starts with a
+ *  doing word ("Look up DNS records for any domain: A, AAAA…" → "look up DNS records for any domain"); else null. */
+function headlineClause(t) {
+    let s = String((t && t.tagline) || '').split(/[:;.(?!]|, | — | - /)[0].trim();
+    if (s.split(/\s+/).length < 2 || s.length > 46) return null;
+    if (/^[A-Z][a-z]/.test(s)) s = s[0].toLowerCase() + s.slice(1);
+    return HEADLINE_VERBS.has(s.split(/\s+/)[0]) ? s : null;
+}
+
 const guardLimits = require('../../../_shared/guard/limits');
 const { foldBlock } = require('../short');
 
@@ -121,11 +136,6 @@ details{border-bottom:1px solid var(--border,rgba(255,255,255,.08));padding:12px
 /* Categories as folds (11-09): the icon and the name are the fold's title; its count sits beside them. */
 .job .fold-block{margin-top:10px}.job .fold-h .sec-h{display:flex;align-items:center;gap:10px;flex:1 1 auto;min-width:0;margin:0}.job .fold-h h2{margin:0}
 .job{border-top:1px solid var(--border,rgba(255,255,255,.08));padding-top:4px}
-// The doing words a tool's tagline may start with to finish "Small tools that …" (see clause() in the home).
-const HEADLINE_VERBS = new Set(('add build calculate change check clean compare compress convert count create crop decode design detect draw edit '
-    + 'encode estimate explore extract find fix flip format generate get look make map measure merge minify mix pick plan play '
-    + 'preview read record remove rename resize roll rotate save scan search see send share shorten sign split strip test time '
-    + 'track translate trim turn validate verify watch write').split(' '));
 /* The headline's last words change: each phrase is a link to its tool, all stacked in one cell (as tall as the
    tallest, so nothing below moves). The one showing rises in; the one leaving lifts away. Once through, then it rests. */
 .hm-rot{display:grid}.hm-ph{grid-area:1/1;color:var(--accent-light,var(--accent,#60a5fa));text-decoration:none;opacity:0;visibility:hidden;transform:translateY(.35em);
@@ -448,12 +458,7 @@ function pageIndex(top = [], activity = { available: false }) {
     // Only a clause that starts with a doing word finishes the sentence (the owner, 2026-11-10, on "Small tools that one
     // reputation report for a domain or IP": "the wording is kind of awkward"); a tagline that names a thing instead is
     // skipped, never bent into the sentence. A question or an exclamation ends the clause too.
-    const clause = (t) => {
-        let s = String(t.tagline || '').split(/[:;.(?!]|, | — | - /)[0].trim();
-        if (s.split(/\s+/).length < 2 || s.length > 46) return null;
-        if (/^[A-Z][a-z]/.test(s)) s = s[0].toLowerCase() + s.slice(1);
-        return HEADLINE_VERBS.has(s.split(/\s+/)[0]) ? s : null;
-    };
+    const clause = headlineClause;
     const spoken = quickTools.map(t => [t, phrases[t.id] || clause(t)]).filter(([, p]) => p).slice(0, 6);
     // Every phrase is in the page as a link to its tool, stacked in one grid cell: the cell is as tall as the tallest,
     // so the swap never moves the page, and each tool is a plain link a crawler reads. One shows at a time.
@@ -801,4 +806,4 @@ function createSiteRouter({ opens = null, discovery = null } = {}) {
 
 const renderNotFound = () => pageSearch('').replace('<h1>Search tools</h1>', '<h1>That page is not here</h1>').replace(/<title>[^<]*<\/title>/, '<title>Page not found | OpenVibe.Tools</title>');
 
-module.exports = { createSiteRouter, pageIndex, pageFamily, pageTool, pageAll, pageDevelopers, search, sitemapEntries, renderNotFound, SITE, NAME };
+module.exports = { headlineClause, createSiteRouter, pageIndex, pageFamily, pageTool, pageAll, pageDevelopers, search, sitemapEntries, renderNotFound, SITE, NAME };

@@ -16,7 +16,14 @@ const site = require('../server/pages/site');
     const srv = http.createServer(app);
     await new Promise((r) => srv.listen(0, '127.0.0.1', r));
     try {
-        const home = await (await fetch(`http://127.0.0.1:${srv.address().port}/`)).text();
+        // A tagline that names a thing never finishes the sentence; one that says what the tool does does (2026-11-10: the
+        // fallback once referred to a list it could not see and the home answered 500 on production).
+        assert.strictEqual(site.headlineClause({ tagline: 'One reputation report for a domain or IP.' }), null);
+        assert.strictEqual(site.headlineClause({ tagline: 'Look up DNS records for any domain: A, AAAA, MX' }), 'look up DNS records for any domain');
+        assert.strictEqual(site.headlineClause({ tagline: 'Check a domain\'s SPF and DMARC policy?' }), 'check a domain\'s SPF and DMARC policy');
+        const res = await fetch(`http://127.0.0.1:${srv.address().port}/`);
+        assert.strictEqual(res.status, 200, 'the home answers');
+        const home = await res.text();
         const rot = home.match(/<h1>Small tools that <span class="hm-rot" id="tool-headline">(.*?)<\/span><\/h1>/s);
         assert.ok(rot, 'the headline ends in the rotating phrases');
         const links = Array.from(rot[1].matchAll(/<a class="hm-ph( is-on)?" href="([^"]+)"([^>]*)>([^<]+)<\/a>/g));
