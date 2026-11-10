@@ -170,29 +170,38 @@
     var q0 = new URL(location.href).searchParams.get('q'); if (q0) { input.value = q0; show(q0, false); }
 })();
 
-// Keep one server-rendered phrase for reduced motion; changes never enter an aria-live region.
+// The headline's phrases are links already in the page; this shows them in turn, once through, then rests on the
+// first. The button pauses, or plays it again. Reduced motion keeps the first. Never an aria-live region.
 (function () {
     const el = document.getElementById('tool-headline');
-    if (!el) return;
+    const items = el ? Array.from(el.querySelectorAll('.hm-ph')) : [];
+    if (items.length < 2) return;
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    let phrases; try { phrases = JSON.parse(el.dataset.phrases); } catch { return; }
-    if (!Array.isArray(phrases) || phrases.length < 2) return;
-    let i = 0, timer, paused = false;
     const control = document.getElementById('headline-motion');
-    const update = () => {
-        clearInterval(timer);
-        if (control) control.hidden = motion.matches;
-        if (!motion.matches && !paused && !document.hidden) timer = setInterval(() => {
-            i = (i + 1) % phrases.length; el.textContent = phrases[i] + '.';
-        }, 4500);
-        if (motion.matches) { i = 0; el.textContent = phrases[0] + '.'; }
+    let i = 0, timer = 0, paused = false, rested = false;
+    const show = (n) => {
+        const from = items[i], to = items[n];
+        if (from === to) return;
+        from.classList.add('is-out'); from.classList.remove('is-on'); from.setAttribute('aria-hidden', 'true'); from.tabIndex = -1;
+        setTimeout(() => from.classList.remove('is-out'), 500);
+        to.classList.add('is-on'); to.removeAttribute('aria-hidden'); to.removeAttribute('tabindex');
+        i = n;
     };
-    if (control) control.addEventListener('click', () => {
-        paused = !paused;
-        const say = paused ? 'Play the headline' : 'Pause the headline';
-        control.setAttribute('aria-label', say); control.title = say; control.classList.toggle('is-paused', paused);
-        update();
-    });
+    const update = () => {
+        clearInterval(timer); timer = 0;
+        if (control) control.hidden = motion.matches;
+        if (motion.matches) { show(0); return; }
+        if (!paused && !rested && !document.hidden) timer = setInterval(() => {
+            if (el.matches(':hover') || el.contains(document.activeElement)) return;
+            const next = (i + 1) % items.length;
+            show(next);
+            if (next === 0) { rested = true; update(); }
+        }, 3200);
+        if (!control) return;
+        const say = paused || rested ? 'Play the headline' : 'Pause the headline';
+        control.setAttribute('aria-label', say); control.title = say; control.classList.toggle('is-paused', paused || rested);
+    };
+    if (control) control.addEventListener('click', () => { if (rested) rested = paused = false; else paused = !paused; update(); });
     motion.addEventListener('change', update);
     document.addEventListener('visibilitychange', update);
     update();

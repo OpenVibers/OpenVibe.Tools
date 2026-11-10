@@ -13,7 +13,7 @@ const BUDGETS = {
     htmlRawKB: 225,       // 206 measured with all 184 crawlable tool rows; room for populated ranking rows
     htmlBrotliKB: 29,      // 26.5 measured with the complete category ItemLists
     jsFiles: 6,           // 5
-    jsRawKB: 365,         // 361.2: the Frame plus the kit's behaviour file (kit-web.js) for the drifting strip, 2026-11-09
+    jsRawKB: 366,         // 365.5: the headline's phrases as links with an animated swap (+0.6), 2026-11-10; 361.2 on 11-09 plus the Frame's growth since
     jsBrotliKB: 88,       // 86.2 with openvibe-shared 4.163.0, 2026-11-09
     cssFiles: 1,          // 1: the kit's stylesheet
     externalFiles: 3,     // 1 in production
