@@ -80,7 +80,7 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'", "unpkg.com", "cdn.jsdelivr.net", "static.cloudflareinsights.com", "https://openvibe.network"],
       styleSrc: ["'self'", "'unsafe-inline'", "unpkg.com", "cdn.jsdelivr.net", "fonts.googleapis.com"],
-      imgSrc: ["'self'", "data:", "blob:", "*.tile.openstreetmap.org", "*.basemaps.cartocdn.com", "server.arcgisonline.com", "image.tmdb.org", "*.wp.com"],
+      imgSrc: ["'self'", "data:", "blob:", "*.tile.openstreetmap.org", "*.basemaps.cartocdn.com", "server.arcgisonline.com", "image.tmdb.org", "*.wp.com", "https://openvibe.media"],
       // openvibe.events: release notifications (release-watch's EventSource, openvibe-shared 2.13.0).
       // The navbar's Messages count asks Chat (openvibe-shared 4.130.0).
       connectSrc: ["'self'", "https://openvibe.chat", "nominatim.openstreetmap.org", "api.weather.gov", "api.open-meteo.com", "*.tile.openstreetmap.org", "*.basemaps.cartocdn.com", "server.arcgisonline.com", "https://openvibe.network", "https://openvibe.events", "https://cloudflareinsights.com"],
