@@ -27,6 +27,7 @@ function createHub({ WebSocketServer, store, now = Date.now }) {
                     if (m.type === 'status') {
                         if (!Array.isArray(m.capabilities) || m.capabilities.some(x => !TYPES.includes(x)) || !Number.isInteger(m.slots) || m.slots < 1 || m.slots > 8 || !Number.isInteger(m.free) || m.free < 0 || m.free > m.slots || !Number.isFinite(m.load) || m.load < 0) { ws.close(1008); return; }
                         Object.assign(c, { capabilities: m.dry ? [] : [...new Set(m.capabilities)], slots: m.slots, free: m.dry ? 0 : m.free, load: m.load, last: now() });
+                        ws.send(JSON.stringify({ type: 'heartbeat' })); // Also keeps the reverse proxy's upstream read deadline alive.
                     } else if (m.type === 'result') {
                         const p = c.pending.get(m.id);
                         if (!p) return;
