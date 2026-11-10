@@ -1,0 +1,11 @@
+[Unit]
+Description=Check for a released Tools worker daily
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=1d
+RandomizedDelaySec=1h
+Persistent=yes
+
+[Install]
+WantedBy=timers.target

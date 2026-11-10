@@ -79,6 +79,7 @@ app.post('/api/internal/workers/dispatch', (req, res, next) => {
     catch { if (!res.headersSent) res.status(503).json({ error: 'Worker placement unavailable' }); }
 });
 
+app.get('/worker/install.sh', (_req, res) => { res.type('text/plain'); res.sendFile(require('path').resolve(__dirname, '../../worker/install.sh')); });
 app.get('/api/v1/workers/status', async (_req, res) => {
     try { res.json({ protocol: 1, dry_run: true, transport: 'outbound-websocket', accepts: ['img.process', 'docs.process', 'audio.process'], routing_enabled: !!(await workerStore.routing())?.enabled, strategy: 'owner-order/free-slots/recent-latency', fallback: 'host' }); }
     catch { res.status(503).json({ error: 'Worker registry unavailable' }); }
