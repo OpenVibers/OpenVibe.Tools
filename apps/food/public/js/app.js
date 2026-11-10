@@ -52,7 +52,7 @@
   async function loadFoodBanks() {
     if (!state.location) { $('#food-banks-list').innerHTML = '<div class="empty-state"><i class="fa-solid fa-location-dot fa-3x"></i><p>Enter your location above to find nearby food banks</p></div>'; return; }
     const c = $('#food-banks-list');
-    c.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Finding food banks...</p></div>';
+    c.innerHTML = '<div class="loading-state"><span class="ov-mark" data-state="busy" data-size="32" aria-hidden="true"></span><p>Finding food banks...</p></div>';
     try {
       const { lat, lon } = state.location;
       const res = await fetch(`${API}/api/food-banks?lat=${lat}&lon=${lon}&radius=10`);
@@ -82,7 +82,7 @@
   async function loadStores() {
     if (!state.location) { $('#stores-list').innerHTML = '<div class="empty-state"><i class="fa-solid fa-cart-shopping fa-3x"></i><p>Enter your location to find nearby stores</p></div>'; return; }
     const c = $('#stores-list');
-    c.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Finding stores...</p></div>';
+    c.innerHTML = '<div class="loading-state"><span class="ov-mark" data-state="busy" data-size="32" aria-hidden="true"></span><p>Finding stores...</p></div>';
     try {
       const { lat, lon } = state.location;
       const res = await fetch(`${API}/api/stores?lat=${lat}&lon=${lon}`);
@@ -115,7 +115,7 @@
     const camp = $('#mp-camp')?.checked;
     const shelf = $('#mp-shelf')?.checked;
     const rc = $('#meal-results');
-    rc.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Optimizing meals...</p></div>';
+    rc.innerHTML = '<div class="loading-state"><span class="ov-mark" data-state="busy" data-size="32" aria-hidden="true"></span><p>Optimizing meals...</p></div>';
     try {
       const res = await fetch(`${API}/api/meal-plan?budget=${budget}&days=${days}&campFriendly=${camp}&shelfStable=${shelf}&randomize=true`);
       const plan = await res.json();
@@ -157,7 +157,7 @@
 
   async function loadFoodDb() {
     const c = $('#food-list');
-    c.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Loading food database...</p></div>';
+    c.innerHTML = '<div class="loading-state"><span class="ov-mark" data-state="busy" data-size="32" aria-hidden="true"></span><p>Loading food database...</p></div>';
     try {
       const res = await fetch(`${API}/api/foods`);
       allFoods = await res.json();
