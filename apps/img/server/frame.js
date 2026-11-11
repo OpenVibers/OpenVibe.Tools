@@ -243,11 +243,7 @@ function verbFor(rec) {
  */
 function boxFor(rec) {
     const accept = 'image/png,image/jpeg,image/webp,image/avif,image/tiff,image/bmp,image/gif,image/heic,image/heif,image/svg+xml,image/x-icon,image/vnd.microsoft.icon';
-    const drop = kit.drop({
-        name: 'file', accept, id: 'file-input',
-        label: 'Drop an image here',
-        hint: 'PNG, JPG, WebP, AVIF, HEIC, SVG, GIF, ICO, TIFF, BMP',
-    });
+    const drop = frame.upload({ accept, label: 'Choose an image', hint: 'PNG, JPG, WebP, AVIF, HEIC, SVG, GIF, ICO, TIFF or BMP', maxBytes: config.upload.maxFileSize });
     return `<form class="ovk-tool-form" id="ovk-img-form" enctype="multipart/form-data" data-ovk-tool-form>`
         + drop
         + `<p class="ovk-try"><span>Try</span><a href="/sample.png" data-ovk-sample="/sample.png">A sample image</a></p>`

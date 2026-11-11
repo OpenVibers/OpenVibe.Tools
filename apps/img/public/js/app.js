@@ -23,6 +23,7 @@
     const processBtn = $('#process-btn');
     const clearBtn = $('#clear-btn');
     const kit = () => window.OpenVibeKit;
+    let uploadUI = null;
 
     // ── Init ─────────────────────────────────────────────────
     async function init() {
@@ -129,9 +130,7 @@
     // ── The box: the drop zone ───────────────────────────────
     function initDrop() {
         if (!fileInput) return;
-        fileInput.addEventListener('change', () => {
-            if (fileInput.files && fileInput.files.length) handleFile(fileInput.files[0]);
-        });
+        uploadUI = window.OVToolFrame && OVToolFrame.upload((files) => files.length ? handleFile(files[0]) : resetUpload(false));
         if (clearBtn) clearBtn.addEventListener('click', resetUpload);
 
         // "Try": the sample picture goes into the drop zone as if it had been chosen.
@@ -162,9 +161,10 @@
         hideAnswer();
     }
 
-    function resetUpload() {
+    function resetUpload(clearPicker = true) {
         selectedFile = null;
         if (fileInput) fileInput.value = '';
+        if (clearPicker && uploadUI) uploadUI.clear();
         if (optionsPanel) optionsPanel.hidden = true;
         if (processBtn) processBtn.disabled = true;
         hideAnswer();
@@ -248,10 +248,13 @@
         showWorking();
 
         try {
-            const job = await OVJobs.submit({ type: 'img.process', input, files: [selectedFile] });
+            if (uploadUI) uploadUI.start();
+            const job = await OVJobs.submit({ type: 'img.process', input, files: [selectedFile], onProgress: uploadUI ? (p) => uploadUI.progress(p.loaded, p.total) : null });
+            if (uploadUI) uploadUI.done();
             OVJobs.remember(job.id);
             followJob(job);
         } catch (err) {
+            if (uploadUI) uploadUI.fail(err.message);
             failProcessing(err.message);
         }
     }

@@ -242,8 +242,14 @@
             update();
         };
         // Logo: read, shrunk to 512 px, kept as a data URL inside the SVG.
-        $('qr-logo').onchange = (e) => {
-            const file = e.target.files && e.target.files[0]; if (!file) return;
+        const logoRoot = $('qr-logo-picker');
+        const logoPicker = OVUpload.picker(logoRoot, { label: 'Choose a logo image', accept: 'image/*', multiple: false,
+            onFile: (file, row) => {
+            logoPicker.rows.querySelectorAll('.ov-upload__row').forEach((old) => { if (old !== row) { old.dispatchEvent(new Event('remove')); old.remove(); } });
+            if (!file.type.startsWith('image/') || file.size > 20 * 1048576) {
+                row.dispatchEvent(new Event('remove')); row.remove();
+                toast('Choose an image under 20 MB.'); return;
+            }
             const img = new Image();
             img.onload = () => {
                 const k = Math.min(1, 512 / Math.max(img.width, img.height));
@@ -256,8 +262,10 @@
             };
             img.onerror = () => toast('That file is not a picture this browser can read');
             img.src = URL.createObjectURL(file);
-        };
-        $('qr-logo-clear').onclick = () => { st.logo = null; $('qr-logo').value = ''; $('qr-logo-name').textContent = ''; $('qr-logo-clear').hidden = true; update(); };
+            },
+            onRemove: () => { st.logo = null; $('qr-logo-name').textContent = ''; $('qr-logo-clear').hidden = true; update(); },
+        });
+        $('qr-logo-clear').onclick = () => { logoPicker.rows.querySelectorAll('.ov-upload__row').forEach((row) => row.dispatchEvent(new Event('remove'))); logoPicker.rows.replaceChildren(); st.logo = null; $('qr-logo-name').textContent = ''; $('qr-logo-clear').hidden = true; update(); };
         bindRange('qr-logo-size', 'qr-logo-size-o', (v) => `${v}%`, (v) => { st.logoSize = v; update(); });
         seg($('qr-ecc'), [['auto', 'Auto'], ['L', 'L 7%'], ['M', 'M 15%'], ['Q', 'Q 25%'], ['H', 'H 30%']], st.ecc, (v) => { st.ecc = v; update(); });
         $('qr-quiet').value = st.quiet; $('qr-px').value = st.px; $('qr-dpi').value = String(st.dpi);
@@ -714,18 +722,25 @@
             };
             shot.src = url;
         }
+        const scanPicker = OVUpload.picker($('sc-picture-picker'), {
+            label: 'Choose a picture to scan', accept: 'image/*', multiple: false,
+            onFile: (file, row) => {
+                scanPicker.rows.querySelectorAll('.ov-upload__row').forEach((old) => { if (old !== row) { old.dispatchEvent(new Event('remove')); old.remove(); } });
+                if (!file.type.startsWith('image/') || file.size > 20 * 1048576) {
+                    row.dispatchEvent(new Event('remove')); row.remove();
+                    toast('Choose an image under 20 MB.'); return;
+                }
+                picture(file);
+            },
+            onRemove: () => { stop(); shot.hidden = true; drop.hidden = false; },
+        });
         $('sc-start').onclick = () => start();
         $('sc-stop').onclick = () => { stop(); drop.hidden = false; shot.hidden = true; };
         $('sc-flip').onclick = () => { if (!devices.length) return; deviceIdx = (deviceIdx + 1) % devices.length; start(devices[deviceIdx].deviceId); };
         $('sc-torch').onclick = async () => { const t = stream && stream.getVideoTracks()[0]; if (!t) return; torch = !torch; try { await t.applyConstraints({ advanced: [{ torch }] }); $('sc-torch').setAttribute('aria-pressed', String(torch)); } catch { toast('The torch is not available'); } };
-        $('sc-file').onchange = (e) => picture(e.target.files[0]);
-        $('sc-file2').onchange = (e) => picture(e.target.files[0]);
+        $('sc-again').onclick = () => scanPicker.input.click();
         $('sc-clear').onclick = () => { history = []; store.set('ov_codes_scans', []); renderHistory(); };
-        const view = $('sc-view');
-        ['dragenter', 'dragover'].forEach((ev) => view.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
-        ['dragleave', 'drop'].forEach((ev) => view.addEventListener(ev, () => drop.classList.remove('over')));
-        view.addEventListener('drop', (e) => { e.preventDefault(); const f = e.dataTransfer && e.dataTransfer.files[0]; if (f) picture(f); });
-        document.addEventListener('paste', (e) => { const item = [...(e.clipboardData ? e.clipboardData.items : [])].find((i) => i.type.startsWith('image/')); if (item) picture(item.getAsFile()); });
+        document.addEventListener('paste', (e) => { const item = [...(e.clipboardData ? e.clipboardData.items : [])].find((i) => i.type.startsWith('image/')); if (item) scanPicker.add([item.getAsFile()]); });
         window.addEventListener('pagehide', stop);
         document.addEventListener('visibilitychange', () => { if (document.hidden && stream) stop(); });
         renderHistory();

@@ -40,6 +40,8 @@ const bwipjs = require('bwip-js');
     // ── Vendor files: the page asks for exactly what the server serves ──
     for (const url of [vendor.urls.bwip, vendor.urls.zxing]) assert.ok(html.includes(`src="${url}"`) || html.includes(`data-zxing="${url}"`), `codes.html loads ${url}`);
     assert.ok(html.includes(`data-zxing-wasm="${vendor.urls.zxingWasm}"`), 'the reader finds its WebAssembly on this host');
+    assert.ok(html.includes('/shared/ov-upload.css') && html.includes('/shared/ov-upload.js'), 'local picture tools use the shared picker');
+    assert.ok(html.includes('id="qr-logo-picker"') && html.includes('id="sc-picture-picker"'), 'both picture inputs have a kit mount');
     for (const f of Object.values(vendor.map)) assert.ok(fs.statSync(f.file).size > 10000, `${f.file} exists`);
 
     // ── The image API ──
