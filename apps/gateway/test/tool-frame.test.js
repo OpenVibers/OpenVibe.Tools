@@ -13,6 +13,8 @@ const { frameFor } = require('../server/seo/frame');
 const PUB = path.join(__dirname, '..', 'public');
 const net = (sub, q) => renderTool(path.join(PUB, 'net.html'), sub, null, q ? { q } : {});
 const dev = (sub, q) => renderTool(path.join(PUB, 'dev.html'), sub, null, q ? { q } : {});
+assert.match(frameFor(CATALOG.get('dns')), /<button type="submit" class="ovk-btn ovk-btn--primary ovk-tool-go" data-ov-guide="tools.job"/,
+    'the live framed DNS page exposes the real run control to Quest');
 
 /** The frame's order: each marker appears once, and in this order. */
 function inOrder(html, parts) {

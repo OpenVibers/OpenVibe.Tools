@@ -197,7 +197,11 @@ function inputFor(rec, value = '') {
             inputmode: URL_TOOLS.has(rec.sub) ? 'url' : 'text',
             tries: tryItems(rec).length ? { items: tryItems(rec) } : null,
         });
-        return `${input}<div id="options-area" class="ovk-tool-options"></div>`;
+        // Framed tool pages use the kit's submit button, not net.html's legacy hub button.
+        const guided = rec.sub === 'dns'
+            ? input.replace('class="ovk-btn ovk-btn--primary ovk-tool-go"', 'class="ovk-btn ovk-btn--primary ovk-tool-go" data-ov-guide="tools.job"')
+            : input;
+        return `${guided}<div id="options-area" class="ovk-tool-options"></div>`;
     }
 
     const ex = rec.examples || [];
