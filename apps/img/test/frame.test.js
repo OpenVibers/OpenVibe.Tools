@@ -46,7 +46,7 @@ function factsOf(html) {
             'class="ovk-family"', 'class="ovk-tool-folds"', 'People also use',
         ]);
         assert.ok(html.includes('https://img.openvibe.tools/">Image tools'), `${host}: the crumb is the family`);
-        assert.ok(html.includes('class="ovk-drop"'), `${host}: a drop zone`);
+        assert.ok(html.includes('data-ov-tool-upload') && html.includes('data-max-bytes='), `${host}: shared upload picker with limit`);
         assert.ok(html.includes('data-ovk-sample'), `${host}: a sample to try`);
         assert.ok(html.includes('aria-current="page"'), `${host}: the family marks this tool`);
         assert.ok(html.includes('Use it from code') && html.includes('https://openvibe.tools/api/v1/tools/'), `${host}: the API fold`);
@@ -132,4 +132,3 @@ function factsOf(html) {
     }
         console.log(`tool frame (img): ${HOSTS.length} image pages framed, the terms from the config, the verb buttons: all checks passed`);
 })().catch((err) => { console.error(err); process.exit(1); });
-

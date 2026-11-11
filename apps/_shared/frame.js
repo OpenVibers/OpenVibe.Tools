@@ -37,6 +37,14 @@ module.exports = function createFrame({ kit, serve }) {
         return `${Math.round(b / 1024)} KB`;
     }
 
+    /** The file tool's native input is kept for samples; OVUpload draws the visible picker. */
+    function upload({ accept, label, hint, multiple = false, maxBytes, maxFiles = 1 }) {
+        return `<input type="file" id="file-input" accept="${esc(accept)}"${multiple ? ' multiple' : ''} hidden>`
+            + `<div data-ov-tool-upload data-label="${esc(label)}" data-max-bytes="${Number(maxBytes)}" data-max-files="${Number(maxFiles)}"></div>`
+            + `<p>${esc(hint || 'Choose a supported file')} · up to ${maxFiles} file${maxFiles === 1 ? '' : 's'}, ${size(maxBytes)} each.</p>`
+            + `<p role="alert" data-ov-tool-upload-error hidden></p><div data-ov-tool-upload-progress></div>`;
+    }
+
     /**
      * The terms of a tool, from its real configuration.
      * @param {object} s
@@ -225,5 +233,5 @@ module.exports = function createFrame({ kit, serve }) {
         };
     }
 
-    return { terms, field, labelOf, head, verbButton, folds, page, assets, size, SITE };
+    return { terms, field, labelOf, head, verbButton, folds, page, assets, upload, size, SITE };
 };

@@ -121,11 +121,7 @@ function boxFor(rec) {
     const spec = SPEC.get(rec.spec);
     const many = (spec && spec.files && spec.files.max) > 1;
     const accept = (spec && spec.files && spec.files.accept) || ['application/pdf'];
-    const drop = kit.drop({
-        name: 'file', accept: accept.join(','), id: 'file-input', multiple: many,
-        label: many ? 'Drop your documents here' : 'Drop a document here',
-        hint: many ? 'Up to 50 files at once' : 'A PDF, a picture, or both',
-    });
+    const drop = frame.upload({ accept: accept.join(','), label: many ? 'Choose documents' : 'Choose a document', hint: 'Accepted formats for this tool: ' + accept.join(', '), multiple: many, maxBytes: config.upload.maxFileSize, maxFiles: many ? 50 : 1 });
     return `<form class="ovk-tool-form" id="ovk-docs-form" enctype="multipart/form-data" data-ovk-tool-form>`
         + `<input type="hidden" name="tool" value="${esc(opOf(rec))}">`
         + drop

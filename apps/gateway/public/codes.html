@@ -9,6 +9,7 @@
 <meta name="color-scheme" content="dark light">
 <link rel="apple-touch-icon" href="/assets/logo-192.png">
 <link rel="manifest" href="/manifest.webmanifest">
+<link rel="stylesheet" href="/shared/ov-upload.css">
 <meta name="description" content="Make QR codes, barcodes and Data Matrix, scan them with your camera or a picture, and check GTIN, ISBN and GS1 numbers. Free, in your browser.">
 <meta property="og:title" content="Barcode & QR Tools">
 <meta property="og:description" content="Make, scan and check QR codes, barcodes and Data Matrix, in your browser.">
@@ -303,10 +304,11 @@ table.ais td.v{font-family:var(--mono);word-break:break-all}
         <details class="panel" id="qr-logo-panel">
           <summary>Logo</summary>
           <div class="row" style="align-items:center">
-            <label class="btn"><svg class="ic"><use href="#i-upload"/></svg>Choose a picture<input type="file" id="qr-logo" accept="image/*" class="sr"></label>
+            <div id="qr-logo-picker"></div>
             <button type="button" class="btn ghost" id="qr-logo-clear" hidden><svg class="ic"><use href="#i-trash"/></svg>Remove</button>
             <span class="muted" id="qr-logo-name"></span>
           </div>
+          <p class="muted">An image up to 20 MB. The logo is resized in your browser; it is never uploaded.</p>
           <div class="field" style="margin-top:10px"><span class="lbl">Logo size</span><div class="range"><input type="range" id="qr-logo-size" min="12" max="30" value="22" aria-label="Logo size"><output id="qr-logo-size-o">22%</output></div><small>Error correction rises to H (30%) with a logo, and the code is checked after every change.</small></div>
         </details>
         <details class="panel">
@@ -407,7 +409,7 @@ table.ais td.v{font-family:var(--mono);word-break:break-all}
             <p>Point your camera at a code, or drop, paste (<span class="kbd">Ctrl</span>+<span class="kbd">V</span>) or choose a picture. Every code in it is read.</p>
             <div class="row" style="justify-content:center">
               <button type="button" class="btn primary" id="sc-start"><svg class="ic"><use href="#i-camera"/></svg>Start camera</button>
-              <label class="btn"><svg class="ic"><use href="#i-image"/></svg>Choose a picture<input type="file" id="sc-file" accept="image/*" class="sr"></label>
+              <div id="sc-picture-picker"></div>
             </div>
           </div>
         </div>
@@ -415,10 +417,11 @@ table.ais td.v{font-family:var(--mono);word-break:break-all}
           <button type="button" class="btn" id="sc-stop" hidden><svg class="ic"><use href="#i-stop"/></svg>Stop</button>
           <button type="button" class="btn" id="sc-flip" hidden><svg class="ic"><use href="#i-flip"/></svg>Switch camera</button>
           <button type="button" class="btn" id="sc-torch" hidden aria-pressed="false"><svg class="ic"><use href="#i-bolt"/></svg>Torch</button>
-          <label class="btn ghost" id="sc-again" hidden><svg class="ic"><use href="#i-image"/></svg>Another picture<input type="file" id="sc-file2" accept="image/*" class="sr"></label>
+          <button type="button" class="btn ghost" id="sc-again" hidden><svg class="ic"><use href="#i-image"/></svg>Another picture</button>
           <label class="check" style="margin-left:auto"><input type="checkbox" id="sc-beep" checked> Sound</label>
         </div>
         <p class="muted" id="sc-engine" style="font-size:.8rem;margin:8px 0 0"></p>
+        <p class="muted">Choose or drop an image up to 20 MB. Scanning happens in your browser; the picture is never uploaded.</p>
       </div>
       <div>
         <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px"><b>Found</b><button type="button" class="btn small ghost" id="sc-clear"><svg class="ic"><use href="#i-trash"/></svg>Clear history</button></div>
@@ -521,6 +524,7 @@ table.ais td.v{font-family:var(--mono);word-break:break-all}
 <script src="/js/codes/draw.js"></script>
 <script src="/js/codes/read.js" id="codes-read" data-zxing="/vendor/zxing-wasm@3.1.5/reader.js" data-zxing-wasm="/vendor/zxing-wasm@3.1.5/zxing_reader.wasm"></script>
 <script src="/vendor/bwip-js@4.11.4/bwip-js.min.js" defer></script>
+<script src="/shared/ov-upload.js" defer></script>
 <script src="/js/codes/app.js" defer></script>
 </body>
 </html>

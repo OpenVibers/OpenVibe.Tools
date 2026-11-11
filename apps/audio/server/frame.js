@@ -141,11 +141,7 @@ function boxFor(rec, host) {
     const spec = SPEC.get(rec.id === 'hub' ? 'convert' : rec.id);
     const many = (spec && spec.files && spec.files.max) > 1;
     const accept = (spec && spec.files && spec.files.accept) || AUDIO_ACCEPT;
-    const drop = kit.drop({
-        name: 'file', accept: accept.join(','), id: 'file-input', multiple: many,
-        label: many ? 'Drop your recordings here' : 'Drop a recording here',
-        hint: many ? 'Up to five files at once' : 'MP3, WAV, FLAC, OGG, M4A, AAC, Opus, WMA, AIFF, MP4, WebM',
-    });
+    const drop = frame.upload({ accept: accept.join(','), label: many ? 'Choose recordings' : 'Choose a recording', hint: 'MP3, WAV, FLAC, OGG, M4A, AAC, Opus, WMA, AIFF, MP4 or WebM', multiple: many, maxBytes: config.upload.maxFileSize, maxFiles: many ? 5 : 1 });
     return `<form class="ovk-tool-form" id="ovk-audio-form" enctype="multipart/form-data" data-ovk-tool-form>`
         + drop
         + `<p class="ovk-try"><span>Try</span><a href="/sample.mp3" data-ovk-sample="/sample.mp3">A sample recording</a></p>`
