@@ -13,6 +13,7 @@ const { schemaDoc } = require('../../_shared/tools/descriptor');
 const { ajvFrom, createInputValidator } = require('../../_shared/tools/run');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'net.html'), 'utf8');
+assert.match(html, /id="btn-go" data-ov-guide="tools.job"/, 'the network diagnostic run control has a stable quest hook');
 const slice = (from, to) => { const a = html.indexOf(from), b = html.indexOf(to, a); assert.ok(a >= 0 && b > a, `net.html: ${from}`); return html.slice(a, b); };
 const TOOLS = new Function(`${slice('const TOOLS = {', 'const CATS = {')}; return TOOLS;`)();
 const { runFields, runInput } = new Function(`${slice('function runFields(', '// ── Run the active tool')}; return { runFields, runInput };`)();
