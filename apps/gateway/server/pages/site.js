@@ -686,15 +686,75 @@ function send(req, res, key, render, type, extra) {
     res.send(e.html);
 }
 
+// /workers (tools-anywhere, part 4; its look 2026-11-11): lend a computer to Tools. Three steps in the order a person
+// takes them (check, install, turn on), the facts as chips, the one command with Copy. Page-scoped styles (wk-*).
+const WORKERS_CSS = `.wk{max-width:880px;margin:0 auto;padding:8px 0 24px}
+.wk-kicker{margin:0 0 8px;font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--accent-light,#60a5fa)}
+.wk h1{margin:0 0 12px;font-size:clamp(30px,5vw,46px);line-height:1.06;letter-spacing:-.03em;font-weight:800}
+.wk-sub{margin:0 0 18px;max-width:60ch;font-size:clamp(15.5px,1.6vw,17.5px);line-height:1.55;color:var(--text-secondary,#a8b3c4)}
+.wk-facts{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 28px;padding:0;list-style:none}
+.wk-facts li{display:inline-flex;align-items:center;gap:7px;min-height:34px;padding:0 12px;border-radius:999px;border:1px solid var(--border,rgba(148,163,184,.18));background:color-mix(in srgb,var(--text-primary,#e6edf7) 4%,transparent);font-size:13.5px;font-weight:600;color:var(--text-primary,#e6edf7)}
+.wk-facts svg{width:16px;height:16px;color:var(--accent-light,#60a5fa)}
+.wk-steps{counter-reset:wk;display:grid;gap:12px;margin:0 0 24px;padding:0;list-style:none}
+.wk-step{counter-increment:wk;position:relative;min-width:0;padding:16px 18px 16px 72px;border-radius:18px;border:1px solid var(--border,rgba(148,163,184,.16));background:var(--bg-card,#111a2b)}
+.wk-step::before{content:counter(wk);position:absolute;left:18px;top:16px;display:grid;place-items:center;width:36px;height:36px;border-radius:12px;background:color-mix(in srgb,var(--accent,#3b82f6) 16%,transparent);color:var(--accent-light,#60a5fa);font-weight:800;font-size:16px}
+.wk-step h2{margin:5px 0 4px;font-size:18px;letter-spacing:-.01em}
+.wk-step p{margin:0;color:var(--text-secondary,#a8b3c4);line-height:1.55}
+.wk-step small{display:block;margin-top:8px;color:var(--text-muted,#7d8aa0);font-size:13px}
+.wk-step.is-owner{border-style:dashed}
+.wk-code{display:flex;align-items:center;gap:8px;min-width:0;margin:10px 0 0;padding:6px 6px 6px 14px;border-radius:12px;background:#070b14;border:1px solid var(--border,rgba(148,163,184,.16))}
+.wk-code code{flex:1;min-width:0;overflow-x:auto;white-space:nowrap;padding:6px 0;font:13.5px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#d6e2f5;scrollbar-width:thin}
+.wk-copy{flex:none;height:34px;padding:0 12px;border:0;border-radius:9px;background:color-mix(in srgb,var(--text-primary,#e6edf7) 9%,transparent);color:var(--text-primary,#e6edf7);font:inherit;font-size:13px;font-weight:650;cursor:pointer}
+.wk-copy:hover,.wk-copy:focus-visible{background:color-mix(in srgb,var(--accent,#3b82f6) 22%,transparent)}
+.wk-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0 0 20px}
+.wk-card{padding:16px 18px;border-radius:18px;background:color-mix(in srgb,var(--text-primary,#e6edf7) 3%,transparent);border:1px solid var(--border,rgba(148,163,184,.12))}
+.wk-card h2{margin:0 0 6px;font-size:16px}
+.wk-card p{margin:0;color:var(--text-secondary,#a8b3c4);line-height:1.55;font-size:14.5px}
+.wk-api{display:inline-flex;align-items:center;gap:8px;min-height:44px;font-weight:650;color:var(--accent-light,#60a5fa);text-decoration:none}
+.wk-api:hover{text-decoration:underline}
+@media (max-width:640px){.wk-cards{grid-template-columns:1fr}.wk-step{padding:14px 14px 14px 60px}.wk-step::before{left:14px;top:14px;width:32px;height:32px;border-radius:10px}}`;
+
+const WK_IC = {
+    out: '<path d="M7 17L17 7M9 7h8v8"/>',
+    size: '<path d="M4 7h16M4 12h10M4 17h6"/>',
+    slots: '<rect x="4" y="5" width="16" height="6" rx="2"/><rect x="4" y="13" width="16" height="6" rx="2"/>',
+    cpu: '<rect x="7" y="7" width="10" height="10" rx="2"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/>',
+    update: '<path d="M20 11a8 8 0 1 0-2.3 5.7M20 5v6h-6"/>',
+};
+const wkIc = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${WK_IC[k]}</svg>`;
+
 function pageWorkers() {
-    return shell({ families: registry.get().families, head: head({ title: 'Run Tools on your own machine', description: 'Install an outbound Tools worker on Ubuntu.', canonical: SITE + '/workers' }), body: `<main><h1>Run Tools on your own machine</h1>
-<p>A worker transforms uploaded image, PDF and audio files. It opens an outbound encrypted connection; no inbound port or public home address is needed. URL-fetching jobs stay on the host. File transfers are limited to 16 MiB per input set and output set.</p>
-<p>On Ubuntu, use the <a href="/worker/install.sh">installer</a> and the <a href="https://github.com/OpenVibers/OpenVibe.Tools/blob/main/apps/worker/README.md">setup instructions</a>. The owner creates a worker credential once, then enables routing separately in the Tools owner console. Keep the credential in a private file, never a command argument.</p>
-<p>The service defaults to two slots, two CPU cores and a 2 GiB memory limit. A daily timer checks the deployed release and installs updates. Draining a worker stops new assignments; running jobs finish.</p>
-<h2>Check without accepting jobs</h2>
-<pre><code>bash install.sh --dry-run --prefix /tmp/tools-worker-check-new</code></pre>
-<p>Dry mode checks HTTPS and the outbound WebSocket without a credential, registration or real jobs. It requires Node 22 or newer and creates no system service.</p>
-<p><a href="/developers#worker-routing">API routing and receipts</a></p></main>` });
+    const check = 'bash install.sh --dry-run --prefix /tmp/tools-worker-check-new';
+    const steps = [
+        ['Check', 'See that your computer can reach Tools. Nothing is installed and no job runs.'],
+        ['Install', 'Run the worker as a service, with the installer and the setup instructions.'],
+        ['Turn on', "Tools' owner creates the worker's credential once and turns its routing on. Until then it takes no jobs."],
+    ];
+    const howTo = { '@context': 'https://schema.org', '@type': 'HowTo', name: 'Run OpenVibe Tools on your own machine', description: 'Lend a computer to OpenVibe Tools: check it, install the worker, turn its routing on.',
+        step: steps.map(([name, text], i) => ({ '@type': 'HowToStep', position: i + 1, name, text })) };
+    return shell({ families: registry.get().families, head: head({ title: 'Run Tools on your own machine', description: 'Lend a computer to OpenVibe Tools: it converts pictures, PDFs and audio over one outbound connection. Check, install, turn on.', canonical: SITE + '/workers',
+        jsonLd: [seo.jsonLd.breadcrumbs([{ name: 'Tools', url: SITE + '/' }, { name: 'Run on your machine', url: SITE + '/workers' }]), howTo] }), body: `<style>${WORKERS_CSS}</style><main class="wk">
+<p class="wk-kicker">For your own computers</p>
+<h1>Run Tools on your own machine</h1>
+<p class="wk-sub">Lend a computer to OpenVibe Tools. It converts uploaded pictures, PDFs and audio for people, over one encrypted connection it opens itself: no open port, no public address.</p>
+<ul class="wk-facts" aria-label="What a worker is">
+<li>${wkIc('out')}Outbound only</li><li>${wkIc('size')}16 MiB in, 16 MiB out</li><li>${wkIc('slots')}Two jobs at once</li><li>${wkIc('cpu')}2 CPU cores, 2 GiB</li><li>${wkIc('update')}Updates itself daily</li>
+</ul>
+<ol class="wk-steps">
+<li class="wk-step"><h2>${steps[0][0]}</h2><p>${steps[0][1]}</p>
+<div class="wk-code"><code id="wk-check">${check}</code><button type="button" class="wk-copy" data-wk-copy="wk-check" aria-label="Copy the command">Copy</button></div>
+<small>Ubuntu, with Node 22 or newer. It checks HTTPS and the outbound WebSocket, and makes no service.</small></li>
+<li class="wk-step"><h2>${steps[1][0]}</h2><p>Run the worker as a service, with the <a href="/worker/install.sh">installer</a> and the <a href="https://github.com/OpenVibers/OpenVibe.Tools/blob/main/apps/worker/README.md">setup instructions</a>.</p>
+<small>Keep its credential in a private file, never on a command line.</small></li>
+<li class="wk-step is-owner"><h2>${steps[2][0]}</h2><p>${steps[2][1]}</p></li>
+</ol>
+<div class="wk-cards">
+<section class="wk-card"><h2>What it runs</h2><p>Picture, PDF and audio conversions. A job that fetches a web address stays on OpenVibe's own server.</p></section>
+<section class="wk-card"><h2>Stopping it</h2><p>Drain a worker and it takes no new jobs; the ones running finish first.</p></section>
+</div>
+<a class="wk-api" href="/developers#worker-routing">API routing and receipts <span aria-hidden="true">→</span></a>
+</main>
+<script>document.querySelectorAll('[data-wk-copy]').forEach(function (b) { b.addEventListener('click', function () { var t = document.getElementById(b.getAttribute('data-wk-copy')); if (!t || !navigator.clipboard) return; navigator.clipboard.writeText(t.textContent).then(function () { b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy'; }, 1600); }); }); });</script>` });
 }
 
 function sitemapEntries() {
