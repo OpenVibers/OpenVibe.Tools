@@ -12,6 +12,7 @@
 
     var kit = window.OpenVibeKit;
     if (!kit) return;
+    var currentUpload = null;
 
     /** A file size in the words a person reads: "1.4 MB", "812 KB". */
     function size(bytes) {
@@ -68,15 +69,65 @@
         }).then(function (blob) {
             var name = String(url).split('/').pop() || 'sample';
             var file = new File([blob], name, { type: blob.type || 'application/octet-stream' });
-            var input = document.querySelector('.ovk-drop-input');
-            if (input && window.DataTransfer) {
-                var dt = new DataTransfer();
-                dt.items.add(file);
-                input.files = dt.files;
-                input.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-            if (onFile) onFile(file);
+            if (currentUpload) currentUpload.add([file]);
+            else if (onFile) onFile(file);
         }).catch(function () { /* the sample is a convenience, not a promise */ });
+    }
+
+    /** Shared picker for image, document and audio tools; their job transport owns the upload. */
+    function upload(onFiles) {
+        var root = document.querySelector('[data-ov-tool-upload]');
+        var input = document.getElementById('file-input');
+        var error = document.querySelector('[data-ov-tool-upload-error]');
+        var progressRoot = document.querySelector('[data-ov-tool-upload-progress]');
+        if (!root || !input || !error || !progressRoot || !window.OVUpload) return null;
+        var files = [];
+        var clearing = false;
+        var maxBytes = Number(root.dataset.maxBytes);
+        var maxFiles = Number(root.dataset.maxFiles);
+        var meter = OVUpload.progress(progressRoot, { onRetry: function () { document.getElementById('process-btn')?.click(); } });
+        function warn(message) { error.textContent = message; error.hidden = false; }
+        var picker = OVUpload.picker(root, {
+            label: root.dataset.label, accept: input.accept, multiple: input.multiple,
+            onFile: function (file, row) {
+                var accepted = input.accept.split(',').some(function (part) {
+                    part = part.trim().toLowerCase();
+                    return part === file.type.toLowerCase() || (part.endsWith('/*') && file.type.toLowerCase().startsWith(part.slice(0, -1))) || (part.startsWith('.') && file.name.toLowerCase().endsWith(part));
+                });
+                if (!accepted || (input.multiple && files.length >= maxFiles) || file.size > maxBytes) {
+                    row.dispatchEvent(new Event('remove')); row.remove();
+                    warn(!accepted ? 'Choose a supported file format for this tool.' : files.length >= maxFiles ? 'Choose at most ' + maxFiles + ' files.' : file.name + ' is over ' + size(maxBytes) + '.');
+                    return;
+                }
+                if (!input.multiple) {
+                    files = [];
+                    picker.rows.querySelectorAll('.ov-upload__row').forEach(function (old) {
+                        if (old !== row) { old.dispatchEvent(new Event('remove')); old.remove(); }
+                    });
+                }
+                error.hidden = true;
+                files.push(file);
+                onFiles(files.slice());
+                meter.update({ state: 'waiting', done: 0, total: files.reduce(function (sum, f) { return sum + f.size; }, 0) });
+            },
+            onRemove: function (file) {
+                files = files.filter(function (item) { return item !== file; });
+                if (!clearing) onFiles(files.slice());
+            }
+        });
+        function clear() {
+            clearing = true;
+            files = [];
+            picker.rows.querySelectorAll('.ov-upload__row').forEach(function (row) { row.dispatchEvent(new Event('remove')); });
+            picker.rows.replaceChildren();
+            clearing = false;
+            meter.update({ state: 'waiting', done: 0, total: 0 });
+        }
+        currentUpload = { add: picker.add, clear: clear, start: function () { meter.update({ state: 'sending', done: 0, total: files.reduce(function (sum, f) { return sum + f.size; }, 0) }); },
+            progress: function (done, total) { meter.update({ state: 'sending', done: done, total: total }); },
+            done: function () { var total = files.reduce(function (sum, f) { return sum + f.size; }, 0); meter.update({ state: 'done', done: total, total: total }); },
+            fail: function (message) { meter.update({ state: 'failed', message: message }); } };
+        return currentUpload;
     }
 
     /**
@@ -122,5 +173,5 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
 
-    window.OVToolFrame = { size: size, fileAnswer: fileAnswer, show: show, sample: sample, moveAnswer: moveAnswer };
+    window.OVToolFrame = { size: size, fileAnswer: fileAnswer, show: show, sample: sample, upload: upload, moveAnswer: moveAnswer };
 })();

@@ -48,7 +48,7 @@ function factsOf(html) {
             'class="ovk-family"', 'class="ovk-tool-folds"', 'People also use',
         ]);
         assert.ok(html.includes('https://audio.openvibe.tools/">Audio tools'), `${host}: the crumb is the family`);
-        assert.ok(html.includes('class="ovk-drop"'), `${host}: a drop zone`);
+        assert.ok(html.includes('data-ov-tool-upload') && html.includes('data-max-bytes='), `${host}: shared upload picker with limit`);
         assert.ok(html.includes('aria-current="page"'), `${host}: the family marks this tool`);
         assert.ok(html.includes('Use it from code') && html.includes('https://openvibe.tools/api/v1/tools/'), `${host}: the API fold`);
         assert.strictEqual((html.match(/<h1/g) || []).length, 1, `${host}: one h1`);

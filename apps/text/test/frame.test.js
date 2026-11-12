@@ -42,6 +42,15 @@ function pageOf(host, file) {
     return frameAround(html, host, { file, hostnameMap: HOSTNAME_MAP });
 }
 
+// Browser-only image tools use the same accessible picker without sending files to a server.
+for (const [host, file] of [['watermark.openvibe.tools', 'watermark.html'], ['thumbnail.openvibe.tools', 'thumbnail.html']]) {
+    const html = pageOf(host, file);
+    assert.ok(html.includes('/shared/ov-upload.css') && html.includes('/shared/ov-upload.js'), `${host}: shared picker assets`);
+    assert.ok(html.includes('OVUpload.picker(') && html.includes('role="alert"'), `${host}: picker and readable errors`);
+    assert.ok(html.includes('Your image stays in this browser.'), `${host}: local processing is explained`);
+    assert.ok(!html.includes('type="file"'), `${host}: old picker is gone`);
+}
+
 // ── Every text tool's page is a framed tool page, in the same order ──
 {
     for (const [host, file] of TOOL_HOSTS) {

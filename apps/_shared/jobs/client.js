@@ -34,6 +34,21 @@
         var files = o.files || [];
         var field = o.fileField || (files.length > 1 ? 'files' : 'file');
         for (var i = 0; i < files.length; i++) fd.append(field, files[i]);
+        if (typeof o.onProgress === 'function') return new Promise(function (resolve, reject) {
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/v1/jobs');
+            xhr.setRequestHeader('Idempotency-Key', o.idempotencyKey || newKey());
+            xhr.setRequestHeader('Accept', 'application/json');
+            xhr.upload.onprogress = function (event) { if (event.lengthComputable) o.onProgress({ loaded: event.loaded, total: event.total }); };
+            xhr.onload = function () {
+                var body;
+                try { body = JSON.parse(xhr.responseText); } catch (_) { body = null; }
+                if (xhr.status >= 200 && xhr.status < 300) resolve(body);
+                else reject(problemError({ status: xhr.status }, body));
+            };
+            xhr.onerror = function () { reject(new Error('The connection stopped. Try again.')); };
+            xhr.send(fd);
+        });
         return fetch('/api/v1/jobs', {
             method: 'POST', body: fd, credentials: 'same-origin',
             headers: { 'Idempotency-Key': o.idempotencyKey || newKey(), Accept: 'application/json' },
