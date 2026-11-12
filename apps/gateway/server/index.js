@@ -157,7 +157,7 @@ app.use(helmet({
             imgSrc: ["'self'", "data:", "blob:", "https://openvibe.network", "https://openvibe.media"],
             // openvibe.events: release notifications (release-watch's EventSource, openvibe-shared 2.13.0).
             // The navbar's Messages count asks Chat (openvibe-shared 4.130.0).
-            connectSrc: ["'self'", "https://openvibe.chat", "https://cloudflareinsights.com", "https://openvibe.network", "https://openvibe.tools", "https://*.openvibe.tools", "https://openvibe.media", "https://openvibe.live", "https://openvibe.games", "https://openvibe.events"],
+            connectSrc: ["'self'", "https://openvibe.chat", "https://cloudflareinsights.com", "https://openvibe.network", "https://openvibe.quest", "https://openvibe.tools", "https://*.openvibe.tools", "https://openvibe.media", "https://openvibe.live", "https://openvibe.games", "https://openvibe.events"],
             frameSrc: ["https://openvibe.network"], // the hidden /sso/check sign-in probe
             scriptSrcAttr: ["'unsafe-inline'"],
         },
