@@ -65,8 +65,8 @@ app.use(helmet({
         directives: {
             defaultSrc: ["'self'"],
             scriptSrc: ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "https://openvibe.network", "https://static.cloudflareinsights.com"],
-            styleSrc: ["'self'", "'unsafe-inline'"],
-            fontSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://openvibe.design"],
+            fontSrc: ["'self'", "https://openvibe.design"],
             imgSrc: ["'self'", "data:", "blob:"],
             // openvibe.events: release notifications (release-watch's EventSource, openvibe-shared 2.13.0).
             // The navbar's Messages count asks Chat (openvibe-shared 4.130.0).

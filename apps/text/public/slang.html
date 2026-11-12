@@ -15,6 +15,7 @@
 <script>
 (function(){try{var raw=localStorage.getItem('ov_theme');if(!raw)return;var t=JSON.parse(raw),v=t&&t.variables;if(!v)return;var el=document.documentElement;for(var k in v)if(k.charAt(0)==='-')el.style.setProperty(k,v[k]);if(t.id)el.setAttribute('data-theme',t.id);}catch(_){}})();
 </script>
+    <link href="https://openvibe.design/fonts/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/shared.css">
     <script src="/shared/theme-loader.js" defer></script>
     <style>
@@ -29,7 +30,7 @@
             width: 100%; padding: 14px 18px 14px 46px;
             background: var(--bg-secondary); border: 1px solid var(--border);
             border-radius: 12px; color: var(--text-primary);
-            font-size: 1rem; font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; outline: none;
+            font-size: 1rem; font-family: 'Inter', sans-serif; outline: none;
         }
         .slang-search:focus { border-color: var(--accent); }
 
@@ -40,7 +41,7 @@
             padding: 7px 16px; border-radius: 20px;
             background: var(--bg-secondary); border: 1px solid var(--border);
             color: var(--text-secondary); cursor: pointer; font-size: 0.82rem;
-            font-weight: 600; transition: all var(--ov-dur-2, 0.2s); font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+            font-weight: 600; transition: all var(--ov-dur-2, 0.2s); font-family: 'Inter', sans-serif;
         }
         .vibe-pill:hover { border-color: var(--accent); color: var(--text-primary); }
         .vibe-pill.active { background: var(--accent); color: #0b0c12; border-color: var(--accent); }
@@ -101,7 +102,7 @@
             background: var(--bg-secondary); border: 1px solid var(--border);
             color: var(--text-secondary); cursor: pointer; font-size: 0.82rem;
             font-weight: 700; display: flex; align-items: center; justify-content: center;
-            transition: all var(--ov-dur-2, 0.15s); font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+            transition: all var(--ov-dur-2, 0.15s); font-family: 'Inter', sans-serif;
         }
         .alpha-btn:hover { border-color: var(--accent); color: var(--accent); }
         .alpha-btn.active { background: var(--accent); color: #0b0c12; border-color: var(--accent); }
