@@ -15,8 +15,6 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://net.openvibe.tools">
     <link rel="canonical" href="https://net.openvibe.tools">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- Critical theme bootstrap (ov-theme-boot) — MUST stay inline and above the stylesheets.
      Paints the cached theme synchronously so the default palette never flashes. Reads
      localStorage only: no network, nothing to block on. theme-loader.js still runs after
@@ -24,7 +22,6 @@
 <script>
 (function(){try{var raw=localStorage.getItem('ov_theme');if(!raw)return;var t=JSON.parse(raw),v=t&&t.variables;if(!v)return;var el=document.documentElement;for(var k in v)if(k.charAt(0)==='-')el.style.setProperty(k,v[k]);if(t.id)el.setAttribute('data-theme',t.id);}catch(_){}})();
 </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-primary: #0b0c12;
@@ -49,14 +46,14 @@
             --shadow: 0 24px 64px rgba(0,0,0,0.4);
             --radius: 16px;
             --radius-sm: 10px;
-            --mono: 'JetBrains Mono', 'Fira Code', monospace;
+            --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         }
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html { background: var(--bg-primary); scroll-behavior: smooth; }
         body {
             min-height: 100vh;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
             overflow-x: hidden;
@@ -103,7 +100,7 @@
             font-size: 15px; color: var(--text-primary); padding: 10px 0;
             font-family: var(--mono);
         }
-        .search-bar input::placeholder { color: var(--text-muted); font-family: 'Inter', sans-serif; }
+        .search-bar input::placeholder { color: var(--text-muted); font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; }
         .search-bar .btn-go {
             padding: 10px 24px; border-radius: 10px; font-weight: 600; font-size: 14px;
             background: var(--cyan); color: #fff; white-space: nowrap;

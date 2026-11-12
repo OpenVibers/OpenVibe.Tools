@@ -8,8 +8,6 @@
 <meta name="theme-color" content="#0d131d">
 <meta name="color-scheme" content="dark light">
     <meta name="description" content="HTML escape/unescape, URL encode/decode, JSON stringify/parse, Base64, and more.">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- Critical theme bootstrap (ov-theme-boot) — MUST stay inline and above the stylesheets.
      Paints the cached theme synchronously so the default palette never flashes. Reads
      localStorage only: no network, nothing to block on. theme-loader.js still runs after
@@ -17,14 +15,13 @@
 <script>
 (function(){try{var raw=localStorage.getItem('ov_theme');if(!raw)return;var t=JSON.parse(raw),v=t&&t.variables;if(!v)return;var el=document.documentElement;for(var k in v)if(k.charAt(0)==='-')el.style.setProperty(k,v[k]);if(t.id)el.setAttribute('data-theme',t.id);}catch(_){}})();
 </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/shared.css">
     <script src="/shared/theme-loader.js" defer></script>
     <style>
         .escape-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
         .escape-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; }
         .escape-card h3 { color: var(--accent); margin: 0 0 .75rem; font-size: 1rem; }
-        .escape-card .output-box { min-height: 80px; max-height: 200px; overflow-y: auto; font-family: 'Fira Code', 'JetBrains Mono', monospace; font-size: .85rem; word-break: break-all; }
+        .escape-card .output-box { min-height: 80px; max-height: 200px; overflow-y: auto; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .85rem; word-break: break-all; }
         .escape-card .btn-row { margin-top: .75rem; }
         @media (max-width: 768px) { .escape-grid { grid-template-columns: 1fr; } }
     </style>

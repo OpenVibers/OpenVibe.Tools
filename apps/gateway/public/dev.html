@@ -15,8 +15,6 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://dev.openvibe.tools">
 <link rel="canonical" href="https://dev.openvibe.tools">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- Critical theme bootstrap (ov-theme-boot) — MUST stay inline and above the stylesheets.
      Paints the cached theme synchronously so the default palette never flashes. Reads
      localStorage only: no network, nothing to block on. theme-loader.js still runs after
@@ -24,12 +22,11 @@
 <script>
 (function(){try{var raw=localStorage.getItem('ov_theme');if(!raw)return;var t=JSON.parse(raw),v=t&&t.variables;if(!v)return;var el=document.documentElement;for(var k in v)if(k.charAt(0)==='-')el.style.setProperty(k,v[k]);if(t.id)el.setAttribute('data-theme',t.id);}catch(_){}})();
 </script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{--bg:var(--bg-primary,#0b0c12);--bg2:var(--bg-secondary,#12131c);--bg3:var(--bg-tertiary,#1a1b28);--card:var(--bg-card,rgba(22,24,36,.85));--tx:var(--text-primary,#f1f4fb);--tx2:var(--text-secondary,#a0a8c4);--tx3:var(--text-muted,#5e6580);--ac:var(--accent,#a78bfa);--acl:var(--accent-light,#c4b5fd);--brd:var(--border,rgba(255,255,255,.07));--r:16px}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{background:var(--bg)}
-body{min-height:100vh;font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--tx);-webkit-font-smoothing:antialiased}
+body{min-height:100vh;font-family:Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;background:var(--bg);color:var(--tx);-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
 .bg-glow{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
 .bg-glow::before,.bg-glow::after{content:'';position:absolute;border-radius:50%;filter:blur(120px);opacity:.35;animation:gd 20s var(--ov-ease-in-out, ease-in-out) infinite alternate}
@@ -45,13 +42,13 @@ a{color:inherit;text-decoration:none}
 .mb{padding:7px 15px;border-radius:8px;background:var(--bg3);color:var(--tx2);font-size:.82rem;font-weight:600;cursor:pointer;border:1px solid var(--brd);transition:var(--ov-dur-2, .15s)}
 .mb:hover{background:#252738;color:var(--tx)}.mb.on{background:var(--ac);color:#fff;border-color:var(--ac)}
 .io{display:flex;gap:12px;margin-bottom:12px}
-.io textarea{flex:1;min-height:200px;padding:14px;background:var(--bg2);color:var(--tx);border:1px solid var(--brd);border-radius:var(--r);font-family:'JetBrains Mono',monospace;font-size:.85rem;resize:vertical;outline:none;transition:border var(--ov-dur-2, .2s)}
+.io textarea{flex:1;min-height:200px;padding:14px;background:var(--bg2);color:var(--tx);border:1px solid var(--brd);border-radius:var(--r);font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;font-size:.85rem;resize:vertical;outline:none;transition:border var(--ov-dur-2, .2s)}
 .io textarea:focus{border-color:var(--ac)}.io textarea::placeholder{color:var(--tx3)}
 .acts{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
 .ab{padding:8px 18px;border-radius:10px;font-size:.82rem;font-weight:600;cursor:pointer;transition:var(--ov-dur-2, .15s);border:none}
 .ab-go{background:var(--ac);color:#fff}.ab-go:hover{filter:brightness(1.15)}
 .ab-s{background:var(--bg3);color:var(--tx2);border:1px solid var(--brd)}.ab-s:hover{background:#252738;color:var(--tx)}
-#out{min-height:100px;padding:16px;background:var(--bg2);border:1px solid var(--brd);border-radius:var(--r);font-family:'JetBrains Mono',monospace;font-size:.85rem;white-space:pre-wrap;word-break:break-all;overflow-x:auto;line-height:1.6}
+#out{min-height:100px;padding:16px;background:var(--bg2);border:1px solid var(--brd);border-radius:var(--r);font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;font-size:.85rem;white-space:pre-wrap;word-break:break-all;overflow-x:auto;line-height:1.6}
 #out:empty::before{content:'Output will appear here...';color:var(--tx3)}
 #out .err{color:var(--danger-text, #f87171)}#out .ok{color:var(--success-text, #34d399)}
 .dl{display:flex;font-size:.82rem;line-height:1.7}.dl .ln{width:34px;text-align:right;padding:0 6px;color:var(--tx3);user-select:none;flex-shrink:0}
@@ -393,7 +390,7 @@ P.csv=(s,m)=>{
     return{html:'<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:.82rem">'+rows.map((r,ri)=>'<tr>'+r.map(c=>'<'+(ri?'td':'th')+' style="border:1px solid var(--brd);padding:6px 10px;text-align:left;'+(ri?'':'background:var(--bg3);font-weight:700')+'">'+H(c)+'</'+(ri?'td':'th')+'>').join('')+'</tr>').join('')+'</table></div>'};
 };
 P.sql=(s,m)=>DevEngine.sql(s,m);
-P.md=(s,m)=>{const h=DevEngine.md(s);if(m==='To HTML')return h;return{html:'<div style="line-height:1.8;font-family:Inter,sans-serif;font-size:.92rem">'+h+'</div>'}};
+P.md=(s,m)=>{const h=DevEngine.md(s);if(m==='To HTML')return h;return{html:'<div style="line-height:1.8;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;font-size:.92rem">'+h+'</div>'}};
 P.html=(s,m)=>{
     if(m==='Unescape'){const d=document.createElement('div');d.innerHTML=s;return d.textContent}
     return DevEngine.html(s,m);

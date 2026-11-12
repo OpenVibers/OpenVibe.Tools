@@ -20,8 +20,8 @@
   --purple: #9b59b6;
   --orange: #e67e22;
   --cyan: #06b6d4;
-  --font: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --radius: 10px;
   --shadow: 0 4px 24px rgba(0,0,0,0.4);
 }

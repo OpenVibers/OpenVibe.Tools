@@ -79,12 +79,12 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'", "unpkg.com", "cdn.jsdelivr.net", "static.cloudflareinsights.com", "https://openvibe.network"],
-      styleSrc: ["'self'", "'unsafe-inline'", "unpkg.com", "cdn.jsdelivr.net", "fonts.googleapis.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "unpkg.com", "cdn.jsdelivr.net"],
       imgSrc: ["'self'", "data:", "blob:", "*.tile.openstreetmap.org", "*.basemaps.cartocdn.com", "server.arcgisonline.com", "image.tmdb.org", "*.wp.com", "https://openvibe.media"],
       // openvibe.events: release notifications (release-watch's EventSource, openvibe-shared 2.13.0).
       // The navbar's Messages count asks Chat (openvibe-shared 4.130.0).
       connectSrc: ["'self'", "https://openvibe.chat", "nominatim.openstreetmap.org", "api.weather.gov", "api.open-meteo.com", "*.tile.openstreetmap.org", "*.basemaps.cartocdn.com", "server.arcgisonline.com", "https://openvibe.network", "https://openvibe.events", "https://cloudflareinsights.com"],
-      fontSrc: ["'self'", "fonts.gstatic.com", "cdn.jsdelivr.net"],
+      fontSrc: ["'self'", "cdn.jsdelivr.net"],
       // The navbar checks Network's session in a hidden /sso/check frame on typed arrivals.
       frameSrc: ["https://openvibe.network"],
       scriptSrcAttr: ["'unsafe-inline'"],

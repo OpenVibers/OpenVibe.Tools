@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // Logo.OpenVibe — Canvas-based Logo / Title / Badge Generation
 // Text rendering with effects, transparent PNG/WebP export,
-// Google Fonts loading, preset templates. 100% client-side.
+// local font stacks, preset templates. 100% client-side.
 // ═══════════════════════════════════════════════════════════════
 
 (function (root) {
@@ -13,7 +13,7 @@ const PRESETS = {
         name: 'Neon Glow',
         bg: 'transparent',
         color: '#00ffff',
-        font: 'Orbitron',
+        font: 'Inter',
         shadowColor: '#00ffff',
         shadowBlur: 20,
         strokeColor: '#00aaff',
@@ -23,7 +23,7 @@ const PRESETS = {
         name: 'Retro Wave',
         bg: 'transparent',
         color: '#ff6ec7',
-        font: 'Press Start 2P',
+        font: 'Courier New',
         shadowColor: '#ff00ff',
         shadowBlur: 15,
         strokeColor: '#ffcc00',
@@ -32,7 +32,7 @@ const PRESETS = {
     gold: {
         name: 'Gold Luxury',
         bg: 'transparent',
-        font: 'Playfair Display',
+        font: 'Georgia',
         gradient: ['#c0965c', '#e1b77d', '#c0965c'],
         shadowColor: 'rgba(192, 150, 92, 0.5)',
         shadowBlur: 10,
@@ -88,7 +88,7 @@ const PRESETS = {
         name: 'Outline Only',
         bg: 'transparent',
         color: 'transparent',
-        font: 'Montserrat',
+        font: 'Inter',
         strokeColor: '#ffffff',
         strokeWidth: 3,
     },
@@ -111,7 +111,7 @@ const PRESETS = {
     streamer: {
         name: 'Streamer',
         bg: 'transparent',
-        font: 'Bangers',
+        font: 'Impact',
         gradient: ['#c0965c', '#fff'],
         shadowColor: '#000',
         shadowBlur: 8,
@@ -122,7 +122,7 @@ const PRESETS = {
         name: 'Pixel Art',
         bg: 'transparent',
         color: '#ffffff',
-        font: 'Press Start 2P',
+        font: 'Courier New',
         shadowColor: '#333333',
         shadowOffsetX: 4,
         shadowOffsetY: 4,
@@ -152,21 +152,14 @@ const PRESETS = {
     },
 };
 
-// ── Google Fonts loader ──────────────────────────────────────
-const loadedFonts = new Set(['Arial', 'Arial Black', 'Courier New', 'Georgia', 'Impact', 'Times New Roman', 'Verdana']);
-
+// ── Local fonts ──────────────────────────────────────────────
+// The house stack only: no font is fetched from a CDN. A family the device
+// does not have falls through the stacks in ctx.font below.
 async function loadFont(fontName) {
-    if (loadedFonts.has(fontName)) return;
+    if (!fontName || !document.fonts) return;
     try {
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontName)}:wght@400;700;900&display=swap`;
-        document.head.appendChild(link);
         await document.fonts.load(`48px "${fontName}"`);
-        loadedFonts.add(fontName);
-    } catch (e) {
-        console.warn(`Failed to load font: ${fontName}`, e);
-    }
+    } catch (_) { /* a missing local face just falls back */ }
 }
 
 // ── Core render function ─────────────────────────────────────
@@ -332,7 +325,7 @@ async function renderWatermark(canvas, image, text, options = {}) {
     ctx.drawImage(image, 0, 0);
 
     await loadFont(opts.font);
-    ctx.font = `${opts.fontSize}px "${opts.font}"`;
+    ctx.font = `${opts.fontSize}px "${opts.font}", sans-serif`;
     ctx.fillStyle = opts.color;
     ctx.textBaseline = 'bottom';
 
@@ -382,18 +375,12 @@ function download(canvas, filename = 'openvibe-logo.png', format = 'png') {
     link.click();
 }
 
-// ── Popular Google Fonts for logos ────────────────────────────
+// ── Fonts offered for logos ──────────────────────────────────
+// Local families and the house stack; the picker never requests a webfont.
 const POPULAR_FONTS = [
-    'Inter', 'Montserrat', 'Playfair Display', 'Oswald', 'Roboto', 'Lato',
-    'Raleway', 'Poppins', 'Merriweather', 'Source Sans 3', 'Nunito',
-    'Ubuntu', 'Rubik', 'Work Sans', 'Fira Sans', 'Quicksand',
-    'Bangers', 'Permanent Marker', 'Bebas Neue', 'Righteous',
-    'Orbitron', 'Press Start 2P', 'Silkscreen', 'Audiowide',
-    'Pacifico', 'Dancing Script', 'Lobster', 'Satisfy', 'Caveat',
-    'Abril Fatface', 'Alfa Slab One', 'Anton', 'Black Ops One',
-    'Bungee', 'Bungee Shade', 'Comfortaa', 'Concert One',
-    'Creepster', 'Fredoka One', 'Graduate', 'Luckiest Guy',
-    'Special Elite', 'Staatliches', 'VT323', 'Zilla Slab',
+    'Inter', 'Arial', 'Arial Black', 'Courier New', 'Georgia',
+    'Impact', 'Times New Roman', 'Verdana',
+    'system-ui', 'sans-serif', 'serif', 'monospace',
 ];
 
 // ── Public API ───────────────────────────────────────────────

@@ -41,7 +41,7 @@
   function toast(msg, type = 'info') {
     const bg = { info: '#22c55e', success: '#059669', error: '#ef4444', warn: '#f59e0b', warning: '#f59e0b' };
     Toastify({ text: msg, duration: 3500, gravity: 'bottom', position: 'right',
-      style: { background: bg[type] || bg.info, borderRadius: '10px', fontFamily: "'Outfit',sans-serif", fontSize: '12px', padding: '8px 16px' }
+      style: { background: bg[type] || bg.info, borderRadius: '10px', fontFamily: "Inter, system-ui, -apple-system, 'Segoe UI', sans-serif", fontSize: '12px', padding: '8px 16px' }
     }).showToast();
   }
 
@@ -816,7 +816,7 @@
     try {
       state.charts.types = new Chart($('#stats-chart'), {
         type:'doughnut', data:{ labels:labels.map(l=>l.charAt(0).toUpperCase()+l.slice(1)), datasets:[{data, backgroundColor:colors, borderWidth:0}] },
-        options:{responsive:true, plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',font:{family:'Outfit',size:11}}}}}
+        options:{responsive:true, plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',font:{family:'Inter, system-ui, -apple-system, Segoe UI, sans-serif',size:11}}}}}
       });
     } catch(e){}
 
@@ -827,7 +827,7 @@
     try {
       state.charts.sources = new Chart($('#sources-chart'), {
         type:'bar', data:{ labels:sl, datasets:[{label:'Locations',data:sd,backgroundColor:['#22c55e','#3b82f6','#f59e0b','#a855f7','#06b6d4','#ef4444','#ec4899','#64748b'],borderWidth:0,borderRadius:6}] },
-        options:{responsive:true, scales:{x:{ticks:{color:'#94a3b8',font:{family:'Outfit',size:9}},grid:{display:false}},y:{ticks:{color:'#94a3b8'},grid:{color:'rgba(34,197,94,0.06)'}}}, plugins:{legend:{display:false}}}
+        options:{responsive:true, scales:{x:{ticks:{color:'#94a3b8',font:{family:'Inter, system-ui, -apple-system, Segoe UI, sans-serif',size:9}},grid:{display:false}},y:{ticks:{color:'#94a3b8'},grid:{color:'rgba(34,197,94,0.06)'}}}, plugins:{legend:{display:false}}}
       });
     } catch(e){}
 

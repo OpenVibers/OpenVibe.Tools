@@ -8,8 +8,6 @@
 <meta name="theme-color" content="#0d131d">
 <meta name="color-scheme" content="dark light">
     <meta name="description" content="Convert between Mexican Pesos (MXN) and US Dollars (USD) with live exchange rates. Fast, no signup.">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- Critical theme bootstrap (ov-theme-boot) — MUST stay inline and above the stylesheets.
      Paints the cached theme synchronously so the default palette never flashes. Reads
      localStorage only: no network, nothing to block on. theme-loader.js still runs after
@@ -17,7 +15,6 @@
 <script>
 (function(){try{var raw=localStorage.getItem('ov_theme');if(!raw)return;var t=JSON.parse(raw),v=t&&t.variables;if(!v)return;var el=document.documentElement;for(var k in v)if(k.charAt(0)==='-')el.style.setProperty(k,v[k]);if(t.id)el.setAttribute('data-theme',t.id);}catch(_){}})();
 </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/shared.css">
     <script src="/shared/theme-loader.js" defer></script>
     <style>
@@ -53,7 +50,7 @@
         .currency-input input {
             background: transparent; border: none; outline: none;
             font-size: 1.8rem; font-weight: 700; color: var(--text-primary);
-            font-family: 'Inter', sans-serif; width: 100%;
+            font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; width: 100%;
         }
         .currency-input input::placeholder { color: var(--text-muted); }
 
@@ -93,7 +90,7 @@
             padding: 8px 16px; border-radius: 8px;
             background: var(--bg-secondary); border: 1px solid var(--border);
             color: var(--text-secondary); cursor: pointer; font-size: 0.85rem;
-            font-weight: 500; transition: all var(--ov-dur-2, 0.2s); font-family: 'Inter', sans-serif;
+            font-weight: 500; transition: all var(--ov-dur-2, 0.2s); font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
         }
         .quick-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
 

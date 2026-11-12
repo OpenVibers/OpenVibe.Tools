@@ -16,8 +16,8 @@
     --radius-sm: 8px;
     --radius-lg: 16px;
     --shadow:    0 4px 24px rgba(0, 0, 0, 0.35);
-    --font:      'Outfit', sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
+    --font:      Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     --max-w:     720px;
 }
 
