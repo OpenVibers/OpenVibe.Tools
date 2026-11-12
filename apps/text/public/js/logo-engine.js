@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════
 // Logo.OpenVibe — Canvas-based Logo / Title / Badge Generation
 // Text rendering with effects, transparent PNG/WebP export,
-// Google Fonts loading, preset templates. 100% client-side.
+// openvibe.design font loading, preset templates. 100% client-side.
 // ═══════════════════════════════════════════════════════════════
 
 (function (root) {
@@ -152,7 +152,7 @@ const PRESETS = {
     },
 };
 
-// ── Google Fonts loader ──────────────────────────────────────
+// ── openvibe.design font loader ──────────────────────────────
 const loadedFonts = new Set(['Arial', 'Arial Black', 'Courier New', 'Georgia', 'Impact', 'Times New Roman', 'Verdana']);
 
 async function loadFont(fontName) {
@@ -160,7 +160,7 @@ async function loadFont(fontName) {
     try {
         const link = document.createElement('link');
         link.rel = 'stylesheet';
-        link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontName)}:wght@400;700;900&display=swap`;
+        link.href = `https://openvibe.design/fonts/css2?family=${encodeURIComponent(fontName)}:wght@400;700;900&display=swap`;
         document.head.appendChild(link);
         await document.fonts.load(`48px "${fontName}"`);
         loadedFonts.add(fontName);
@@ -382,7 +382,7 @@ function download(canvas, filename = 'openvibe-logo.png', format = 'png') {
     link.click();
 }
 
-// ── Popular Google Fonts for logos ────────────────────────────
+// ── Popular open fonts for logos ─────────────────────────────
 const POPULAR_FONTS = [
     'Inter', 'Montserrat', 'Playfair Display', 'Oswald', 'Roboto', 'Lato',
     'Raleway', 'Poppins', 'Merriweather', 'Source Sans 3', 'Nunito',

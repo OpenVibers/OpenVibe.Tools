@@ -151,9 +151,9 @@ app.use(helmet({
         directives: {
             defaultSrc: ["'self'"],
             // 'wasm-unsafe-eval': the barcode scanner's ZXing reader is WebAssembly (codes.html), served from /vendor here.
-            scriptSrc: ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", "https://openvibe.network", "https://openvibe.live", "cdn.jsdelivr.net", "fonts.googleapis.com", "https://static.cloudflareinsights.com"],
-            styleSrc: ["'self'", "'unsafe-inline'", "fonts.googleapis.com", "fonts.gstatic.com"],
-            fontSrc: ["'self'", "fonts.gstatic.com"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", "https://openvibe.network", "https://openvibe.live", "cdn.jsdelivr.net", "https://static.cloudflareinsights.com"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            fontSrc: ["'self'"],
             imgSrc: ["'self'", "data:", "blob:", "https://openvibe.network", "https://openvibe.media"],
             // openvibe.events: release notifications (release-watch's EventSource, openvibe-shared 2.13.0).
             // The navbar's Messages count asks Chat (openvibe-shared 4.130.0).

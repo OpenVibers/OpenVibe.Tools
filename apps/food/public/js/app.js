@@ -26,7 +26,7 @@
   function toast(msg, type = 'info') {
     const bg = { info: '#22c55e', error: '#ef4444', warn: '#f59e0b' };
     Toastify({ text: msg, duration: 3000, gravity: 'bottom', position: 'right',
-      style: { background: bg[type] || bg.info, borderRadius: '10px', fontFamily: "'Outfit',sans-serif", fontSize: '12px', padding: '8px 16px' }
+      style: { background: bg[type] || bg.info, borderRadius: '10px', fontFamily: "Inter, system-ui, -apple-system, 'Segoe UI', sans-serif", fontSize: '12px', padding: '8px 16px' }
     }).showToast();
   }
 

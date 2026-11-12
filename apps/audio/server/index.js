@@ -95,9 +95,9 @@ app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://openvibe.network", "https://static.cloudflareinsights.com"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
-            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://openvibe.network", "https://static.cloudflareinsights.com"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            fontSrc: ["'self'"],
             imgSrc: ["'self'", "data:", "blob:", jobsRuntime.mediaOrigin()],     // job result previews are 302s to Media
             mediaSrc: ["'self'", "blob:", jobsRuntime.mediaOrigin()],
             // openvibe.events: release notifications (release-watch's EventSource, openvibe-shared 2.13.0).
