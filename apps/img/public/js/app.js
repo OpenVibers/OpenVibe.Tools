@@ -352,7 +352,7 @@
         const out = data.output || {};
         const rows = [];
         if (out.ext) rows.push(['Format', String(out.ext).toUpperCase()]);
-        if (data.dimensions) rows.push(['Size', `${data.dimensions.original.width}×${data.dimensions.original.height} → ${data.dimensions.resized.width}×${data.dimensions.resized.height}`]);
+        if (data.dimensions) rows.push(['Size', `${data.dimensions.original.width}×${data.dimensions.original.height} to ${data.dimensions.resized.width}×${data.dimensions.resized.height}`]);
         if (data.crop) rows.push(['Kept', `${data.crop.width}×${data.crop.height}`]);
         const expires = data.download && data.download.expiresIn;
         if (expires) {

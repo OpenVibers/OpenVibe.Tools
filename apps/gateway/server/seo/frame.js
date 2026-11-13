@@ -51,7 +51,7 @@ const SHORT = {
     curlconvert: 'curl', webhook: 'Webhook', color: 'Colour', opengraph: 'Open Graph', read: 'Reader', jsminify: 'JS minify',
     jsformat: 'JS format', cssminify: 'CSS minify', cssformat: 'CSS format', htmlminify: 'HTML minify', xmlminify: 'XML minify',
     jsonminify: 'JSON minify', jsonparse: 'JSON parser', jsonvalidate: 'Validator', jsonstringify: 'Stringify',
-    html2md: 'HTML→MD', md2html: 'MD→HTML',
+    html2md: 'HTML to MD', md2html: 'MD to HTML',
 };
 
 // The nearest kit icon (kit.ICONS); the family icon is the fallback.

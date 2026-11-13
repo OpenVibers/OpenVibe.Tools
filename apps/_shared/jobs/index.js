@@ -139,7 +139,7 @@ function setupJobs(o) {
         events.outbox.start();
         pruneOutbox = setInterval(() => { events.outbox.prune().catch(() => { /* next time */ }); }, 6 * 60 * 60 * 1000);
         if (pruneOutbox.unref) pruneOutbox.unref();
-        console.log(`[Jobs] ${o.service}: job events → ${events.outbox.url}`);
+        console.log(`[Jobs] ${o.service}: job events at ${events.outbox.url}`);
     }
     system.db = db;
     // The `tools` database is shared with the rest of the app and closed there; this only stops the worker.

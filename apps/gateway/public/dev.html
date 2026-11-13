@@ -165,7 +165,7 @@ H=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/
 const T={
 dev:{n:'Developer Tools',i:'fa-code',c:'hub',d:'Developer & SEO Tools Hub',hub:1},
 jsonfmt:{n:'JSON Formatter',i:'fa-code',c:'data',d:'Format, validate & minify JSON',p:'{"name":"openvibe","version":1,"active":true}',m:['Format','Validate','Minify']},
-yaml:{n:'YAML to JSON Converter',i:'fa-file-code',c:'data',d:'YAML \u2194 JSON converter',p:'name: openvibe\nversion: 1\nactive: true',m:['YAML\u2192JSON','JSON\u2192YAML']},
+yaml:{n:'YAML to JSON Converter',i:'fa-file-code',c:'data',d:'YAML and JSON converter',p:'name: openvibe\nversion: 1\nactive: true',m:['YAML to JSON','JSON to YAML']},
 xml:{n:'XML Formatter',i:'fa-file-code',c:'data',d:'XML formatter & validator',p:'<root><item id="1"><name>OpenVibe</name></item></root>',m:['Format','Validate','Minify']},
 csv:{n:'CSV to JSON Converter',i:'fa-table',c:'data',d:'CSV viewer & JSON converter',p:'name,age,city\nAlice,30,NYC\nBob,25,LA',m:['Table','To JSON']},
 sql:{n:'SQL Formatter',i:'fa-database',c:'data',d:'SQL formatter & highlighter',p:'select u.id, u.name, o.total from users u join orders o on u.id = o.user_id where o.total > 100 order by o.total desc limit 10',m:['Format','Uppercase','Compact']},
@@ -422,7 +422,7 @@ P.beautify=(s,m)=>DevEngine.beautify(s,m);
 // ── Single-purpose tools ─────────────────────────────────────
 const loadScript=(src)=>RT.loadScript(src).catch(()=>{throw new Error('Could not load the minifier. Check your connection and try again.')});
 const terser=async()=>{if(!window.Terser)await loadScript('https://cdn.jsdelivr.net/npm/terser@5/dist/bundle.min.js');return window.Terser};
-const saved=(a,b)=>{const x=new Blob([a]).size,y=new Blob([b]).size;return x?`${x.toLocaleString()} → ${y.toLocaleString()} bytes (${Math.max(0,Math.round((1-y/x)*100))}% smaller)`:''};
+const saved=(a,b)=>{const x=new Blob([a]).size,y=new Blob([b]).size;return x?`${x.toLocaleString()} to ${y.toLocaleString()} bytes (${Math.max(0,Math.round((1-y/x)*100))}% smaller)`:''};
 const withNote=(code,note)=>({html:(note?'<div style="color:var(--tx2);font-size:.8rem;margin-bottom:8px">'+H(note)+'</div>':'')+'<pre style="margin:0;white-space:pre-wrap;word-break:break-word">'+H(code)+'</pre>'});
 P.jsminify=async(s,m)=>{const T=await terser();const r=await T.minify(s,m==='Whitespace only'?{compress:false,mangle:false}:{compress:true,mangle:m==='Minify + mangle'});return withNote(r.code||'',saved(s,r.code||''))};
 P.jsformat=async(s)=>{const T=await terser();const r=await T.minify(s,{compress:false,mangle:false,format:{beautify:true,comments:'all',indent_level:2}});return r.code||''};
