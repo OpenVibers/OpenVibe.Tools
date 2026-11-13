@@ -26,9 +26,9 @@ function j2y(o, ind) {
     else r += ind + o + '\n';
     return r;
 }
-/** mode 'YAML→JSON' (default) or 'JSON→YAML'. */
+/** mode 'YAML to JSON' (default) or 'JSON to YAML'. */
 E.yaml = (s, m) => {
-    if (String(m || '').includes('JSON\u2192')) { const o = JSON.parse(s); return j2y(o, ''); }
+    if (String(m || '').includes('JSON to YAML')) { const o = JSON.parse(s); return j2y(o, ''); }
     const ln = s.split('\n').filter(l => l.trim() && !l.trim().startsWith('#')), r = {};
     for (const l of ln) { const mt = l.match(/^(\s*)([^:]+):\s*(.*)$/); if (mt) { let v = mt[3].trim(); v = v === '' || v === '~' || v === 'null' ? null : v === 'true' ? true : v === 'false' ? false : /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v.replace(/^["']|["']$/g, ''); r[mt[2].trim()] = v; } }
     return JSON.stringify(r, null, 2);

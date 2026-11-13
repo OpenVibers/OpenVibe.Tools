@@ -37,7 +37,7 @@ function page(id, output = TEXT) {
 }
 
 const SPECS = [
-    engine('yaml', obj({ text: text(), to: mode(['json', 'yaml'], 'json', 'json: YAML → JSON; yaml: JSON → YAML') }), TEXT, { text: 'name: openvibe\nactive: true' }),
+    engine('yaml', obj({ text: text(), to: mode(['json', 'yaml'], 'json', 'json: YAML to JSON; yaml: JSON to YAML') }), TEXT, { text: 'name: openvibe\nactive: true' }),
     engine('xml', obj({ text: text(), mode: mode(['format', 'minify'], 'format') }), TEXT, { text: '<a><b>1</b></a>' }),
     engine('csv', obj({ text: text('CSV with a header row') }),
         { kind: 'json', schema: { type: 'object', required: ['rows'], properties: { rows: { type: 'array', items: { type: 'object', additionalProperties: { type: 'string' } }, description: 'One object per row, keyed by the header' } } } },
@@ -56,7 +56,7 @@ const SPECS = [
         { kind: 'json', schema: { type: 'object', required: ['algorithm', 'hex'], properties: { algorithm: { type: 'string' }, hex: { type: 'string', pattern: '^[0-9a-f]+$' } } } },
         { text: 'Hello, World!' }),
     engine('hex', obj({ text: text(), mode: mode(['to-hex', 'from-hex'], 'to-hex') }), TEXT, { text: 'Hello' }),
-    engine('timestamp', obj({ mode: mode(['now', 'to-date', 'to-unix'], 'now', 'to-date: a Unix time (s or ms) → dates; to-unix: a date → Unix time'), text: { type: 'string', maxLength: 100 } }, []), TEXT, { mode: 'to-date', text: '1700000000' }),
+    engine('timestamp', obj({ mode: mode(['now', 'to-date', 'to-unix'], 'now', 'to-date: a Unix time (s or ms) returns dates; to-unix: a date returns Unix time'), text: { type: 'string', maxLength: 100 } }, []), TEXT, { mode: 'to-date', text: '1700000000' }),
     engine('cron', obj({ expression: { type: 'string', maxLength: 200, description: 'minute hour day month weekday' } }, ['expression']), TEXT, { expression: '*/15 9-17 * * 1-5' }),
     engine('beautify', obj({ text: text(), language: mode(['html', 'css', 'json'], 'html') }), TEXT, { text: '{"a":1}', language: 'json' }),
     engine('minify', obj({ text: text(), language: { enum: ['json', 'html', 'css'] } }, ['text', 'language']), TEXT, { text: 'a { color: red; }', language: 'css' }),

@@ -37,7 +37,7 @@ const DEV_TOOLS = [
     { id: 'escape',    subdomain: 'entities',    name: 'OpenVibeEscape',    icon: 'fa-shield-halved',        desc: 'HTML, JavaScript & URL escape/unescape', category: 'encoding' },
 
     // Time & Scheduling
-    { id: 'timestamp', subdomain: 'timestamp', name: 'OpenVibeTimestamp', icon: 'fa-clock',                desc: 'Unix timestamp ↔ date converter with timezones', category: 'time' },
+    { id: 'timestamp', subdomain: 'timestamp', name: 'OpenVibeTimestamp', icon: 'fa-clock',                desc: 'Unix timestamp and date converter with timezones', category: 'time' },
     { id: 'cron',      subdomain: 'cron',      name: 'OpenVibeCron',      icon: 'fa-calendar-days',       desc: 'Cron expression parser with next run calculator', category: 'time' },
 
     // Code Quality

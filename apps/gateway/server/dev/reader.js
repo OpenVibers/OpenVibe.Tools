@@ -19,11 +19,11 @@ const MAX_ATTR_TEXT = 300;
 
 const ENTITIES = {
     amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', ensp: ' ', emsp: ' ', thinsp: ' ', shy: '',
-    mdash: '—', ndash: '–', hellip: '…', copy: '©', reg: '®', trade: '™', laquo: '«', raquo: '»',
+    mdash: '—', ndash: '–', hellip: '…', copy: '©', reg: '®', trade: '™', laquo: String.fromCodePoint(0xAB), raquo: String.fromCodePoint(0xBB),
     lsquo: '‘', rsquo: '’', sbquo: '‚', ldquo: '“', rdquo: '”', bdquo: '„', bull: '•', middot: '·',
     times: '×', divide: '÷', euro: '€', pound: '£', yen: '¥', cent: '¢', sect: '§', para: '¶',
-    deg: '°', plusmn: '±', frac12: '½', frac14: '¼', frac34: '¾', larr: '←', rarr: '→', uarr: '↑',
-    darr: '↓', hearts: '♥', check: '✓', iexcl: '¡', iquest: '¿', eacute: 'é', egrave: 'è', agrave: 'à',
+    deg: '°', plusmn: '±', frac12: '½', frac14: '¼', frac34: '¾', larr: String.fromCodePoint(0x2190), rarr: String.fromCodePoint(0x2192), uarr: String.fromCodePoint(0x2191),
+    darr: String.fromCodePoint(0x2193), hearts: '♥', check: '✓', iexcl: '¡', iquest: '¿', eacute: 'é', egrave: 'è', agrave: 'à',
     aacute: 'á', uuml: 'ü', ouml: 'ö', auml: 'ä', szlig: 'ß', ntilde: 'ñ', ccedil: 'ç',
 };
 

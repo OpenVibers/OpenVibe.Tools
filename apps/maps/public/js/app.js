@@ -496,7 +496,7 @@
         });
         marker._typeClass = tc;
         const dist = loc.distanceMiles ? `<br><span class="popup-distance">${esc(distText(loc.distanceMiles))}</span>` : '';
-        marker.bindPopup(`<div class="popup-name">${esc(loc.name||'Unknown')}</div><div class="popup-type">${esc(loc.type||'')} – ${esc(loc.source||'')}</div>${dist}<a href="#" class="popup-link" data-loc-id="${esc(loc._id)}">View details →</a>`);
+        marker.bindPopup(`<div class="popup-name">${esc(loc.name||'Unknown')}</div><div class="popup-type">${esc(loc.type||'')} – ${esc(loc.source||'')}</div>${dist}<a href="#" class="popup-link" data-loc-id="${esc(loc._id)}">View details <i data-ov-icon="arrow-right" aria-hidden="true"></i></a>`);
         marker.on('click', () => selectLocation(loc));
         state.markerCache.set(loc._id, marker);
       }
@@ -881,7 +881,7 @@
       <li><strong>Abandoned structures</strong> — Collapse, asbestos, squatters</li></ul></div>`,
     fire: `<div class="detail-section"><h3><i class="fa-solid fa-fire"></i> Fire Starting</h3>
       <p style="color:var(--red);font-size:11px;margin-bottom:8px"><i class="fa-solid fa-triangle-exclamation"></i> Always check burn bans before making fire.</p>
-      <div class="guide-card"><h4>Ferro Rod</h4><p>Prepare tinder bundle → hold rod close → push rod back (not striker forward) → sparks hit tinder → blow gently → add sticks</p></div>
+      <div class="guide-card"><h4>Ferro Rod</h4><p>Prepare tinder bundle, then hold rod close, then push rod back (not striker forward), then sparks hit tinder, then blow gently, then add sticks</p></div>
       <div class="guide-card"><h4>Dakota Fire Hole (Stealth!)</h4><p>Dig two holes 12" deep, 8" apart, connected by tunnel. Fire in one, air feeds from other. <strong>Almost invisible at night.</strong></p></div>
       <div class="guide-card"><h4>Finding Dry Fuel</h4><ul>
         <li>Standing dead wood — drier than ground wood</li>
@@ -889,12 +889,12 @@
         <li>Birch bark — oils ignite readily even damp</li>
         <li>Bring vaseline cotton balls — waterproof, 3+ min burn</li></ul></div></div>`,
     firstaid: `<div class="detail-section"><h3><i class="fa-solid fa-kit-medical"></i> First Aid</h3>
-      <div class="guide-card"><h4>Cuts</h4><p>Stop bleeding (direct pressure 10+ min) → Clean (flush with water) → Close (butterfly strips) → Cover (antibiotic + gauze) → Monitor for infection</p></div>
+      <div class="guide-card"><h4>Cuts</h4><p>Stop bleeding (direct pressure 10+ min), then clean (flush with water), then close (butterfly strips), then cover (antibiotic + gauze), then monitor for infection</p></div>
       <div class="guide-card"><h4>Hypothermia (#1 Killer)</h4><ul>
         <li><strong>Mild:</strong> Shivering, cold hands — self-rescue possible</li>
         <li><strong>Moderate:</strong> Confusion, slurred speech — need help NOW</li>
         <li><strong>Severe:</strong> Shivering stops — 911 emergency</li></ul>
-        <p>Treatment: Get shelter → Remove wet clothes → Warm core (armpits, groin, neck) → Warm drinks if conscious → Handle gently</p></div>
+        <p>Treatment: Get shelter, then remove wet clothes, then warm the core (armpits, groin, neck), then warm drinks if conscious, then handle gently</p></div>
       <div class="guide-card"><h4>RICE for Sprains</h4><p><strong>R</strong>est, <strong>I</strong>ce, <strong>C</strong>ompression, <strong>E</strong>levation. Splint suspected fractures with sticks/poles.</p></div></div>`
   };
 

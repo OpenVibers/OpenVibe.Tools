@@ -43,7 +43,7 @@ const DEV = {
         desc: 'Convert YAML to JSON and JSON to YAML online, and validate YAML syntax instantly. Ideal for Kubernetes manifests, CI pipelines and config files. No signup.',
         kw: 'yaml to json, json to yaml, yaml converter, yaml validator, yaml parser online, kubernetes yaml',
         about: 'Convert between YAML and JSON in either direction and check that your YAML actually parses. Useful whenever you are moving between a config file and an API payload, or debugging an indentation mistake in a CI or Kubernetes file.',
-        bullets: ['YAML → JSON and JSON → YAML with one click', 'Catches the indentation and tab errors that break YAML parsers', 'Keeps nested structures, lists and multi-line strings intact'],
+        bullets: ['YAML to JSON and JSON to YAML with one click', 'Catches the indentation and tab errors that break YAML parsers', 'Keeps nested structures, lists and multi-line strings intact'],
         faq: [['Why does my YAML fail to parse?', 'YAML forbids tab characters for indentation and is strict about consistent spacing. Paste it here and the parser reports the line where the structure breaks.'], ['Can I convert Kubernetes manifests to JSON?', 'Yes. Kubernetes accepts both formats, and converting to JSON is a quick way to verify exactly what a manifest resolves to.']],
     },
     xml: {
@@ -59,7 +59,7 @@ const DEV = {
         desc: 'Convert CSV to JSON and view CSV as a sortable table online. Handles quoted fields, commas inside values and custom headers. Instant, no upload.',
         kw: 'csv to json, csv viewer, csv converter, csv parser online, convert csv, csv table viewer',
         about: 'Paste CSV to see it as a clean table or convert it straight to a JSON array of objects using the first row as keys. Quoted fields and embedded commas are parsed correctly.',
-        bullets: ['Table view for scanning a file quickly', 'CSV → JSON using the header row as object keys', 'Correctly handles quoted values containing commas and newlines'],
+        bullets: ['Table view for scanning a file quickly', 'CSV to JSON using the header row as object keys', 'Correctly handles quoted values containing commas and newlines'],
         faq: [['How does the converter handle commas inside a field?', 'Fields wrapped in double quotes are parsed as single values, so embedded commas and line breaks survive the conversion.'], ['Can I convert a spreadsheet export?', 'Yes. Export the sheet as CSV, paste it here, and convert to JSON or read it as a table.']],
     },
     sql: {
@@ -131,7 +131,7 @@ const DEV = {
         desc: 'Convert text to hexadecimal, decode hex back to text, and switch between hex, binary and decimal. Instant, runs in your browser.',
         kw: 'hex to text, text to hex, hex converter, hex decoder, binary converter, ascii to hex',
         about: 'Convert between text, hexadecimal and binary. Useful when reading a memory dump, decoding a protocol payload, or converting a byte sequence you found in a log.',
-        bullets: ['Text ⇄ hex with UTF-8 handling', 'Hex ⇄ binary and decimal conversion', 'Accepts spaced, prefixed or continuous hex input'],
+        bullets: ['Text and hex with UTF-8 handling', 'Hex, binary and decimal conversion', 'Accepts spaced, prefixed or continuous hex input'],
         faq: [['What do the 0x prefixes mean?', 'They mark a number as hexadecimal in most programming languages. The converter accepts input with or without them.'], ['Why do some characters become several hex bytes?', 'Non-ASCII characters take more than one byte in UTF-8, so an emoji or accented letter maps to several hex pairs.']],
     },
     entities: {
@@ -147,7 +147,7 @@ const DEV = {
         desc: 'Convert Unix timestamps to human-readable dates and back, with timezone support. Handles seconds and milliseconds. Instant, no signup.',
         kw: 'unix timestamp converter, epoch converter, timestamp to date, date to timestamp, epoch time',
         about: 'Turn an epoch timestamp into a readable date in any timezone, or convert a date back into a timestamp. Both seconds and milliseconds are detected automatically.',
-        bullets: ['Epoch ⇄ date in both directions', 'Automatic detection of seconds vs milliseconds', 'Timezone-aware output including UTC and local time'],
+        bullets: ['Epoch and date in both directions', 'Automatic detection of seconds vs milliseconds', 'Timezone-aware output including UTC and local time'],
         faq: [['Is my timestamp in seconds or milliseconds?', 'Ten digits is seconds, thirteen is milliseconds. The converter detects which you pasted and labels the result.'], ['What is the Unix epoch?', 'Midnight UTC on 1 January 1970. A Unix timestamp counts the seconds elapsed since that moment.']],
     },
     cron: {
@@ -443,7 +443,7 @@ const CODES = {
         desc: 'Calculate and verify check digits for GTIN-8, UPC-A, EAN-13, GTIN-14, SSCC, GLN and ISBN. Convert ISBN-10 to ISBN-13 and UPC-E to UPC-A, and read GS1 element strings.',
         kw: 'gtin check digit calculator, ean check digit, upc check digit, isbn converter, isbn-10 to isbn-13, sscc check digit, gs1 parser, gs1 application identifiers, upc-e to upc-a',
         about: 'Type a product, book or shipping number and the checker names it (GTIN-8, UPC-A, EAN-13, GTIN-14, SSCC, ISBN, ISSN, UPC-E), says whether its check digit is right and what it should be. It converts between ISBN-10 and ISBN-13 and expands UPC-E. Paste a GS1 element string, bracketed or raw from a scanner, and it splits it into Application Identifiers with dates, weights and check digits verified.',
-        bullets: ['Check digits for every GS1 key, and ISBN-10\'s mod 11', 'ISBN-10 ↔ ISBN-13, UPC-E → UPC-A, GTIN-13 → GTIN-14', 'GS1 element strings split into labelled, validated fields', 'One click to the matching barcode'],
+        bullets: ['Check digits for every GS1 key, and ISBN-10\'s mod 11', 'ISBN-10 and ISBN-13, UPC-E to UPC-A, GTIN-13 to GTIN-14', 'GS1 element strings split into labelled, validated fields', 'One click to the matching barcode'],
         faq: [['How is a GTIN check digit calculated?', 'From the right, digits are multiplied alternately by 3 and 1 and added up; the check digit is what brings the total to the next multiple of 10.'], ['What is a GS1 Application Identifier?', 'A number in brackets that says what the data after it is: (01) a GTIN, (17) an expiry date, (10) a batch, (21) a serial number. Labels on cartons, pallets and medicines use them.'], PRIVATE],
     },
     wifiqr: {
@@ -610,7 +610,7 @@ for (const [sub, examples] of Object.entries(EXAMPLES)) { const rec = DEV[sub] |
 // equal. Network tools have no modes (their options are record types and ports).
 const MODES = {
     jsonfmt: ['Format', 'Validate', 'Minify'],
-    yaml: ['YAML→JSON', 'JSON→YAML'],
+    yaml: ['YAML to JSON', 'JSON to YAML'],
     xml: ['Format', 'Validate', 'Minify'],
     csv: ['Table', 'To JSON'],
     sql: ['Format', 'Uppercase', 'Compact'],

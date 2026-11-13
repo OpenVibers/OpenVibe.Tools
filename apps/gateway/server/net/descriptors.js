@@ -54,7 +54,7 @@ const OUTPUT = {
     '/ipv6': out({ ip: S, hostname: nul(S), ipv6: out({ type: S, scope: nul(S), prefix: nul(S), expanded: S, compressed: S, ptr: nul(S) }), geo: O, network: O }, ['ip', 'ipv6']),
     '/rdns': out({ ip: S, hostnames: { type: 'array', items: S }, ptr: nul(S) }, ['ip']),
     '/rdap': out({ target: S, type: { enum: ['domain', 'ip'] }, summary: O, raw: O }, ['target', 'summary']),
-    '/dns': out({ target: S, server: S, records: { type: 'object', description: 'record type → answers' } }, ['target', 'records']),
+    '/dns': out({ target: S, server: S, records: { type: 'object', description: 'answers by record type' } }, ['target', 'records']),
     '/dnsprop': out({ target: S, type: S, resolvers: A, agree: B, answered: I, majority: nul(O) }, ['target', 'resolvers']),
     '/ping': out({ target: S, ip: S, count: I, results: A, stats: out({ min: { type: 'number' }, max: { type: 'number' }, avg: { type: 'number' }, loss: { type: 'number' } }) }, ['target', 'stats']),
     '/trace': out({ target: S, ip: S, family: I, reached: B, probes: I, hops: { type: 'array', items: out({ hop: I, ip: nul(S), host: nul(S), asn: nul(S), loss: nul({ type: 'number' }), sent: I, last: nul({ type: 'number' }), avg: nul({ type: 'number' }), best: nul({ type: 'number' }), worst: nul({ type: 'number' }), stdev: nul({ type: 'number' }) }) } }, ['target', 'ip', 'hops']),

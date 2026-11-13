@@ -44,7 +44,7 @@ const site = require('../server/pages/site');
         assert.equal((await r.json()).tools[0].id, 'dns');
         for (const q of ['limit=0','limit=51','limit=no','window=day']) assert.equal((await fetch(base + '/api/v1/tools/trending?' + q)).status,400);
         const html = await (await fetch(base + '/')).text();
-        assert.match(html, /13<\/b> successful uses today/); assert.match(html, /↗ \+4/);
+        assert.match(html, /13<\/b> successful uses today/); assert.match(html, /aria-label="Up 4 uses"><svg[^>]*>[\s\S]*?<\/svg> \+4</); assert.ok(!html.includes('↗'), 'a drawn glyph, not a text arrow');
         // "Ask Vibe which tool": one clear winner opens the tool, anything close goes to the search.
         r = await fetch(base + '/ask-tool?q=I%20want%20to%20merge%20PDFs', { redirect: 'manual' });
         assert.equal(r.status,302); assert.ok(r.headers.get('location').includes('pdf'), 'the merge tool opens');

@@ -15,7 +15,7 @@ const D = require('../../public/js/dev-engine');
 const label = (map, value, dflt) => map[value] || map[dflt];
 
 const ENGINES = {
-    yaml: ({ text, to = 'json' }) => ({ text: D.yaml(text, to === 'yaml' ? 'JSON→YAML' : 'YAML→JSON') }),
+    yaml: ({ text, to = 'json' }) => ({ text: D.yaml(text, to === 'yaml' ? 'JSON to YAML' : 'YAML to JSON') }),
     xml: ({ text, mode = 'format' }) => ({ text: D.xml(text, mode === 'minify' ? 'Minify' : 'Format') }),
     csv: ({ text }) => ({ data: { rows: D.csvObjects(text) } }),
     sql: ({ text, mode = 'format' }) => ({ text: D.sql(text, label({ format: 'Format', uppercase: 'Uppercase', compact: 'Compact' }, mode, 'format')) }),

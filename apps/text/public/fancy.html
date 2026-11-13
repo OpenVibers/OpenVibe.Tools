@@ -21,7 +21,7 @@
 </head>
 <body>
     <div class="tool-wrap">
-        <nav class="crumbs" aria-label="Breadcrumb"><a href="https://text.openvibe.tools/">Text</a> › Fancy Text</nav>
+        <nav class="crumbs" aria-label="Breadcrumb"><a href="https://text.openvibe.tools/">Text</a> <i data-ov-icon="chevron-right" aria-hidden="true"></i> Fancy Text</nav>
         <header class="tool-head">
             <h1>Fancy Text Generator</h1>
             <p class="subtitle">Type or paste your text and see it in 30+ Unicode styles below. Copy any style, or copy them all.</p>
@@ -73,7 +73,7 @@
   -H 'Content-Type: application/json' \
   -d '{"input":{"text":"Hello World"}}'
 
-# → {"state":"succeeded","tool":"fancy","result":{"data":{"styles":[...]}}}</code></pre>
+# returns {"state":"succeeded","tool":"fancy","result":{"data":{"styles":[...]}}}</code></pre>
             <button class="btn btn-secondary btn-sm copy-request" type="button" id="copy-curl">Copy request</button>
             <p>Inputs and output are described at <a href="https://openvibe.tools/api/v1/tools/fancy/schema">/api/v1/tools/fancy/schema</a>. <a href="https://openvibe.tools/developers">How the API works</a>.</p>
         </details>

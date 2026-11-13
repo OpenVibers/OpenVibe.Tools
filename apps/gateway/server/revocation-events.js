@@ -98,7 +98,7 @@ async function ensureSubscription({ port, fetchImpl = globalThis.fetch, log = co
         if (r.status === 409) continue;
         if (!r.ok) throw new Error(`Events answered ${r.status} creating the ${topic} subscription`);
         made = true;
-        log.log && log.log(`[Events] subscription created: ${topic} → ${endpoint}`);
+        log.log && log.log(`[Events] subscription created: ${topic} for ${endpoint}`);
     }
     return made ? 'created' : 'exists';
 }

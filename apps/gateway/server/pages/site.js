@@ -19,6 +19,11 @@ const seo = require('openvibe-shared/seo');
 const icons = require('openvibe-shared/icons');
 const kit = require('openvibe-shared/kit');
 const appIcon = require('openvibe-shared/app-icon');
+const glyphs = require('openvibe-shared/glyphs');
+const arrowRight = glyphs.svg('arrow-right', { size: 16 });
+const arrowUp = glyphs.svg('arrow-up', { size: 16 });
+const arrowDown = glyphs.svg('arrow-down', { size: 16 });
+const chevronRight = glyphs.svg('chevron-right', { size: 16 });
 const registry = require('../registry');
 const { seoFor } = require('../seo/catalog');
 
@@ -442,7 +447,7 @@ function pageIndex(top = [], activity = { available: false }) {
 <div><dt><a href="/tool/case">Title case</a></dt><dd><output id="demo-case" for="demo-text">${esc(titleText(sample))}</output></dd></div>
 <div><dt><a href="/tool/count">Words and characters</a></dt><dd><output id="demo-count" for="demo-text">${esc(countText(sample))}</output></dd></div>
 </dl>
-<p class="promo-foot"><a ${startLink(fancy)}>Open Fancy Text →</a></p>
+<p class="promo-foot"><a ${startLink(fancy)}>Open Fancy Text ${arrowRight}</a></p>
 </aside>` : '';
     const jsonIn = '{"b":1,"a":2}';
     const jsonOut = JSON.stringify(JSON.parse(jsonIn), null, 2);
@@ -464,7 +469,7 @@ function pageIndex(top = [], activity = { available: false }) {
     const headlineHtml = spoken.length
         ? `<span class="hm-rot" id="tool-headline">${spoken.map(([t, p], i) => `<a class="hm-ph${i ? '' : ' is-on'}" href="${esc(t.url)}"${go(t)}${i ? ' aria-hidden="true" tabindex="-1"' : ''}>${esc(p)}.</a>`).join('')}</span>`
         : '<span class="hm-rot">finish the job.</span>';
-    const rows = (items, trend = false) => `<ul class="ovk-list">${items.slice(0,6).map(t => { const n = Number(t.uses || 0); return kit.row({ href: t.url, mark: icon(t.icon, 28), title: t.name, sub: t.description, meta: t.added_at ? `Added ${t.added_at}` : `${n.toLocaleString('en-US')} ${n === 1 ? 'use' : 'uses'}`, trail: trend ? `<span aria-label="Up ${t.increase} uses">↗ +${t.increase}</span>` : '' }); }).join('')}</ul>`;
+    const rows = (items, trend = false) => `<ul class="ovk-list">${items.slice(0,6).map(t => { const n = Number(t.uses || 0); return kit.row({ href: t.url, mark: icon(t.icon, 28), title: t.name, sub: t.description, meta: t.added_at ? `Added ${t.added_at}` : `${n.toLocaleString('en-US')} ${n === 1 ? 'use' : 'uses'}`, trail: trend ? `<span aria-label="Up ${t.increase} uses">${arrowUp} +${t.increase}</span>` : '' }); }).join('')}</ul>`;
     // One ranking as a section of its own: the heading, the line that says what the numbers mean, then the rows.
     const rankedSection = (title, items, { trend = false, note = '' } = {}) => `<section><h2>${title}</h2>${note ? `<p class="sec-p">${note}</p>` : ''}${items && items.length ? rows(items, trend) : `<p class="sec-p">${activity.available ? 'No recorded activity in this window yet.' : 'Usage is temporarily unavailable.'}</p>`}</section>`;
     const discoveryHtml = `<section aria-labelledby="live-h"><h2 id="live-h">Live usage</h2><p class="sec-p">${activity.available ? `<b>${Number(activity.uses_today || 0).toLocaleString('en-US')}</b> successful uses today (UTC).` : 'Live usage is temporarily unavailable.'} Counts cover successful API runs, including completed file jobs. Browser-only edits and page opens are not counted. Updated every minute.</p></section>
@@ -487,10 +492,10 @@ ${discoveryHtml}
 <section aria-labelledby="start-h"><div class="sec-h"><h2 id="start-h">Good places to start</h2><a class="more" href="/all-tools">A to Z list</a></div>
 <p class="sec-p">Real examples, not a feature list. Each card opens the tool itself.</p>
 <div class="start-grid">
-${startCard('json', (t) => `<span class="start-name">${esc(t.name)}<small>${host(t)}</small></span><pre tabindex="0"><code>${esc(jsonIn)}</code></pre><span class="start-arrow" aria-hidden="true">↓</span><pre tabindex="0"><code>${esc(jsonOut)}</code></pre><span class="start-go">Format JSON →</span>`)}
-${startCard('mergepdf', (t) => `<span class="start-name">${esc(t.name)}<small>${host(t)}</small></span><div class="flow" aria-hidden="true"><span>PDF</span><span>PDF</span><span>PDF</span><span class="flow-arrow">→</span><span class="flow-out">one PDF</span></div><p class="start-note">Drop the files, drag them into order, download one document.</p><span class="start-go">Merge PDFs →</span>`)}
-${startCard('compress', (t) => `<span class="start-name">${esc(t.name)}<small>${host(t)}</small></span><div class="flow" aria-hidden="true"><span>PNG</span><span>JPG</span><span>WebP</span><span class="flow-arrow">→</span><span class="flow-out">smaller file</span></div><p class="start-note">Keep the pixels, lose the weight. iPhone HEIC works too.</p><span class="start-go">Compress an image →</span>`)}
-${startCard('dns', (t) => `<span class="start-name">${esc(t.name)}<small>${host(t)}</small></span><div class="flow" aria-hidden="true"><span>domain</span><span class="flow-arrow">→</span><span class="flow-out">A · AAAA · MX · TXT</span></div><p class="start-note">See what a domain actually points at, from outside your network.</p><span class="start-go">Look up DNS →</span>`)}
+${startCard('json', (t) => `<span class="start-name">${esc(t.name)}<small>${host(t)}</small></span><pre tabindex="0"><code>${esc(jsonIn)}</code></pre><span class="start-arrow" aria-hidden="true">${arrowDown}</span><pre tabindex="0"><code>${esc(jsonOut)}</code></pre><span class="start-go">Format JSON ${arrowRight}</span>`)}
+${startCard('mergepdf', (t) => `<span class="start-name">${esc(t.name)}<small>${host(t)}</small></span><div class="flow" aria-hidden="true"><span>PDF</span><span>PDF</span><span>PDF</span><span class="flow-arrow">${arrowRight}</span><span class="flow-out">one PDF</span></div><p class="start-note">Drop the files, drag them into order, download one document.</p><span class="start-go">Merge PDFs ${arrowRight}</span>`)}
+${startCard('compress', (t) => `<span class="start-name">${esc(t.name)}<small>${host(t)}</small></span><div class="flow" aria-hidden="true"><span>PNG</span><span>JPG</span><span>WebP</span><span class="flow-arrow">${arrowRight}</span><span class="flow-out">smaller file</span></div><p class="start-note">Keep the pixels, lose the weight. iPhone HEIC works too.</p><span class="start-go">Compress an image ${arrowRight}</span>`)}
+${startCard('dns', (t) => `<span class="start-name">${esc(t.name)}<small>${host(t)}</small></span><div class="flow" aria-hidden="true"><span>domain</span><span class="flow-arrow">${arrowRight}</span><span class="flow-out">A · AAAA · MX · TXT</span></div><p class="start-note">See what a domain actually points at, from outside your network.</p><span class="start-go">Look up DNS ${arrowRight}</span>`)}
 </div></section>
 ${opened.length >= 4 ? foldBlock({
         id: 'top',
@@ -539,7 +544,7 @@ function pageFamily(f) {
     const { tools, families } = registry.get();
     const list = tools.filter(t => t.family === f.id || (t.alsoIn || []).includes(f.id));
     const url = SITE + f.path;
-    const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> › ${esc(f.name)}</nav>
+    const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> ${chevronRight} ${esc(f.name)}</nav>
 <div class="page-h">${icon(f.icon, 56)}<h1>${esc(f.name)}</h1></div><p class="lead">${esc(f.description)}</p>
 ${f.hosts ? `<a class="cta" href="${esc(f.url)}">Open ${esc(f.name)}</a>` : ''}
 <section><div class="sec-h"><h2>${list.length} ${list.length === 1 ? 'tool' : 'tools'}</h2></div><p class="sec-p">${esc(f.intro || '')}</p><div class="grid">${list.map(toolCard).join('')}</div></section>
@@ -565,7 +570,7 @@ function pageTool(t) {
 <p class="sec-p"><b>What it's for:</b> ${esc(period(purpose))}</p>
 ${pitfall ? `<p class="sec-p"><b>What trips people up:</b> <strong>${esc(pitfall[0])}</strong> ${esc(pitfall[1])}</p>` : ''}
 <ul class="kw">${t.keywords.map(k => `<li>${esc(k)}</li>`).join('')}</ul></section>` : '';
-    const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> › ${f && f.path ? `<a href="${esc(f.path)}">${esc(f.name)}</a> › ` : ''}${esc(t.name)}</nav>
+    const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> ${chevronRight} ${f && f.path ? `<a href="${esc(f.path)}">${esc(f.name)}</a> ${chevronRight} ` : ''}${esc(t.name)}</nav>
 <div class="page-h">${icon(t.icon, 56)}<h1>${esc(t.name)}</h1></div><p class="lead">${esc(t.description)}</p>
 ${factsSection(t)}
 ${t.status === 'unavailable' ? `<p class="lead"><strong>Not available yet.</strong> ${esc(t.unavailable || '')}</p>` : `<a class="cta" href="${esc(t.url)}">Open ${esc(t.name)}</a>`}
@@ -582,7 +587,7 @@ ${related.length ? `<section><div class="sec-h"><h2>Similar tools</h2>${f && f.p
 function pageAll() {
     const { tools, families } = registry.get();
     const sorted = [...tools].sort((a, b) => a.name.localeCompare(b.name));
-    const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> › All tools</nav><div class="page-h">${icon('tools', 56)}<h1>All ${tools.length} tools, A to Z</h1></div>
+    const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> ${chevronRight} All tools</nav><div class="page-h">${icon('tools', 56)}<h1>All ${tools.length} tools, A to Z</h1></div>
 ${searchForm('')}<section><ul class="az">${sorted.map(t => `<li><a href="${esc(t.url)}">${esc(t.name)}</a> <small><a href="${esc(t.url)}" aria-label="About ${esc(t.name)}">about</a></small></li>`).join('')}</ul></section>`;
     return shell({ families, agent: true, body, head: head({ title: `All ${tools.length} Online Tools, A to Z`, description: 'The complete list of tools on OpenVibe.Tools: converters, downloaders, PDF and image tools, text utilities, developer tools and network diagnostics.', canonical: SITE + '/all-tools',
         jsonLd: [seo.jsonLd.breadcrumbs([{ name: 'Tools', url: SITE + '/' }, { name: 'All tools', url: SITE + '/all-tools' }])] }) });
@@ -591,7 +596,7 @@ ${searchForm('')}<section><ul class="az">${sorted.map(t => `<li><a href="${esc(t
 function pageSearch(q) {
     const { families } = registry.get();
     const hits = search(q);
-    const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> › Search</nav><div class="page-h"><h1>${q ? `Tools for “${esc(q)}”` : 'Search tools'}</h1></div>${searchForm(q)}
+    const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> ${chevronRight} Search</nav><div class="page-h"><h1>${q ? `Tools for “${esc(q)}”` : 'Search tools'}</h1></div>${searchForm(q)}
 <section>${hits.length ? `<div class="grid">${hits.map(toolCard).join('')}</div>` : `<p class="empty">${q ? 'No tool matches that yet.' : 'Type what you need to do.'} <a href="/all-tools">Browse every tool</a>.</p>`}</section>`;
     return shell({ families, body, head: head({ title: q ? `Tools for “${seo.clip(q, 30)}”` : 'Search tools', description: 'Search every tool on OpenVibe.Tools.', canonical: SITE + '/search', robots: 'noindex,follow' }) });
 }
@@ -607,7 +612,7 @@ function cached(key, render, extra = '') {
 /** /developers: how to call any tool from code (run API, jobs, SDK, auth tiers, limits). */
 function pageUpdates() {
     const { families } = registry.get();
-    const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> › Updates</nav>${frame.updatesBody({ service: 'tools', siteName: NAME })}${`<script src="${ovServe.url('shipped.js')}" defer></script>`}`;
+    const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> ${chevronRight} Updates</nav>${frame.updatesBody({ service: 'tools', siteName: NAME })}${`<script src="${ovServe.url('shipped.js')}" defer></script>`}`;
     return shell({ families, body, head: head({ title: 'What shipped on OpenVibe.Tools', description: 'Every change deployed to OpenVibe.Tools, newest first, with the Patch notes that gather them.', canonical: SITE + '/updates' }) });
 }
 
@@ -628,7 +633,7 @@ function pageDevelopers() {
         ['GET /api/v1/jobs/{id}/events', 'Follow one job as server-sent events', "The job's owner", rate('tools-api'), `curl -N ${SITE}/api/v1/jobs/{id}/events`],
         ['GET /api/v1/jobs/{id}/files/{n}', "Download a finished job's result file", "The job's owner", rate('tools-api'), `curl -O ${SITE}/api/v1/jobs/{id}/files/0`],
     ];
-    const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> › Developers</nav><div class="page-h">${icon('code', 56)}<h1>Tools API</h1></div>
+    const body = `<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Tools</a> ${chevronRight} Developers</nav><div class="page-h">${icon('code', 56)}<h1>Tools API</h1></div>
 <p class="lead">${withApi.length} of ${snap.tools.length} tools can be called from code, with the same engines the pages use. One request shape for all of them; long work runs as a job you can follow.</p>
 <section><div class="sec-h"><h2>At a glance</h2></div><p class="sec-p">The six calls behind every tool. Rate limits are the anonymous allowance; signing in or using a token raises it, and a tool's cost counts against the limit.</p>
 <table class="api-table" role="table"><caption class="sr-only">Tools API endpoints, what they do, who may call them, their anonymous rate limit and an example request</caption>
@@ -644,7 +649,7 @@ function pageDevelopers() {
 ${code(`curl -X POST ${SITE}/api/v1/tools/jsonminify/run \\
   -H 'Content-Type: application/json' \\
   -d '{"input":{"text":"{ \\"a\\": 1 }"}}'
-# → {"state":"succeeded","tool":"jsonminify","result":{"text":"{\\"a\\":1}"},"took_ms":3}`)}
+# returns {"state":"succeeded","tool":"jsonminify","result":{"text":"{\\"a\\":1}"},"took_ms":3}`)}
 <p class="sec-p">File tools take <code>multipart/form-data</code> (<code>file</code> parts plus an <code>input</code> JSON part). Work that outlasts <code>wait_ms</code> answers <b>202</b> with a job: follow it at <code>/api/v1/jobs/{id}/events</code> (server-sent events) and download results from <code>/api/v1/jobs/{id}/files/{n}</code>. Send an <code>Idempotency-Key</code> header to make retries safe.</p></section>
 <section><div class="sec-h"><h2>From JavaScript</h2></div>
 ${code(`const { createClient } = require('openvibe-sdk/core');
@@ -752,7 +757,7 @@ function pageWorkers() {
 <section class="wk-card"><h2>What it runs</h2><p>Picture, PDF and audio conversions. A job that fetches a web address stays on OpenVibe's own server.</p></section>
 <section class="wk-card"><h2>Stopping it</h2><p>Drain a worker and it takes no new jobs; the ones running finish first.</p></section>
 </div>
-<a class="wk-api" href="/developers#worker-routing">API routing and receipts <span aria-hidden="true">→</span></a>
+<a class="wk-api" href="/developers#worker-routing">API routing and receipts <span aria-hidden="true">${arrowRight}</span></a>
 </main>
 <script>document.querySelectorAll('[data-wk-copy]').forEach(function (b) { b.addEventListener('click', function () { var t = document.getElementById(b.getAttribute('data-wk-copy')); if (!t || !navigator.clipboard) return; navigator.clipboard.writeText(t.textContent).then(function () { b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy'; }, 1600); }); }); });</script>` });
 }
