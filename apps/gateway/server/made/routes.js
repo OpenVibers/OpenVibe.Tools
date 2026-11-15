@@ -172,6 +172,20 @@ function createMadeToolRoutes({ store, runner, models = null, verify, verifyServ
         } catch (err) { send(res, err); }
     });
 
+    // Bring a Pipedream code step (made/import-pipedream.js; Pipedream Workflows close 2027-03-31): pasted code only,
+    // read and compiled, never run here; the same answer as /import/val.
+    r.post('/import/pipedream', express.json({ limit: '128kb' }), async (req, res) => {
+        try {
+            const p = await person(req, res, { make: true });
+            if (!p) return;
+            const b = req.body || {};
+            const { convertPipedream } = require('./import-pipedream');
+            const out = convertPipedream({ code: b.code, name: String(b.name || 'pipedream-step').replace(/[^A-Za-z0-9 _-]/g, '').slice(0, 64) || 'pipedream-step' });
+            const { bodyFromDraft } = require('./prompt');
+            res.json({ ...out, body: { ...bodyFromDraft(out.draft), net: out.net } });
+        } catch (err) { send(res, err); }
+    });
+
     r.post('/', express.json({ limit: '128kb' }), async (req, res) => {
         try {
             const p = await person(req, res, { make: true });

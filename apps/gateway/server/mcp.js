@@ -50,6 +50,17 @@ const META = [
         inputSchema: { type: 'object', properties: { description: { type: 'string', minLength: 8, maxLength: 2000, description: 'What the tool should do, in a sentence or two' }, kind: { enum: ['prompt', 'code'], description: 'prompt: a model does the work (default). code: JavaScript computes the answer (math, formats, conversions)' } }, required: ['description'], additionalProperties: false },
         annotations: { title: 'Make a tool', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
+    {
+        name: 'bring_tool',
+        description: 'Bring a function from Val Town (a val\'s address, e.g. https://www.val.town/v/you/name, or its code) or a Pipedream Node.js code step (its code) and save it as your own private code tool: TypeScript, the vals it imports, and how it was called (a script\'s parameters, an http val\'s request, a step\'s props) are converted. Run it with run_tool and its id. Packages it imports cannot come along (the answer says which).',
+        inputSchema: { type: 'object', properties: {
+            from: { enum: ['valtown', 'pipedream'], description: 'Where the code comes from' },
+            url: { type: 'string', maxLength: 300, description: 'Val Town: the val\'s address' },
+            code: { type: 'string', maxLength: 65536, description: 'The code itself (a val\'s, when it has no public address; a Pipedream step\'s, always)' },
+            name: { type: 'string', maxLength: 64, description: 'A name, for pasted code' },
+        }, required: ['from'], additionalProperties: false },
+        annotations: { title: 'Bring a tool from Val Town or Pipedream', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
 ];
 
 // The words of a need that say something: not a, the, for, my, … (they match every tool).
@@ -151,6 +162,38 @@ function createToolsMcp({ address, snapshot, store, verify, extractToken, fetchI
         } catch { return { ok: false, text: 'Making the tool took too long. Try again.' }; }
     }
 
+    /** bring_tool: convert a val or a Pipedream step (POST /api/v1/made-tools/import/…) and save it as the caller's own
+     *  private tool, the way make_tool saves a draft. */
+    async function bringOne(req, args) {
+        const base = origin();
+        if (!base) return { ok: false, text: 'The tools cannot be reached right now' };
+        const a = args || {};
+        const fromPd = a.from === 'pipedream';
+        const body = fromPd ? { code: String(a.code || ''), name: a.name } : (a.code ? { code: String(a.code), name: a.name } : { url: String(a.url || '') });
+        if (fromPd ? !body.code.trim() : !(body.url || body.code)) return { ok: false, text: fromPd ? 'Give the Pipedream step\'s code' : 'Give the val\'s address on Val Town, or its code' };
+        const post = async (path, b, ms) => {
+            const res = await fetchImpl(base + path, { method: 'POST', headers: callerHeaders(req), body: JSON.stringify(b), redirect: 'error', signal: AbortSignal.timeout(ms) });
+            return { status: res.status, body: await res.json().catch(() => null) };
+        };
+        try {
+            const d = await post(fromPd ? '/api/v1/made-tools/import/pipedream' : '/api/v1/made-tools/import/val', body, 60_000);
+            if (d.status === 401) return { ok: false, text: 'Sign in (a Bearer token for openvibe.tools) to bring a tool of your own' };
+            if (d.status !== 200 || !d.body || !d.body.body) return { ok: false, text: refusal(d.body, d.status, 'It could not be brought') };
+            let tool = { ...d.body.body, visibility: 'private' };
+            for (let tries = 0; tries < 3; tries++) {
+                const m = await post('/api/v1/made-tools', tool, 30_000);
+                if (m.status === 201 && m.body) {
+                    const t = m.body;
+                    return { ok: true, text: JSON.stringify({ made: { id: t.id, name: t.name, summary: t.summary, kind: t.kind, net: t.net, visibility: t.visibility, input: t.input, output: t.output },
+                        notes: d.body.notes || [], run: `run_tool with tool "${t.id}"`, page: `https://openvibe.tools/make#${t.id}`, note: 'Your own private tool. Change it or publish it on its page.' }) };
+                }
+                if (m.status !== 409) return { ok: false, text: refusal(m.body, m.status, 'The tool was not saved') };
+                tool = { ...tool, slug: `${String(tool.slug).slice(0, 34)}-${Math.random().toString(36).slice(2, 6)}` };
+            }
+            return { ok: false, text: 'The tool was not saved: its name is taken. Give it another name.' };
+        } catch { return { ok: false, text: 'Bringing the tool took too long. Try again.' }; }
+    }
+
     /** One run through the gateway's own run API, with the caller's credentials and address. */
     async function runOne(req, tool, input) {
         const base = origin();
@@ -193,7 +236,7 @@ function createToolsMcp({ address, snapshot, store, verify, extractToken, fetchI
             case 'initialize': {
                 const asked = String(p.protocolVersion || '');
                 return ok({ protocolVersion: SUPPORTED.includes(asked) ? asked : PROTOCOL, capabilities: { tools: { listChanged: false } }, serverInfo: SERVER,
-                    instructions: 'OpenVibe Tools: 180+ tools (network, developer, text, image, PDF, audio, video) and the tools people made. Use find_tools to find one for a need, then run_tool (or run_tools for several at once); when nothing fits, make_tool makes one of your own from a description. Sign in (a Bearer token for openvibe.tools) to run your own tools and the ones people made, and to make tools; their runs are paid from your own allowance.' });
+                    instructions: 'OpenVibe Tools: 180+ tools (network, developer, text, image, PDF, audio, video) and the tools people made. Use find_tools to find one for a need, then run_tool (or run_tools for several at once); when nothing fits, make_tool makes one of your own from a description, and bring_tool brings one from Val Town or Pipedream. Sign in (a Bearer token for openvibe.tools) to run your own tools and the ones people made, and to make tools; their runs are paid from your own allowance.' });
             }
             case 'ping': return ok({});
             case 'tools/list': {
@@ -216,6 +259,7 @@ function createToolsMcp({ address, snapshot, store, verify, extractToken, fetchI
                 }
                 if (name === 'run_tool') return ok(result(await runOne(req, args.tool, args.input)));
                 if (name === 'make_tool') return ok(result(await makeOne(req, args)));
+                if (name === 'bring_tool') return ok(result(await bringOne(req, args)));
                 if (name === 'run_tools') {
                     const calls = Array.isArray(args.calls) ? args.calls.slice(0, MAX_CALLS) : [];
                     if (!calls.length) return fail(RPC.params, `run_tools needs { calls: [1..${MAX_CALLS}] }`);
