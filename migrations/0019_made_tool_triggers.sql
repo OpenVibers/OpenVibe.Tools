@@ -3,9 +3,8 @@
 -- "from gui to cmd or whatever and beyond"; Val Town and Pipedream close in 2027). A link trigger is a secret URL (only
 -- its SHA-256 and its last four characters are kept) that runs the tool as its owner with the request's input; a
 -- schedule runs it every hour or every day with a fixed input. Every run is the owner's: their allowance pays. The last
--- answer is kept to show on /make, and a schedule tells its owner what it answered (notify: a Network notification).
--- The owner's content, exported (without the hash) and erased with the account (account-data.js); deleting the tool
--- deletes its triggers. Additive: one new empty table.
+-- answer is kept to show on /make. The owner's content, exported (without the hash) and erased with the account
+-- (account-data.js); deleting the tool deletes its triggers. Additive: one new empty table.
 CREATE TABLE IF NOT EXISTS made_tool_triggers (
     id            text PRIMARY KEY,
     tool_id       text NOT NULL REFERENCES made_tools (id) ON DELETE CASCADE,
@@ -17,7 +16,6 @@ CREATE TABLE IF NOT EXISTS made_tool_triggers (
     at_minute     integer CHECK (at_minute >= 0 AND at_minute < 1440),
     input         jsonb NOT NULL DEFAULT '{}'::jsonb,
     enabled       boolean NOT NULL DEFAULT true,
-    notify        boolean NOT NULL DEFAULT false,
     next_run_at   timestamptz,
     last_run_at   timestamptz,
     last_state    text,
