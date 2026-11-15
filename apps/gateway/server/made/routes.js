@@ -6,8 +6,9 @@
 //   GET    /api/v1/made-tools?mine=1     the caller's own tools, every visibility; signed in
 //   GET    /api/v1/made-tools/models     the models a prompt tool can name (./models.js); anyone
 //   POST   /api/v1/made-tools            make one (201); signed in
-//   POST   /api/v1/made-tools/draft      { description } → { draft }: a model writes the make form's fields, as the
-//                                        person (their allowance pays); nothing is saved (§AD.12 (d), Describe it)
+//   POST   /api/v1/made-tools/draft      { description, kind? } → { draft, body }: a model writes the make form's fields
+//                                        (and a code tool's run(input)), as the person (their allowance pays); body is the
+//                                        tool as POST / takes it. Nothing is saved (§AD.12 (d), Describe it)
 //   GET    /api/v1/made-tools/:id        one tool: public and unlisted to anyone, private to its owner (else 404)
 //   PATCH  /api/v1/made-tools/:id        change it (the next version); its owner
 //   DELETE /api/v1/made-tools/:id        delete it (204); its owner
@@ -18,9 +19,10 @@
 //                                        until Link nodes run them (§AD.7 step 4).
 //
 // Who: a Network sign-in (Bearer user token with audience openvibe.tools, or the site's session cookie). A write that
-// rides on the cookie must come from the site's own origin. A first-party service holding tools.made.run (Contracts
-// 0.437.0: Actor's and Codes' agents) acts for the person named in X-OV-Subject: it lists their tools and runs a tool as
-// them (paid from their allowance), and never makes, changes or deletes one. Errors are problem+json.
+// rides on the cookie must come from the site's own origin. A first-party service (Actor's and Codes' agents) acts for
+// the person named in X-OV-Subject: with tools.made.run (Contracts 0.437.0) it lists their tools and runs a tool as them
+// (paid from their allowance); with tools.made.write (0.439.0) it drafts a tool from their words and makes it for them,
+// always private (only the person publishes). No service changes or deletes a tool. Errors are problem+json.
 // ═══════════════════════════════════════════════════════════════
 
 const express = require('express');
@@ -64,9 +66,12 @@ function createMadeToolRoutes({ store, runner, models = null, verify, verifyServ
         const peeked = peek(token);
         if (verifyService && peeked && looksLikePrincipal(peeked)) {
             const v = await Promise.resolve(verifyService(token)).catch(() => null);
-            if (!v || !v.ok || capabilityDenied(v.claims, 'tools.made.run')) return null;
+            if (!v || !v.ok) return null;
+            const canRun = !capabilityDenied(v.claims, 'tools.made.run');
+            const canMake = !capabilityDenied(v.claims, 'tools.made.write');
+            if (!canRun && !canMake) return null;
             const sub = String(req.get('x-ov-subject') || '');
-            return SUBJECT.test(sub) ? { sub, service: v.claims.sub } : null;
+            return SUBJECT.test(sub) ? { sub, service: v.claims.sub, canRun, canMake } : null;
         }
         const claims = await Promise.resolve(verify(token)).catch(() => null);
         const sub = claims && (claims.sub || claims.subject);
@@ -75,10 +80,15 @@ function createMadeToolRoutes({ store, runner, models = null, verify, verifyServ
         return { sub, name: claims.name || claims.username || null };
     }
 
-    async function person(req, res, { write = false } = {}) {
+    /** The person a request acts for, or null (answered). `make`: drafting or making a tool (tools.made.write for a
+     *  service); `write`: changing or deleting one (the person only); else listing and running (tools.made.run). */
+    async function person(req, res, { write = false, make = false } = {}) {
         const p = await who(req);
         if (!p) { problem(res, 401, 'tools.session_required', 'Sign in with your OpenVibe account'); return null; }
-        if (write && p.service) { problem(res, 403, 'capability.denied', 'A service lists and runs a person\'s tools; only the person makes or changes one'); return null; }
+        if (p.service) {
+            const ok = make ? p.canMake : write ? false : p.canRun;
+            if (!ok) { problem(res, 403, 'capability.denied', make ? 'This service may not make tools for people (tools.made.write)' : write ? 'Only the person changes or deletes their tool' : 'This service may not run people\'s tools (tools.made.run)'); return null; }
+        }
         if (p.crossSite) { problem(res, 403, 'tools.origin.refused', 'This change must come from openvibe.tools'); return null; }
         return p;
     }
@@ -115,20 +125,25 @@ function createMadeToolRoutes({ store, runner, models = null, verify, verifyServ
 
     r.post('/draft', express.json({ limit: '16kb' }), async (req, res) => {
         try {
-            const p = await person(req, res, { write: true });
+            const p = await person(req, res, { make: true });
             if (!p) return;
             const description = String((req.body && req.body.description) || '').trim();
             if (description.length < 8) return problem(res, 422, 'tools.made.invalid', 'Say in a sentence or two what the tool should do');
-            const { draftTool } = require('./prompt');
-            res.json(await draftTool(runner, description, { subject: p.sub, kind: req.body && req.body.kind === 'code' ? 'code' : 'prompt' }));
+            const { draftTool, bodyFromDraft } = require('./prompt');
+            const out = await draftTool(runner, description, { subject: p.sub, kind: req.body && req.body.kind === 'code' ? 'code' : 'prompt' });
+            // The same tool as POST / takes it (private), for an agent or a command line that makes it next.
+            res.json({ ...out, body: bodyFromDraft(out.draft) });
         } catch (err) { send(res, err); }
     });
 
     r.post('/', express.json({ limit: '128kb' }), async (req, res) => {
         try {
-            const p = await person(req, res, { write: true });
+            const p = await person(req, res, { make: true });
             if (!p) return;
-            const row = await store.create(p.sub, req.body, { compileSchema });
+            // A tool an agent makes is the person's and private: only they publish it, on the make page.
+            const body = p.service && req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? { ...req.body, visibility: 'private' } : req.body;
+            const row = await store.create(p.sub, body, { compileSchema });
+            if (p.service) log.log(`[made-tools] ${p.service} made ${row.id} for ${p.sub}`);
             res.status(201).set('Location', `/api/v1/made-tools/${row.id}`).json(store.present(row, p.name));
         } catch (err) { send(res, err); }
     });

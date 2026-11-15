@@ -6,8 +6,9 @@
 //
 //   initialize, notifications/initialized, ping
 //   tools/list   find_tools, run_tool and run_tools (the whole catalogue, the public tools people made, and the
-//                caller's own, without putting 200 schemas in an agent's context), then the caller's own made tools
-//                by name (made_<slug>)
+//                caller's own, without putting 200 schemas in an agent's context), make_tool (a new tool of the
+//                caller's own from a description: drafted by a model and saved private, §AD.12), then the caller's own
+//                made tools by name (made_<slug>)
 //   tools/call   one of those
 //
 // Who: anyone (the anonymous tools run for anyone, as on their pages), or a person's Bearer token for openvibe.tools
@@ -42,6 +43,12 @@ const META = [
         description: `Run several OpenVibe tools at once (at most ${MAX_CALLS}), in parallel: the same ids and inputs run_tool takes. Use it when the calls do not depend on each other (the DNS, the certificate and the headers of one site; one lookup for several domains). Each answer comes back under its call.`,
         inputSchema: { type: 'object', properties: { calls: { type: 'array', minItems: 1, maxItems: MAX_CALLS, items: { type: 'object', properties: { tool: { type: 'string' }, input: { type: 'object' } }, required: ['tool'] } } }, required: ['calls'], additionalProperties: false },
         annotations: { title: 'Run tools in parallel', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
+    {
+        name: 'make_tool',
+        description: 'Make a new tool of your own from a description, when find_tools has nothing that fits ("turn meeting notes into decisions and action items", "add sales tax to a price"). A model drafts it, as instructions for a model (kind prompt, the default) or as plain JavaScript that computes the answer without a network (kind code), and it is saved as your own private tool: run it with run_tool and its id. Drafting is paid from your allowance. Change it or publish it on openvibe.tools/make.',
+        inputSchema: { type: 'object', properties: { description: { type: 'string', minLength: 8, maxLength: 2000, description: 'What the tool should do, in a sentence or two' }, kind: { enum: ['prompt', 'code'], description: 'prompt: a model does the work (default). code: JavaScript computes the answer (math, formats, conversions)' } }, required: ['description'], additionalProperties: false },
+        annotations: { title: 'Make a tool', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     },
 ];
 
@@ -104,6 +111,46 @@ function createToolsMcp({ address, snapshot, store, verify, extractToken, fetchI
         return scored.sort((a, b) => b.score - a.score).slice(0, limit).map((x) => x.tool);
     }
 
+    /** The caller's credentials and address, for a call through the gateway's own API. */
+    function callerHeaders(req) {
+        const headers = { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Forwarded-For': req.ip || '' };
+        if (req.headers.authorization) headers.Authorization = req.headers.authorization;
+        else { const t = extractToken(req); if (t) headers.Authorization = `Bearer ${t}`; }
+        return headers;
+    }
+    const refusal = (body, status, fallback) => String((body && (body.detail || body.title || body.error)) || `${fallback} (${status})`).slice(0, 500);
+
+    /** make_tool: draft a tool from the caller's words (POST /api/v1/made-tools/draft) and save the draft's body as their
+     *  own private tool (POST /api/v1/made-tools), both as the caller; a slug they already use gets a short suffix. */
+    async function makeOne(req, args) {
+        const base = origin();
+        if (!base) return { ok: false, text: 'The tools cannot be reached right now' };
+        const description = String((args && args.description) || '').trim().slice(0, 2000);
+        if (description.length < 8) return { ok: false, text: 'Say in a sentence or two what the tool should do' };
+        const kind = args && args.kind === 'code' ? 'code' : 'prompt';
+        const post = async (path, body, ms) => {
+            const res = await fetchImpl(base + path, { method: 'POST', headers: callerHeaders(req), body: JSON.stringify(body), redirect: 'error', signal: AbortSignal.timeout(ms) });
+            return { status: res.status, body: await res.json().catch(() => null) };
+        };
+        try {
+            const d = await post('/api/v1/made-tools/draft', { description, kind }, 120_000);
+            if (d.status === 401) return { ok: false, text: 'Sign in (a Bearer token for openvibe.tools) to make a tool of your own' };
+            if (d.status !== 200 || !d.body || !d.body.body) return { ok: false, text: refusal(d.body, d.status, 'The tool could not be drafted') };
+            let body = { ...d.body.body, visibility: 'private' };
+            for (let tries = 0; tries < 3; tries++) {
+                const m = await post('/api/v1/made-tools', body, 30_000);
+                if (m.status === 201 && m.body) {
+                    const t = m.body;
+                    return { ok: true, text: JSON.stringify({ made: { id: t.id, name: t.name, summary: t.summary, kind: t.kind, visibility: t.visibility, input: t.input, output: t.output },
+                        run: `run_tool with tool "${t.id}"`, page: `https://openvibe.tools/make#${t.id}`, note: 'Your own private tool. Change it or publish it on its page.' }) };
+                }
+                if (m.status !== 409) return { ok: false, text: refusal(m.body, m.status, 'The tool was not saved') };
+                body = { ...body, slug: `${String(body.slug).slice(0, 34)}-${Math.random().toString(36).slice(2, 6)}` };
+            }
+            return { ok: false, text: 'The tool was not saved: its name is taken. Try other words.' };
+        } catch { return { ok: false, text: 'Making the tool took too long. Try again.' }; }
+    }
+
     /** One run through the gateway's own run API, with the caller's credentials and address. */
     async function runOne(req, tool, input) {
         const base = origin();
@@ -112,9 +159,7 @@ function createToolsMcp({ address, snapshot, store, verify, extractToken, fetchI
         const made = MADE_ID.test(id);
         if (!made && !TOOL_ID.test(id)) return { ok: false, text: `No tool is called ${id.slice(0, 64)}: use find_tools` };
         const path = made ? `/api/v1/made-tools/${id}/run` : `/api/v1/tools/${encodeURIComponent(id)}/run`;
-        const headers = { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Forwarded-For': req.ip || '' };
-        if (req.headers.authorization) headers.Authorization = req.headers.authorization;
-        else { const t = extractToken(req); if (t) headers.Authorization = `Bearer ${t}`; }
+        const headers = callerHeaders(req);
         let res, body;
         try {
             res = await fetchImpl(base + path, { method: 'POST', headers, body: JSON.stringify(made ? { input: input || {} } : { input: input || {}, wait_ms: 30000 }), redirect: 'error', signal: AbortSignal.timeout(90_000) });
@@ -148,7 +193,7 @@ function createToolsMcp({ address, snapshot, store, verify, extractToken, fetchI
             case 'initialize': {
                 const asked = String(p.protocolVersion || '');
                 return ok({ protocolVersion: SUPPORTED.includes(asked) ? asked : PROTOCOL, capabilities: { tools: { listChanged: false } }, serverInfo: SERVER,
-                    instructions: 'OpenVibe Tools: 180+ tools (network, developer, text, image, PDF, audio, video) and the tools people made. Use find_tools to find one for a need, then run_tool (or run_tools for several at once). Sign in (a Bearer token for openvibe.tools) to run your own tools and the ones people made; their runs are paid from your own allowance.' });
+                    instructions: 'OpenVibe Tools: 180+ tools (network, developer, text, image, PDF, audio, video) and the tools people made. Use find_tools to find one for a need, then run_tool (or run_tools for several at once); when nothing fits, make_tool makes one of your own from a description. Sign in (a Bearer token for openvibe.tools) to run your own tools and the ones people made, and to make tools; their runs are paid from your own allowance.' });
             }
             case 'ping': return ok({});
             case 'tools/list': {
@@ -170,6 +215,7 @@ function createToolsMcp({ address, snapshot, store, verify, extractToken, fetchI
                     return ok({ content: [{ type: 'text', text: JSON.stringify(found.length ? found : { none: `No tool fits "${need}" yet. People can make one at https://openvibe.tools/make` }) }] });
                 }
                 if (name === 'run_tool') return ok(result(await runOne(req, args.tool, args.input)));
+                if (name === 'make_tool') return ok(result(await makeOne(req, args)));
                 if (name === 'run_tools') {
                     const calls = Array.isArray(args.calls) ? args.calls.slice(0, MAX_CALLS) : [];
                     if (!calls.length) return fail(RPC.params, `run_tools needs { calls: [1..${MAX_CALLS}] }`);

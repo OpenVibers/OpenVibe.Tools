@@ -46,7 +46,7 @@ const ORIGIN = 'https://openvibe.tools';
     });
     let server;
     app.use('/api/v1/made-tools', createMadeToolRoutes({
-        store, runner, origin: ORIGIN, log: { error() {} },
+        store, runner, origin: ORIGIN, log: { error() {}, log() {} },
         verify: async (t) => ({ ada: { sub: ADA, username: 'ada' }, bo: { sub: BO, username: 'bo' } }[t] || null),
         extractToken: (req) => (req.headers.authorization || '').replace(/^Bearer /, '') || (req.cookies && req.cookies.ov_token) || null,
         // A first-party service (Actor's agents): tools.made.run, acting for X-OV-Subject (Contracts 0.437.0).
@@ -177,11 +177,31 @@ const ORIGIN = 'https://openvibe.tools';
         const codeDraft = await call('POST', '/draft', { as: 'ada', body: { description: 'Count the words in a text', kind: 'code' } });
         assert.strictEqual(codeDraft.status, 200, JSON.stringify(codeDraft.body));
         assert.deepStrictEqual([codeDraft.body.draft.kind, /function run/.test(codeDraft.body.draft.source), codeDraft.body.draft.instructions], ['code', true, undefined]);
+        // The draft as the body POST / takes: keys from the labels, private, and it makes the tool as it is.
+        assert.deepStrictEqual([codeDraft.body.body.slug, codeDraft.body.body.kind, codeDraft.body.body.visibility, Object.keys(codeDraft.body.body.input.properties), Object.keys(codeDraft.body.body.output.schema.properties)], ['word-count', 'code', 'private', ['text'], ['words']]);
+        const fromDraft = await call('POST', '/', { as: 'ada', body: codeDraft.body.body });
+        assert.strictEqual(fromDraft.status, 201, JSON.stringify(fromDraft.body));
+        assert.strictEqual((await call('DELETE', `/${fromDraft.body.id}`, { as: 'ada' })).status, 204);
         assert.match(aiCalls[aiCalls.length - 1].body.input.messages[0].content, /plain JavaScript/, 'the code drafter\'s own instructions');
         aiAnswer = JSON.stringify({ name: 'Broken', summary: 'x', inputs: [], answer: 'text', fields: [], source: 'const x = 1;' });
         const badDraft = await call('POST', '/draft', { as: 'ada', body: { description: 'Something that will not hold up', kind: 'code' } });
         assert.deepStrictEqual([badDraft.status, badDraft.body.code], [422, 'tools.made.bad_answer']);
         assert.strictEqual((await call('POST', '/draft', { as: svc(['tools.made.run']), subject: ADA, body: { description: 'an agent drafting a tool' } })).status, 403, 'an agent does not draft through this');
+        // ── an agent makes a tool for the person (tools.made.write, Contracts 0.439.0): drafted and saved as theirs, private ──
+        const maker = svc(['tools.made.write']);
+        aiAnswer = JSON.stringify({ name: 'Word count', summary: 'Counts words.', inputs: [{ label: 'Text', kind: 'long' }], answer: 'fields', fields: [{ label: 'Words' }], source: 'function run(input) {\n  return { words: String(input.text || "").split(/\\s+/).filter(Boolean).length };\n}' });
+        const agentDraft = await call('POST', '/draft', { as: maker, subject: ADA, body: { description: 'Count the words in a text', kind: 'code' } });
+        assert.strictEqual(agentDraft.status, 200, JSON.stringify(agentDraft.body));
+        assert.deepStrictEqual(aiCalls[aiCalls.length - 1].body.on_behalf_of, { type: 'user', id: ADA }, 'the person the agent works for pays for the draft');
+        const agentMade = await call('POST', '/', { as: maker, subject: ADA, body: { slug: 'word-count', name: 'Word count', summary: 'Counts words.', kind: 'code', input: { type: 'object', properties: { text: { type: 'string' } } }, output: { kind: 'json', schema: { type: 'object' } }, source_code: agentDraft.body.draft.source, visibility: 'public' } });
+        assert.strictEqual(agentMade.status, 201, JSON.stringify(agentMade.body));
+        assert.deepStrictEqual([agentMade.body.owner.subject, agentMade.body.visibility], [ADA, 'private'], 'the person owns it, and it stays private until they publish it');
+        assert.ok((await call('GET', '/?mine=1', { as: 'ada' })).body.tools.some((x) => x.id === agentMade.body.id), 'it is in their own list');
+        assert.strictEqual((await call('PATCH', `/${agentMade.body.id}`, { as: maker, subject: ADA, body: { visibility: 'public' } })).status, 403, 'an agent never changes one');
+        assert.strictEqual((await call('DELETE', `/${agentMade.body.id}`, { as: maker, subject: ADA })).status, 403, 'or deletes one');
+        assert.strictEqual((await call('POST', `/${t.id}/run`, { as: maker, subject: BO, body: { input: { message: 'x' } } })).status, 403, 'making is not running (tools.made.run)');
+        assert.strictEqual((await call('POST', '/', { as: maker, body: { ...reply, slug: 'nobody' } })).status, 401, 'without the person it works for');
+        aiAnswer = '{"reply":"Thank you, that is kind of you."}';
         aiAnswer = '{"reply":"Thank you, that is kind of you."}';
         // ── code tools from source (§AD.12 (c)): the source in, the entry's digest out, both served ──
         const crypto = require('crypto');
