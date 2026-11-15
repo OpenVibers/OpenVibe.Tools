@@ -26,6 +26,16 @@ module.exports = {
         audience: process.env.OV_AI_AUDIENCE || 'openvibe.ai',
     },
 
+    // OpenVibe.Run, where a code tool people made runs as a function job (made/run-code.js, §AD.13 (2)): as OpenVibe's
+    // operator (TOOLS_RUN_SUBJECT, usr_…) in their project (TOOLS_RUN_PROJECT, prj_…), the way Run's own checks run.
+    // Either unset: code tools run on their page only.
+    run: {
+        url: (process.env.OV_RUN_INTERNAL_URL || 'http://127.0.0.1:4920').replace(/\/+$/, ''),
+        audience: process.env.OV_RUN_AUDIENCE || 'openvibe.run',
+        subject: process.env.TOOLS_RUN_SUBJECT || '',
+        project: process.env.TOOLS_RUN_PROJECT || '',
+    },
+
     // OAuth2 client credentials (client seeded in Network's oauth_clients table)
     oauth: {
         clientId: process.env.OV_OAUTH_CLIENT_ID || 'tools',
