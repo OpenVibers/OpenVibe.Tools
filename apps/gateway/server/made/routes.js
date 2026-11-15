@@ -15,7 +15,7 @@
 //   GET    /api/v1/made-tools/:id/code    a code tool's entry (tool.js) for a runner; its sha256 is code.sha256
 //   GET    /api/v1/made-tools/:id/triggers         its triggers (made/triggers.js, §AD.12 (g)); its owner
 //   POST   /api/v1/made-tools/:id/triggers         { kind: link|schedule, every?, at?, input? } (201; a link's URL once)
-//   PATCH  /api/v1/made-tools/:id/triggers/:tid    { enabled }; DELETE …/:tid (204); its owner
+//   PATCH  /api/v1/made-tools/:id/triggers/:tid    { enabled?, notify? }; DELETE …/:tid (204); its owner
 //   GET|POST /hooks/<mth_…>                         a link trigger: the tool runs as its owner (mounted by index.js)
 //   POST   /api/v1/made-tools/:id/run    { input } → tools.run@1; signed in (the run is paid from the caller's own
 //                                        allowance, Vibes or keys). A code tool answers 501 tools.made.code_not_ready
@@ -272,7 +272,8 @@ function createMadeToolRoutes({ store, runner, models = null, verify, verifyServ
         try {
             const own = await ownTool(req, res);
             if (!own) return;
-            const t = await triggers.setEnabled(req.params.tid, own.p.sub, !!(req.body && req.body.enabled));
+            const b = req.body || {};
+            const t = await triggers.change(req.params.tid, own.p.sub, { ...(b.enabled !== undefined ? { enabled: !!b.enabled } : {}), ...(b.notify !== undefined ? { notify: !!b.notify } : {}) });
             if (!t || t.tool !== own.row.id) return problem(res, 404, 'tools.trigger.not_found', 'This tool has no trigger with that id');
             res.json(t);
         } catch (err) { triggerSend(res, err); }
@@ -321,6 +322,13 @@ function createMadeToolRoutes({ store, runner, models = null, verify, verifyServ
     }
     r.hook = hook;
     // The scheduler's run: a due schedule's tool, as its owner, with its fixed input.
+    // After a schedule ran: tell its owner (made/notify.js), with the tool's name.
+    r.toldTrigger = async (trig, out, notifier) => {
+        if (!notifier) return { sent: false, reason: 'off' };
+        const row = await store.get(trig.tool_id);
+        if (!row) return { sent: false, reason: 'gone' };
+        return notifier.scheduleRan({ subject: trig.owner_subject, tool: { id: row.id, name: row.name }, says: require('./triggers').describe(trig), out });
+    };
     r.runTrigger = async (trig) => {
         const row = await store.get(trig.tool_id);
         if (!row || row.owner_subject !== trig.owner_subject) return { state: 'failed', error: { detail: 'The tool is gone' } };

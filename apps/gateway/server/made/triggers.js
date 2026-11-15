@@ -8,7 +8,8 @@
 //             the URL is shown once, when it is made.
 //   schedule  every hour (at a minute) or every day (at a time, UTC), with a fixed input.
 //
-// Every run is the owner's (their allowance pays) and the last answer is kept for /make. A code tool runs only in the
+// Every run is the owner's (their allowance pays) and the last answer is kept for /make. A schedule tells its owner what it
+// answered (notify: on unless they turn it off; made/notify.js), a link answers whoever called it. A code tool runs only in the
 // browser for now, and a chain that calls tools people made needs a person signed in, so neither takes a trigger yet.
 // ═══════════════════════════════════════════════════════════════
 
@@ -67,7 +68,7 @@ function createTriggers({ db, now = () => Date.now(), baseUrl = 'https://openvib
     const present = (row, extra = {}) => ({
         id: row.id, tool: row.tool_id, kind: row.kind, says: describe(row),
         ...(row.kind === 'schedule' ? { every: row.every_minutes === 60 ? 'hour' : 'day', at: `${String(Math.floor(row.at_minute / 60)).padStart(2, '0')}:${String(row.at_minute % 60).padStart(2, '0')}` } : { hint: row.token_hint }),
-        input: row.input || {}, enabled: row.enabled !== false,
+        input: row.input || {}, enabled: row.enabled !== false, notify: row.notify === true,
         next_run_at: row.next_run_at ? new Date(row.next_run_at).toISOString() : null,
         last_run_at: row.last_run_at ? new Date(row.last_run_at).toISOString() : null,
         last_state: row.last_state || null, last_result: row.last_result || null, runs: Number(row.runs) || 0,
@@ -96,8 +97,8 @@ function createTriggers({ db, now = () => Date.now(), baseUrl = 'https://openvib
         const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(String(body.at || '00:00'));
         if (!m) throw new TriggerError(422, 'tools.trigger.invalid', 'at is a time, HH:MM (UTC)');
         const atMinute = every === 60 ? Number(m[2]) : Number(m[1]) * 60 + Number(m[2]);
-        const row = await db.one(`INSERT INTO made_tool_triggers (id, tool_id, owner_subject, kind, every_minutes, at_minute, input, next_run_at, created_at, updated_at)
-            VALUES ($1, $2, $3, 'schedule', $4, $5, $6::jsonb, $7, $8, $8) RETURNING *`, [id, tool.id, owner, every, atMinute, JSON.stringify(input), new Date(nextRun(every, atMinute, now())), at]);
+        const row = await db.one(`INSERT INTO made_tool_triggers (id, tool_id, owner_subject, kind, every_minutes, at_minute, input, notify, next_run_at, created_at, updated_at)
+            VALUES ($1, $2, $3, 'schedule', $4, $5, $6::jsonb, $7, $8, $9, $9) RETURNING *`, [id, tool.id, owner, every, atMinute, JSON.stringify(input), body.notify !== false, new Date(nextRun(every, atMinute, now())), at]);
         return present(row);
     }
 
@@ -105,14 +106,18 @@ function createTriggers({ db, now = () => Date.now(), baseUrl = 'https://openvib
         return (await db.many('SELECT * FROM made_tool_triggers WHERE tool_id = $1 AND owner_subject = $2 ORDER BY created_at', [toolId, owner])).map((r) => present(r));
     }
 
-    async function setEnabled(id, owner, enabled) {
+    /** { enabled?, notify? }: pause or resume, and whether a schedule tells its owner. */
+    async function change(id, owner, patch = {}) {
         if (!ID_RE.test(String(id || ''))) return null;
         const row = await db.maybe('SELECT * FROM made_tool_triggers WHERE id = $1 AND owner_subject = $2', [id, owner]);
         if (!row) return null;
+        const enabled = patch.enabled === undefined ? row.enabled : !!patch.enabled;
+        const notify = patch.notify === undefined ? row.notify : !!patch.notify;
         // A schedule turned back on counts from now: it never makes up the runs it missed.
-        const next = row.kind === 'schedule' && enabled ? new Date(nextRun(row.every_minutes, row.at_minute, now())) : row.next_run_at;
-        return present(await db.one('UPDATE made_tool_triggers SET enabled = $3, next_run_at = $4, updated_at = $5 WHERE id = $1 AND owner_subject = $2 RETURNING *', [id, owner, !!enabled, next, new Date(now())]));
+        const next = row.kind === 'schedule' && enabled && !row.enabled ? new Date(nextRun(row.every_minutes, row.at_minute, now())) : row.next_run_at;
+        return present(await db.one('UPDATE made_tool_triggers SET enabled = $3, notify = $4, next_run_at = $5, updated_at = $6 WHERE id = $1 AND owner_subject = $2 RETURNING *', [id, owner, enabled, notify, next, new Date(now())]));
     }
+    const setEnabled = (id, owner, enabled) => change(id, owner, { enabled });
 
     async function remove(id, owner) {
         if (!ID_RE.test(String(id || ''))) return false;
@@ -160,8 +165,9 @@ function createTriggers({ db, now = () => Date.now(), baseUrl = 'https://openvib
         return true;
     }
 
-    /** The scheduler: every `everyMs`, the due schedules run (run(row) → tools.run@1), one at a time. */
-    function start({ run, everyMs = 30_000, log = console } = {}) {
+    /** The scheduler: every `everyMs`, the due schedules run (run(row) → tools.run@1), one at a time; told(row, out) after
+     *  each one whose owner wants to know. */
+    function start({ run, told = null, everyMs = 30_000, log = console } = {}) {
         let busy = false;
         const tick = async () => {
             if (busy) return;
@@ -171,6 +177,7 @@ function createTriggers({ db, now = () => Date.now(), baseUrl = 'https://openvib
                     let out;
                     try { out = await run(row); } catch (err) { out = { state: 'failed', error: { detail: (err && err.message) || 'The run failed' } }; }
                     await record(row.id, out).catch(() => {});
+                    if (told && row.notify) await Promise.resolve(told(row, out)).catch(() => {});
                 }
             } catch (err) {
                 log.error(`[made-triggers] ${(err && err.message) || err}`);
@@ -181,7 +188,7 @@ function createTriggers({ db, now = () => Date.now(), baseUrl = 'https://openvib
         return { stop: () => clearInterval(timer), tick };
     }
 
-    return { create, list, setEnabled, remove, byToken, claimDue, record, allowLink, start, present };
+    return { create, list, change, setEnabled, remove, byToken, claimDue, record, allowLink, start, present };
 }
 
 module.exports = { createTriggers, nextRun, describe, refusal, TriggerError, hashOf };
