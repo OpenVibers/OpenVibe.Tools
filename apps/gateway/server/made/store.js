@@ -20,7 +20,7 @@ const SLUG = /^[a-z][a-z0-9-]{1,39}$/;
 const MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,255}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const ENTRY = /^[A-Za-z0-9._/-]+\.m?js$/;
-const KINDS = ['prompt', 'code'];
+const KINDS = ['prompt', 'code', 'chain'];
 const NETS = ['deny', 'public', 'openvibe-only'];
 const HOSTINGS = ['openvibe', 'mine', 'shared'];
 const VISIBILITIES = ['private', 'unlisted', 'public'];
@@ -74,7 +74,7 @@ function fieldsFrom(body, current = null, { compileSchema } = {}) {
         if (!out.summary) throw new Invalid('summary is one sentence: what the tool does (at most 200 characters)', [{ pointer: '/summary' }]);
     }
     const kind = make ? body.kind : current.kind;
-    if (make && !KINDS.includes(kind)) throw new Invalid('kind is prompt or code', [{ pointer: '/kind' }]);
+    if (make && !KINDS.includes(kind)) throw new Invalid('kind is prompt, code or chain', [{ pointer: '/kind' }]);
     if (!make && has('kind') && body.kind !== current.kind) throw new Invalid('A tool keeps its kind: make a new tool for the other kind', [{ pointer: '/kind' }]);
     if (make) out.kind = kind;
     if (make || has('input')) {
@@ -87,7 +87,16 @@ function fieldsFrom(body, current = null, { compileSchema } = {}) {
         out.output = o.kind === 'json' ? { kind: 'json', schema: objectSchema(o.schema, 'output.schema') } : { kind: 'text' };
         if (out.output.schema && compileSchema) compileSchema(out.output.schema, 'output.schema');
     }
-    if (kind === 'prompt') {
+    if (kind === 'chain') {
+        if (make || has('chain')) {
+            const checked = require('./chain').checkChain(body.chain);
+            if (checked.error) throw new Invalid(checked.error, [{ pointer: checked.pointer }]);
+            out.chain = checked;
+        }
+        if ((has('prompt') && body.prompt != null) || (has('code') && body.code != null) || (has('source_code') && body.source_code != null)) throw new Invalid('A chain tool runs other tools: no prompt and no code of its own', [{ pointer: '/kind' }]);
+        if ((has('net') && body.net !== 'deny') || (has('hosting') && body.hosting !== 'openvibe')) throw new Invalid('A chain runs on OpenVibe; its steps reach what they reach', [{ pointer: '/net' }]);
+        if (make) { out.prompt = null; out.code = null; out.net = 'deny'; out.hosting = 'openvibe'; }
+    } else if (kind === 'prompt') {
         if (make || has('prompt')) {
             const p = body.prompt;
             if (!p || typeof p !== 'object') throw new Invalid('A prompt tool needs prompt: { instructions, model }', [{ pointer: '/prompt' }]);
@@ -174,6 +183,7 @@ function present(row, ownerName = null) {
         output: json(row.output),
         prompt: row.prompt == null ? null : json(row.prompt),
         code: row.code == null ? null : json(row.code),
+        ...(row.kind === 'chain' ? { chain: row.chain == null ? null : json(row.chain) } : {}),
         net: row.net,
         hosting: row.hosting,
         visibility: row.visibility,
@@ -185,8 +195,8 @@ function present(row, ownerName = null) {
     };
 }
 
-const COLUMNS = ['slug', 'name', 'summary', 'kind', 'input_schema', 'output', 'prompt', 'code', 'net', 'hosting', 'visibility', 'code_text'];
-const JSONB = new Set(['input_schema', 'output', 'prompt', 'code']);
+const COLUMNS = ['slug', 'name', 'summary', 'kind', 'input_schema', 'output', 'prompt', 'code', 'net', 'hosting', 'visibility', 'code_text', 'chain'];
+const JSONB = new Set(['input_schema', 'output', 'prompt', 'code', 'chain']);
 const MAX_PER_OWNER = 200;
 
 function createMadeTools({ db, now = () => new Date(), baseUrl = 'https://openvibe.tools' } = {}) {

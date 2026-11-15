@@ -37,6 +37,14 @@ const ORIGIN = 'https://openvibe.tools';
     const runner = createPromptRunner({ aiUrl: 'https://ai.example', tokens: { getToken: async () => 'svc-token' }, fetchImpl: fakeAi });
     const app = express();
     app.use(cookieParser());
+    // A catalogue tool a chain can call (the run API's shape): upper-cases text; 'refuse' fails.
+    const stepRuns = [];
+    app.post('/api/v1/tools/:id/run', express.json(), (req, res) => {
+        stepRuns.push({ tool: req.params.id, input: req.body.input, auth: req.headers.authorization || null });
+        if (req.params.id === 'refuse') return res.status(422).json({ title: 'The input does not match', detail: 'input.text is required' });
+        res.json({ state: 'succeeded', tool: req.params.id, result: { data: { text: String(req.body.input.text || '').toUpperCase() } } });
+    });
+    let server;
     app.use('/api/v1/made-tools', createMadeToolRoutes({
         store, runner, origin: ORIGIN, log: { error() {} },
         verify: async (t) => ({ ada: { sub: ADA, username: 'ada' }, bo: { sub: BO, username: 'bo' } }[t] || null),
@@ -44,8 +52,9 @@ const ORIGIN = 'https://openvibe.tools';
         // A first-party service (Actor's agents): tools.made.run, acting for X-OV-Subject (Contracts 0.437.0).
         verifyService: async (t) => { const c = JSON.parse(Buffer.from(t.split('.')[1], 'base64url').toString()); return c.sig === 'good' ? { ok: true, claims: c } : { ok: false, code: 'token.bad_signature' }; },
         ...ajvFrom(require),
+        address: () => server.address(),
     }));
-    const server = http.createServer(app).listen(0);
+    server = http.createServer(app).listen(0);
     const base = `http://127.0.0.1:${server.address().port}/api/v1/made-tools`;
     const svc = (cap, sig = 'good') => `x.${Buffer.from(JSON.stringify({ sub: 'svc:actor', cap, sig })).toString('base64url')}.y`;
     const call = async (method, path, { as, body, cookie, origin, subject } = {}) => {
@@ -198,6 +207,30 @@ const ORIGIN = 'https://openvibe.tools';
         assert.notStrictEqual(privateCode.body.code.sha256, digest, 'new code, a new digest');
         assert.strictEqual((await fetch(`${base}/${shout.body.id}/source`)).status, 404, 'a private tool\'s code is its owner\'s alone');
         assert.strictEqual((await call('GET', `/${shout.body.id}/source`, { as: 'ada' })).status, 200);
+
+        // ── chains (§AD.12 (e)): a catalogue tool, then a made tool, as the person who runs it ──
+        aiAnswer = '{"reply":"Thanks for the kind words!"}';
+        const chainBody = { slug: 'shout-then-reply', name: 'Shout, then reply', summary: 'Upper-cases a message, then drafts a kind reply to it.', kind: 'chain',
+            input: { type: 'object', required: ['text'], properties: { text: { type: 'string' } } }, output: { kind: 'json', schema: { type: 'object', required: ['reply'], properties: { reply: { type: 'string' } } } },
+            chain: { steps: [{ tool: 'upper', name: 'Shout it', input: { text: '{{input.text}}' } }, { tool: t.id, name: 'Reply', input: { message: 'They said: {{steps.0.text}}' } }] }, visibility: 'public' };
+        const chainMade = await call('POST', '/', { as: 'ada', body: chainBody });
+        assert.strictEqual(chainMade.status, 201, JSON.stringify(chainMade.body));
+        assert.deepStrictEqual([chainMade.body.kind, chainMade.body.chain.steps.length, chainMade.body.chain.output_from, chainMade.body.prompt, chainMade.body.code], ['chain', 2, 'last', null, null]);
+        const nAi = aiCalls.length;
+        const chained = await call('POST', `/${chainMade.body.id}/run`, { as: 'bo', body: { input: { text: 'you rock' } } });
+        assert.strictEqual(chained.status, 200, JSON.stringify(chained.body));
+        assert.deepStrictEqual([chained.body.state, chained.body.result.data.reply, chained.body.steps.map((s) => s.name)], ['succeeded', 'Thanks for the kind words!', ['Shout it', 'Reply']]);
+        assert.deepStrictEqual([stepRuns[stepRuns.length - 1].tool, stepRuns[stepRuns.length - 1].input, stepRuns[stepRuns.length - 1].auth], ['upper', { text: 'you rock' }, 'Bearer bo'], 'step 1 ran as the caller with the chain\'s input');
+        assert.strictEqual(JSON.parse(aiCalls[nAi].body.input.messages[1].content).message, 'They said: YOU ROCK', 'step 2 read step 1\'s answer');
+        assert.deepStrictEqual(aiCalls[nAi].body.on_behalf_of, { type: 'user', id: BO }, 'the person who runs the chain pays for every step');
+        const brokenChain = await call('POST', '/', { as: 'ada', body: { ...chainBody, slug: 'broken-chain', chain: { steps: [{ tool: 'refuse', input: {} }, { tool: t.id, input: { message: '{{steps.0.text}}' } }] } } });
+        const failedChain = await call('POST', `/${brokenChain.body.id}/run`, { as: 'bo', body: { input: { text: 'x' } } });
+        assert.deepStrictEqual([failedChain.body.state, failedChain.body.error.step], ['failed', 0]);
+        assert.match(failedChain.body.error.detail, /Step 1 \(refuse\): input.text is required/);
+        const forward = await call('POST', '/', { as: 'ada', body: { ...chainBody, slug: 'reads-ahead', chain: { steps: [{ tool: 'upper', input: { text: '{{steps.1.text}}' } }, { tool: 'upper', input: {} }] } } });
+        assert.deepStrictEqual([forward.status, forward.body.errors[0].pointer], [422, '/chain/steps/0/input'], 'a step reads only steps before it');
+        assert.strictEqual((await call('POST', '/', { as: 'ada', body: { ...chainBody, slug: 'one-step', chain: { steps: [{ tool: 'upper', input: {} }] } } })).status, 422, 'two steps at least');
+        aiAnswer = '{"reply":"Thank you, that is kind of you."}';
 
         // ── changing and deleting ──
         assert.strictEqual((await call('PATCH', `/${t.id}`, { cookie: 'ada', origin: 'https://evil.example', body: { name: 'x' } })).status, 403, 'a cookie-borne write from another site is refused');

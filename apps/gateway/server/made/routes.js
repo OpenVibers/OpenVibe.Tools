@@ -36,7 +36,7 @@ function problem(res, status, code, detail, extra = {}) {
  * createMadeToolRoutes({ store, runner, verify, extractToken, origin, Ajv, addFormats, log })
  *   verify(token) → claims | null (Network user tokens for openvibe.tools); origin: https://openvibe.tools.
  */
-function createMadeToolRoutes({ store, runner, models = null, verify, verifyService = null, extractToken, origin, Ajv, addFormats = null, log = console }) {
+function createMadeToolRoutes({ store, runner, models = null, verify, verifyService = null, extractToken, origin, address = null, fetchImpl = globalThis.fetch, Ajv, addFormats = null, log = console }) {
     const { peek, looksLikePrincipal, capabilityDenied } = require('../../../_shared/guard/tokens');
     const r = express.Router();
     const ajv = new Ajv({ strict: false, allErrors: true });
@@ -195,6 +195,22 @@ function createMadeToolRoutes({ store, runner, models = null, verify, verifyServ
             if (tool.kind === 'code') return problem(res, 501, 'tools.made.code_not_ready', `A code tool runs on its page, in your browser (${origin}/make#${tool.id}); runs for agents and the API come with Link's runner`);
             const ctrl = new AbortController();
             res.on('close', () => { if (!res.writableFinished) ctrl.abort(); });
+            if (tool.kind === 'chain') {
+                // Each step is one run through the gateway's own run API, as the caller (made/chain.js).
+                const a = typeof address === 'function' ? address() : null;
+                if (!a || !a.port) return problem(res, 503, 'tools.unavailable', 'The chain cannot reach the tools right now');
+                const host = !a.address || a.address === '::' || a.address === '0.0.0.0' ? '127.0.0.1' : a.address.includes(':') ? `[${a.address}]` : a.address;
+                const headers = { 'X-Forwarded-For': req.ip || '' };
+                for (const k of ['authorization', 'cookie', 'x-ov-subject']) if (req.headers[k]) headers[k] = req.headers[k];
+                headers.Origin = origin;
+                const out = await require('./chain').runChain(tool.chain, input, { base: `http://${host}:${a.port}`, headers, fetchImpl, signal: ctrl.signal });
+                if (!out.ok) return res.json({ state: 'failed', tool: tool.id, error: { type: 'https://openvibe.tools/problems/tools.made.step_failed', title: out.error, status: 502, code: 'tools.made.step_failed', detail: out.error, step: out.step }, steps: out.steps, took_ms: Date.now() - t0 });
+                if (v.output && out.result.data !== undefined && !v.output(out.result.data)) {
+                    return res.json({ state: 'failed', tool: tool.id, error: { type: 'https://openvibe.tools/problems/tools.made.bad_answer', title: 'The last step\'s answer did not match the tool\'s output schema', status: 422, code: 'tools.made.bad_answer', detail: (v.output.errors || []).slice(0, 3).map((e) => `${e.instancePath || '/'} ${e.message}`).join('; ') }, steps: out.steps, took_ms: Date.now() - t0 });
+                }
+                store.counted(tool.id).catch(() => {});
+                return res.json({ state: 'succeeded', tool: tool.id, result: out.result, steps: out.steps, took_ms: Date.now() - t0 });
+            }
             let out;
             try {
                 out = await runner.run(tool, input, { subject: p.sub, signal: ctrl.signal });
