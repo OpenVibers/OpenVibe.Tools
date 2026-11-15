@@ -11,6 +11,8 @@
 //   GET    /api/v1/made-tools/:id        one tool: public and unlisted to anyone, private to its owner (else 404)
 //   PATCH  /api/v1/made-tools/:id        change it (the next version); its owner
 //   DELETE /api/v1/made-tools/:id        delete it (204); its owner
+//   GET    /api/v1/made-tools/:id/source  a code tool's source as its maker wrote it (the page runs it in the browser)
+//   GET    /api/v1/made-tools/:id/code    a code tool's entry (tool.js) for a runner; its sha256 is code.sha256
 //   POST   /api/v1/made-tools/:id/run    { input } → tools.run@1; signed in (the run is paid from the caller's own
 //                                        allowance, Vibes or keys). A code tool answers 501 tools.made.code_not_ready
 //                                        until Link nodes run them (§AD.7 step 4).
@@ -122,7 +124,7 @@ function createMadeToolRoutes({ store, runner, models = null, verify, verifyServ
         } catch (err) { send(res, err); }
     });
 
-    r.post('/', express.json({ limit: '64kb' }), async (req, res) => {
+    r.post('/', express.json({ limit: '128kb' }), async (req, res) => {
         try {
             const p = await person(req, res, { write: true });
             if (!p) return;
@@ -140,7 +142,24 @@ function createMadeToolRoutes({ store, runner, models = null, verify, verifyServ
         } catch (err) { send(res, err); }
     });
 
-    r.patch('/:id', express.json({ limit: '64kb' }), async (req, res) => {
+    // A code tool's source (for the page's sandbox) and entry (for a runner): to whoever may see the tool, never cached
+    // by a shared cache for a private one.
+    const codeOf = (kind) => async (req, res) => {
+        try {
+            const p = await who(req);
+            const row = await store.get(req.params.id);
+            if (!visibleTo(row, p && p.sub) || row.kind !== 'code' || row.code_text == null) return problem(res, 404, 'tools.made.not_found', 'No code tool has that id');
+            const { entryOf } = require('./code');
+            const body = kind === 'entry' ? entryOf(row.code_text) : row.code_text;
+            res.set({ 'Content-Type': 'text/javascript; charset=utf-8', 'X-Content-Type-Options': 'nosniff', 'Cache-Control': row.visibility === 'private' ? 'private, no-store' : 'public, max-age=60',
+                'Content-Disposition': `inline; filename="${kind === 'entry' ? 'tool.js' : `${row.slug}.js`}"` });
+            res.send(body);
+        } catch (err) { send(res, err); }
+    };
+    r.get('/:id/source', codeOf('source'));
+    r.get('/:id/code', codeOf('entry'));
+
+    r.patch('/:id', express.json({ limit: '128kb' }), async (req, res) => {
         try {
             const p = await person(req, res, { write: true });
             if (!p) return;
@@ -173,7 +192,7 @@ function createMadeToolRoutes({ store, runner, models = null, verify, verifyServ
                 return problem(res, 422, 'tools.input.invalid', 'The input does not match the tool\'s input schema',
                     { errors: (v.input.errors || []).slice(0, 20).map((e) => ({ pointer: e.instancePath || '/', message: e.message })) });
             }
-            if (tool.kind === 'code') return problem(res, 501, 'tools.made.code_not_ready', 'Code tools run on Link nodes, which are not taking them yet: make it a prompt tool for now');
+            if (tool.kind === 'code') return problem(res, 501, 'tools.made.code_not_ready', `A code tool runs on its page, in your browser (${origin}/make#${tool.id}); runs for agents and the API come with Link's runner`);
             const ctrl = new AbortController();
             res.on('close', () => { if (!res.writableFinished) ctrl.abort(); });
             let out;

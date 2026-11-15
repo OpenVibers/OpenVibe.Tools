@@ -108,13 +108,19 @@ function fieldsFrom(body, current = null, { compileSchema } = {}) {
             }
             out.prompt = prompt;
         }
-        if (has('code') && body.code != null) throw new Invalid('A prompt tool has no code', [{ pointer: '/code' }]);
+        if ((has('code') && body.code != null) || (has('source_code') && body.source_code != null)) throw new Invalid('A prompt tool has no code', [{ pointer: '/code' }]);
         if ((has('net') && body.net !== 'deny') || (has('hosting') && body.hosting !== 'openvibe')) throw new Invalid('A prompt tool runs on OpenVibe and reaches no network', [{ pointer: '/net' }]);
         if (make) { out.code = null; out.net = 'deny'; out.hosting = 'openvibe'; }
     } else {
-        if (make || has('code')) {
+        if (has('source_code') && body.source_code != null) {
+            // The maker's own run(input) function (made/code.js): its entry and digest are built from it here.
+            const checked = require('./code').checkSource(body.source_code);
+            if (checked.error) throw new Invalid(checked.error, [{ pointer: '/source_code' }]);
+            out.code_text = checked.source;
+            out.code = { sha256: checked.sha256, entry: require('./code').ENTRY, bytes: checked.bytes };
+        } else if (make || has('code')) {
             const c = body.code;
-            if (!c || typeof c !== 'object') throw new Invalid('A code tool needs code: { sha256, entry }', [{ pointer: '/code' }]);
+            if (!c || typeof c !== 'object') throw new Invalid('A code tool needs its code: source_code (a run(input) function), or code: { sha256, entry }', [{ pointer: '/code' }]);
             if (!SHA256.test(String(c.sha256 || ''))) throw new Invalid('code.sha256 is the entry file\'s SHA-256 (64 hex)', [{ pointer: '/code/sha256' }]);
             if (!ENTRY.test(String(c.entry || '')) || String(c.entry).length > 200) throw new Invalid('code.entry is the entry file\'s path (tool.js)', [{ pointer: '/code/entry' }]);
             const code = { sha256: c.sha256, entry: c.entry };
@@ -179,11 +185,12 @@ function present(row, ownerName = null) {
     };
 }
 
-const COLUMNS = ['slug', 'name', 'summary', 'kind', 'input_schema', 'output', 'prompt', 'code', 'net', 'hosting', 'visibility'];
+const COLUMNS = ['slug', 'name', 'summary', 'kind', 'input_schema', 'output', 'prompt', 'code', 'net', 'hosting', 'visibility', 'code_text'];
 const JSONB = new Set(['input_schema', 'output', 'prompt', 'code']);
 const MAX_PER_OWNER = 200;
 
-function createMadeTools({ db, now = () => new Date() } = {}) {
+function createMadeTools({ db, now = () => new Date(), baseUrl = 'https://openvibe.tools' } = {}) {
+    const codeUrl = (id) => `${String(baseUrl).replace(/\/+$/, '')}/api/v1/made-tools/${id}/code`;
     const taken = (err) => err && (err.code === '23505' || /made_tools_owner_slug/.test(String(err.message || '')));
     const slugTaken = (slug) => Object.assign(new Error(`You already have a tool called ${slug}: pick another short name`), { status: 409, code: 'tools.made.slug_taken' });
 
@@ -193,7 +200,8 @@ function createMadeTools({ db, now = () => new Date() } = {}) {
         if (count.n >= MAX_PER_OWNER) throw Object.assign(new Error(`A person keeps at most ${MAX_PER_OWNER} tools: delete one first`), { status: 409, code: 'tools.made.too_many' });
         const at = now();
         const id = newId(at.getTime());
-        const vals = COLUMNS.map((c) => (JSONB.has(c) ? (f[c] == null ? null : JSON.stringify(f[c])) : f[c]));
+        if (f.code_text != null && f.code) f.code = { ...f.code, source: codeUrl(id) };
+        const vals = COLUMNS.map((c) => (JSONB.has(c) ? (f[c] == null ? null : JSON.stringify(f[c])) : (f[c] === undefined ? null : f[c])));
         try {
             const row = await db.one(`INSERT INTO made_tools (id, owner_subject, ${COLUMNS.join(', ')}, version, runs, created_at, updated_at)
                 VALUES ($1, $2, ${COLUMNS.map((c, i) => `$${i + 3}${JSONB.has(c) ? '::jsonb' : ''}`).join(', ')}, 1, 0, $${COLUMNS.length + 3}, $${COLUMNS.length + 3}) RETURNING *`,
@@ -214,6 +222,7 @@ function createMadeTools({ db, now = () => new Date() } = {}) {
         const row = await get(id);
         if (!row || row.owner_subject !== owner) return null;
         const f = fieldsFrom(patch, row, { compileSchema });
+        if (f.code_text != null && f.code) f.code = { ...f.code, source: codeUrl(id) };
         const keys = Object.keys(f);
         if (!keys.length) return row;
         const sets = keys.map((k, i) => `${k} = $${i + 3}${JSONB.has(k) ? '::jsonb' : ''}`);
@@ -246,7 +255,7 @@ function createMadeTools({ db, now = () => new Date() } = {}) {
         await db.exec('UPDATE made_tools SET runs = runs + 1 WHERE id = $1', [id]);
     }
 
-    return { create, get, update, remove, listMine, listPublic, counted, present };
+    return { create, get, update, remove, listMine, listPublic, counted, present, codeUrl };
 }
 
 module.exports = { createMadeTools, fieldsFrom, present, newId, Invalid, SLUG };

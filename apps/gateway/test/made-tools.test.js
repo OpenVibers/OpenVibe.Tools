@@ -165,6 +165,30 @@ const ORIGIN = 'https://openvibe.tools';
         assert.strictEqual((await call('POST', '/draft', { as: 'ada', body: { description: 'short' } })).status, 422);
         assert.strictEqual((await call('POST', '/draft', { as: svc(['tools.made.run']), subject: ADA, body: { description: 'an agent drafting a tool' } })).status, 403, 'an agent does not draft through this');
         aiAnswer = '{"reply":"Thank you, that is kind of you."}';
+        // ── code tools from source (§AD.12 (c)): the source in, the entry's digest out, both served ──
+        const crypto = require('crypto');
+        const { entryOf } = require('../server/made/code');
+        const SRC = "function run(input) {\n  return { upper: String(input.text || '').toUpperCase() };\n}\n";
+        const shout = await call('POST', '/', { as: 'ada', body: { slug: 'shout', name: 'Shout', summary: 'Upper-cases text.', kind: 'code', input: { type: 'object', properties: { text: { type: 'string' } } }, output: { kind: 'json', schema: { type: 'object' } }, source_code: SRC, visibility: 'unlisted' } });
+        assert.strictEqual(shout.status, 201, JSON.stringify(shout.body));
+        const digest = crypto.createHash('sha256').update(entryOf(SRC)).digest('hex');
+        assert.deepStrictEqual([shout.body.code.sha256, shout.body.code.entry, shout.body.code.source], [digest, 'tool.js', `https://openvibe.tools/api/v1/made-tools/${shout.body.id}/code`], 'the entry\'s digest and where it is');
+        const srcRes = await fetch(`${base}/${shout.body.id}/source`);
+        assert.strictEqual(await srcRes.text(), SRC, 'the source, for the page\'s sandbox');
+        const entryText = await (await fetch(`${base}/${shout.body.id}/code`)).text();
+        assert.strictEqual(crypto.createHash('sha256').update(entryText).digest('hex'), digest, 'the entry a runner gets has the digest the tool names');
+        const badCode = await call('POST', '/', { as: 'ada', body: { slug: 'nope-code', name: 'Nope', summary: 'x', kind: 'code', input: { type: 'object' }, output: { kind: 'text' }, source_code: 'const x = 1;' } });
+        assert.deepStrictEqual([badCode.status, badCode.body.errors[0].pointer], [422, '/source_code']);
+        assert.match(badCode.body.detail, /run\(input\) function/);
+        assert.strictEqual((await call('POST', '/', { as: 'ada', body: { ...reply, slug: 'prompt-with-src', source_code: SRC } })).status, 422, 'a prompt tool has no code');
+        const ranCode = await call('POST', `/${shout.body.id}/run`, { as: 'bo', body: { input: { text: 'hi' } } });
+        assert.deepStrictEqual([ranCode.status, ranCode.body.code], [501, 'tools.made.code_not_ready']);
+        assert.match(ranCode.body.detail, /on its page, in your browser/);
+        const privateCode = await call('PATCH', `/${shout.body.id}`, { as: 'ada', body: { visibility: 'private', source_code: SRC.replace('toUpperCase', 'toLowerCase') } });
+        assert.strictEqual(privateCode.body.version, 2);
+        assert.notStrictEqual(privateCode.body.code.sha256, digest, 'new code, a new digest');
+        assert.strictEqual((await fetch(`${base}/${shout.body.id}/source`)).status, 404, 'a private tool\'s code is its owner\'s alone');
+        assert.strictEqual((await call('GET', `/${shout.body.id}/source`, { as: 'ada' })).status, 200);
 
         // ── changing and deleting ──
         assert.strictEqual((await call('PATCH', `/${t.id}`, { cookie: 'ada', origin: 'https://evil.example', body: { name: 'x' } })).status, 403, 'a cookie-borne write from another site is refused');
