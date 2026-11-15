@@ -267,19 +267,28 @@
         // Bring a val (§AD.12; Val Town closes on 2027-01-10): its address becomes this form, the vals it imports with it.
         var sv = null;
         if (!f.id && f.kind === 'code') {
-            sv = section('Bring a val from Val Town', 'Paste its address. Its TypeScript becomes JavaScript, the vals it imports come along, and run(input) calls it the way Val Town did.');
+            var fromPd = state.bringFrom === 'pipedream';
+            sv = section('Bring it from Val Town or Pipedream', fromPd
+                ? 'Paste a Node.js code step. Its props become the inputs, and run(input) calls its run({ steps, $ }).'
+                : 'Paste a val\u2019s address. Its TypeScript becomes JavaScript, the vals it imports come along, and run(input) calls it the way Val Town did.');
             sv.classList.add('mk-val');
+            sv.append(seg('bring', [['valtown', 'Val Town'], ['pipedream', 'Pipedream']], fromPd ? 'pipedream' : 'valtown', function (v) { state.bringFrom = v; state.valNotes = []; drawForm(); }, 'Bring it from'));
             var vu = h('input'); vu.type = 'url'; vu.inputMode = 'url'; vu.autocomplete = 'off'; vu.spellcheck = false;
             vu.placeholder = 'https://www.val.town/v/you/yourVal'; vu.value = state.valUrl || '';
             vu.addEventListener('input', function () { state.valUrl = vu.value; });
+            var pd = h('textarea', 'mk-code'); pd.rows = 8; pd.spellcheck = false; pd.autocapitalize = 'off'; pd.setAttribute('autocorrect', 'off'); pd.maxLength = 65536;
+            pd.placeholder = 'export default defineComponent({\n  props: { city: { type: "string", label: "City" } },\n  async run({ steps, $ }) {\n    return `Hello, ${this.city}`;\n  },\n})';
+            pd.value = state.pdCode || '';
+            pd.addEventListener('input', function () { state.pdCode = pd.value; });
             var vnote = h('p', 'mk-hint'); vnote.setAttribute('role', 'status');
             var vgo = btn('Bring it', 'primary', function () {
                 var url = vu.value.trim();
-                if (!url) { vnote.textContent = 'Paste the val\u2019s address on Val Town.'; return; }
+                var pdCode = pd.value.trim();
+                if (fromPd ? !pdCode : !url) { vnote.textContent = fromPd ? 'Paste the code step.' : 'Paste the val\u2019s address on Val Town.'; return; }
                 vgo.disabled = true; vgo.textContent = 'Bringing\u2026'; vnote.textContent = '';
-                api('/import/val', { method: 'POST', body: { url: url } }).then(function (res) {
+                api(fromPd ? '/import/pipedream' : '/import/val', { method: 'POST', body: fromPd ? { code: pdCode } : { url: url } }).then(function (res) {
                     vgo.disabled = false; vgo.textContent = 'Bring it';
-                    if (!res.ok || !res.body || !res.body.draft) { vnote.textContent = words(res, 'It could not bring that val.'); return; }
+                    if (!res.ok || !res.body || !res.body.draft) { vnote.textContent = words(res, fromPd ? 'It could not bring that step.' : 'It could not bring that val.'); return; }
                     var d = res.body.draft;
                     var keep = state.form;
                     state.form = Object.assign(blank(), { kind: 'code', source: d.source, name: d.name, summary: d.summary,
@@ -288,11 +297,11 @@
                     if (!state.form.fields.length) state.form.fields = [{ label: 'Answer' }];
                     state.valNotes = res.body.notes || [];
                     drawForm();
-                    say('Brought ' + (res.body.val && res.body.val.user ? res.body.val.user + '/' : '') + ((res.body.val && res.body.val.name) || 'the val') + '. Check it, try it, then Make it.', 'good');
+                    say(fromPd ? 'Brought the Pipedream step. Name it, check it, try it, then Make it.' : 'Brought ' + (res.body.val && res.body.val.user ? res.body.val.user + '/' : '') + ((res.body.val && res.body.val.name) || 'the val') + '. Check it, try it, then Make it.', 'good');
                 });
             });
             vgo.classList.add('mk-val-go');
-            sv.append(field('Its address', vu), vgo, vnote);
+            sv.append(fromPd ? field('The code step', pd) : field('Its address', vu), vgo, vnote);
             if (state.valNotes && state.valNotes.length) {
                 var vl = h('ul', 'mk-val-notes');
                 state.valNotes.forEach(function (n) { var li = h('li'); li.textContent = n; vl.append(li); });
