@@ -353,6 +353,8 @@ app.post('/api/v1/made-tools/:id/run', actorLimits.backstop('tools.tool.run'));
 app.use('/api/v1/made-tools', require('./made/routes').createMadeToolRoutes({
     store: madeTools, runner: madeRunner, models: require('./made/models').createModelList({ exchangeUrl: config.exchange.url }),
     verify: (token) => auth.verify(token), extractToken,
+    // Actor's and Codes' agents (tools.made.run, Contracts 0.437.0) act for the person in X-OV-Subject.
+    verifyService: (token) => require('../../_shared/guard/tokens').verifyServiceToken(token, { publicKey: auth && auth.client.publicKey, issuer: config.networkUrl, contracts: require('openvibe-contracts') }),
     origin: new URL(config.baseUrl).origin, ...ajvFrom(require),
 }));
 

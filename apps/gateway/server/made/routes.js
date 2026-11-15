@@ -14,7 +14,9 @@
 //                                        until Link nodes run them (§AD.7 step 4).
 //
 // Who: a Network sign-in (Bearer user token with audience openvibe.tools, or the site's session cookie). A write that
-// rides on the cookie must come from the site's own origin. Errors are problem+json.
+// rides on the cookie must come from the site's own origin. A first-party service holding tools.made.run (Contracts
+// 0.437.0: Actor's and Codes' agents) acts for the person named in X-OV-Subject: it lists their tools and runs a tool as
+// them (paid from their allowance), and never makes, changes or deletes one. Errors are problem+json.
 // ═══════════════════════════════════════════════════════════════
 
 const express = require('express');
@@ -30,7 +32,8 @@ function problem(res, status, code, detail, extra = {}) {
  * createMadeToolRoutes({ store, runner, verify, extractToken, origin, Ajv, addFormats, log })
  *   verify(token) → claims | null (Network user tokens for openvibe.tools); origin: https://openvibe.tools.
  */
-function createMadeToolRoutes({ store, runner, models = null, verify, extractToken, origin, Ajv, addFormats = null, log = console }) {
+function createMadeToolRoutes({ store, runner, models = null, verify, verifyService = null, extractToken, origin, Ajv, addFormats = null, log = console }) {
+    const { peek, looksLikePrincipal, capabilityDenied } = require('../../../_shared/guard/tokens');
     const r = express.Router();
     const ajv = new Ajv({ strict: false, allErrors: true });
     if (addFormats) addFormats(ajv);
@@ -54,6 +57,13 @@ function createMadeToolRoutes({ store, runner, models = null, verify, extractTok
     async function who(req) {
         const token = extractToken(req);
         if (!token) return null;
+        const peeked = peek(token);
+        if (verifyService && peeked && looksLikePrincipal(peeked)) {
+            const v = await Promise.resolve(verifyService(token)).catch(() => null);
+            if (!v || !v.ok || capabilityDenied(v.claims, 'tools.made.run')) return null;
+            const sub = String(req.get('x-ov-subject') || '');
+            return SUBJECT.test(sub) ? { sub, service: v.claims.sub } : null;
+        }
         const claims = await Promise.resolve(verify(token)).catch(() => null);
         const sub = claims && (claims.sub || claims.subject);
         if (!SUBJECT.test(String(sub || ''))) return null;
@@ -61,9 +71,10 @@ function createMadeToolRoutes({ store, runner, models = null, verify, extractTok
         return { sub, name: claims.name || claims.username || null };
     }
 
-    async function person(req, res) {
+    async function person(req, res, { write = false } = {}) {
         const p = await who(req);
         if (!p) { problem(res, 401, 'tools.session_required', 'Sign in with your OpenVibe account'); return null; }
+        if (write && p.service) { problem(res, 403, 'capability.denied', 'A service lists and runs a person\'s tools; only the person makes or changes one'); return null; }
         if (p.crossSite) { problem(res, 403, 'tools.origin.refused', 'This change must come from openvibe.tools'); return null; }
         return p;
     }
@@ -100,7 +111,7 @@ function createMadeToolRoutes({ store, runner, models = null, verify, extractTok
 
     r.post('/', express.json({ limit: '64kb' }), async (req, res) => {
         try {
-            const p = await person(req, res);
+            const p = await person(req, res, { write: true });
             if (!p) return;
             const row = await store.create(p.sub, req.body, { compileSchema });
             res.status(201).set('Location', `/api/v1/made-tools/${row.id}`).json(store.present(row, p.name));
@@ -118,7 +129,7 @@ function createMadeToolRoutes({ store, runner, models = null, verify, extractTok
 
     r.patch('/:id', express.json({ limit: '64kb' }), async (req, res) => {
         try {
-            const p = await person(req, res);
+            const p = await person(req, res, { write: true });
             if (!p) return;
             const row = await store.update(req.params.id, p.sub, req.body, { compileSchema });
             if (!row) return problem(res, 404, 'tools.made.not_found', 'You have no tool with that id');
@@ -128,7 +139,7 @@ function createMadeToolRoutes({ store, runner, models = null, verify, extractTok
 
     r.delete('/:id', async (req, res) => {
         try {
-            const p = await person(req, res);
+            const p = await person(req, res, { write: true });
             if (!p) return;
             if (!(await store.remove(req.params.id, p.sub))) return problem(res, 404, 'tools.made.not_found', 'You have no tool with that id');
             res.status(204).end();
