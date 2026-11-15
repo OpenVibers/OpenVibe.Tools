@@ -95,6 +95,7 @@ function rawGet(port, p, headers = {}) {
             'gateway/server/made/run-code.js': 'OpenVibe.Run\'s internal API (OV_RUN_INTERNAL_URL, config), fixed paths /api/v1/jobs and /api/v1/jobs/<id from Run>; nothing a visitor chooses',
             'gateway/server/made/chain.js': 'the gateway\'s own run API on loopback (its own socket address, a fixed path per checked tool id), as the caller; redirects refused',
             'gateway/server/made/prompt.js': 'OpenVibe.AI runs (configured OV_AI_URL; fixed path /api/v1/runs), never a caller URL',
+            'gateway/server/made/import-pipedream.js': 'none from here: fetch() appears only inside the generated tool\'s code (the @pipedream/platform axios shim), which runs on a Link machine as the tool, never in the gateway',
             'gateway/server/made/import-val.js': 'Val Town\'s public API, a fixed host (https://api.val.town/v1/alias/<user>/<name>, both checked names); redirects refused',
             'gateway/server/made/models.js': 'OpenVibe.Exchange\'s public model directory (configured OV_EXCHANGE_URL; fixed path /api/v1/models; redirects refused)',
             'food/server/index.js': 'the maps satellite (configured; fixed paths, only the query string is the visitor\'s)',
