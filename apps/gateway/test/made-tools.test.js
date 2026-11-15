@@ -41,12 +41,15 @@ const ORIGIN = 'https://openvibe.tools';
         store, runner, origin: ORIGIN, log: { error() {} },
         verify: async (t) => ({ ada: { sub: ADA, username: 'ada' }, bo: { sub: BO, username: 'bo' } }[t] || null),
         extractToken: (req) => (req.headers.authorization || '').replace(/^Bearer /, '') || (req.cookies && req.cookies.ov_token) || null,
+        // A first-party service (Actor's agents): tools.made.run, acting for X-OV-Subject (Contracts 0.437.0).
+        verifyService: async (t) => { const c = JSON.parse(Buffer.from(t.split('.')[1], 'base64url').toString()); return c.sig === 'good' ? { ok: true, claims: c } : { ok: false, code: 'token.bad_signature' }; },
         ...ajvFrom(require),
     }));
     const server = http.createServer(app).listen(0);
     const base = `http://127.0.0.1:${server.address().port}/api/v1/made-tools`;
-    const call = async (method, path, { as, body, cookie, origin } = {}) => {
-        const res = await fetch(base + path, { method, headers: { ...(as ? { Authorization: `Bearer ${as}` } : {}), ...(cookie ? { Cookie: `ov_token=${cookie}` } : {}), ...(origin ? { Origin: origin } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
+    const svc = (cap, sig = 'good') => `x.${Buffer.from(JSON.stringify({ sub: 'svc:actor', cap, sig })).toString('base64url')}.y`;
+    const call = async (method, path, { as, body, cookie, origin, subject } = {}) => {
+        const res = await fetch(base + path, { method, headers: { ...(subject ? { 'X-OV-Subject': subject } : {}), ...(as ? { Authorization: `Bearer ${as}` } : {}), ...(cookie ? { Cookie: `ov_token=${cookie}` } : {}), ...(origin ? { Origin: origin } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
         const text = await res.text();
         let json = null;
         try { json = JSON.parse(text); } catch { /* empty */ }
@@ -132,6 +135,23 @@ const ORIGIN = 'https://openvibe.tools';
         assert.strictEqual((await call('POST', `/${code.body.id}/run`, { as: 'bo', body: { input: {} } })).status, 404, 'nobody else runs a private tool');
         const notYet = await call('POST', `/${code.body.id}/run`, { as: 'ada', body: { input: { csv: 'a,b' } } });
         assert.deepStrictEqual([notYet.status, notYet.body.code], [501, 'tools.made.code_not_ready']);
+
+        // ── an agent runs it as the person (tools.made.run) ──
+        const agent = svc(['tools.made.run']);
+        const n0 = aiCalls.length;
+        aiAnswer = '{"reply":"Hello from an agent run"}';
+        const viaAgent = await call('POST', `/${t.id}/run`, { as: agent, subject: BO, body: { input: { message: 'hi' } } });
+        assert.deepStrictEqual([viaAgent.status, viaAgent.body.state], [200, 'succeeded'], JSON.stringify(viaAgent.body));
+        assert.deepStrictEqual(aiCalls[n0].body.on_behalf_of, { type: 'user', id: BO }, 'the person the agent works for pays');
+        const theirs = await call('GET', '/?mine=1', { as: agent, subject: ADA });
+        assert.deepStrictEqual(theirs.body.tools.map((x) => x.slug).sort(), ['csv-columns', 'reply-kindly'], 'the agent lists the person\'s own tools');
+        assert.strictEqual((await call('POST', `/${code.body.id}/run`, { as: agent, subject: BO, body: { input: {} } })).status, 404, 'a private tool runs only for its owner, through an agent too');
+        assert.strictEqual((await call('POST', '/', { as: agent, subject: ADA, body: { ...reply, slug: 'by-agent' } })).status, 403, 'an agent never makes one');
+        assert.strictEqual((await call('DELETE', `/${t.id}`, { as: agent, subject: ADA })).status, 403, 'or deletes one');
+        assert.strictEqual((await call('POST', `/${t.id}/run`, { as: svc([]), subject: BO, body: { input: { message: 'x' } } })).status, 401, 'without tools.made.run');
+        assert.strictEqual((await call('POST', `/${t.id}/run`, { as: agent, body: { input: { message: 'x' } } })).status, 401, 'without the person it works for');
+        assert.strictEqual((await call('POST', `/${t.id}/run`, { as: svc(['tools.made.run'], 'forged'), subject: BO, body: { input: { message: 'x' } } })).status, 401, 'a forged token');
+        aiAnswer = '{"reply":"Thank you, that is kind of you."}';
 
         // ── changing and deleting ──
         assert.strictEqual((await call('PATCH', `/${t.id}`, { cookie: 'ada', origin: 'https://evil.example', body: { name: 'x' } })).status, 403, 'a cookie-borne write from another site is refused');
