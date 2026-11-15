@@ -47,13 +47,14 @@ const SRC = "function run(input) {\n  return { words: String(input.text || '').s
             if (m) {
                 const j = jobs[Number(m[1]) - 1];
                 j.reads++;
-                if (mode === 'slow') return json(200, { job: { id: `job_${m[1]}`, state: 'queued' } });
-                if (j.reads < 2) return json(200, { job: { id: `job_${m[1]}`, state: 'running' } });
-                if (mode === 'expired') return json(200, { job: { id: `job_${m[1]}`, state: 'expired' } });
+                if (mode === 'slow') return json(200, { id: `job_${m[1]}`, state: 'queued' });
+                if (j.reads < 2) return json(200, { id: `job_${m[1]}`, state: 'running' });
+                if (mode === 'expired') return json(200, { id: `job_${m[1]}`, state: 'expired' });
                 const args = j.body.args;
                 const ok = (mode === 'ok' || mode === 'text') && crypto.createHash('sha256').update(args.source).digest('hex') === args.sha256;
                 const words = String(args.input.text || '').split(/\s+/).filter(Boolean).length;
-                return json(200, { job: { id: `job_${m[1]}`, state: 'succeeded', result: ok ? { ok: true, output: mode === 'text' ? `${words} words` : { words }, exit: 0 } : { ok: false, error: 'the tool exited with code 1', exit: 1, stderr: 'TypeError: boom' } } });
+                // run.job-read-result@1: the job itself, not wrapped (production showed it, 11-15).
+                return json(200, { id: `job_${m[1]}`, state: 'succeeded', result: ok ? { ok: true, output: mode === 'text' ? `${words} words` : { words }, exit: 0 } : { ok: false, error: 'the tool exited with code 1', exit: 1, stderr: 'TypeError: boom' } });
             }
             json(404, {});
         });

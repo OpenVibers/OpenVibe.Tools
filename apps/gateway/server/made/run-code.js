@@ -69,7 +69,9 @@ function createCodeRunner({ runUrl, tokens = null, subject = '', project = '', f
             if (Date.now() > until) throw fail(504, 'tools.made.too_slow', j.state === 'queued' ? 'No machine took the run in time' : 'The run took too long');
             await new Promise((ok) => setTimeout(ok, pollMs));
             if (signal && signal.aborted) throw fail(499, 'tools.made.cancelled', 'The run was cancelled');
-            j = ((await call('GET', `/api/v1/jobs/${encodeURIComponent(id)}`, null, signal)) || {}).job || j;
+            // run.job-read-result@1 is the job itself (run.job-create-result@1 wraps it in { job }); either is read.
+            const got = await call('GET', `/api/v1/jobs/${encodeURIComponent(id)}`, null, signal);
+            j = (got && (got.job || (got.state ? got : null))) || j;
         }
         if (j.state !== 'succeeded') throw fail(502, 'tools.made.machine_failed', j.state === 'expired' ? 'No machine that runs code tools was free' : `The run ${j.state} on its machine`);
         const r = j.result || {};
