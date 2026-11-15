@@ -1,7 +1,8 @@
 'use strict';
 // POST /mcp (plan 2026-11-13 §AD.12 (a)): every tool to any agent over MCP's Streamable HTTP transport.
 //   - initialize names the server and echoes a protocol it speaks; a notification gets 202 and no body;
-//   - tools/list is find_tools, run_tool and run_tools, then the signed-in person's own made tools by name;
+//   - tools/list is find_tools, run_tool, run_tools and make_tool, then the signed-in person's own made tools by name;
+//   - make_tool drafts a tool from words and saves it private, both as the caller; a taken slug gets a suffix;
 //   - find_tools finds catalogue and made tools for a need, with their input schemas (private tools only for their owner);
 //   - run_tool and run_tools go through the run API over loopback with the caller's own Authorization, a made tool to
 //     /api/v1/made-tools/:id/run; a failure is isError with the run's own words; an unknown method or tool is an error.
@@ -28,6 +29,16 @@ const PUB = 'mtl_01JCZ3NDEKTSV4RRFFQ69G5FA2';
             if (req.url === '/api/v1/tools/broken/run') return json(422, { title: 'The input does not match', detail: 'input.domain is required' });
             if (req.url === `/api/v1/made-tools/${OWN}/run`) return json(200, { state: 'succeeded', tool: OWN, result: { data: { reply: 'Thanks!' } } });
             if (req.url === `/api/v1/made-tools/${PUB}/run`) return json(200, { state: 'failed', tool: PUB, error: { detail: 'The model did not answer with a JSON object' } });
+            if (req.url === '/api/v1/made-tools/draft') {
+                if (req.headers.authorization !== 'Bearer ada') return json(401, { title: 'Sign in with your OpenVibe account' });
+                const d = JSON.parse(body);
+                return json(200, { draft: { kind: d.kind, name: 'Price with tax' }, body: { slug: 'price-with-tax', name: 'Price with tax', summary: 'Adds tax.', kind: d.kind, input: { type: 'object', properties: { price: { type: 'number' } } }, output: { kind: 'text' }, source_code: 'function run(input) { return String(input.price * 1.1); }', visibility: 'private' } });
+            }
+            if (req.url === '/api/v1/made-tools') {
+                const b = JSON.parse(body);
+                if (b.slug === 'price-with-tax') return json(409, { title: 'You already have a tool called price-with-tax' });
+                return json(201, { id: 'mtl_01JCZ3NDEKTSV4RRFFQ69G5FA9', slug: b.slug, name: b.name, summary: b.summary, kind: b.kind, visibility: b.visibility, input: b.input, output: b.output });
+            }
             return json(404, { title: 'No such tool' });
         });
     }).listen(0, '127.0.0.1');
@@ -74,10 +85,10 @@ const PUB = 'mtl_01JCZ3NDEKTSV4RRFFQ69G5FA2';
 
         // tools/list: the three, then your own made tools by name.
         const anon = (await rpc('tools/list')).body.result.tools.map((t) => t.name);
-        assert.deepStrictEqual(anon, ['find_tools', 'run_tool', 'run_tools']);
+        assert.deepStrictEqual(anon, ['find_tools', 'run_tool', 'run_tools', 'make_tool']);
         const mine = (await rpc('tools/list', null, { as: 'ada' })).body.result.tools;
-        assert.deepStrictEqual(mine.map((t) => t.name), ['find_tools', 'run_tool', 'run_tools', 'made_reply_kindly']);
-        assert.deepStrictEqual(mine[3].inputSchema, { type: 'object', properties: { message: { type: 'string' } } }, 'your tool with its own input schema');
+        assert.deepStrictEqual(mine.map((t) => t.name), ['find_tools', 'run_tool', 'run_tools', 'make_tool', 'made_reply_kindly']);
+        assert.deepStrictEqual(mine[4].inputSchema, { type: 'object', properties: { message: { type: 'string' } } }, 'your tool with its own input schema');
 
         // find_tools: the catalogue (with its schema) and the made tools; a private tool only for its owner.
         const dns = JSON.parse(textOf(await call('find_tools', { need: 'mx records for a domain' })));
@@ -112,6 +123,20 @@ const PUB = 'mtl_01JCZ3NDEKTSV4RRFFQ69G5FA2';
         assert.strictEqual(textOf(await call('made_reply_kindly', { message: 'hi' }, { as: 'ada' })), '{"reply":"Thanks!"}');
         assert.strictEqual((await call('made_reply_kindly', {})).result.isError, true, 'signed out: no own tools');
 
+        // make_tool: drafted and saved as the caller, private; the slug they already use gets a suffix.
+        const before = runs.length;
+        const madeNew = await call('make_tool', { description: 'Add sales tax to a price', kind: 'code' }, { as: 'ada' });
+        assert.ok(!madeNew.result.isError, textOf(madeNew));
+        const told = JSON.parse(textOf(madeNew));
+        assert.deepStrictEqual([told.made.id, told.made.kind, told.made.visibility, told.page], ['mtl_01JCZ3NDEKTSV4RRFFQ69G5FA9', 'code', 'private', 'https://openvibe.tools/make#mtl_01JCZ3NDEKTSV4RRFFQ69G5FA9']);
+        const calls = runs.slice(before);
+        assert.deepStrictEqual(calls.map((c) => [c.path, c.auth]), [['/api/v1/made-tools/draft', 'Bearer ada'], ['/api/v1/made-tools', 'Bearer ada'], ['/api/v1/made-tools', 'Bearer ada']], 'drafted, then saved twice (the slug was taken), all as the caller');
+        assert.deepStrictEqual([calls[0].body, calls[2].body.visibility], [{ description: 'Add sales tax to a price', kind: 'code' }, 'private']);
+        assert.match(calls[2].body.slug, /^price-with-tax-[a-z0-9]{1,4}$/);
+        const anonMake = await call('make_tool', { description: 'Add sales tax to a price' });
+        assert.deepStrictEqual([anonMake.result.isError, /Sign in/.test(textOf(anonMake))], [true, true], 'signed out: sign in to make one');
+        assert.strictEqual((await call('make_tool', { description: 'short' }, { as: 'ada' })).result.isError, true, 'a description says something');
+
         assert.strictEqual((await rpc('resources/list')).body.error.code, -32601);
         assert.strictEqual((await call('nope', {})).error.code, -32602);
         const bad = await fetch(base, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '[]' });
@@ -119,5 +144,5 @@ const PUB = 'mtl_01JCZ3NDEKTSV4RRFFQ69G5FA2';
     } finally {
         server.close(); api.close();
     }
-    console.log('tools mcp: initialize, find_tools (catalogue and made, private stays private), run_tool and run_tools through the run API as the caller, own tools by name');
+    console.log('tools mcp: initialize, find_tools (catalogue and made, private stays private), run_tool and run_tools through the run API as the caller, make_tool drafts and saves as the caller, own tools by name');
 })().catch((err) => { console.error(err); process.exit(1); });

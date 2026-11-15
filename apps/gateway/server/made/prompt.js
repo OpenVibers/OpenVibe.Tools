@@ -169,4 +169,44 @@ async function draftTool(runner, description, opts) {
     };
 }
 
-module.exports = { createPromptRunner, messagesFor, parseJson, draftTool, DRAFT_SCHEMA };
+// A label as a schema key, the way the make page writes them (public/js/make.js keyOf): "Meeting note" → meeting_note.
+function keyOf(label, taken) {
+    let k = String(label || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'field';
+    if (!/^[a-z]/.test(k)) k = `f_${k}`;
+    let out = k;
+    for (let n = 2; taken.has(out); n++) out = `${k}_${n}`;
+    taken.add(out);
+    return out;
+}
+function slugOf(name) {
+    let s = String(name || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+    if (!/^[a-z]/.test(s)) s = `tool-${s}`.slice(0, 40);
+    s = s.replace(/-+$/, '');
+    return s.length >= 2 ? s : 'my-tool';
+}
+
+/** A draft (draftTool's) as the body POST /api/v1/made-tools takes (tools.made-tool-create-request@1), built the way the
+ *  make page builds it, so an agent or a command line can make the tool a draft describes in one more call. */
+function bodyFromDraft(d, { visibility = 'private' } = {}) {
+    const taken = new Set();
+    const props = {};
+    const required = [];
+    for (const i of d.inputs || []) {
+        const key = keyOf(i.label, taken);
+        props[key] = i.kind === 'number' ? { type: 'number', title: i.label } : { type: 'string', title: i.label, maxLength: i.kind === 'short' ? 500 : 20000 };
+        required.push(key);
+    }
+    let output = { kind: 'text' };
+    if (d.answer === 'fields') {
+        const t2 = new Set();
+        const op = {};
+        const oreq = [];
+        for (const x of d.fields || []) { const k = keyOf(x.label, t2); op[k] = { type: 'string', title: x.label }; oreq.push(k); }
+        output = { kind: 'json', schema: { type: 'object', required: oreq, properties: op } };
+    }
+    const base = { slug: slugOf(d.name), name: d.name, summary: d.summary || d.name, input: { type: 'object', required, properties: props }, output, visibility };
+    if (d.kind === 'code') return { ...base, kind: 'code', source_code: d.source, net: 'deny', hosting: 'openvibe' };
+    return { ...base, kind: 'prompt', prompt: { instructions: d.instructions, model: 'auto' } };
+}
+
+module.exports = { createPromptRunner, messagesFor, parseJson, draftTool, bodyFromDraft, slugOf, DRAFT_SCHEMA };
