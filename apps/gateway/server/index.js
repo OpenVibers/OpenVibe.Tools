@@ -380,7 +380,15 @@ app.options('/hooks/:token', (req, res) => { res.set({ 'Access-Control-Allow-Ori
 app.get('/hooks/:token', actorLimits.backstop('tools.tool.run'), (req, res) => madeRoutes.hook(req, res));
 app.post('/hooks/:token', actorLimits.backstop('tools.tool.run'), express.json({ limit: '256kb' }), express.text({ type: ['text/*', 'application/x-www-form-urlencoded'], limit: '256kb' }), (req, res) => madeRoutes.hook(req, res));
 // The schedules run here, one process's loop (a schedule is claimed before it runs, so two processes never run one twice).
-if (process.env.NODE_ENV !== 'test' && process.env.TOOLS_TRIGGERS !== 'off') madeTriggers.start({ run: madeRoutes.runTrigger });
+// Each run's answer goes to its owner as a Network notification (made/notify.js; Network #1021 grants the push).
+const madeNotifier = require('./made/notify').createRunNotifier({
+    networkUrl: config.networkInternalUrl, baseUrl: config.baseUrl,
+    tokens: config.oauth.clientSecret ? require('openvibe-contracts').serviceAuth.createTokenClient({
+        tokenUrl: `${config.networkInternalUrl}/oauth/token`, clientId: config.oauth.clientId, clientSecret: config.oauth.clientSecret,
+        audience: 'openvibe.network', scope: 'network.notifications.push',
+    }) : null,
+});
+if (process.env.NODE_ENV !== 'test' && process.env.TOOLS_TRIGGERS !== 'off') madeTriggers.start({ run: madeRoutes.runTrigger, told: (row, out) => madeRoutes.toldTrigger(row, out, madeNotifier) });
 
 
 /** 401 unless a valid ov_token is presented. */
