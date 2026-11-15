@@ -240,6 +240,7 @@ background:color-mix(in srgb,var(--text-primary,#e8ecf3) 8%,transparent);color:v
 @media (max-width:560px){.grid{grid-template-columns:minmax(0,1fr);gap:6px}.search button{padding:0 14px}.tool{padding:9px 11px;align-items:center}.tool small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tool i{display:none}.hero{padding-top:20px}.hero h1{font-size:28px}.kicker{display:none}}
 /* The home on phones (2026-10-29): the examples are one row that scrolls sideways (all four still there), and four of the most
    opened tools show (the families below and the A to Z list hold the rest). */
+.make-own{padding:18px;border:1px solid color-mix(in srgb,var(--accent,#3b82f6) 35%,var(--border,#2a3346));border-radius:18px;background:linear-gradient(150deg,color-mix(in srgb,var(--accent,#3b82f6) 10%,transparent),transparent 60%)}.make-own h2{margin-top:0}.make-acts{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px}
 @media (max-width:599px){.start-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-inline:16px;scrollbar-width:none;gap:10px;margin:0 -16px;padding:0 16px 4px}.start-grid::-webkit-scrollbar{display:none}.start-grid>*{flex:0 0 84%;min-width:0;scroll-snap-align:start}section[aria-labelledby="top-h"] .grid>:nth-child(n+5){display:none}}
 ${icons.CSS}
 /* Touch targets on phones (fleet audit, 2026-10-29): touch pointers only. */
@@ -485,6 +486,7 @@ ${searchForm('')}
 <nav class="quick-strip" data-ovk-scroll="drift" aria-label="${rankedIds.length ? 'Popular tools' : 'Explore tools'}">${quick.join('')}</nav></div>
 ${demo}</div>
 <section aria-labelledby="ask-tool-h"><h2 id="ask-tool-h">Ask Vibe which tool</h2><p class="sec-p">Describe your task to find a matching tool in this catalog.</p><form class="search" action="/ask-tool" method="get"><input name="q" aria-label="What would you like to do?" placeholder="I want to merge PDFs" maxlength="160" required>${kit.button({ label: 'Find a tool', icon: 'search' })}</form></section>
+<section class="make-own" aria-labelledby="make-h"><h2 id="make-h">Make your own tool</h2><p class="sec-p">Say what it should do and a model drafts it, or write the code yourself, or put tools in a row. Share it, and it works in every agent.</p><div class="make-acts">${kit.button({ href: '/make', label: 'Make a tool', icon: 'plus' })}<a class="more" href="/make">Tools people made</a></div></section>
 ${discoveryHtml}
 <ul class="stats"><li><b>${tools.length}</b> tools</li><li><b>${fams.length}</b> families</li><li><b>${withApi}</b> with an API</li><li>nothing to install</li></ul>
 <section id="results" hidden aria-live="polite"><div class="sec-h"><h2>Results</h2></div><div class="grid" id="results-grid"></div><p class="empty" id="results-empty" hidden>No tool matches that yet. <a href="/all-tools">Browse every tool</a>.</p></section>
@@ -517,7 +519,7 @@ ${opened.length >= 4 ? foldBlock({
 <div class="dev"><pre tabindex="0"><code>curl -X POST ${SITE}/api/v1/tools/jsonminify/run \\
   -H 'Content-Type: application/json' \\
   -d '{"input":{"text":"{ \\"a\\": 1 }"}}'</code></pre>
-<ul><li><a href="/api/v1/openapi.json">OpenAPI 3.1</a>, generated from the tool descriptors</li><li><a href="/api/v1/tools">/api/v1/tools</a>: every tool's inputs, limits and access</li><li>Long work runs as a job you can follow over server-sent events</li><li><a href="https://openvibe.design/kit">OpenVibe.Design components</a> power the buttons and lists</li><li><a href="/api/v1/tools/popular">Popular tools API</a> · <a href="/api/v1/tools/trending">Trending tools API</a></li><li><a href="https://github.com/OpenVibers/OpenVibe.SDK">openvibe-sdk</a>: <code>tools.run(id, input)</code> from JavaScript</li></ul></div></details></section>
+<ul><li>Any agent: the MCP server <code>${SITE}/mcp</code> (find_tools, run_tool, run_tools) for Claude, ChatGPT, Cursor and the rest</li><li>The terminal: <code>openvibe-codes tools find "merge pdf"</code>, <code>tools run</code>, <code>tools make</code></li><li><a href="/api/v1/openapi.json">OpenAPI 3.1</a>, generated from the tool descriptors</li><li><a href="/api/v1/tools">/api/v1/tools</a>: every tool's inputs, limits and access</li><li>Long work runs as a job you can follow over server-sent events</li><li><a href="https://openvibe.design/kit">OpenVibe.Design components</a> power the buttons and lists</li><li><a href="/api/v1/tools/popular">Popular tools API</a> · <a href="/api/v1/tools/trending">Trending tools API</a></li><li><a href="https://github.com/OpenVibers/OpenVibe.SDK">openvibe-sdk</a>: <code>tools.run(id, input)</code> from JavaScript</li></ul></div></details></section>
 ${foldBlock({
         id: 'shipped',
         head: '<h2 id="shipped-h">Recently shipped on OpenVibe.Tools</h2>',
