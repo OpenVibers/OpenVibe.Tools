@@ -87,9 +87,67 @@
         });
     }
 
+    // ── Chains (§AD.12 (e)) ────────────────────────────────────
+    var schemaCache = {};
+    /** A tool's input schema and its answer's fields (null when it answers text), for a step's fields and chips. */
+    function schemaFor(toolId) {
+        if (schemaCache[toolId]) return Promise.resolve(schemaCache[toolId]);
+        var p = /^mtl_/.test(toolId)
+            ? api('/' + encodeURIComponent(toolId)).then(function (r) { var t = r.body || {}; return { input: t.input || { type: 'object' }, output: t.output && t.output.kind === 'json' && t.output.schema ? t.output.schema : null }; })
+            : fetch('/api/v1/tools/' + encodeURIComponent(toolId) + '/schema', { headers: { Accept: 'application/json' } }).then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (d) { var o = d && d.$defs && d.$defs.output; return { input: (d && d.$defs && d.$defs.input) || { type: 'object' }, output: o && o.type === 'object' && o.properties ? o : null }; })
+                .catch(function () { return { input: { type: 'object' }, output: null }; });
+        return p.then(function (s) { schemaCache[toolId] = s; return s; });
+    }
+    function findTools(need) {
+        return fetch('/mcp', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'find_tools', arguments: { need: need, limit: 12 } } }) })
+            .then(function (r) { return r.json(); })
+            .then(function (d) { try { var v = JSON.parse(d.result.content[0].text); return Array.isArray(v) ? v : []; } catch (e) { return []; } })
+            .catch(function () { return []; });
+    }
+    var picker = h('dialog', 'ovk-sheet mk-sheet');
+    picker.setAttribute('aria-labelledby', 'mk-picker-t');
+    (function () {
+        var head = h('div', 'ovk-sheet-head');
+        var t = h('h2', null, 'Pick a tool'); t.id = 'mk-picker-t';
+        var close = h('button', 'ovk-icon-btn mk-icon', '×'); close.type = 'button'; close.setAttribute('aria-label', 'Close');
+        close.addEventListener('click', function () { picker.close(); });
+        head.append(t, close);
+        var body = h('div', 'ovk-sheet-body');
+        var find = h('input', 'mk-find'); find.type = 'search'; find.placeholder = 'What should this step do? (dns, qr code, summarize…)'; find.setAttribute('aria-label', 'Find a tool');
+        var list = h('div', 'mk-models');
+        body.append(find, list);
+        picker.append(head, body);
+        picker.addEventListener('click', function (e) { if (e.target === picker) picker.close(); });
+        var timer = 0, seq = 0;
+        find.addEventListener('input', function () {
+            clearTimeout(timer);
+            var q = find.value.trim();
+            timer = setTimeout(function () {
+                var my = ++seq;
+                if (q.length < 2) { list.textContent = ''; return; }
+                findTools(q).then(function (tools) {
+                    if (my !== seq) return;
+                    list.textContent = '';
+                    if (!tools.length) { list.append(h('p', 'mk-hint', 'No tool fits that. Try other words.')); return; }
+                    tools.forEach(function (tl) {
+                        var b = h('button', 'mk-opt'); b.type = 'button';
+                        var top = h('span', 'mk-opt-top'); top.append(h('b', null, tl.name || tl.tool));
+                        if (tl.made) top.append(h('span', 'mk-badge', tl.yours ? 'Yours' : 'Made by someone'));
+                        b.append(top, h('small', null, tl.summary || ''));
+                        b.addEventListener('click', function () { if (picker.onPick) picker.onPick(tl); picker.close(); });
+                        list.append(b);
+                    });
+                });
+            }, 200);
+        });
+        picker.pick = function (onPick) { picker.onPick = onPick; find.value = ''; list.textContent = ''; if (typeof picker.showModal === 'function') picker.showModal(); else picker.setAttribute('open', ''); setTimeout(function () { find.focus(); }, 30); };
+    })();
+    document.body.append(picker);
+
     // ── State ──────────────────────────────────────────────────
     function blank() {
-        return { id: null, kind: 'prompt', source: CODE_TEMPLATE, slug: '', name: '', summary: '', instructions: '', model: 'auto', modelName: 'Auto', inputs: [{ label: 'Text', kind: 'long' }], answer: 'text', fields: [{ label: 'Answer' }], visibility: 'private', version: 0 };
+        return { id: null, kind: 'prompt', steps: [{ tool: '', name: '', input: {} }, { tool: '', name: '', input: {} }], source: CODE_TEMPLATE, slug: '', name: '', summary: '', instructions: '', model: 'auto', modelName: 'Auto', inputs: [{ label: 'Text', kind: 'long' }], answer: 'text', fields: [{ label: 'Answer' }], visibility: 'private', version: 0 };
     }
     var state = { signedIn: null, mine: [], form: blank(), models: null, saving: false };
 
@@ -102,7 +160,8 @@
         });
         var out = t.output || { kind: 'text' };
         var fields = out.kind === 'json' ? Object.keys((out.schema && out.schema.properties) || {}).map(function (k) { var p = out.schema.properties[k] || {}; return { label: p.title || k, key: k }; }) : [{ label: 'Answer' }];
-        return { id: t.id, slug: t.slug, name: t.name, summary: t.summary, instructions: (t.prompt && t.prompt.instructions) || '', model: (t.prompt && t.prompt.model) || 'auto', modelName: (t.prompt && t.prompt.model) === 'auto' || !t.prompt ? 'Auto' : t.prompt.model, inputs: inputs.length ? inputs : [{ label: 'Text', kind: 'long' }], answer: out.kind === 'json' ? 'fields' : 'text', fields: fields.length ? fields : [{ label: 'Answer' }], visibility: t.visibility, version: t.version, kind: t.kind, runs: t.runs, source: t.kind === 'code' ? null : CODE_TEMPLATE };
+        return { id: t.id, slug: t.slug, name: t.name, summary: t.summary, instructions: (t.prompt && t.prompt.instructions) || '', model: (t.prompt && t.prompt.model) || 'auto', modelName: (t.prompt && t.prompt.model) === 'auto' || !t.prompt ? 'Auto' : t.prompt.model, inputs: inputs.length ? inputs : [{ label: 'Text', kind: 'long' }], answer: out.kind === 'json' ? 'fields' : 'text', fields: fields.length ? fields : [{ label: 'Answer' }], visibility: t.visibility, version: t.version, kind: t.kind, runs: t.runs, source: t.kind === 'code' ? null : CODE_TEMPLATE,
+            steps: t.kind === 'chain' && t.chain ? t.chain.steps.map(function (s) { return { tool: s.tool, name: s.name || s.tool, input: Object.assign({}, s.input) }; }) : [{ tool: '', name: '', input: {} }, { tool: '', name: '', input: {} }] };
     }
 
     /** The form as the API's body. */
@@ -121,6 +180,13 @@
         }
         var base = { slug: f.slug || slugOf(f.name), name: f.name.trim(), summary: f.summary.trim(), input: { type: 'object', required: required, properties: props }, output: output, visibility: f.visibility };
         if (f.kind === 'code') return Object.assign(base, { kind: 'code', source_code: f.source || '', net: 'deny', hosting: 'openvibe' });
+        if (f.kind === 'chain') {
+            return Object.assign(base, { kind: 'chain', chain: { steps: f.steps.map(function (s) {
+                var input = {};
+                Object.keys(s.input || {}).forEach(function (k) { var v = s.input[k]; if (v !== '' && v != null) input[k] = /^-?\d+(\.\d+)?$/.test(String(v)) ? Number(v) : v; });
+                return { tool: s.tool, name: (s.name || s.tool).slice(0, 80), input: input };
+            }) } });
+        }
         return Object.assign(base, { kind: 'prompt', prompt: { instructions: f.instructions.trim(), model: f.model || 'auto' } });
     }
 
@@ -209,7 +275,7 @@
         var sk = null;
         if (!f.id) {
             sk = section('How it works');
-            sk.append(seg('kind', [['prompt', 'A model writes the answer'], ['code', 'My code']], f.kind, function (v) { f.kind = v; drawForm(); }, 'How it works'));
+            sk.append(seg('kind', [['prompt', 'A model'], ['code', 'My code'], ['chain', 'Tools in a row']], f.kind, function (v) { f.kind = v; drawForm(); }, 'How it works'));
         }
         var s2c = null;
         if (f.kind === 'code') {
@@ -228,6 +294,63 @@
                 ed.value = ed.value.slice(0, a) + '  ' + ed.value.slice(b); ed.selectionStart = ed.selectionEnd = a + 2; f.source = ed.value;
             });
             s2c.append(ed);
+        }
+        // A chain: steps, each a tool and its input (literal words, the chain's input, or an earlier step's answer).
+        var s2ch = null;
+        if (f.kind === 'chain') {
+            s2ch = section('The steps', 'Each step runs one tool, in order. Its input can be words, the chain\'s own input, or an earlier step\'s answer.');
+            var inputKeys = (function () { var t = {}; return f.inputs.map(function (i) { return keyOf(i.label, t); }); })();
+            f.steps.forEach(function (st, n) {
+                var card = h('div', 'mk-step');
+                var headRow = h('div', 'mk-step-head');
+                headRow.append(h('span', 'mk-step-n', String(n + 1)));
+                var pickBtn = h('button', 'mk-model mk-step-tool'); pickBtn.type = 'button';
+                var mine = st.tool && state.mine.some(function (x) { return x.id === st.tool; });
+                pickBtn.append(h('span', 'mk-model-name', st.tool ? (st.name || st.tool) : 'Pick a tool'),
+                    h('span', 'mk-model-sub', !st.tool ? 'Search the catalogue and the tools people made' : /^mtl_/.test(st.tool) ? (mine ? 'A tool you made' : 'A tool someone made') : 'openvibe.tools/' + st.tool));
+                pickBtn.addEventListener('click', function () { picker.pick(function (tl) { st.tool = tl.tool; st.name = tl.name || tl.tool; st.input = {}; drawForm(); }); });
+                headRow.append(pickBtn);
+                if (f.steps.length > 2) headRow.append(iconButton('Remove this step', '×', function () { f.steps.splice(n, 1); drawForm(); }));
+                card.append(headRow);
+                if (st.tool) {
+                    var fieldsBox = h('div', 'mk-step-fields'); fieldsBox.append(h('p', 'mk-hint', 'Loading what it takes…'));
+                    card.append(fieldsBox);
+                    // The answers of the steps before this one, field by field (a text answer is one chip).
+                    var earlier = f.steps.slice(0, n).map(function (prev) { return prev.tool ? schemaFor(prev.tool) : Promise.resolve({ output: null }); });
+                    Promise.all([schemaFor(st.tool)].concat(earlier)).then(function (all) {
+                        var schema = all[0].input, prevOut = all.slice(1).map(function (x) { return x.output; });
+                        fieldsBox.textContent = '';
+                        var props = (schema && schema.properties) || {};
+                        var req = (schema && schema.required) || [];
+                        var keys = Object.keys(props);
+                        if (!keys.length) { fieldsBox.append(h('p', 'mk-hint', 'It takes nothing.')); return; }
+                        keys.slice(0, 8).forEach(function (k) {
+                            var p = props[k] || {};
+                            var inp = h('input'); inp.value = st.input[k] == null ? '' : String(st.input[k]); inp.placeholder = (p.description || p.title || k).slice(0, 80);
+                            // What a template takes, in words, under the field.
+                            var says = h('small', 'mk-hint mk-takes');
+                            var plain = function () {
+                                var m = /^\s*\{\{\s*(input|steps)\.([A-Za-z0-9_.-]+)\s*\}\}\s*$/.exec(inp.value);
+                                if (!m) { says.textContent = ''; return; }
+                                if (m[1] === 'input') { var i = inputKeys.indexOf(m[2]); says.textContent = 'Takes the chain\'s ' + (i >= 0 ? (f.inputs[i].label || m[2]) : m[2]); return; }
+                                var parts = m[2].split('.'); says.textContent = 'Takes step ' + (Number(parts[0]) + 1) + '\'s ' + (parts.slice(1).join('.') || 'answer');
+                            };
+                            plain();
+                            inp.addEventListener('input', function () { st.input[k] = inp.value; plain(); });
+                            var chips = h('div', 'mk-chips');
+                            inputKeys.forEach(function (ik, i) { chips.append(btn('Input: ' + (f.inputs[i].label || ik), 'quiet', function () { inp.value = '{{input.' + ik + '}}'; st.input[k] = inp.value; plain(); })); });
+                            prevOut.forEach(function (out, m) {
+                                var outKeys = out && out.properties ? Object.keys(out.properties).slice(0, 6) : [];
+                                if (!outKeys.length) { chips.append(btn('Step ' + (m + 1) + '\'s answer', 'quiet', function () { inp.value = '{{steps.' + m + '}}'; st.input[k] = inp.value; plain(); })); return; }
+                                outKeys.forEach(function (ok) { chips.append(btn('Step ' + (m + 1) + ': ' + ((out.properties[ok] && out.properties[ok].title) || ok), 'quiet', function () { inp.value = '{{steps.' + m + '.' + ok + '}}'; st.input[k] = inp.value; plain(); })); });
+                            });
+                            fieldsBox.append(field((p.title || k) + (req.indexOf(k) >= 0 ? '' : ' (optional)'), inp), says, chips);
+                        });
+                    });
+                }
+                s2ch.append(card);
+            });
+            if (f.steps.length < 8) s2ch.append(btn('Add a step', 'quiet', function () { f.steps.push({ tool: '', name: '', input: {} }); drawForm(); }));
         }
         var s2 = section('What the model does');
         var ins = h('textarea'); ins.maxLength = 8000; ins.rows = 5; ins.value = f.instructions; ins.required = true;
@@ -286,7 +409,7 @@
         if (sk) form.append(sk);
         if (sd) form.append(sd);
         form.append(s1);
-        form.append(f.kind === 'code' ? s2c : s2, s3, s4, s5, status, bar);
+        form.append(f.kind === 'code' ? s2c : f.kind === 'chain' ? s3 : s2, f.kind === 'chain' ? s2ch : s3, s4, s5, status, bar);
         if (f.id) form.append(deleteRow(f));
         form.addEventListener('submit', function (e) { e.preventDefault(); submit(); });
         formCol.append(form);
@@ -309,7 +432,8 @@
     function check(f) {
         if (!f.name.trim()) return 'Give it a name.';
         if (!f.summary.trim()) return 'Say what it does, in one sentence.';
-        if (f.kind === 'code' ? !/\brun\b/.test(f.source || '') : !f.instructions.trim()) return f.kind === 'code' ? 'Write a run(input) function that returns the answer.' : 'Tell the model what to do.';
+        if (f.kind === 'chain') { if (f.steps.length < 2 || f.steps.some(function (s) { return !s.tool; })) return 'A chain needs at least two steps, each with a tool.'; }
+        else if (f.kind === 'code' ? !/\brun\b/.test(f.source || '') : !f.instructions.trim()) return f.kind === 'code' ? 'Write a run(input) function that returns the answer.' : 'Tell the model what to do.';
         if (f.inputs.some(function (i) { return !String(i.label).trim(); })) return 'Name every input (or remove the empty one).';
         if (f.answer === 'fields' && f.fields.some(function (x) { return !String(x.label).trim(); })) return 'Name every field (or remove the empty one).';
         return '';

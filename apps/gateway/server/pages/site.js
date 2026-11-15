@@ -750,6 +750,16 @@ const MAKE_CSS = `.mk{max-width:1120px;margin:0 auto;padding:8px 0 24px}
 .mk-row>input{flex:1 1 180px;min-width:0}
 .mk-row .ovk-seg{flex:none}
 .mk-sec>.ovk-seg{justify-self:start}
+.mk-step{display:grid;gap:10px;padding:12px;border:1px solid var(--ovk-line);border-radius:14px;background:var(--ovk-panel-2)}
+.mk-step-head{display:flex;align-items:center;gap:10px;min-width:0}
+.mk-step-n{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:color-mix(in srgb,var(--ovk-accent) 18%,transparent);color:var(--ovk-text);font-weight:800;font-size:.85rem}
+.mk-step-tool{flex:1;min-width:0}
+.mk-step-tool .mk-model-sub,.mk-step-tool .mk-model-name{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mk-takes{margin-top:-4px;color:var(--ovk-accent)}
+.mk-takes:empty{display:none}
+.mk-step-fields{display:grid;gap:8px}
+.mk-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:-2px}
+.mk-chips .ovk-btn{min-height:32px;padding:4px 10px;font-size:.8rem;border-radius:999px}
 .mk-describe{border-color:color-mix(in srgb,var(--ovk-accent) 40%,var(--ovk-line));background:linear-gradient(160deg,color-mix(in srgb,var(--ovk-accent) 10%,var(--ovk-panel)),var(--ovk-panel) 60%)}
 .mk-draft-go{justify-self:start}
 .mk-code{font:13.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace!important;tab-size:2;white-space:pre;overflow:auto;min-height:220px}

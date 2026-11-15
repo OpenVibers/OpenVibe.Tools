@@ -368,6 +368,8 @@ app.use('/api/v1/made-tools', require('./made/routes').createMadeToolRoutes({
     // Actor's and Codes' agents (tools.made.run, Contracts 0.437.0) act for the person in X-OV-Subject.
     verifyService: (token) => require('../../_shared/guard/tokens').verifyServiceToken(token, { publicKey: auth && auth.client.publicKey, issuer: config.networkUrl, contracts: require('openvibe-contracts') }),
     origin: new URL(config.baseUrl).origin, ...ajvFrom(require),
+    // A chain's steps go through the run API on loopback (made/chain.js).
+    address: () => { try { return server.address(); } catch { return null; } },
 }));
 
 
