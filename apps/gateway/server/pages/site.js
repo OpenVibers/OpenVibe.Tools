@@ -754,6 +754,25 @@ const MAKE_CSS = `.mk{max-width:1120px;margin:0 auto;padding:8px 0 24px}
 .mk-step-head{display:flex;align-items:center;gap:10px;min-width:0}
 .mk-step-n{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:color-mix(in srgb,var(--ovk-accent) 18%,transparent);color:var(--ovk-text);font-weight:800;font-size:.85rem}
 .mk-step-tool{flex:1;min-width:0}
+.mk-trigs{display:grid;gap:8px;margin:4px 0 10px}
+.mk-trig{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:6px 12px;padding:10px 12px;border:1px solid var(--ovk-line);border-radius:12px;background:var(--ovk-panel-2)}
+.mk-trig-ic{display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center;border-radius:10px;background:color-mix(in srgb,var(--ovk-accent) 14%,transparent);color:var(--ovk-accent)}
+.mk-trig-main{display:grid;gap:2px;min-width:0}
+.mk-trig-main small{color:var(--ovk-muted);font-size:.84rem;overflow-wrap:anywhere}
+.mk-trig-last{padding:0;border:0;border-radius:0;background:none}
+.mk-trig-last summary{cursor:pointer;color:var(--ovk-accent);font-size:.82rem;min-height:32px;display:inline-flex;align-items:center}
+.mk-trig-last summary::after{content:none}
+.mk-trig-last pre{margin:4px 0 0;padding:8px 10px;border-radius:8px;background:var(--ovk-bg);font-size:.8rem;white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto}
+.mk-trig-del{width:44px;min-width:44px;padding:0;justify-content:center}
+.mk-auto-add{display:flex;flex-wrap:wrap;gap:8px;margin:0}
+.mk-auto-panel:empty{display:none}
+.mk-auto-panel{margin:0 0 10px;padding:12px;border:1px solid var(--ovk-line);border-radius:12px;animation:mk-in .2s ease both}
+.mk-auto-bar{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 0}
+.mk-auto-new{display:grid;gap:8px}
+.mk-auto-urlrow{display:flex;gap:8px;margin:0;min-width:0}
+.mk-auto-url{flex:1;min-width:0;min-height:44px;padding:0 12px;border:1px solid var(--ovk-line);border-radius:10px;background:var(--ovk-bg);color:var(--ovk-text);font:inherit;font-size:.86rem}
+.mk-auto-curl{margin:0;padding:10px 12px;border-radius:10px;background:var(--ovk-bg);font-size:.78rem;white-space:pre-wrap;overflow-wrap:anywhere}
+@media (max-width:520px){.mk-trig{grid-template-columns:auto minmax(0,1fr) auto;align-items:start}.mk-trig-ic{grid-row:span 2}.mk-trig .ovk-switch{margin-top:4px}.mk-trig-main{grid-row:span 2}.mk-trig-del{grid-column:3;grid-row:2;align-self:end;width:44px;min-width:44px;height:44px}}
 .mk-step-tool .mk-model-sub,.mk-step-tool .mk-model-name{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mk-takes{margin-top:-4px;color:var(--ovk-accent)}
 .mk-takes:empty{display:none}
@@ -907,7 +926,7 @@ function llmsTxtBody() {
     // is on another subdomain, so its link keeps its URL; /developers has no twin yet (llms-twins-probe, 11-03), so
     // it keeps its URL and says (HTML). The API stays in a main section: it is what an agent came for.
     return seo.llmsTxt({ name: NAME, markdown: true, base: SITE, summary: llmsSummary(),
-        sections: [{ title: 'API', links: [{ title: 'Developer guide', url: SITE + '/developers', note: 'run any tool from code' }, { title: 'MCP server', url: SITE + '/mcp', note: 'Streamable HTTP (POST): find_tools, run_tool, run_tools and your own made tools, for any agent' }, { title: 'Make a tool', url: SITE + '/make', note: 'a prompt on any model, or code' }, { title: 'OpenAPI 3.1', url: SITE + '/api/v1/openapi.json' }, { title: 'Tool registry (JSON)', url: SITE + '/api/v1/tools' }] }].concat(llmsSections()),
+        sections: [{ title: 'API', links: [{ title: 'Developer guide', url: SITE + '/developers', note: 'run any tool from code' }, { title: 'MCP server', url: SITE + '/mcp', note: 'Streamable HTTP (POST): find_tools, run_tool, run_tools and your own made tools, for any agent' }, { title: 'Make a tool', url: SITE + '/make', note: 'a prompt on any model, code, or a chain of tools; each runs from a private link (/hooks/…, a webhook) or on a schedule, as its maker' }, { title: 'OpenAPI 3.1', url: SITE + '/api/v1/openapi.json' }, { title: 'Tool registry (JSON)', url: SITE + '/api/v1/tools' }] }].concat(llmsSections()),
         // llmstxt.org's "## Optional": what an agent may skip when it needs a shorter context.
         optional: [
             { title: 'Full text (llms-full.txt)', url: SITE + '/llms-full.txt', note: 'the public pages above as one plain-text document' },

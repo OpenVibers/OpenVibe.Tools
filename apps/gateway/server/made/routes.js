@@ -14,6 +14,10 @@
 //   DELETE /api/v1/made-tools/:id        delete it (204); its owner
 //   GET    /api/v1/made-tools/:id/source  a code tool's source as its maker wrote it (the page runs it in the browser)
 //   GET    /api/v1/made-tools/:id/code    a code tool's entry (tool.js) for a runner; its sha256 is code.sha256
+//   GET    /api/v1/made-tools/:id/triggers         its triggers (made/triggers.js, §AD.12 (g)); its owner
+//   POST   /api/v1/made-tools/:id/triggers         { kind: link|schedule, every?, at?, input? } (201; a link's URL once)
+//   PATCH  /api/v1/made-tools/:id/triggers/:tid    { enabled }; DELETE …/:tid (204); its owner
+//   GET|POST /hooks/<mth_…>                         a link trigger: the tool runs as its owner (mounted by index.js)
 //   POST   /api/v1/made-tools/:id/run    { input } → tools.run@1; signed in (the run is paid from the caller's own
 //                                        allowance, Vibes or keys). A code tool answers 501 tools.made.code_not_ready
 //                                        until Link nodes run them (§AD.7 step 4).
@@ -38,7 +42,7 @@ function problem(res, status, code, detail, extra = {}) {
  * createMadeToolRoutes({ store, runner, verify, extractToken, origin, Ajv, addFormats, log })
  *   verify(token) → claims | null (Network user tokens for openvibe.tools); origin: https://openvibe.tools.
  */
-function createMadeToolRoutes({ store, runner, models = null, verify, verifyService = null, extractToken, origin, address = null, fetchImpl = globalThis.fetch, Ajv, addFormats = null, log = console }) {
+function createMadeToolRoutes({ store, runner, models = null, verify, verifyService = null, extractToken, origin, address = null, fetchImpl = globalThis.fetch, Ajv, addFormats = null, log = console, triggers = null }) {
     const { peek, looksLikePrincipal, capabilityDenied } = require('../../../_shared/guard/tokens');
     const r = express.Router();
     const ajv = new Ajv({ strict: false, allErrors: true });
@@ -193,8 +197,51 @@ function createMadeToolRoutes({ store, runner, models = null, verify, verifyServ
         } catch (err) { send(res, err); }
     });
 
-    r.post('/:id/run', express.json({ limit: '256kb' }), async (req, res) => {
+    /**
+     * One run of a made tool as `subject`: { body } (tools.run@1, succeeded or failed with the tool's own error), or
+     * { refused: { status, code, detail, errors? } } before anything ran. `headers` carry the caller's credentials to a
+     * chain's steps (none for a trigger: its steps run as anyone may).
+     */
+    async function runAs(tool, input, { subject, signal = null, headers = {}, ip = '' } = {}) {
         const t0 = Date.now();
+        const v = validatorsFor(tool);
+        if (!v.input(input)) {
+            return { refused: { status: 422, code: 'tools.input.invalid', detail: 'The input does not match the tool\'s input schema',
+                errors: (v.input.errors || []).slice(0, 20).map((e) => ({ pointer: e.instancePath || '/', message: e.message })) } };
+        }
+        if (tool.kind === 'code') return { refused: { status: 501, code: 'tools.made.code_not_ready', detail: `A code tool runs on its page, in your browser (${origin}/make#${tool.id}); runs for agents and the API come with Link's runner` } };
+        if (tool.kind === 'chain') {
+            // Each step is one run through the gateway's own run API, as the caller (made/chain.js).
+            const a = typeof address === 'function' ? address() : null;
+            if (!a || !a.port) return { refused: { status: 503, code: 'tools.unavailable', detail: 'The chain cannot reach the tools right now' } };
+            const host = !a.address || a.address === '::' || a.address === '0.0.0.0' ? '127.0.0.1' : a.address.includes(':') ? `[${a.address}]` : a.address;
+            const h = { 'X-Forwarded-For': ip || '', ...headers, Origin: origin };
+            const out = await require('./chain').runChain(tool.chain, input, { base: `http://${host}:${a.port}`, headers: h, fetchImpl, signal });
+            if (!out.ok) return { body: { state: 'failed', tool: tool.id, error: { type: 'https://openvibe.tools/problems/tools.made.step_failed', title: out.error, status: 502, code: 'tools.made.step_failed', detail: out.error, step: out.step }, steps: out.steps, took_ms: Date.now() - t0 } };
+            if (v.output && out.result.data !== undefined && !v.output(out.result.data)) {
+                return { body: { state: 'failed', tool: tool.id, error: { type: 'https://openvibe.tools/problems/tools.made.bad_answer', title: 'The last step\'s answer did not match the tool\'s output schema', status: 422, code: 'tools.made.bad_answer', detail: (v.output.errors || []).slice(0, 3).map((e) => `${e.instancePath || '/'} ${e.message}`).join('; ') }, steps: out.steps, took_ms: Date.now() - t0 } };
+            }
+            store.counted(tool.id).catch(() => {});
+            return { body: { state: 'succeeded', tool: tool.id, result: out.result, steps: out.steps, took_ms: Date.now() - t0 } };
+        }
+        let out;
+        try {
+            out = await runner.run(tool, input, { subject, signal });
+        } catch (err) {
+            if (err && err.status === 401) return { refused: { status: 401, code: err.code, detail: err.message } };
+            return { body: { state: 'failed', tool: tool.id, error: { type: `https://openvibe.tools/problems/${err.code || 'tools.made.model_failed'}`, title: err.message, status: err.status || 502, code: err.code || 'tools.made.model_failed', detail: err.message }, took_ms: Date.now() - t0 } };
+        }
+        if (v.output && !v.output(out.data)) {
+            return { body: { state: 'failed', tool: tool.id, error: { type: 'https://openvibe.tools/problems/tools.made.bad_answer', title: 'The model\'s answer did not match the tool\'s output schema', status: 422, code: 'tools.made.bad_answer', detail: (v.output.errors || []).slice(0, 3).map((e) => `${e.instancePath || '/'} ${e.message}`).join('; ') }, took_ms: Date.now() - t0 } };
+        }
+        store.counted(tool.id).catch(() => {});
+        return { body: { state: 'succeeded', tool: tool.id, result: out.data !== undefined ? { data: out.data } : { text: out.text }, took_ms: Date.now() - t0, ...(out.model ? { model: out.model } : {}), ...(out.usage ? { usage: out.usage } : {}) } };
+    }
+    const answer = (res, out) => (out.refused
+        ? problem(res, out.refused.status, out.refused.code, out.refused.detail, out.refused.errors ? { errors: out.refused.errors } : {})
+        : res.json(out.body));
+
+    r.post('/:id/run', express.json({ limit: '256kb' }), async (req, res) => {
         try {
             const p = await person(req, res);
             if (!p) return;
@@ -202,44 +249,99 @@ function createMadeToolRoutes({ store, runner, models = null, verify, verifyServ
             if (!visibleTo(row, p.sub)) return problem(res, 404, 'tools.made.not_found', 'No tool has that id');
             const tool = store.present(row);
             const input = req.body && typeof req.body === 'object' && req.body.input !== undefined ? req.body.input : {};
-            const v = validatorsFor(tool);
-            if (!v.input(input)) {
-                return problem(res, 422, 'tools.input.invalid', 'The input does not match the tool\'s input schema',
-                    { errors: (v.input.errors || []).slice(0, 20).map((e) => ({ pointer: e.instancePath || '/', message: e.message })) });
-            }
-            if (tool.kind === 'code') return problem(res, 501, 'tools.made.code_not_ready', `A code tool runs on its page, in your browser (${origin}/make#${tool.id}); runs for agents and the API come with Link's runner`);
             const ctrl = new AbortController();
             res.on('close', () => { if (!res.writableFinished) ctrl.abort(); });
-            if (tool.kind === 'chain') {
-                // Each step is one run through the gateway's own run API, as the caller (made/chain.js).
-                const a = typeof address === 'function' ? address() : null;
-                if (!a || !a.port) return problem(res, 503, 'tools.unavailable', 'The chain cannot reach the tools right now');
-                const host = !a.address || a.address === '::' || a.address === '0.0.0.0' ? '127.0.0.1' : a.address.includes(':') ? `[${a.address}]` : a.address;
-                const headers = { 'X-Forwarded-For': req.ip || '' };
-                for (const k of ['authorization', 'cookie', 'x-ov-subject']) if (req.headers[k]) headers[k] = req.headers[k];
-                headers.Origin = origin;
-                const out = await require('./chain').runChain(tool.chain, input, { base: `http://${host}:${a.port}`, headers, fetchImpl, signal: ctrl.signal });
-                if (!out.ok) return res.json({ state: 'failed', tool: tool.id, error: { type: 'https://openvibe.tools/problems/tools.made.step_failed', title: out.error, status: 502, code: 'tools.made.step_failed', detail: out.error, step: out.step }, steps: out.steps, took_ms: Date.now() - t0 });
-                if (v.output && out.result.data !== undefined && !v.output(out.result.data)) {
-                    return res.json({ state: 'failed', tool: tool.id, error: { type: 'https://openvibe.tools/problems/tools.made.bad_answer', title: 'The last step\'s answer did not match the tool\'s output schema', status: 422, code: 'tools.made.bad_answer', detail: (v.output.errors || []).slice(0, 3).map((e) => `${e.instancePath || '/'} ${e.message}`).join('; ') }, steps: out.steps, took_ms: Date.now() - t0 });
-                }
-                store.counted(tool.id).catch(() => {});
-                return res.json({ state: 'succeeded', tool: tool.id, result: out.result, steps: out.steps, took_ms: Date.now() - t0 });
-            }
-            let out;
-            try {
-                out = await runner.run(tool, input, { subject: p.sub, signal: ctrl.signal });
-            } catch (err) {
-                if (err && err.status === 401) return problem(res, 401, err.code, err.message);
-                return res.json({ state: 'failed', tool: tool.id, error: { type: `https://openvibe.tools/problems/${err.code || 'tools.made.model_failed'}`, title: err.message, status: err.status || 502, code: err.code || 'tools.made.model_failed', detail: err.message }, took_ms: Date.now() - t0 });
-            }
-            if (v.output && !v.output(out.data)) {
-                return res.json({ state: 'failed', tool: tool.id, error: { type: 'https://openvibe.tools/problems/tools.made.bad_answer', title: 'The model\'s answer did not match the tool\'s output schema', status: 422, code: 'tools.made.bad_answer', detail: (v.output.errors || []).slice(0, 3).map((e) => `${e.instancePath || '/'} ${e.message}`).join('; ') }, took_ms: Date.now() - t0 });
-            }
-            store.counted(tool.id).catch(() => {});
-            res.json({ state: 'succeeded', tool: tool.id, result: out.data !== undefined ? { data: out.data } : { text: out.text }, took_ms: Date.now() - t0, ...(out.model ? { model: out.model } : {}), ...(out.usage ? { usage: out.usage } : {}) });
+            const headers = {};
+            for (const k of ['authorization', 'cookie', 'x-ov-subject']) if (req.headers[k]) headers[k] = req.headers[k];
+            answer(res, await runAs(tool, input, { subject: p.sub, signal: ctrl.signal, headers, ip: req.ip }));
         } catch (err) { send(res, err); }
     });
+
+    // ── Triggers (§AD.12 (g)): the owner's alone; a service never makes or changes one ──
+    const ownTool = async (req, res) => {
+        if (!triggers) { problem(res, 404, 'tools.trigger.off', 'Triggers are not on here'); return null; }
+        const p = await person(req, res, { write: true });
+        if (!p) return null;
+        const row = await store.get(req.params.id);
+        if (!row || row.owner_subject !== p.sub) { problem(res, 404, 'tools.made.not_found', 'You have no tool with that id'); return null; }
+        return { p, row };
+    };
+    const triggerSend = (res, err) => (err && err.code && String(err.code).startsWith('tools.trigger.') ? problem(res, err.status, err.code, err.message) : send(res, err));
+    r.get('/:id/triggers', async (req, res) => {
+        try {
+            const own = await ownTool(req, res);
+            if (!own) return;
+            const why = require('./triggers').refusal(store.present(own.row));
+            res.json({ triggers: await triggers.list(own.row.id, own.p.sub), ...(why ? { unsupported: why } : {}) });
+        } catch (err) { triggerSend(res, err); }
+    });
+    r.post('/:id/triggers', express.json({ limit: '32kb' }), async (req, res) => {
+        try {
+            const own = await ownTool(req, res);
+            if (!own) return;
+            const made = await triggers.create(store.present(own.row), own.p.sub, req.body || {});
+            res.status(201).json(made);
+        } catch (err) { triggerSend(res, err); }
+    });
+    r.patch('/:id/triggers/:tid', express.json({ limit: '4kb' }), async (req, res) => {
+        try {
+            const own = await ownTool(req, res);
+            if (!own) return;
+            const t = await triggers.setEnabled(req.params.tid, own.p.sub, !!(req.body && req.body.enabled));
+            if (!t || t.tool !== own.row.id) return problem(res, 404, 'tools.trigger.not_found', 'This tool has no trigger with that id');
+            res.json(t);
+        } catch (err) { triggerSend(res, err); }
+    });
+    r.delete('/:id/triggers/:tid', async (req, res) => {
+        try {
+            const own = await ownTool(req, res);
+            if (!own) return;
+            if (!(await triggers.remove(req.params.tid, own.p.sub))) return problem(res, 404, 'tools.trigger.not_found', 'This tool has no trigger with that id');
+            res.status(204).end();
+        } catch (err) { triggerSend(res, err); }
+    });
+
+    /**
+     * GET|POST /hooks/<mth_…> (index.js mounts it): a link trigger runs its tool as the owner. The input is the trigger's
+     * fixed input under the request's: a JSON body's `input`, else the JSON body itself, else the query. When that is not
+     * the tool's input and the tool takes one text field, the request's whole body goes into it (a webhook's payload).
+     */
+    async function hook(req, res) {
+        res.set({ 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' });
+        try {
+            if (!triggers) return problem(res, 404, 'tools.trigger.not_found', 'No trigger has that link');
+            const trig = await triggers.byToken(req.params.token);
+            if (!trig) return problem(res, 404, 'tools.trigger.not_found', 'No trigger has that link');
+            if (!trig.enabled) return problem(res, 423, 'tools.trigger.paused', 'Its owner paused this link');
+            if (!triggers.allowLink(trig.id)) return problem(res, 429, 'tools.trigger.too_many', 'This link ran 30 times this minute: try again shortly');
+            const row = await store.get(trig.tool_id);
+            if (!row || row.owner_subject !== trig.owner_subject) return problem(res, 404, 'tools.trigger.not_found', 'No trigger has that link');
+            const tool = store.present(row);
+            const b = req.body;
+            const json = b && typeof b === 'object' && !Array.isArray(b) && Object.keys(b).length ? b : null;
+            const given = json ? (json.input && typeof json.input === 'object' && !Array.isArray(json.input) ? json.input : json) : { ...req.query };
+            let input = { ...(trig.input || {}), ...given };
+            const props = (tool.input && tool.input.properties) || {};
+            const keys = Object.keys(props);
+            if (!validatorsFor(tool).input(input) && keys.length === 1 && props[keys[0]] && props[keys[0]].type === 'string') {
+                const raw = typeof b === 'string' ? b : b && typeof b === 'object' && Object.keys(b).length ? JSON.stringify(b) : '';
+                if (raw) input = { [keys[0]]: raw.slice(0, Number(props[keys[0]].maxLength) || 20000) };
+            }
+            const ctrl = new AbortController();
+            res.on('close', () => { if (!res.writableFinished) ctrl.abort(); });
+            const out = await runAs(tool, input, { subject: trig.owner_subject, signal: ctrl.signal, ip: req.ip });
+            await triggers.record(trig.id, out.body || { state: 'failed', error: { detail: out.refused.detail } }).catch(() => {});
+            answer(res, out);
+        } catch (err) { send(res, err); }
+    }
+    r.hook = hook;
+    // The scheduler's run: a due schedule's tool, as its owner, with its fixed input.
+    r.runTrigger = async (trig) => {
+        const row = await store.get(trig.tool_id);
+        if (!row || row.owner_subject !== trig.owner_subject) return { state: 'failed', error: { detail: 'The tool is gone' } };
+        const out = await runAs(store.present(row), trig.input || {}, { subject: trig.owner_subject, signal: AbortSignal.timeout(120_000) });
+        return out.body || { state: 'failed', error: { detail: out.refused.detail } };
+    };
 
     return r;
 }
