@@ -18,6 +18,11 @@ module.exports = {
     // Identity provider — OpenVibe.Network (OAuth2 authorization server)
     networkUrl: process.env.OV_NETWORK_URL || 'https://openvibe.network',
     networkInternalUrl: process.env.OV_NETWORK_INTERNAL_URL || 'http://127.0.0.1:4000',
+    // OpenVibe.AI, where a prompt tool people made runs (made/prompt.js) as the person who runs it.
+    ai: {
+        url: (process.env.OV_AI_URL || 'https://ai.openvibe.services').replace(/\/+$/, ''),
+        audience: process.env.OV_AI_AUDIENCE || 'openvibe.ai',
+    },
 
     // OAuth2 client credentials (client seeded in Network's oauth_clients table)
     oauth: {
