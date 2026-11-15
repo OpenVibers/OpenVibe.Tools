@@ -4,6 +4,7 @@
 //
 //   GET    /api/v1/made-tools            public tools, the most run first (?q= words, ?limit= 1..100); anyone
 //   GET    /api/v1/made-tools?mine=1     the caller's own tools, every visibility; signed in
+//   GET    /api/v1/made-tools/models     the models a prompt tool can name (./models.js); anyone
 //   POST   /api/v1/made-tools            make one (201); signed in
 //   GET    /api/v1/made-tools/:id        one tool: public and unlisted to anyone, private to its owner (else 404)
 //   PATCH  /api/v1/made-tools/:id        change it (the next version); its owner
@@ -29,7 +30,7 @@ function problem(res, status, code, detail, extra = {}) {
  * createMadeToolRoutes({ store, runner, verify, extractToken, origin, Ajv, addFormats, log })
  *   verify(token) → claims | null (Network user tokens for openvibe.tools); origin: https://openvibe.tools.
  */
-function createMadeToolRoutes({ store, runner, verify, extractToken, origin, Ajv, addFormats = null, log = console }) {
+function createMadeToolRoutes({ store, runner, models = null, verify, extractToken, origin, Ajv, addFormats = null, log = console }) {
     const r = express.Router();
     const ajv = new Ajv({ strict: false, allErrors: true });
     if (addFormats) addFormats(ajv);
@@ -89,6 +90,12 @@ function createMadeToolRoutes({ store, runner, verify, extractToken, origin, Ajv
             res.set({ 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=60' });
             res.json({ tools: rows.map((x) => store.present(x)), count: rows.length });
         } catch (err) { send(res, err); }
+    });
+
+    r.get('/models', async (req, res) => {
+        const body = models ? await models.list().catch(() => ({ models: [], updated_at: null })) : { models: [], updated_at: null };
+        res.set({ 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=300' });
+        res.json(body);
     });
 
     r.post('/', express.json({ limit: '64kb' }), async (req, res) => {

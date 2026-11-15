@@ -91,6 +91,7 @@ function rawGet(port, p, headers = {}) {
             'gateway/server/run/batch.js': 'the gateway\'s own run API on loopback (its own socket address, a fixed path per tool id); redirects refused',
             'gateway/server/search-index.js': 'OpenVibe.Search (configured)',
             'gateway/server/made/prompt.js': 'OpenVibe.AI runs (configured OV_AI_URL; fixed path /api/v1/runs), never a caller URL',
+            'gateway/server/made/models.js': 'OpenVibe.Exchange\'s public model directory (configured OV_EXCHANGE_URL; fixed path /api/v1/models; redirects refused)',
             'food/server/index.js': 'the maps satellite (configured; fixed paths, only the query string is the visitor\'s)',
             'maps/server/index.js': 'fixed third-party map, weather and geocoding hosts',
             'maps/server/sources/bathrooms.js': 'fixed third-party host', 'maps/server/sources/bridges.js': 'fixed third-party host',

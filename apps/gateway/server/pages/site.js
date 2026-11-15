@@ -728,6 +728,98 @@ const WK_IC = {
 };
 const wkIc = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${WK_IC[k]}</svg>`;
 
+const MAKE_CSS = `.mk{max-width:1120px;margin:0 auto;padding:8px 0 24px}
+.mk-kicker{margin:0 0 6px;color:var(--ovk-accent);font-size:.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.mk h1{margin:0 0 8px;font-size:clamp(1.9rem,6vw,2.6rem);line-height:1.05;letter-spacing:-.03em;text-wrap:balance}
+.mk-lede{margin:0 0 20px;max-width:62ch;color:var(--ovk-muted);font-size:1.02rem;line-height:1.55}
+.mk-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start}
+@media(min-width:960px){.mk-grid{grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:24px}.mk-side{position:sticky;top:calc(var(--ovk-top,64px) + 12px)}}
+.mk-col{display:grid;gap:14px;min-width:0}
+.mk-form{gap:14px}
+.mk-sec,.mk-card{display:grid;gap:10px;min-width:0;padding:16px;border:1px solid var(--ovk-line);border-radius:16px;background:var(--ovk-panel)}
+.mk-sec h2,.mk-card h2{margin:0;font-size:1.02rem;letter-spacing:-.01em}
+.mk-sub{margin:-4px 0 0;color:var(--ovk-muted);font-size:.9rem;line-height:1.45}
+.mk-field{display:grid;gap:5px;min-width:0}
+.mk-label{color:var(--ovk-muted);font-size:.86rem;font-weight:650}
+.mk-hint{margin:0;color:var(--ovk-muted);font-size:.8rem;line-height:1.4}
+.mk-form textarea{field-sizing:content;max-height:50vh}
+.mk-rows{display:grid;gap:8px}
+.mk-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0}
+.mk-row>input{flex:1 1 180px;min-width:0}
+.mk-row .ovk-seg{flex:none}
+.mk-sec>.ovk-seg{justify-self:start}
+.mk-vis{display:grid;gap:8px}
+@media(min-width:640px){.mk-vis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.mk-vis-opt{position:relative;display:grid;gap:2px;align-content:start;color:var(--ovk-text);min-height:var(--ovk-tap,44px);padding:12px 14px;border:1px solid var(--ovk-line);border-radius:12px;cursor:pointer;transition:border-color .15s,background .15s}
+.mk-vis-opt input{position:absolute;opacity:0;pointer-events:none}
+.mk-vis-opt b{font-size:.95rem}
+.mk-vis-opt small{color:var(--ovk-muted);font-size:.8rem;line-height:1.35}
+.mk-vis-opt:has(input:checked){border-color:var(--ovk-accent);background:color-mix(in srgb,var(--ovk-accent) 12%,transparent)}
+.mk-vis-opt:has(input:focus-visible){outline:2px solid var(--ovk-accent);outline-offset:2px}
+.mk-icon{display:inline-grid;place-items:center;flex:none;width:44px;height:44px;border:1px solid var(--ovk-line);border-radius:12px;background:transparent;color:var(--ovk-muted);font:inherit;font-size:1.3rem;line-height:1;cursor:pointer}
+.mk-icon:hover{color:var(--ovk-text);border-color:color-mix(in srgb,var(--ovk-text) 30%,var(--ovk-line))}
+.mk-model{display:grid;gap:2px;justify-items:start;width:100%;min-height:var(--ovk-tap,44px);padding:10px 14px;border:1px solid var(--ovk-line);border-radius:12px;background:var(--ovk-input);color:var(--ovk-text);font:inherit;text-align:left;cursor:pointer}
+.mk-model:hover{border-color:color-mix(in srgb,var(--ovk-accent) 45%,var(--ovk-line))}
+.mk-model-name{font-weight:700}
+.mk-model-sub{color:var(--ovk-muted);font-size:.82rem}
+.mk-save{display:flex;gap:8px;flex-wrap:wrap}
+.mk-save .ovk-btn{flex:1 1 160px;width:auto}
+.mk-status{margin:0;min-height:1.2em;color:var(--ovk-muted);font-size:.9rem}
+.mk-status.is-bad,.mk-bad{color:var(--ovk-bad)}
+.mk-status.is-good{color:var(--ovk-ok)}
+.mk-danger{margin:0}
+.mk-danger .ovk-btn{color:var(--ovk-bad)}
+.mk-danger .ovk-btn.is-sure{border-color:var(--ovk-bad)}
+.mk-tools{display:grid;gap:8px}
+.mk-tool{display:grid;gap:3px;justify-items:start;width:100%;min-height:var(--ovk-tap,44px);padding:12px 14px;border:1px solid var(--ovk-line);border-radius:12px;background:var(--ovk-panel-2);color:var(--ovk-text);font:inherit;text-align:left;cursor:pointer;transition:border-color .15s,transform .15s}
+.mk-tool:hover{border-color:color-mix(in srgb,var(--ovk-accent) 45%,var(--ovk-line))}
+.mk-tool:active{transform:scale(.99)}
+.mk-tool span{color:var(--ovk-muted);font-size:.88rem;line-height:1.4}
+.mk-tool small{color:var(--ovk-muted);font-size:.78rem}
+.mk-answer{display:grid;gap:8px;min-width:0}
+.mk-answer.is-busy{color:var(--ovk-muted)}
+.mk-dots::after{content:"…";display:inline-block;animation:mk-dots 1.2s steps(4,end) infinite;width:1.2em;overflow:hidden;vertical-align:bottom}
+@keyframes mk-dots{0%{width:0}100%{width:1.2em}}
+.mk-text{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.55}
+.mk-fields{display:grid;gap:4px 12px;margin:0}
+.mk-fields dt{color:var(--ovk-muted);font-size:.82rem;font-weight:700}
+.mk-fields dd{margin:0 0 6px;white-space:pre-wrap;overflow-wrap:anywhere}
+.mk-meta{color:var(--ovk-muted);font-size:.78rem}
+.mk-share{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0}
+.mk-share code{flex:1 1 200px;min-width:0;overflow-wrap:anywhere;font-size:.8rem;color:var(--ovk-muted)}
+.mk-gate .ovk-btn{justify-self:start}
+.mk-sheet .ovk-sheet-body{display:grid;gap:8px;padding:12px 16px 16px;overflow:auto}
+.mk-find{width:100%;box-sizing:border-box;min-height:var(--ovk-tap,44px);padding:10px 14px;border-radius:999px;border:1px solid var(--ovk-line);background:var(--ovk-input);color:var(--ovk-text);font:inherit;font-size:1rem;appearance:none}
+.mk-find:focus-visible{outline:2px solid var(--ovk-accent);outline-offset:0;border-color:transparent}
+.mk-models{display:grid;gap:6px}
+.mk-opt{display:grid;gap:2px;width:100%;min-height:var(--ovk-tap,44px);padding:10px 12px;border:1px solid var(--ovk-line);border-radius:12px;background:transparent;color:var(--ovk-text);font:inherit;text-align:left;cursor:pointer}
+.mk-opt.is-on{border-color:var(--ovk-accent);background:color-mix(in srgb,var(--ovk-accent) 12%,transparent)}
+.mk-opt-top{display:flex;align-items:center;gap:8px;min-width:0}
+.mk-opt-top b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mk-opt small{color:var(--ovk-muted);font-size:.8rem}
+.mk-badge{flex:none;padding:2px 8px;border-radius:999px;border:1px solid var(--ovk-line);color:var(--ovk-muted);font-size:.72rem;font-weight:700}
+.mk-badge.is-here{border-color:color-mix(in srgb,var(--ovk-ok) 50%,var(--ovk-line));color:color-mix(in srgb,var(--ovk-ok) 60%,var(--ovk-text))}
+@media(max-width:640px){.mk-sheet{width:100vw;max-height:88dvh;margin:auto 0 0;border-radius:18px 18px 0 0}}
+.mk-enter{animation:mk-in .24s cubic-bezier(.2,.8,.2,1) both}
+@keyframes mk-in{from{opacity:0;transform:translateY(calc(6px * var(--ov-move,1)))}to{opacity:1;transform:none}}
+html[data-ov-motion="off"] .mk-enter,html[data-ov-motion="off"] .mk-dots::after{animation:none}
+`;
+
+/**
+ * Make a tool (plan 2026-11-13 §AD.7 step 3): the page is drawn by /js/make.js on /api/v1/made-tools. Without
+ * JavaScript it still says what it is and where the API is.
+ */
+function pageMake() {
+    return shell({ families: registry.get().families, head: head({ title: 'Make a tool', description: 'Make your own tool on OpenVibe: tell any model on OpenVibe.Exchange what to do, name what it takes and gives back, try it and share it.', canonical: SITE + '/make',
+        jsonLd: [seo.jsonLd.breadcrumbs([{ name: 'Tools', url: SITE + '/' }, { name: 'Make a tool', url: SITE + '/make' }])] }), body: `<style>${MAKE_CSS}</style><div class="mk">
+<p class="mk-kicker">Tools you make</p>
+<h1>Make a tool</h1>
+<p class="mk-lede">Tell a model what to do and name what it takes. Any model on OpenVibe.Exchange can run it, and agents can use it too. Whoever runs a tool pays from their own allowance.</p>
+<div id="mk-app"><noscript><p class="mk-lede">This page needs JavaScript. The same is in the API: <a href="/developers">POST /api/v1/made-tools</a>.</p></noscript></div>
+</div>
+<script src="/js/make.js" defer></script>` });
+}
+
 function pageWorkers() {
     const check = 'bash install.sh --dry-run --prefix /tmp/tools-worker-check-new';
     const steps = [
@@ -846,6 +938,7 @@ function createSiteRouter({ opens = null, discovery = null } = {}) {
     router.use(apexOnly);
     router.get('/api/v1/openapi.json', (req, res) => { res.set('Access-Control-Allow-Origin', '*'); send(req, res, 'openapi', () => JSON.stringify(require('../openapi').openapi(require('../registry/descriptors').snapshot(), SITE)), 'application/json; charset=utf-8'); });
     router.get('/workers', (req, res) => send(req, res, 'workers', pageWorkers));
+    router.get('/make', (req, res) => send(req, res, 'make', pageMake));
     router.get('/developers', (req, res) => send(req, res, 'developers', pageDevelopers));
     // What shipped on OpenVibe.Tools: the shared update log every OpenVibe site has.
     router.get('/updates', (req, res) => send(req, res, 'updates', pageUpdates));
@@ -891,4 +984,4 @@ function createSiteRouter({ opens = null, discovery = null } = {}) {
 
 const renderNotFound = () => pageSearch('').replace('<h1>Search tools</h1>', '<h1>That page is not here</h1>').replace(/<title>[^<]*<\/title>/, '<title>Page not found | OpenVibe.Tools</title>');
 
-module.exports = { headlineClause, createSiteRouter, pageIndex, pageFamily, pageTool, pageAll, pageDevelopers, pageWorkers, search, sitemapEntries, renderNotFound, SITE, NAME };
+module.exports = { headlineClause, createSiteRouter, pageIndex, pageFamily, pageTool, pageAll, pageDevelopers, pageWorkers, pageMake, search, sitemapEntries, renderNotFound, SITE, NAME };

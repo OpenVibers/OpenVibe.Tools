@@ -351,7 +351,8 @@ const madeRunner = require('./made/prompt').createPromptRunner({
 });
 app.post('/api/v1/made-tools/:id/run', actorLimits.backstop('tools.tool.run'));
 app.use('/api/v1/made-tools', require('./made/routes').createMadeToolRoutes({
-    store: madeTools, runner: madeRunner, verify: (token) => auth.verify(token), extractToken,
+    store: madeTools, runner: madeRunner, models: require('./made/models').createModelList({ exchangeUrl: config.exchange.url }),
+    verify: (token) => auth.verify(token), extractToken,
     origin: new URL(config.baseUrl).origin, ...ajvFrom(require),
 }));
 

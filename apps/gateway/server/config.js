@@ -18,6 +18,8 @@ module.exports = {
     // Identity provider — OpenVibe.Network (OAuth2 authorization server)
     networkUrl: process.env.OV_NETWORK_URL || 'https://openvibe.network',
     networkInternalUrl: process.env.OV_NETWORK_INTERNAL_URL || 'http://127.0.0.1:4000',
+    // OpenVibe.Exchange's public model directory: the Make a tool page's model picker (made/models.js).
+    exchange: { url: (process.env.OV_EXCHANGE_URL || 'https://openvibe.exchange').replace(/\/+$/, '') },
     // OpenVibe.AI, where a prompt tool people made runs (made/prompt.js) as the person who runs it.
     ai: {
         url: (process.env.OV_AI_URL || 'https://ai.openvibe.services').replace(/\/+$/, ''),
