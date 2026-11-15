@@ -42,7 +42,9 @@ function problem(res, status, code, detail, extra = {}) {
  * createMadeToolRoutes({ store, runner, verify, extractToken, origin, Ajv, addFormats, log })
  *   verify(token) → claims | null (Network user tokens for openvibe.tools); origin: https://openvibe.tools.
  */
-function createMadeToolRoutes({ store, runner, models = null, verify, verifyService = null, extractToken, origin, address = null, fetchImpl = globalThis.fetch, Ajv, addFormats = null, log = console, triggers = null }) {
+function createMadeToolRoutes({ store, runner, models = null, verify, verifyService = null, extractToken, origin, address = null, fetchImpl = globalThis.fetch, Ajv, addFormats = null, log = console, triggers = null, codeRunner = null }) {
+    // Code tools run on machines when OpenVibe.Run is set up (made/run-code.js, §AD.13 (2)); else on their page only.
+    const codeRuns = !!(codeRunner && codeRunner.enabled);
     const { peek, looksLikePrincipal, capabilityDenied } = require('../../../_shared/guard/tokens');
     const r = express.Router();
     const ajv = new Ajv({ strict: false, allErrors: true });
@@ -202,14 +204,28 @@ function createMadeToolRoutes({ store, runner, models = null, verify, verifyServ
      * { refused: { status, code, detail, errors? } } before anything ran. `headers` carry the caller's credentials to a
      * chain's steps (none for a trigger: its steps run as anyone may).
      */
-    async function runAs(tool, input, { subject, signal = null, headers = {}, ip = '' } = {}) {
+    async function runAs(tool, input, { subject, signal = null, headers = {}, ip = '', codeText = null } = {}) {
         const t0 = Date.now();
         const v = validatorsFor(tool);
         if (!v.input(input)) {
             return { refused: { status: 422, code: 'tools.input.invalid', detail: 'The input does not match the tool\'s input schema',
                 errors: (v.input.errors || []).slice(0, 20).map((e) => ({ pointer: e.instancePath || '/', message: e.message })) } };
         }
-        if (tool.kind === 'code') return { refused: { status: 501, code: 'tools.made.code_not_ready', detail: `A code tool runs on its page, in your browser (${origin}/make#${tool.id}); runs for agents and the API come with Link's runner` } };
+        if (tool.kind === 'code') {
+            if (!codeRuns || codeText == null) return { refused: { status: 501, code: 'tools.made.code_not_ready', detail: `A code tool runs on its page, in your browser (${origin}/make#${tool.id}); runs for agents and the API come with Link's runner` } };
+            let out;
+            try {
+                out = await codeRunner.run(tool, codeText, input, { signal });
+            } catch (err) {
+                if (err && err.status === 501) return { refused: { status: 501, code: err.code, detail: err.message } };
+                return { body: { state: 'failed', tool: tool.id, error: { type: `https://openvibe.tools/problems/${err.code || 'tools.made.machine_failed'}`, title: err.message, status: err.status || 502, code: err.code || 'tools.made.machine_failed', detail: err.message }, took_ms: Date.now() - t0 } };
+            }
+            if (v.output && out.data !== undefined && !v.output(out.data)) {
+                return { body: { state: 'failed', tool: tool.id, error: { type: 'https://openvibe.tools/problems/tools.made.bad_answer', title: 'The code\'s answer did not match the tool\'s output schema', status: 422, code: 'tools.made.bad_answer', detail: (v.output.errors || []).slice(0, 3).map((e) => `${e.instancePath || '/'} ${e.message}`).join('; ') }, took_ms: Date.now() - t0 } };
+            }
+            store.counted(tool.id).catch(() => {});
+            return { body: { state: 'succeeded', tool: tool.id, result: out.data !== undefined ? { data: out.data } : { text: out.text }, took_ms: Date.now() - t0, ...(out.job ? { job: out.job } : {}) } };
+        }
         if (tool.kind === 'chain') {
             // Each step is one run through the gateway's own run API, as the caller (made/chain.js).
             const a = typeof address === 'function' ? address() : null;
@@ -253,7 +269,7 @@ function createMadeToolRoutes({ store, runner, models = null, verify, verifyServ
             res.on('close', () => { if (!res.writableFinished) ctrl.abort(); });
             const headers = {};
             for (const k of ['authorization', 'cookie', 'x-ov-subject']) if (req.headers[k]) headers[k] = req.headers[k];
-            answer(res, await runAs(tool, input, { subject: p.sub, signal: ctrl.signal, headers, ip: req.ip }));
+            answer(res, await runAs(tool, input, { subject: p.sub, signal: ctrl.signal, headers, ip: req.ip, codeText: row.code_text }));
         } catch (err) { send(res, err); }
     });
 
@@ -271,7 +287,7 @@ function createMadeToolRoutes({ store, runner, models = null, verify, verifyServ
         try {
             const own = await ownTool(req, res);
             if (!own) return;
-            const why = require('./triggers').refusal(store.present(own.row));
+            const why = require('./triggers').refusal(store.present(own.row), { codeRuns });
             res.json({ triggers: await triggers.list(own.row.id, own.p.sub), ...(why ? { unsupported: why } : {}) });
         } catch (err) { triggerSend(res, err); }
     });
@@ -279,7 +295,7 @@ function createMadeToolRoutes({ store, runner, models = null, verify, verifyServ
         try {
             const own = await ownTool(req, res);
             if (!own) return;
-            const made = await triggers.create(store.present(own.row), own.p.sub, req.body || {});
+            const made = await triggers.create(store.present(own.row), own.p.sub, req.body || {}, { codeRuns });
             res.status(201).json(made);
         } catch (err) { triggerSend(res, err); }
     });
@@ -330,7 +346,7 @@ function createMadeToolRoutes({ store, runner, models = null, verify, verifyServ
             }
             const ctrl = new AbortController();
             res.on('close', () => { if (!res.writableFinished) ctrl.abort(); });
-            const out = await runAs(tool, input, { subject: trig.owner_subject, signal: ctrl.signal, ip: req.ip });
+            const out = await runAs(tool, input, { subject: trig.owner_subject, signal: ctrl.signal, ip: req.ip, codeText: row.code_text });
             await triggers.record(trig.id, out.body || { state: 'failed', error: { detail: out.refused.detail } }).catch(() => {});
             answer(res, out);
         } catch (err) { send(res, err); }
@@ -347,7 +363,7 @@ function createMadeToolRoutes({ store, runner, models = null, verify, verifyServ
     r.runTrigger = async (trig) => {
         const row = await store.get(trig.tool_id);
         if (!row || row.owner_subject !== trig.owner_subject) return { state: 'failed', error: { detail: 'The tool is gone' } };
-        const out = await runAs(store.present(row), trig.input || {}, { subject: trig.owner_subject, signal: AbortSignal.timeout(120_000) });
+        const out = await runAs(store.present(row), trig.input || {}, { subject: trig.owner_subject, signal: AbortSignal.timeout(120_000), codeText: row.code_text });
         return out.body || { state: 'failed', error: { detail: out.refused.detail } };
     };
 

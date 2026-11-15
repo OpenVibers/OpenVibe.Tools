@@ -55,9 +55,9 @@ function describe(row) {
     return row.every_minutes === 60 ? `Every hour at :${mm}` : `Every day at ${hh}:${mm} UTC`;
 }
 
-/** Can this tool take a trigger? Words when it cannot. */
-function refusal(tool) {
-    if (tool.kind === 'code') return 'A code tool runs in your browser for now, so it cannot run on its own yet';
+/** Can this tool take a trigger? Words when it cannot. A code tool can once code tools run on machines (codeRuns). */
+function refusal(tool, { codeRuns = false } = {}) {
+    if (tool.kind === 'code' && !codeRuns) return 'A code tool runs in your browser for now, so it cannot run on its own yet';
     if (tool.kind === 'chain' && ((tool.chain && tool.chain.steps) || []).some((s) => /^mtl_/.test(String(s.tool)))) {
         return 'A chain that calls tools people made needs you there to run them; a trigger can run chains of catalogue tools';
     }
@@ -76,8 +76,8 @@ function createTriggers({ db, now = () => Date.now(), baseUrl = 'https://openvib
     });
 
     /** A new trigger on the owner's tool. A link's URL comes back here, once. */
-    async function create(tool, owner, body = {}) {
-        const why = refusal(tool);
+    async function create(tool, owner, body = {}, { codeRuns = false } = {}) {
+        const why = refusal(tool, { codeRuns });
         if (why) throw new TriggerError(422, 'tools.trigger.unsupported', why);
         const count = Number((await db.one('SELECT count(*)::int AS n FROM made_tool_triggers WHERE owner_subject = $1', [owner])).n);
         if (count >= MAX_PER_OWNER) throw new TriggerError(422, 'tools.trigger.limit', `You have ${MAX_PER_OWNER} triggers: delete one first`);

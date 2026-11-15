@@ -364,6 +364,14 @@ app.post('/api/v1/made-tools/:id/run', actorLimits.backstop('tools.tool.run'));
 app.get('/made-sandbox', require('./made/sandbox').sandboxPage);
 // Triggers (plan §AD.12 (g); migration 0019): a made tool runs from a secret link or on a schedule, as its owner.
 const madeTriggers = require('./made/triggers').createTriggers({ db: toolsDb.db, baseUrl: config.baseUrl });
+// Code tools on machines (§AD.13 (2)): OpenVibe.Run function jobs on the skill runner (Link v0.70.0).
+const madeCodeRunner = require('./made/run-code').createCodeRunner({
+    runUrl: config.run.url, subject: config.run.subject, project: config.run.project,
+    tokens: config.oauth.clientSecret ? require('openvibe-contracts').serviceAuth.createTokenClient({
+        tokenUrl: `${config.networkInternalUrl}/oauth/token`, clientId: config.oauth.clientId, clientSecret: config.oauth.clientSecret,
+        audience: config.run.audience, scope: 'run.job.submit run.job.read',
+    }) : null,
+});
 const madeRoutes = require('./made/routes').createMadeToolRoutes({
     store: madeTools, runner: madeRunner, models: require('./made/models').createModelList({ exchangeUrl: config.exchange.url }),
     verify: (token) => auth.verify(token), extractToken,
@@ -373,6 +381,7 @@ const madeRoutes = require('./made/routes').createMadeToolRoutes({
     // A chain's steps go through the run API on loopback (made/chain.js).
     address: () => { try { return server.address(); } catch { return null; } },
     triggers: madeTriggers,
+    codeRunner: madeCodeRunner,
 });
 app.use('/api/v1/made-tools', madeRoutes);
 // A link trigger: GET or POST https://openvibe.tools/hooks/<mth_…> runs its tool as the owner (made/routes.js hook).
