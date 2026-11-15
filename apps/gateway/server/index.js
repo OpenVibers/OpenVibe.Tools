@@ -322,6 +322,11 @@ const jobsFacade = createJobsFacade({ ports: () => SATELLITES, index: jobIndex, 
 // a satellite counts the same run or submit again when the gateway streams it there.
 app.post('/api/v1/tools/:id/run', actorLimits.backstop('tools.tool.run'));
 app.post(['/api/v1/jobs', '/api/v1/jobs/:id/retry'], actorLimits.backstop('tools.job.create'));
+// POST /api/v1/tools/batch (11-15): up to 16 runs at once for an agent, each through the run API above over loopback
+// with the caller's own credentials and address (every rule of one run applies to each); a sign-in or a token only.
+const { createBatch } = require('./run/batch');
+const batchApi = createBatch({ address: () => { try { return server.address(); } catch { return null; } } });
+app.post('/api/v1/tools/batch', actorLimits.backstop('tools.tool.run'), express.json({ limit: '2mb' }), (req, res) => batchApi.handle(req, res));
 app.use(runApi.handle);
 app.use((req, res, next) => { jobsFacade.handle(req, res, next); });
 
