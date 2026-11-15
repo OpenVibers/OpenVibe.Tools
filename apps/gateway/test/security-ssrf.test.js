@@ -88,6 +88,7 @@ function rawGet(port, p, headers = {}) {
             'gateway/server/registry/services.js': 'Network registry (configured)',
             'gateway/server/revocation-events.js': 'OpenVibe.Events (configured)',
             'gateway/server/run/jobs-facade.js': 'the satellites on loopback',
+            'gateway/server/run/batch.js': 'the gateway\'s own run API on loopback (its own socket address, a fixed path per tool id); redirects refused',
             'gateway/server/search-index.js': 'OpenVibe.Search (configured)',
             'food/server/index.js': 'the maps satellite (configured; fixed paths, only the query string is the visitor\'s)',
             'maps/server/index.js': 'fixed third-party map, weather and geocoding hosts',
