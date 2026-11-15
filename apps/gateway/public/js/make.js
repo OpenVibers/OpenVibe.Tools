@@ -460,6 +460,151 @@
         });
     }
 
+    // ── Run it on its own (§AD.12 (g)): a private link, or a schedule ──
+    function ago(iso) {
+        if (!iso) return '';
+        var s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+        return s < 90 ? 'just now' : s < 5400 ? Math.round(s / 60) + ' min ago' : s < 129600 ? Math.round(s / 3600) + ' h ago' : Math.round(s / 86400) + ' days ago';
+    }
+    function whenNext(iso) {
+        if (!iso) return '';
+        var d = new Date(iso);
+        var hm = String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0');
+        var today = new Date(); var same = d.toISOString().slice(0, 10) === today.toISOString().slice(0, 10);
+        return 'next ' + (same ? 'today' : d.toISOString().slice(0, 10)) + ' ' + hm + ' UTC';
+    }
+    function preview(r) {
+        if (!r) return '';
+        if (r.error) return r.error;
+        if (r.text != null) return String(r.text);
+        return JSON.stringify(r.data !== undefined ? r.data : r);
+    }
+    /** The tool's input fields, for a trigger's fixed input (empty ones are left out). */
+    function inputFields(t, box) {
+        var props = (t.input && t.input.properties) || {};
+        var controls = {};
+        Object.keys(props).forEach(function (k) {
+            var p = props[k] || {};
+            var c = p.type === 'string' && (!p.maxLength || p.maxLength > 500) ? h('textarea') : h('input');
+            if (c.tagName === 'TEXTAREA') c.rows = 2;
+            if (p.type === 'number' || p.type === 'integer') { c.type = 'number'; c.inputMode = 'decimal'; }
+            controls[k] = c;
+            box.append(field(p.title || k, c));
+        });
+        return function () {
+            var out = {};
+            Object.keys(controls).forEach(function (k) { var v = controls[k].value; if (v !== '') out[k] = controls[k].type === 'number' ? Number(v) : v; });
+            return out;
+        };
+    }
+    function drawAuto(t) {
+        var box = h('section', 'mk-card mk-enter mk-auto'); box.id = 'mk-auto';
+        box.append(h('h2', null, 'Run it on its own'));
+        box.append(h('p', 'mk-sub', 'From a private link (a webhook, a form, a shortcut) or on a schedule. Every run is yours: your allowance pays.'));
+        var list = h('div', 'mk-trigs');
+        var adders = h('p', 'mk-auto-add');
+        var panel = h('div', 'mk-auto-panel');
+        var say2 = h('p', 'mk-status'); say2.setAttribute('role', 'status'); say2.setAttribute('aria-live', 'polite');
+        box.append(list, panel, adders, say2);
+        var base = '/' + encodeURIComponent(t.id) + '/triggers';
+        function row(tr) {
+            var r = h('div', 'mk-trig');
+            var ic = h('span', 'mk-trig-ic'); ic.setAttribute('aria-hidden', 'true');
+            var g = h('i'); g.setAttribute('data-ov-icon', tr.kind === 'link' ? 'link' : 'clock'); ic.append(g);
+            var main = h('div', 'mk-trig-main');
+            main.append(h('strong', null, tr.says));
+            var bits = [];
+            if (tr.last_run_at) bits.push((tr.last_state === 'succeeded' ? 'Ran ' : 'Failed ') + ago(tr.last_run_at));
+            else bits.push('Not run yet');
+            if (tr.kind === 'schedule' && tr.enabled) bits.push(whenNext(tr.next_run_at));
+            if (!tr.enabled) bits.push('paused');
+            if (tr.runs) bits.push(tr.runs + (tr.runs === 1 ? ' run' : ' runs'));
+            main.append(h('small', null, bits.join(' · ')));
+            if (tr.last_result) {
+                var d = h('details', 'mk-trig-last'); var sm = h('summary', null, 'Last answer'); d.append(sm, h('pre', null, preview(tr.last_result).slice(0, 1200)));
+                main.append(d);
+            }
+            var sw = h('input', 'ovk-switch'); sw.type = 'checkbox'; sw.setAttribute('role', 'switch'); sw.checked = tr.enabled;
+            sw.setAttribute('aria-label', (tr.enabled ? 'Pause ' : 'Turn on ') + tr.says);
+            sw.addEventListener('change', function () {
+                sw.disabled = true;
+                api(base + '/' + tr.id, { method: 'PATCH', body: { enabled: sw.checked } }).then(function (res) { sw.disabled = false; if (!res.ok) { sw.checked = !sw.checked; say2.textContent = words(res, 'That did not change. Try again.'); return; } load(); });
+            });
+            var del = btn('', 'quiet', function () {
+                del.disabled = true;
+                api(base + '/' + tr.id, { method: 'DELETE' }).then(function (res) { if (!res.ok) { del.disabled = false; say2.textContent = words(res, 'It was not deleted. Try again.'); return; } load(); });
+            });
+            del.classList.add('mk-trig-del'); del.setAttribute('aria-label', 'Delete ' + tr.says);
+            var x = h('i'); x.setAttribute('data-ov-icon', 'trash'); del.append(x);
+            r.append(ic, main, sw, del);
+            return r;
+        }
+        function load() {
+            api(base).then(function (res) {
+                list.textContent = ''; adders.textContent = '';
+                if (!res.ok || !res.body) { list.append(h('p', 'mk-sub', words(res, 'Its triggers did not load.'))); return; }
+                if (res.body.unsupported) { list.append(h('p', 'mk-sub', res.body.unsupported + '.')); return; }
+                (res.body.triggers || []).forEach(function (tr) { list.append(row(tr)); });
+                adders.append(btn('Add a link', 'quiet', function () { openLink(); }), btn('Add a schedule', 'quiet', function () { openSchedule(); }));
+                if (window.OVGlyphs && typeof window.OVGlyphs.swap === 'function') { try { window.OVGlyphs.swap(box); } catch (e) { /* the navbar draws them later */ } }
+            });
+        }
+        function openLink() {
+            panel.textContent = '';
+            var f = h('form', 'ovk-form mk-auto-form'); f.noValidate = true;
+            f.append(h('p', 'mk-hint', 'Anything you fill in here is always sent; what a request sends goes on top. A webhook\'s own payload fills a tool with one text field.'));
+            var read = inputFields(t, f);
+            var bar = h('p', 'mk-auto-bar');
+            bar.append(btn('Make the link', 'primary', null, 'submit'), btn('Cancel', 'quiet', function () { panel.textContent = ''; }));
+            f.append(bar);
+            f.addEventListener('submit', function (e) {
+                e.preventDefault();
+                api(base, { method: 'POST', body: { kind: 'link', input: read() } }).then(function (res) {
+                    if (!res.ok || !res.body) { say2.textContent = words(res, 'The link was not made. Try again.'); return; }
+                    panel.textContent = '';
+                    var made = h('div', 'mk-auto-new');
+                    made.append(h('strong', null, 'Your link: copy it now, it is shown once'));
+                    var u = h('input', 'mk-auto-url'); u.readOnly = true; u.value = res.body.url; u.setAttribute('aria-label', 'The link');
+                    var copy = btn('Copy', 'primary', function () {
+                        u.select();
+                        if (navigator.clipboard) navigator.clipboard.writeText(res.body.url).then(function () { copy.textContent = 'Copied'; }, function () {});
+                    });
+                    var keys = Object.keys((t.input && t.input.properties) || {});
+                    var sample = {}; keys.slice(0, 2).forEach(function (k) { sample[k] = '…'; });
+                    var curl = h('pre', 'mk-auto-curl', "curl -X POST '" + res.body.url + "' -H 'Content-Type: application/json' -d '" + JSON.stringify(sample) + "'");
+                    var urlRow = h('p', 'mk-auto-urlrow'); urlRow.append(u, copy);
+                    made.append(urlRow, curl, btn('Done', 'quiet', function () { panel.textContent = ''; }));
+                    panel.append(made);
+                    load();
+                });
+            });
+            panel.append(f);
+        }
+        function openSchedule() {
+            panel.textContent = '';
+            var f = h('form', 'ovk-form mk-auto-form'); f.noValidate = true;
+            var every = 'day';
+            var at = h('input'); at.type = 'time'; at.value = '09:00'; at.step = 60;
+            var atField = field('At (UTC)', at, 'Your time now is ' + new Date().toISOString().slice(11, 16) + ' UTC.');
+            f.append(field('Every', seg('mk-every', [['hour', 'Hour'], ['day', 'Day']], every, function (v) { every = v; atField.querySelector('.mk-label').textContent = v === 'hour' ? 'At minute (the hour does not matter)' : 'At (UTC)'; }, 'How often')), atField);
+            var read = inputFields(t, f);
+            var bar = h('p', 'mk-auto-bar');
+            bar.append(btn('Make the schedule', 'primary', null, 'submit'), btn('Cancel', 'quiet', function () { panel.textContent = ''; }));
+            f.append(bar);
+            f.addEventListener('submit', function (e) {
+                e.preventDefault();
+                api(base, { method: 'POST', body: { kind: 'schedule', every: every, at: at.value || '00:00', input: read() } }).then(function (res) {
+                    if (!res.ok) { say2.textContent = words(res, 'The schedule was not made. Try again.'); return; }
+                    panel.textContent = ''; say2.textContent = res.body.says + ': ' + whenNext(res.body.next_run_at) + '.';
+                    load();
+                });
+            });
+            panel.append(f);
+        }
+        load();
+        return box;
+    }
+
     // ── Try it ─────────────────────────────────────────────────
     function drawTry(t) {
         var box = h('section', 'mk-card mk-enter'); box.id = 'mk-try';
@@ -546,7 +691,7 @@
         var f = state.form;
         if (f.id) {
             var t = state.mine.filter(function (x) { return x.id === f.id; })[0];
-            if (t) side.append(drawTry(t));
+            if (t) side.append(drawTry(t), drawAuto(t));
         }
         if (state.signedIn) {
             var yours = h('section', 'mk-card mk-enter');

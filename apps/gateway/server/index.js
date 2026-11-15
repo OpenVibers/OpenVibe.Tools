@@ -362,7 +362,9 @@ app.post('/mcp', actorLimits.backstop('tools.tool.run'), express.json({ limit: '
 app.post('/api/v1/made-tools/:id/run', actorLimits.backstop('tools.tool.run'));
 // Where a code tool people made runs in the browser (made/sandbox.js): its own policy, no network.
 app.get('/made-sandbox', require('./made/sandbox').sandboxPage);
-app.use('/api/v1/made-tools', require('./made/routes').createMadeToolRoutes({
+// Triggers (plan §AD.12 (g); migration 0019): a made tool runs from a secret link or on a schedule, as its owner.
+const madeTriggers = require('./made/triggers').createTriggers({ db: toolsDb.db, baseUrl: config.baseUrl });
+const madeRoutes = require('./made/routes').createMadeToolRoutes({
     store: madeTools, runner: madeRunner, models: require('./made/models').createModelList({ exchangeUrl: config.exchange.url }),
     verify: (token) => auth.verify(token), extractToken,
     // Actor's and Codes' agents (tools.made.run, Contracts 0.437.0) act for the person in X-OV-Subject.
@@ -370,7 +372,15 @@ app.use('/api/v1/made-tools', require('./made/routes').createMadeToolRoutes({
     origin: new URL(config.baseUrl).origin, ...ajvFrom(require),
     // A chain's steps go through the run API on loopback (made/chain.js).
     address: () => { try { return server.address(); } catch { return null; } },
-}));
+    triggers: madeTriggers,
+});
+app.use('/api/v1/made-tools', madeRoutes);
+// A link trigger: GET or POST https://openvibe.tools/hooks/<mth_…> runs its tool as the owner (made/routes.js hook).
+app.options('/hooks/:token', (req, res) => { res.set({ 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '600' }); res.status(204).end(); });
+app.get('/hooks/:token', actorLimits.backstop('tools.tool.run'), (req, res) => madeRoutes.hook(req, res));
+app.post('/hooks/:token', actorLimits.backstop('tools.tool.run'), express.json({ limit: '256kb' }), express.text({ type: ['text/*', 'application/x-www-form-urlencoded'], limit: '256kb' }), (req, res) => madeRoutes.hook(req, res));
+// The schedules run here, one process's loop (a schedule is claimed before it runs, so two processes never run one twice).
+if (process.env.NODE_ENV !== 'test' && process.env.TOOLS_TRIGGERS !== 'off') madeTriggers.start({ run: madeRoutes.runTrigger });
 
 
 /** 401 unless a valid ov_token is presented. */
