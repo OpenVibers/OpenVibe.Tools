@@ -134,6 +134,38 @@
         formCol.textContent = '';
         var form = h('form', 'ovk-form mk-form'); form.noValidate = true;
 
+        // Describe it (§AD.12 (d); the owner, 11-15: "create a tool for you completely end to end"): a model drafts the
+        // whole form from a sentence or two, as you (your allowance pays); you check it, try it and make it.
+        var sd = null;
+        if (!f.id) {
+            sd = section('Describe it', 'Say what you want. A model drafts the tool below; you check it, try it and make it.');
+            sd.classList.add('mk-describe');
+            var ta = h('textarea'); ta.rows = 3; ta.maxLength = 2000; ta.value = state.describe || '';
+            ta.placeholder = 'A tool that turns a messy meeting note into a summary, the decisions, and the action items with who does each.';
+            ta.addEventListener('input', function () { state.describe = ta.value; });
+            var dnote = h('p', 'mk-hint'); dnote.setAttribute('role', 'status');
+            var go = btn('Draft it', 'primary', function () {
+                var text = ta.value.trim();
+                if (text.length < 8) { dnote.textContent = 'Say in a sentence or two what it should do.'; return; }
+                go.disabled = true; go.textContent = 'Drafting…'; dnote.textContent = '';
+                api('/draft', { method: 'POST', body: { description: text } }).then(function (res) {
+                    go.disabled = false; go.textContent = 'Draft it';
+                    if (!res.ok || !res.body || !res.body.draft) { dnote.textContent = words(res, 'It could not draft that. Try other words.'); return; }
+                    var d = res.body.draft;
+                    var keep = state.form;
+                    state.form = Object.assign(blank(), { name: d.name, summary: d.summary, instructions: d.instructions,
+                        inputs: d.inputs.map(function (x) { return { label: x.label, kind: x.kind }; }), answer: d.answer,
+                        fields: d.fields.map(function (x) { return { label: x.label }; }), model: keep.model, modelName: keep.modelName, modelSub: keep.modelSub, visibility: keep.visibility });
+                    drawForm();
+                    say('Drafted' + (res.body.model ? ' by ' + res.body.model : '') + '. Check it, then Make it.', 'good');
+                    var first = formCol.querySelectorAll('.mk-sec')[1];
+                    if (first) first.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                });
+            });
+            go.classList.add('mk-draft-go');
+            sd.append(field('What should it do?', ta), go, dnote);
+        }
+
         var s1 = section('What it is');
         var name = h('input'); name.maxLength = 80; name.value = f.name; name.placeholder = 'Reply kindly'; name.required = true; name.autocomplete = 'off';
         name.addEventListener('input', function () { f.name = name.value; });
@@ -195,6 +227,7 @@
         bar.append(save);
         if (f.id) bar.append(btn('New tool', 'quiet', function () { state.form = blank(); drawAll(); }));
 
+        if (sd) form.append(sd);
         form.append(s1, s2, s3, s4, s5, status, bar);
         if (f.id) form.append(deleteRow(f));
         form.addEventListener('submit', function (e) { e.preventDefault(); submit(); });
