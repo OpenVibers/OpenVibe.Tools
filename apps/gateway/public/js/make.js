@@ -147,7 +147,7 @@
 
     // ── State ──────────────────────────────────────────────────
     function blank() {
-        return { id: null, kind: 'prompt', steps: [{ tool: '', name: '', input: {} }, { tool: '', name: '', input: {} }], source: CODE_TEMPLATE, slug: '', name: '', summary: '', instructions: '', model: 'auto', modelName: 'Auto', inputs: [{ label: 'Text', kind: 'long' }], answer: 'text', fields: [{ label: 'Answer' }], visibility: 'private', version: 0 };
+        return { id: null, kind: 'prompt', steps: [{ tool: '', name: '', input: {} }, { tool: '', name: '', input: {} }], source: CODE_TEMPLATE, slug: '', name: '', summary: '', instructions: '', model: 'auto', modelName: 'Auto', inputs: [{ label: 'Text', kind: 'long' }], answer: 'text', fields: [{ label: 'Answer' }], visibility: 'private', version: 0, net: 'deny' };
     }
     var state = { signedIn: null, mine: [], form: blank(), models: null, saving: false };
 
@@ -160,7 +160,7 @@
         });
         var out = t.output || { kind: 'text' };
         var fields = out.kind === 'json' ? Object.keys((out.schema && out.schema.properties) || {}).map(function (k) { var p = out.schema.properties[k] || {}; return { label: p.title || k, key: k }; }) : [{ label: 'Answer' }];
-        return { id: t.id, slug: t.slug, name: t.name, summary: t.summary, instructions: (t.prompt && t.prompt.instructions) || '', model: (t.prompt && t.prompt.model) || 'auto', modelName: (t.prompt && t.prompt.model) === 'auto' || !t.prompt ? 'Auto' : t.prompt.model, inputs: inputs.length ? inputs : [{ label: 'Text', kind: 'long' }], answer: out.kind === 'json' ? 'fields' : 'text', fields: fields.length ? fields : [{ label: 'Answer' }], visibility: t.visibility, version: t.version, kind: t.kind, runs: t.runs, source: t.kind === 'code' ? null : CODE_TEMPLATE,
+        return { id: t.id, slug: t.slug, name: t.name, summary: t.summary, instructions: (t.prompt && t.prompt.instructions) || '', model: (t.prompt && t.prompt.model) || 'auto', modelName: (t.prompt && t.prompt.model) === 'auto' || !t.prompt ? 'Auto' : t.prompt.model, inputs: inputs.length ? inputs : [{ label: 'Text', kind: 'long' }], answer: out.kind === 'json' ? 'fields' : 'text', fields: fields.length ? fields : [{ label: 'Answer' }], visibility: t.visibility, version: t.version, kind: t.kind, runs: t.runs, net: t.net || 'deny', source: t.kind === 'code' ? null : CODE_TEMPLATE,
             steps: t.kind === 'chain' && t.chain ? t.chain.steps.map(function (s) { return { tool: s.tool, name: s.name || s.tool, input: Object.assign({}, s.input) }; }) : [{ tool: '', name: '', input: {} }, { tool: '', name: '', input: {} }] };
     }
 
@@ -179,7 +179,7 @@
             output = { kind: 'json', schema: { type: 'object', required: oreq, properties: op } };
         }
         var base = { slug: f.slug || slugOf(f.name), name: f.name.trim(), summary: f.summary.trim(), input: { type: 'object', required: required, properties: props }, output: output, visibility: f.visibility };
-        if (f.kind === 'code') return Object.assign(base, { kind: 'code', source_code: f.source || '', net: 'deny', hosting: 'openvibe' });
+        if (f.kind === 'code') return Object.assign(base, { kind: 'code', source_code: f.source || '', net: f.net === 'public' ? 'public' : 'deny', hosting: 'openvibe' });
         if (f.kind === 'chain') {
             return Object.assign(base, { kind: 'chain', chain: { steps: f.steps.map(function (s) {
                 var input = {};
@@ -264,6 +264,42 @@
             sd.append(field('What should it do?', ta), go, dnote);
         }
 
+        // Bring a val (§AD.12; Val Town closes on 2027-01-10): its address becomes this form, the vals it imports with it.
+        var sv = null;
+        if (!f.id && f.kind === 'code') {
+            sv = section('Bring a val from Val Town', 'Paste its address. Its TypeScript becomes JavaScript, the vals it imports come along, and run(input) calls it the way Val Town did.');
+            sv.classList.add('mk-val');
+            var vu = h('input'); vu.type = 'url'; vu.inputMode = 'url'; vu.autocomplete = 'off'; vu.spellcheck = false;
+            vu.placeholder = 'https://www.val.town/v/you/yourVal'; vu.value = state.valUrl || '';
+            vu.addEventListener('input', function () { state.valUrl = vu.value; });
+            var vnote = h('p', 'mk-hint'); vnote.setAttribute('role', 'status');
+            var vgo = btn('Bring it', 'primary', function () {
+                var url = vu.value.trim();
+                if (!url) { vnote.textContent = 'Paste the val\u2019s address on Val Town.'; return; }
+                vgo.disabled = true; vgo.textContent = 'Bringing\u2026'; vnote.textContent = '';
+                api('/import/val', { method: 'POST', body: { url: url } }).then(function (res) {
+                    vgo.disabled = false; vgo.textContent = 'Bring it';
+                    if (!res.ok || !res.body || !res.body.draft) { vnote.textContent = words(res, 'It could not bring that val.'); return; }
+                    var d = res.body.draft;
+                    var keep = state.form;
+                    state.form = Object.assign(blank(), { kind: 'code', source: d.source, name: d.name, summary: d.summary,
+                        inputs: d.inputs.map(function (x) { return { label: x.label, kind: x.kind }; }), answer: d.answer,
+                        fields: (d.fields || []).map(function (x) { return { label: x.label }; }), net: res.body.net === 'public' ? 'public' : 'deny', visibility: keep.visibility });
+                    if (!state.form.fields.length) state.form.fields = [{ label: 'Answer' }];
+                    state.valNotes = res.body.notes || [];
+                    drawForm();
+                    say('Brought ' + (res.body.val && res.body.val.user ? res.body.val.user + '/' : '') + ((res.body.val && res.body.val.name) || 'the val') + '. Check it, try it, then Make it.', 'good');
+                });
+            });
+            vgo.classList.add('mk-val-go');
+            sv.append(field('Its address', vu), vgo, vnote);
+            if (state.valNotes && state.valNotes.length) {
+                var vl = h('ul', 'mk-val-notes');
+                state.valNotes.forEach(function (n) { var li = h('li'); li.textContent = n; vl.append(li); });
+                sv.append(vl);
+            }
+        }
+
         var s1 = section('What it is');
         var name = h('input'); name.maxLength = 80; name.value = f.name; name.placeholder = 'Reply kindly'; name.required = true; name.autocomplete = 'off';
         name.addEventListener('input', function () { f.name = name.value; });
@@ -279,7 +315,7 @@
         }
         var s2c = null;
         if (f.kind === 'code') {
-            s2c = section('The code', 'run(input) gets the inputs below and returns the answer. It runs in a sandbox with no network: on this page in the browser now, on Link machines for agents and the API next.');
+            s2c = section('The code', 'run(input) gets the inputs below and returns the answer. It runs in a sandbox: on this page in your browser, and on Link machines for agents, the API and its schedule.');
             var ed = h('textarea', 'mk-code'); ed.rows = 12; ed.spellcheck = false; ed.autocapitalize = 'off'; ed.setAttribute('autocorrect', 'off'); ed.maxLength = 65536;
             ed.setAttribute('aria-label', 'The code');
             if (f.source == null) {
@@ -294,6 +330,12 @@
                 ed.value = ed.value.slice(0, a) + '  ' + ed.value.slice(b); ed.selectionStart = ed.selectionEnd = a + 2; f.source = ed.value;
             });
             s2c.append(ed);
+            // What it may reach when it runs on a machine (this page's sandbox never has a network).
+            var netRow = h('div', 'mk-field');   // a div, not a label: a label around buttons would press the first
+            netRow.append(h('span', 'mk-label', 'When it runs on a machine'),
+                seg('net', [['deny', 'No network'], ['public', 'The public internet']], f.net === 'public' ? 'public' : 'deny', function (v) { f.net = v; }, 'When it runs on a machine'),
+                h('small', 'mk-hint', 'No network is safest and runs anywhere; the public internet lets fetch() reach other sites, never OpenVibe\u2019s own.'));
+            s2c.append(netRow);
         }
         // A chain: steps, each a tool and its input (literal words, the chain's input, or an earlier step's answer).
         var s2ch = null;
@@ -407,6 +449,7 @@
         if (f.id) bar.append(btn('New tool', 'quiet', function () { state.form = blank(); drawAll(); }));
 
         if (sk) form.append(sk);
+        if (sv) form.append(sv);
         if (sd) form.append(sd);
         form.append(s1);
         form.append(f.kind === 'code' ? s2c : f.kind === 'chain' ? s3 : s2, f.kind === 'chain' ? s2ch : s3, s4, s5, status, bar);

@@ -42,7 +42,7 @@ function problem(res, status, code, detail, extra = {}) {
  * createMadeToolRoutes({ store, runner, verify, extractToken, origin, Ajv, addFormats, log })
  *   verify(token) → claims | null (Network user tokens for openvibe.tools); origin: https://openvibe.tools.
  */
-function createMadeToolRoutes({ store, runner, models = null, verify, verifyService = null, extractToken, origin, address = null, fetchImpl = globalThis.fetch, Ajv, addFormats = null, log = console, triggers = null, codeRunner = null }) {
+function createMadeToolRoutes({ store, runner, models = null, verify, verifyService = null, extractToken, origin, address = null, fetchImpl = globalThis.fetch, valFetch = globalThis.fetch, Ajv, addFormats = null, log = console, triggers = null, codeRunner = null }) {
     // Code tools run on machines when OpenVibe.Run is set up (made/run-code.js, §AD.13 (2)); else on their page only.
     const codeRuns = !!(codeRunner && codeRunner.enabled);
     const { peek, looksLikePrincipal, capabilityDenied } = require('../../../_shared/guard/tokens');
@@ -139,6 +139,36 @@ function createMadeToolRoutes({ store, runner, models = null, verify, verifyServ
             const out = await draftTool(runner, description, { subject: p.sub, kind: req.body && req.body.kind === 'code' ? 'code' : 'prompt' });
             // The same tool as POST / takes it (private), for an agent or a command line that makes it next.
             res.json({ ...out, body: bodyFromDraft(out.draft) });
+        } catch (err) { send(res, err); }
+    });
+
+    // Bring a val from Val Town (made/import-val.js; §AD.12: Val Town closes 2027-01-10): its address or its code as a
+    // code tool's draft, the way /draft answers, with the vals it imports; nothing is saved. 20 a person each 10 minutes.
+    const valImports = new Map();
+    r.post('/import/val', express.json({ limit: '300kb' }), async (req, res) => {
+        try {
+            const p = await person(req, res, { make: true });
+            if (!p) return;
+            const now = Date.now();
+            const recent = (valImports.get(p.sub) || []).filter((t) => now - t < 600_000);
+            if (recent.length >= 20) return problem(res, 429, 'tools.made.slow_down', 'That is many vals at once: try again in a few minutes');
+            recent.push(now);
+            valImports.set(p.sub, recent);
+            if (valImports.size > 5000) valImports.clear();
+            const { parseValRef, fetchVal, convertVal } = require('./import-val');
+            const b = req.body || {};
+            const getVal = (ref) => fetchVal(ref, { fetchImpl: valFetch });
+            let val;
+            if (typeof b.code === 'string' && b.code.trim()) {
+                val = { code: b.code, name: String(b.name || 'my-val').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64) || 'my-val', type: ['script', 'http', 'interval'].includes(b.type) ? b.type : 'script', user: '' };
+            } else {
+                const ref = parseValRef(b.url);
+                if (!ref) return problem(res, 422, 'tools.made.invalid', 'Paste a val\'s address on Val Town (https://www.val.town/v/you/name), or its code');
+                val = await getVal(ref);
+            }
+            const out = await convertVal(val, { getVal });
+            const { bodyFromDraft } = require('./prompt');
+            res.json({ ...out, body: { ...bodyFromDraft(out.draft), net: out.net } });
         } catch (err) { send(res, err); }
     });
 

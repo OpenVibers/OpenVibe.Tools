@@ -782,6 +782,10 @@ const MAKE_CSS = `.mk{max-width:1120px;margin:0 auto;padding:8px 0 24px}
 .mk-chips .ovk-btn{min-height:32px;padding:4px 10px;font-size:.8rem;border-radius:999px}
 .mk-describe{border-color:color-mix(in srgb,var(--ovk-accent) 40%,var(--ovk-line));background:linear-gradient(160deg,color-mix(in srgb,var(--ovk-accent) 10%,var(--ovk-panel)),var(--ovk-panel) 60%)}
 .mk-draft-go{justify-self:start}
+.mk-val{border-style:dashed}
+.mk-val-go{justify-self:start}
+.mk-val-notes{margin:0;padding-left:1.2em;display:grid;gap:4px;color:var(--ovk-muted);font-size:13px;line-height:1.45}
+.mk-val-notes li::marker{color:var(--ovk-accent)}
 .mk-code{font:13.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace!important;tab-size:2;white-space:pre;overflow:auto;min-height:220px}
 .mk-vis{display:grid;gap:8px}
 @media(min-width:640px){.mk-vis{grid-template-columns:repeat(3,minmax(0,1fr))}}
