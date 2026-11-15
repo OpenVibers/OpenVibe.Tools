@@ -19,6 +19,7 @@ const { createMadeTools } = require('../server/made/store');
 const { createPromptRunner } = require('../server/made/prompt');
 const { createMadeToolRoutes } = require('../server/made/routes');
 const { createTriggers, nextRun } = require('../server/made/triggers');
+const { createRunNotifier, answerLine } = require('../server/made/notify');
 const accountData = require('../server/account-data');
 
 const ADA = 'usr_01JCZ3NDEKTSV4RRFFQ69G5FAW';
@@ -126,10 +127,14 @@ const T0 = Date.UTC(2026, 10, 15, 8, 10);   // 2026-11-15 08:10 UTC
         // ── a schedule ──
         const daily = await call('POST', `/api/v1/made-tools/${id}/triggers`, { as: 'ada', body: { kind: 'schedule', every: 'day', at: '09:30', input: { message: 'good morning' } } });
         assert.strictEqual(daily.status, 201, JSON.stringify(daily.body));
-        assert.deepStrictEqual([daily.body.says, daily.body.next_run_at], ['Every day at 09:30 UTC', '2026-11-15T09:30:00.000Z']);
+        assert.deepStrictEqual([daily.body.says, daily.body.next_run_at, daily.body.notify], ['Every day at 09:30 UTC', '2026-11-15T09:30:00.000Z', true], 'a schedule tells its owner unless they say not to');
+        assert.strictEqual(link.body.notify, false, 'a link answers its caller, nobody else');
         assert.strictEqual((await call('POST', `/api/v1/made-tools/${id}/triggers`, { as: 'ada', body: { kind: 'schedule', every: 'minute' } })).status, 422);
         assert.strictEqual((await call('POST', `/api/v1/made-tools/${id}/triggers`, { as: 'ada', body: { kind: 'schedule', every: 'day', at: '25:00' } })).status, 422);
-        const loop = triggers.start({ run: routes.runTrigger, everyMs: 3_600_000 });
+        const pushes = [];
+        const notifier = createRunNotifier({ networkUrl: 'http://network.test', baseUrl: ORIGIN, tokens: { authHeaders: async () => ({ Authorization: 'Bearer svc-tools' }) },
+            fetchImpl: async (url, init) => { pushes.push({ url, auth: init.headers.Authorization, body: JSON.parse(init.body) }); return new Response('{"ok":true}', { status: 200 }); } });
+        const loop = triggers.start({ run: routes.runTrigger, told: (row, out) => routes.toldTrigger(row, out, notifier), everyMs: 3_600_000 });
         await loop.tick();
         assert.strictEqual((await call('GET', `/api/v1/made-tools/${id}/triggers`, { as: 'ada' })).body.triggers[1].runs, 0, 'not due yet');
         clock = Date.UTC(2026, 10, 17, 12, 0);   // two days later: one run, not three
@@ -137,6 +142,19 @@ const T0 = Date.UTC(2026, 10, 15, 8, 10);   // 2026-11-15 08:10 UTC
         await loop.tick();
         const ranDaily = (await call('GET', `/api/v1/made-tools/${id}/triggers`, { as: 'ada' })).body.triggers[1];
         assert.deepStrictEqual([ranDaily.runs, ranDaily.last_state, ranDaily.next_run_at], [1, 'succeeded', '2026-11-18T09:30:00.000Z'], 'run once, the missed day not made up');
+        assert.strictEqual(pushes.length, 1, 'its owner is told, once');
+        assert.deepStrictEqual([pushes[0].url, pushes[0].auth, pushes[0].body.subject, pushes[0].body.service, pushes[0].body.type, pushes[0].body.title, pushes[0].body.url],
+            ['http://network.test/internal/notifications/push', 'Bearer svc-tools', ADA, 'tools', 'TOOL_RAN', 'Reply kindly', `${ORIGIN}/make#${id}`]);
+        assert.match(pushes[0].body.message, /^reply: Thanks/, 'what it answered, in a line');
+        // Told no more when they turn it off.
+        const quiet = await call('PATCH', `/api/v1/made-tools/${id}/triggers/${daily.body.id}`, { as: 'ada', body: { notify: false } });
+        assert.deepStrictEqual([quiet.body.notify, quiet.body.enabled], [false, true]);
+        clock = Date.UTC(2026, 10, 18, 10, 0);
+        await loop.tick();
+        assert.strictEqual(pushes.length, 1, 'not told when they said not to');
+        assert.strictEqual((await call('GET', `/api/v1/made-tools/${id}/triggers`, { as: 'ada' })).body.triggers[1].runs, 2, 'it still ran');
+        assert.strictEqual(answerLine({ text: 'hello' }), 'hello');
+        assert.strictEqual((await createRunNotifier({}).scheduleRan({ subject: ADA, tool: { id, name: 'x' }, out: {} })).reason, 'off', 'off without a secret');
         loop.stop();
 
         // ── who may ──

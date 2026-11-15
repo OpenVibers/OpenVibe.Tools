@@ -29,7 +29,7 @@ const TABLES = [
     { table: 'made_tools', subject: 'owner_subject', file: 'made-tools.json' },
     // Their tools' triggers (made/triggers.js): the schedule, the fixed input and the last answer; never the link's hash.
     { table: 'made_tool_triggers', subject: 'owner_subject', file: 'made-tool-triggers.json',
-        columns: ['id', 'tool_id', 'kind', 'token_hint', 'every_minutes', 'at_minute', 'input', 'enabled', 'next_run_at', 'last_run_at', 'last_state', 'last_result', 'runs', 'created_at', 'updated_at'] },
+        columns: ['id', 'tool_id', 'kind', 'token_hint', 'every_minutes', 'at_minute', 'input', 'enabled', 'notify', 'next_run_at', 'last_run_at', 'last_state', 'last_result', 'runs', 'created_at', 'updated_at'] },
 ];
 const GUARDED = ['tool_jobs'];
 

@@ -768,6 +768,7 @@ const MAKE_CSS = `.mk{max-width:1120px;margin:0 auto;padding:8px 0 24px}
 .mk-auto-panel:empty{display:none}
 .mk-auto-panel{margin:0 0 10px;padding:12px;border:1px solid var(--ovk-line);border-radius:12px;animation:mk-in .2s ease both}
 .mk-auto-bar{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 0}
+.mk-auto-tell{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;font-size:.92rem}
 .mk-auto-new{display:grid;gap:8px}
 .mk-auto-urlrow{display:flex;gap:8px;margin:0;min-width:0}
 .mk-auto-url{flex:1;min-width:0;min-height:44px;padding:0 12px;border:1px solid var(--ovk-line);border-radius:10px;background:var(--ovk-bg);color:var(--ovk-text);font:inherit;font-size:.86rem}

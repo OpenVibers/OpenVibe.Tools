@@ -518,6 +518,7 @@
             else bits.push('Not run yet');
             if (tr.kind === 'schedule' && tr.enabled) bits.push(whenNext(tr.next_run_at));
             if (!tr.enabled) bits.push('paused');
+            else if (tr.kind === 'schedule' && tr.notify) bits.push('tells you');
             if (tr.runs) bits.push(tr.runs + (tr.runs === 1 ? ' run' : ' runs'));
             main.append(h('small', null, bits.join(' · ')));
             if (tr.last_result) {
@@ -588,12 +589,16 @@
             var atField = field('At (UTC)', at, 'Your time now is ' + new Date().toISOString().slice(11, 16) + ' UTC.');
             f.append(field('Every', seg('mk-every', [['hour', 'Hour'], ['day', 'Day']], every, function (v) { every = v; atField.querySelector('.mk-label').textContent = v === 'hour' ? 'At minute (the hour does not matter)' : 'At (UTC)'; }, 'How often')), atField);
             var read = inputFields(t, f);
+            var tell = h('label', 'mk-auto-tell');
+            var tellSw = h('input', 'ovk-switch'); tellSw.type = 'checkbox'; tellSw.setAttribute('role', 'switch'); tellSw.checked = true;
+            tell.append(h('span', null, 'Tell me what it answered, each time'), tellSw);
+            f.append(tell);
             var bar = h('p', 'mk-auto-bar');
             bar.append(btn('Make the schedule', 'primary', null, 'submit'), btn('Cancel', 'quiet', function () { panel.textContent = ''; }));
             f.append(bar);
             f.addEventListener('submit', function (e) {
                 e.preventDefault();
-                api(base, { method: 'POST', body: { kind: 'schedule', every: every, at: at.value || '00:00', input: read() } }).then(function (res) {
+                api(base, { method: 'POST', body: { kind: 'schedule', every: every, at: at.value || '00:00', input: read(), notify: tellSw.checked } }).then(function (res) {
                     if (!res.ok) { say2.textContent = words(res, 'The schedule was not made. Try again.'); return; }
                     panel.textContent = ''; say2.textContent = res.body.says + ': ' + whenNext(res.body.next_run_at) + '.';
                     load();
