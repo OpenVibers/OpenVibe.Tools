@@ -119,20 +119,48 @@ instructions, and gives back either plain text or a few named fields. From the p
 - answer: "fields" when the result has distinct parts (then 1 to 6 field labels), else "text" (then fields is []).
 Answer with JSON only.`;
 
-/** A tool drafted from a description by a model, as the person (their allowance pays): the make form's fields. */
+// A code tool's draft: the same fields, and the run(input) function itself (made/code.js checks it).
+const CODE_DRAFT_SCHEMA = { ...DRAFT_SCHEMA, required: [...DRAFT_SCHEMA.required.filter((k) => k !== 'instructions'), 'source'], properties: { ...DRAFT_SCHEMA.properties, source: { type: 'string', description: 'The JavaScript: a function run(input) that returns the answer' } } };
+delete CODE_DRAFT_SCHEMA.properties.instructions;
+const CODE_DRAFT_SYSTEM = `You write small tools for OpenVibe Tools as plain JavaScript. A tool takes a few inputs and returns an answer, computed by
+code alone: no network, no files, no packages, no eval; only the language and its built-ins (Math, Date, JSON, Intl,
+RegExp, String, Array…). From the person's description, write:
+- name: 2 to 5 words; summary: one plain sentence;
+- inputs: 1 to 6 fields people fill in, each with a plain label and a kind (short text, long text or a number);
+- answer: "fields" when the result has distinct parts (then 1 to 6 field labels), else "text" (then fields is []);
+- source: one JavaScript function, function run(input) { … return answer; }. The input object's keys are the input
+  labels in lower case with underscores (a label "Meeting note" is input.meeting_note). With answer "fields" return an
+  object whose keys are the field labels the same way; with "text" return a string. Handle empty or odd input calmly.
+Answer with JSON only.`;
+
+/** A tool drafted from a description by a model, as the person (their allowance pays): the make form's fields; for a
+ *  code tool, its run(input) source too, checked like a maker's own. */
 async function draftTool(runner, description, opts) {
-    const fake = { slug: 'draft', prompt: { instructions: DRAFT_SYSTEM, model: 'auto', temperature: 0.3, max_tokens: 1200 }, output: { kind: 'json', schema: DRAFT_SCHEMA } };
+    const code = !!(opts && opts.kind === 'code');
+    const fake = code
+        ? { slug: 'draft', prompt: { instructions: CODE_DRAFT_SYSTEM, model: 'auto', temperature: 0.2, max_tokens: 2400 }, output: { kind: 'json', schema: CODE_DRAFT_SCHEMA } }
+        : { slug: 'draft', prompt: { instructions: DRAFT_SYSTEM, model: 'auto', temperature: 0.3, max_tokens: 1200 }, output: { kind: 'json', schema: DRAFT_SCHEMA } };
     const out = await runner.run(fake, { description: String(description).slice(0, 2000) }, opts);
     const d = out && out.data;
     if (!d || typeof d !== 'object') throw Object.assign(new Error('The model did not draft a tool'), { status: 422, code: 'tools.made.bad_answer' });
     const clip = (v, n) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, n);
-    const inputs = (Array.isArray(d.inputs) ? d.inputs : []).slice(0, 6).map((x) => ({ label: clip(x && x.label, 60) || 'Text', kind: ['short', 'long', 'number'].includes(x && x.kind) ? x.kind : 'long' }));
-    const fields = (Array.isArray(d.fields) ? d.fields : []).slice(0, 6).map((x) => ({ label: clip(x && x.label, 60) })).filter((x) => x.label);
+    // Models write a kind as "long text" or a field as a bare label now and then: read both.
+    const kindOf = (k) => { const w = String(k || '').toLowerCase(); return /number|numeric|integer/.test(w) ? 'number' : /short/.test(w) ? 'short' : 'long'; };
+    const labelOf = (x) => clip(typeof x === 'string' ? x : x && x.label, 60);
+    const inputs = (Array.isArray(d.inputs) ? d.inputs : []).slice(0, 6).map((x) => ({ label: labelOf(x) || 'Text', kind: kindOf(x && x.kind) }));
+    const fields = (Array.isArray(d.fields) ? d.fields : []).slice(0, 6).map((x) => ({ label: labelOf(x) })).filter((x) => x.label);
+    let source;
+    if (code) {
+        const checked = require('./code').checkSource(String(d.source || ''));
+        if (checked.error) throw Object.assign(new Error(`The drafted code did not hold up (${checked.error}). Try other words.`), { status: 422, code: 'tools.made.bad_answer' });
+        source = checked.source;
+    }
     return {
         draft: {
+            kind: code ? 'code' : 'prompt',
             name: clip(d.name, 80) || 'My tool',
             summary: clip(d.summary, 200),
-            instructions: String(d.instructions || '').trim().slice(0, 8000),
+            ...(code ? { source } : { instructions: String(d.instructions || '').trim().slice(0, 8000) }),
             inputs: inputs.length ? inputs : [{ label: 'Text', kind: 'long' }],
             answer: d.answer === 'fields' && fields.length ? 'fields' : 'text',
             fields: fields.length ? fields : [{ label: 'Answer' }],

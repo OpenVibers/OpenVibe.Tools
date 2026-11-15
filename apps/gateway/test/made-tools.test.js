@@ -163,6 +163,15 @@ const ORIGIN = 'https://openvibe.tools';
         assert.strictEqual((await call('GET', '/?mine=1', { as: 'ada' })).body.count, before, 'a draft saves nothing');
         assert.strictEqual((await call('POST', '/draft', { body: { description: 'something useful please' } })).status, 401);
         assert.strictEqual((await call('POST', '/draft', { as: 'ada', body: { description: 'short' } })).status, 422);
+        // A code tool's draft: the run(input) source too, checked like a maker's own.
+        aiAnswer = JSON.stringify({ name: 'Word count', summary: 'Counts words.', inputs: [{ label: 'Text', kind: 'long' }], answer: 'fields', fields: [{ label: 'Words' }], source: 'function run(input) {\n  return { words: String(input.text || "").split(/\\s+/).filter(Boolean).length };\n}' });
+        const codeDraft = await call('POST', '/draft', { as: 'ada', body: { description: 'Count the words in a text', kind: 'code' } });
+        assert.strictEqual(codeDraft.status, 200, JSON.stringify(codeDraft.body));
+        assert.deepStrictEqual([codeDraft.body.draft.kind, /function run/.test(codeDraft.body.draft.source), codeDraft.body.draft.instructions], ['code', true, undefined]);
+        assert.match(aiCalls[aiCalls.length - 1].body.input.messages[0].content, /plain JavaScript/, 'the code drafter\'s own instructions');
+        aiAnswer = JSON.stringify({ name: 'Broken', summary: 'x', inputs: [], answer: 'text', fields: [], source: 'const x = 1;' });
+        const badDraft = await call('POST', '/draft', { as: 'ada', body: { description: 'Something that will not hold up', kind: 'code' } });
+        assert.deepStrictEqual([badDraft.status, badDraft.body.code], [422, 'tools.made.bad_answer']);
         assert.strictEqual((await call('POST', '/draft', { as: svc(['tools.made.run']), subject: ADA, body: { description: 'an agent drafting a tool' } })).status, 403, 'an agent does not draft through this');
         aiAnswer = '{"reply":"Thank you, that is kind of you."}';
         // ── code tools from source (§AD.12 (c)): the source in, the entry's digest out, both served ──

@@ -169,8 +169,8 @@
         // Describe it (§AD.12 (d); the owner, 11-15: "create a tool for you completely end to end"): a model drafts the
         // whole form from a sentence or two, as you (your allowance pays); you check it, try it and make it.
         var sd = null;
-        if (!f.id && f.kind !== 'code') {
-            sd = section('Describe it', 'Say what you want. A model drafts the tool below; you check it, try it and make it.');
+        if (!f.id && f.kind !== 'chain') {
+            sd = section('Describe it', f.kind === 'code' ? 'Say what you want. A model writes the code below; you check it, try it and make it.' : 'Say what you want. A model drafts the tool below; you check it, try it and make it.');
             sd.classList.add('mk-describe');
             var ta = h('textarea'); ta.rows = 3; ta.maxLength = 2000; ta.value = state.describe || '';
             ta.placeholder = 'A tool that turns a messy meeting note into a summary, the decisions, and the action items with who does each.';
@@ -180,12 +180,12 @@
                 var text = ta.value.trim();
                 if (text.length < 8) { dnote.textContent = 'Say in a sentence or two what it should do.'; return; }
                 go.disabled = true; go.textContent = 'Drafting…'; dnote.textContent = '';
-                api('/draft', { method: 'POST', body: { description: text } }).then(function (res) {
+                api('/draft', { method: 'POST', body: { description: text, kind: f.kind === 'code' ? 'code' : 'prompt' } }).then(function (res) {
                     go.disabled = false; go.textContent = 'Draft it';
                     if (!res.ok || !res.body || !res.body.draft) { dnote.textContent = words(res, 'It could not draft that. Try other words.'); return; }
                     var d = res.body.draft;
                     var keep = state.form;
-                    state.form = Object.assign(blank(), { name: d.name, summary: d.summary, instructions: d.instructions,
+                    state.form = Object.assign(blank(), { kind: d.kind === 'code' ? 'code' : keep.kind, source: d.source || keep.source, name: d.name, summary: d.summary, instructions: d.instructions || '',
                         inputs: d.inputs.map(function (x) { return { label: x.label, kind: x.kind }; }), answer: d.answer,
                         fields: d.fields.map(function (x) { return { label: x.label }; }), model: keep.model, modelName: keep.modelName, modelSub: keep.modelSub, visibility: keep.visibility });
                     drawForm();
@@ -283,9 +283,9 @@
         bar.append(save);
         if (f.id) bar.append(btn('New tool', 'quiet', function () { state.form = blank(); drawAll(); }));
 
+        if (sk) form.append(sk);
         if (sd) form.append(sd);
         form.append(s1);
-        if (sk) form.append(sk);
         form.append(f.kind === 'code' ? s2c : s2, s3, s4, s5, status, bar);
         if (f.id) form.append(deleteRow(f));
         form.addEventListener('submit', function (e) { e.preventDefault(); submit(); });

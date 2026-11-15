@@ -120,7 +120,7 @@ function createMadeToolRoutes({ store, runner, models = null, verify, verifyServ
             const description = String((req.body && req.body.description) || '').trim();
             if (description.length < 8) return problem(res, 422, 'tools.made.invalid', 'Say in a sentence or two what the tool should do');
             const { draftTool } = require('./prompt');
-            res.json(await draftTool(runner, description, { subject: p.sub }));
+            res.json(await draftTool(runner, description, { subject: p.sub, kind: req.body && req.body.kind === 'code' ? 'code' : 'prompt' }));
         } catch (err) { send(res, err); }
     });
 
