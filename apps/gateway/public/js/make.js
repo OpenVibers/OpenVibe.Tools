@@ -53,9 +53,43 @@
     }
     var money = function (v) { return v == null ? null : '$' + (v >= 1 ? v.toFixed(2) : v >= 0.01 ? v.toFixed(2) : v.toFixed(3).replace(/0+$/, '').replace(/\.$/, '')); };
 
+    // ── Code tools (§AD.12 (c)) ────────────────────────────────
+    var CODE_TEMPLATE = '// run(input) gets the inputs below and returns the answer (it may be async).\n' +
+        '// It runs without a network: work with the input only.\n' +
+        'function run(input) {\n' +
+        '  const text = String(input.text || \'\');\n' +
+        '  const words = text.trim().split(/\\s+/).filter(Boolean);\n' +
+        '  return { words: words.length, characters: text.length };\n' +
+        '}\n';
+    /** A code tool's run(input) in /made-sandbox: an opaque-origin frame (no cookies, no storage, no way to this page)
+     *  whose own policy allows no network, running the code in a Worker; the frame is removed after the time limit. */
+    function runInSandbox(source, input, timeoutMs) {
+        return new Promise(function (resolve) {
+            var frame = document.createElement('iframe');
+            frame.setAttribute('sandbox', 'allow-scripts');
+            frame.setAttribute('aria-hidden', 'true');
+            frame.setAttribute('tabindex', '-1');
+            frame.style.cssText = 'position:absolute;width:1px;height:1px;border:0;opacity:0;pointer-events:none';
+            var t = Math.random().toString(36).slice(2);
+            var done = false, timer = 0;
+            function finish(r) { if (done) return; done = true; window.removeEventListener('message', onMsg); clearTimeout(timer); frame.remove(); resolve(r); }
+            function onMsg(e) {
+                if (e.source !== frame.contentWindow) return;
+                var d = e.data || {};
+                if (d.sandbox === 'ready') { frame.contentWindow.postMessage({ t: t, source: String(source), input: input }, '*'); return; }
+                if (d.t !== t) return;
+                finish(d.ok ? { ok: true, out: d.out } : { ok: false, error: d.error || 'It failed' });
+            }
+            window.addEventListener('message', onMsg);
+            timer = setTimeout(function () { finish({ ok: false, error: 'It took longer than ' + Math.round(timeoutMs / 1000) + ' s and was stopped' }); }, timeoutMs);
+            frame.src = '/made-sandbox';
+            document.body.append(frame);
+        });
+    }
+
     // ── State ──────────────────────────────────────────────────
     function blank() {
-        return { id: null, slug: '', name: '', summary: '', instructions: '', model: 'auto', modelName: 'Auto', inputs: [{ label: 'Text', kind: 'long' }], answer: 'text', fields: [{ label: 'Answer' }], visibility: 'private', version: 0 };
+        return { id: null, kind: 'prompt', source: CODE_TEMPLATE, slug: '', name: '', summary: '', instructions: '', model: 'auto', modelName: 'Auto', inputs: [{ label: 'Text', kind: 'long' }], answer: 'text', fields: [{ label: 'Answer' }], visibility: 'private', version: 0 };
     }
     var state = { signedIn: null, mine: [], form: blank(), models: null, saving: false };
 
@@ -68,7 +102,7 @@
         });
         var out = t.output || { kind: 'text' };
         var fields = out.kind === 'json' ? Object.keys((out.schema && out.schema.properties) || {}).map(function (k) { var p = out.schema.properties[k] || {}; return { label: p.title || k, key: k }; }) : [{ label: 'Answer' }];
-        return { id: t.id, slug: t.slug, name: t.name, summary: t.summary, instructions: (t.prompt && t.prompt.instructions) || '', model: (t.prompt && t.prompt.model) || 'auto', modelName: (t.prompt && t.prompt.model) === 'auto' || !t.prompt ? 'Auto' : t.prompt.model, inputs: inputs.length ? inputs : [{ label: 'Text', kind: 'long' }], answer: out.kind === 'json' ? 'fields' : 'text', fields: fields.length ? fields : [{ label: 'Answer' }], visibility: t.visibility, version: t.version, kind: t.kind, runs: t.runs };
+        return { id: t.id, slug: t.slug, name: t.name, summary: t.summary, instructions: (t.prompt && t.prompt.instructions) || '', model: (t.prompt && t.prompt.model) || 'auto', modelName: (t.prompt && t.prompt.model) === 'auto' || !t.prompt ? 'Auto' : t.prompt.model, inputs: inputs.length ? inputs : [{ label: 'Text', kind: 'long' }], answer: out.kind === 'json' ? 'fields' : 'text', fields: fields.length ? fields : [{ label: 'Answer' }], visibility: t.visibility, version: t.version, kind: t.kind, runs: t.runs, source: t.kind === 'code' ? null : CODE_TEMPLATE };
     }
 
     /** The form as the API's body. */
@@ -85,11 +119,9 @@
             f.fields.forEach(function (x) { var k = keyOf(x.label, t2); op[k] = { type: 'string', title: x.label }; oreq.push(k); });
             output = { kind: 'json', schema: { type: 'object', required: oreq, properties: op } };
         }
-        return {
-            slug: f.slug || slugOf(f.name), name: f.name.trim(), summary: f.summary.trim(), kind: 'prompt',
-            input: { type: 'object', required: required, properties: props },
-            output: output, prompt: { instructions: f.instructions.trim(), model: f.model || 'auto' }, visibility: f.visibility,
-        };
+        var base = { slug: f.slug || slugOf(f.name), name: f.name.trim(), summary: f.summary.trim(), input: { type: 'object', required: required, properties: props }, output: output, visibility: f.visibility };
+        if (f.kind === 'code') return Object.assign(base, { kind: 'code', source_code: f.source || '', net: 'deny', hosting: 'openvibe' });
+        return Object.assign(base, { kind: 'prompt', prompt: { instructions: f.instructions.trim(), model: f.model || 'auto' } });
     }
 
     // ── The page ───────────────────────────────────────────────
@@ -137,7 +169,7 @@
         // Describe it (§AD.12 (d); the owner, 11-15: "create a tool for you completely end to end"): a model drafts the
         // whole form from a sentence or two, as you (your allowance pays); you check it, try it and make it.
         var sd = null;
-        if (!f.id) {
+        if (!f.id && f.kind !== 'code') {
             sd = section('Describe it', 'Say what you want. A model drafts the tool below; you check it, try it and make it.');
             sd.classList.add('mk-describe');
             var ta = h('textarea'); ta.rows = 3; ta.maxLength = 2000; ta.value = state.describe || '';
@@ -173,6 +205,30 @@
         summary.addEventListener('input', function () { f.summary = summary.value; });
         s1.append(field('Name', name), field('What it does, in one sentence', summary, 'People and agents read this to decide when to use it.'));
 
+        // How it works: a model (a prompt) or your own code (run(input)); a tool keeps its kind once made.
+        var sk = null;
+        if (!f.id) {
+            sk = section('How it works');
+            sk.append(seg('kind', [['prompt', 'A model writes the answer'], ['code', 'My code']], f.kind, function (v) { f.kind = v; drawForm(); }, 'How it works'));
+        }
+        var s2c = null;
+        if (f.kind === 'code') {
+            s2c = section('The code', 'run(input) gets the inputs below and returns the answer. It runs in a sandbox with no network: on this page in the browser now, on Link machines for agents and the API next.');
+            var ed = h('textarea', 'mk-code'); ed.rows = 12; ed.spellcheck = false; ed.autocapitalize = 'off'; ed.setAttribute('autocorrect', 'off'); ed.maxLength = 65536;
+            ed.setAttribute('aria-label', 'The code');
+            if (f.source == null) {
+                ed.value = 'Loading the code…'; ed.disabled = true;
+                fetch('/api/v1/made-tools/' + encodeURIComponent(f.id) + '/source', { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (t) { f.source = t || ''; drawForm(); });
+            } else ed.value = f.source;
+            ed.addEventListener('input', function () { f.source = ed.value; });
+            ed.addEventListener('keydown', function (e) {
+                if (e.key !== 'Tab' || e.shiftKey) return;
+                e.preventDefault();
+                var a = ed.selectionStart, b = ed.selectionEnd;
+                ed.value = ed.value.slice(0, a) + '  ' + ed.value.slice(b); ed.selectionStart = ed.selectionEnd = a + 2; f.source = ed.value;
+            });
+            s2c.append(ed);
+        }
         var s2 = section('What the model does');
         var ins = h('textarea'); ins.maxLength = 8000; ins.rows = 5; ins.value = f.instructions; ins.required = true;
         ins.placeholder = 'Write a short, kind reply to the message. Keep it under three sentences.';
@@ -228,7 +284,9 @@
         if (f.id) bar.append(btn('New tool', 'quiet', function () { state.form = blank(); drawAll(); }));
 
         if (sd) form.append(sd);
-        form.append(s1, s2, s3, s4, s5, status, bar);
+        form.append(s1);
+        if (sk) form.append(sk);
+        form.append(f.kind === 'code' ? s2c : s2, s3, s4, s5, status, bar);
         if (f.id) form.append(deleteRow(f));
         form.addEventListener('submit', function (e) { e.preventDefault(); submit(); });
         formCol.append(form);
@@ -251,7 +309,7 @@
     function check(f) {
         if (!f.name.trim()) return 'Give it a name.';
         if (!f.summary.trim()) return 'Say what it does, in one sentence.';
-        if (!f.instructions.trim()) return 'Tell the model what to do.';
+        if (f.kind === 'code' ? !/\brun\b/.test(f.source || '') : !f.instructions.trim()) return f.kind === 'code' ? 'Write a run(input) function that returns the answer.' : 'Tell the model what to do.';
         if (f.inputs.some(function (i) { return !String(i.label).trim(); })) return 'Name every input (or remove the empty one).';
         if (f.answer === 'fields' && f.fields.some(function (x) { return !String(x.label).trim(); })) return 'Name every field (or remove the empty one).';
         return '';
@@ -305,7 +363,15 @@
                 input[k] = controls[k].type === 'number' ? (v === '' ? 0 : Number(v)) : v;
             });
             run.disabled = true; out.textContent = ''; out.className = 'mk-answer is-busy'; out.append(h('span', 'mk-dots', 'Running'));
-            api('/' + encodeURIComponent(t.id) + '/run', { method: 'POST', body: { input: input } }).then(function (res) {
+            var started = Date.now();
+            var go = t.kind === 'code'
+                ? fetch('/api/v1/made-tools/' + encodeURIComponent(t.id) + '/source', { credentials: 'same-origin' })
+                    .then(function (r) { return r.ok ? r.text() : Promise.reject(new Error('The code could not be read')); })
+                    .then(function (src) { return runInSandbox(src, input, 10000); })
+                    .then(function (r) { return r.ok ? { status: 200, ok: true, body: { state: 'succeeded', result: (r.out && typeof r.out === 'object' && !Array.isArray(r.out)) ? { data: r.out } : { text: typeof r.out === 'string' ? r.out : JSON.stringify(r.out) }, model: 'your browser', took_ms: Date.now() - started } } : { status: 200, ok: true, body: { state: 'failed', error: { detail: r.error } } }; },
+                        function (err) { return { status: 0, ok: false, body: { detail: (err && err.message) || 'It did not run' } }; })
+                : api('/' + encodeURIComponent(t.id) + '/run', { method: 'POST', body: { input: input } });
+            go.then(function (res) {
                 run.disabled = false; out.className = 'mk-answer mk-enter'; out.textContent = '';
                 var b = res.body || {};
                 if (res.status === 401) { out.append(h('p', 'mk-bad', 'Sign in to run it: the run is paid from your own allowance.')); return; }

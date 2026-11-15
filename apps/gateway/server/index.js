@@ -158,7 +158,8 @@ app.use(helmet({
             // openvibe.events: release notifications (release-watch's EventSource, openvibe-shared 2.13.0).
             // The navbar's Messages count asks Chat (openvibe-shared 4.130.0).
             connectSrc: ["'self'", "https://openvibe.chat", "https://cloudflareinsights.com", "https://openvibe.network", "https://openvibe.quest", "https://openvibe.tools", "https://*.openvibe.tools", "https://openvibe.media", "https://openvibe.live", "https://openvibe.games", "https://openvibe.events"],
-            frameSrc: ["https://openvibe.network"], // the hidden /sso/check sign-in probe
+            // the hidden /sso/check sign-in probe, and the sandbox a code tool people made runs in (made/sandbox.js)
+            frameSrc: ["https://openvibe.network", "'self'"],
             scriptSrcAttr: ["'unsafe-inline'"],
         },
     },
@@ -341,7 +342,7 @@ app.use('/api/v1/owner', require('./workers/admin').createAdmin({ express, guard
 
 // Tools people make (plan 2026-11-13 §AD.7 step 2; tools.made-tool@1; migration 0016): /api/v1/made-tools. A prompt
 // tool runs through OpenVibe.AI as the person who runs it (Tools' token: ai.run.create on openvibe.ai, ai.complete).
-const madeTools = require('./made/store').createMadeTools({ db: toolsDb.db });
+const madeTools = require('./made/store').createMadeTools({ db: toolsDb.db, baseUrl: config.baseUrl });
 const madeRunner = require('./made/prompt').createPromptRunner({
     aiUrl: config.ai.url,
     tokens: config.oauth.clientSecret ? require('openvibe-contracts').serviceAuth.createTokenClient({
@@ -359,6 +360,8 @@ app.options('/mcp', (req, res) => { res.set({ 'Access-Control-Allow-Origin': '*'
 app.get('/mcp', (req, res) => res.status(405).set('Allow', 'POST').json({ error: 'POST one JSON-RPC request (MCP Streamable HTTP); this server keeps no stream' }));
 app.post('/mcp', actorLimits.backstop('tools.tool.run'), express.json({ limit: '1mb' }), (req, res) => toolsMcp.handle(req, res));
 app.post('/api/v1/made-tools/:id/run', actorLimits.backstop('tools.tool.run'));
+// Where a code tool people made runs in the browser (made/sandbox.js): its own policy, no network.
+app.get('/made-sandbox', require('./made/sandbox').sandboxPage);
 app.use('/api/v1/made-tools', require('./made/routes').createMadeToolRoutes({
     store: madeTools, runner: madeRunner, models: require('./made/models').createModelList({ exchangeUrl: config.exchange.url }),
     verify: (token) => auth.verify(token), extractToken,
