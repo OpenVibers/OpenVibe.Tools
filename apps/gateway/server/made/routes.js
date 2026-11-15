@@ -6,6 +6,8 @@
 //   GET    /api/v1/made-tools?mine=1     the caller's own tools, every visibility; signed in
 //   GET    /api/v1/made-tools/models     the models a prompt tool can name (./models.js); anyone
 //   POST   /api/v1/made-tools            make one (201); signed in
+//   POST   /api/v1/made-tools/draft      { description } → { draft }: a model writes the make form's fields, as the
+//                                        person (their allowance pays); nothing is saved (§AD.12 (d), Describe it)
 //   GET    /api/v1/made-tools/:id        one tool: public and unlisted to anyone, private to its owner (else 404)
 //   PATCH  /api/v1/made-tools/:id        change it (the next version); its owner
 //   DELETE /api/v1/made-tools/:id        delete it (204); its owner
@@ -107,6 +109,17 @@ function createMadeToolRoutes({ store, runner, models = null, verify, verifyServ
         const body = models ? await models.list().catch(() => ({ models: [], updated_at: null })) : { models: [], updated_at: null };
         res.set({ 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=300' });
         res.json(body);
+    });
+
+    r.post('/draft', express.json({ limit: '16kb' }), async (req, res) => {
+        try {
+            const p = await person(req, res, { write: true });
+            if (!p) return;
+            const description = String((req.body && req.body.description) || '').trim();
+            if (description.length < 8) return problem(res, 422, 'tools.made.invalid', 'Say in a sentence or two what the tool should do');
+            const { draftTool } = require('./prompt');
+            res.json(await draftTool(runner, description, { subject: p.sub }));
+        } catch (err) { send(res, err); }
     });
 
     r.post('/', express.json({ limit: '64kb' }), async (req, res) => {

@@ -153,6 +153,19 @@ const ORIGIN = 'https://openvibe.tools';
         assert.strictEqual((await call('POST', `/${t.id}/run`, { as: svc(['tools.made.run'], 'forged'), subject: BO, body: { input: { message: 'x' } } })).status, 401, 'a forged token');
         aiAnswer = '{"reply":"Thank you, that is kind of you."}';
 
+        // ── Describe it: a model drafts the form, as the person; nothing is saved ──
+        aiAnswer = JSON.stringify({ name: 'Meeting notes', summary: 'Turns a meeting note into a summary, decisions and actions.', instructions: 'Read the note. Write a short summary, the decisions, and the action items with their owners.', inputs: [{ label: 'Note', kind: 'long' }], answer: 'fields', fields: [{ label: 'Summary' }, { label: 'Decisions' }, { label: 'Actions' }] });
+        const before = (await call('GET', '/?mine=1', { as: 'ada' })).body.count;
+        const drafted = await call('POST', '/draft', { as: 'ada', body: { description: 'Turn my meeting notes into decisions and action items' } });
+        assert.strictEqual(drafted.status, 200, JSON.stringify(drafted.body));
+        assert.deepStrictEqual([drafted.body.draft.name, drafted.body.draft.answer, drafted.body.draft.fields.length, drafted.body.draft.inputs[0].kind], ['Meeting notes', 'fields', 3, 'long']);
+        assert.deepStrictEqual(aiCalls[aiCalls.length - 1].body.on_behalf_of, { type: 'user', id: ADA }, 'the drafting is paid by the person');
+        assert.strictEqual((await call('GET', '/?mine=1', { as: 'ada' })).body.count, before, 'a draft saves nothing');
+        assert.strictEqual((await call('POST', '/draft', { body: { description: 'something useful please' } })).status, 401);
+        assert.strictEqual((await call('POST', '/draft', { as: 'ada', body: { description: 'short' } })).status, 422);
+        assert.strictEqual((await call('POST', '/draft', { as: svc(['tools.made.run']), subject: ADA, body: { description: 'an agent drafting a tool' } })).status, 403, 'an agent does not draft through this');
+        aiAnswer = '{"reply":"Thank you, that is kind of you."}';
+
         // ── changing and deleting ──
         assert.strictEqual((await call('PATCH', `/${t.id}`, { cookie: 'ada', origin: 'https://evil.example', body: { name: 'x' } })).status, 403, 'a cookie-borne write from another site is refused');
         assert.strictEqual((await call('PATCH', `/${t.id}`, { as: 'bo', body: { name: 'Mine now' } })).status, 404, 'nobody else changes it');

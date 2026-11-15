@@ -748,6 +748,8 @@ const MAKE_CSS = `.mk{max-width:1120px;margin:0 auto;padding:8px 0 24px}
 .mk-row>input{flex:1 1 180px;min-width:0}
 .mk-row .ovk-seg{flex:none}
 .mk-sec>.ovk-seg{justify-self:start}
+.mk-describe{border-color:color-mix(in srgb,var(--ovk-accent) 40%,var(--ovk-line));background:linear-gradient(160deg,color-mix(in srgb,var(--ovk-accent) 10%,var(--ovk-panel)),var(--ovk-panel) 60%)}
+.mk-draft-go{justify-self:start}
 .mk-vis{display:grid;gap:8px}
 @media(min-width:640px){.mk-vis{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .mk-vis-opt{position:relative;display:grid;gap:2px;align-content:start;color:var(--ovk-text);min-height:var(--ovk-tap,44px);padding:12px 14px;border:1px solid var(--ovk-line);border-radius:12px;cursor:pointer;transition:border-color .15s,background .15s}
