@@ -339,6 +339,22 @@ app.use('/auth', createAuthRoutes(config, auth));
 const workerOwner = require('./workers/owner').ownerGuard({ verify: token => auth.verify(token), extractToken, origin: new URL(config.baseUrl).origin });
 app.use('/api/v1/owner', require('./workers/admin').createAdmin({ express, guard: workerOwner, store: workerStore, hub: workerHub, ports: SATELLITES }));
 
+// Tools people make (plan 2026-11-13 §AD.7 step 2; tools.made-tool@1; migration 0016): /api/v1/made-tools. A prompt
+// tool runs through OpenVibe.AI as the person who runs it (Tools' token: ai.run.create on openvibe.ai, ai.complete).
+const madeTools = require('./made/store').createMadeTools({ db: toolsDb.db });
+const madeRunner = require('./made/prompt').createPromptRunner({
+    aiUrl: config.ai.url,
+    tokens: config.oauth.clientSecret ? require('openvibe-contracts').serviceAuth.createTokenClient({
+        tokenUrl: `${config.networkInternalUrl}/oauth/token`, clientId: config.oauth.clientId, clientSecret: config.oauth.clientSecret,
+        audience: config.ai.audience, scope: 'ai.run.create',
+    }) : null,
+});
+app.post('/api/v1/made-tools/:id/run', actorLimits.backstop('tools.tool.run'));
+app.use('/api/v1/made-tools', require('./made/routes').createMadeToolRoutes({
+    store: madeTools, runner: madeRunner, verify: (token) => auth.verify(token), extractToken,
+    origin: new URL(config.baseUrl).origin, ...ajvFrom(require),
+}));
+
 
 /** 401 unless a valid ov_token is presented. */
 async function requireAuth(req, res, next) {

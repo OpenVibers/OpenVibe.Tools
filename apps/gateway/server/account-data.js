@@ -13,6 +13,8 @@
  * - the analytics (analytics_events): the tracker's own rows. Its user_id is a local counter, not a subject, and
  *   the rows are not keyed by a person (the guard's exemption says so);
  * - the guard's abuse log (guard_abuse): an address hash and a service principal, never a person.
+ * - the tools they made (made_tools.owner_subject): their own content, so it goes in their export and goes with the
+ *   account. Its run count is everyone's runs, never who ran it.
  *
  * Telemetry samples that name a person are covered by the SDK itself (telemetry.json, then the subject NULL).
  */
@@ -22,7 +24,10 @@ const { createAccountData, TOPICS } = require('openvibe-sdk/account-data');
 // them (the job's event log, its references), so they are not in the table map: the map deletes the job first and
 // those rows would stay behind. The guard (openvibe-sdk/account-data's uncovered) needs the table named, so it is
 // in GUARDED below.
-const TABLES = [];
+const TABLES = [
+    // The tools they made (made/store.js): their own content, exported and deleted with the account.
+    { table: 'made_tools', subject: 'owner_subject', file: 'made-tools.json' },
+];
 const GUARDED = ['tool_jobs'];
 
 // What of a job is the person's to read back: the job, its input, its files and its result.
