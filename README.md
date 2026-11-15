@@ -651,5 +651,5 @@ counters and salt use Valkey through `VALKEY_URL`, with process-local state when
 <!-- versions:start -->
 - openvibe-contracts: v0.422.0
 - openvibe-sdk: v0.172.0
-- openvibe-shared: v4.259.0
+- openvibe-shared: v4.260.0
 <!-- versions:end -->
