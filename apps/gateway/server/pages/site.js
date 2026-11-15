@@ -892,7 +892,7 @@ function llmsTxtBody() {
     // is on another subdomain, so its link keeps its URL; /developers has no twin yet (llms-twins-probe, 11-03), so
     // it keeps its URL and says (HTML). The API stays in a main section: it is what an agent came for.
     return seo.llmsTxt({ name: NAME, markdown: true, base: SITE, summary: llmsSummary(),
-        sections: [{ title: 'API', links: [{ title: 'Developer guide', url: SITE + '/developers', note: 'run any tool from code' }, { title: 'OpenAPI 3.1', url: SITE + '/api/v1/openapi.json' }, { title: 'Tool registry (JSON)', url: SITE + '/api/v1/tools' }] }].concat(llmsSections()),
+        sections: [{ title: 'API', links: [{ title: 'Developer guide', url: SITE + '/developers', note: 'run any tool from code' }, { title: 'MCP server', url: SITE + '/mcp', note: 'Streamable HTTP (POST): find_tools, run_tool, run_tools and your own made tools, for any agent' }, { title: 'Make a tool', url: SITE + '/make', note: 'a prompt on any model, or code' }, { title: 'OpenAPI 3.1', url: SITE + '/api/v1/openapi.json' }, { title: 'Tool registry (JSON)', url: SITE + '/api/v1/tools' }] }].concat(llmsSections()),
         // llmstxt.org's "## Optional": what an agent may skip when it needs a shorter context.
         optional: [
             { title: 'Full text (llms-full.txt)', url: SITE + '/llms-full.txt', note: 'the public pages above as one plain-text document' },

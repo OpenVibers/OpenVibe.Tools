@@ -349,6 +349,15 @@ const madeRunner = require('./made/prompt').createPromptRunner({
         audience: config.ai.audience, scope: 'ai.run.create',
     }) : null,
 });
+// MCP (plan §AD.12 (a)): every tool to any agent at POST /mcp (find_tools, run_tool, run_tools and the person's own
+// made tools); every run goes through the run API over loopback with the caller's own credentials.
+const toolsMcp = require('./mcp').createToolsMcp({
+    address: () => { try { return server.address(); } catch { return null; } },
+    snapshot: () => toolRegistry.snapshot(), store: madeTools, verify: (token) => auth.verify(token), extractToken,
+});
+app.options('/mcp', (req, res) => { res.set({ 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Authorization, Content-Type, Mcp-Session-Id, MCP-Protocol-Version', 'Access-Control-Max-Age': '600' }); res.status(204).end(); });
+app.get('/mcp', (req, res) => res.status(405).set('Allow', 'POST').json({ error: 'POST one JSON-RPC request (MCP Streamable HTTP); this server keeps no stream' }));
+app.post('/mcp', actorLimits.backstop('tools.tool.run'), express.json({ limit: '1mb' }), (req, res) => toolsMcp.handle(req, res));
 app.post('/api/v1/made-tools/:id/run', actorLimits.backstop('tools.tool.run'));
 app.use('/api/v1/made-tools', require('./made/routes').createMadeToolRoutes({
     store: madeTools, runner: madeRunner, models: require('./made/models').createModelList({ exchangeUrl: config.exchange.url }),
