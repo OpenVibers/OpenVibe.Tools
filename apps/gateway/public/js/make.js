@@ -422,7 +422,12 @@
 
     root.textContent = '';
     root.append(grid);
-    api('?mine=1').then(function (res) {
+    // Signed out, the page never asks for "your tools" (a 401 is a console error the browser check counts): /auth/me first.
+    fetch('/auth/me', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        .then(function (r) { return r.ok ? r.json() : { user: null }; })
+        .catch(function () { return { user: null }; })
+        .then(function (me) { return me && me.user ? api('?mine=1') : { status: 401, ok: false, body: null }; })
+        .then(function (res) {
         if (res.status === 401) { state.signedIn = false; signedOut(); }
         else {
             state.signedIn = true;
