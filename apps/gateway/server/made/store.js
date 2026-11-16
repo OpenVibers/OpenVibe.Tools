@@ -246,7 +246,10 @@ function createMadeTools({ db, now = () => new Date(), baseUrl = 'https://openvi
     }
 
     async function remove(id, owner) {
-        return (await db.exec('DELETE FROM made_tools WHERE id = $1 AND owner_subject = $2', [id, owner])) > 0;
+        const gone = (await db.exec('DELETE FROM made_tools WHERE id = $1 AND owner_subject = $2', [id, owner])) > 0;
+        // Its triggers go with it (no cascade since a trigger may name a catalogue tool; migration 0021).
+        if (gone) await db.exec('DELETE FROM made_tool_triggers WHERE tool_id = $1 AND owner_subject = $2', [id, owner]);
+        return gone;
     }
 
     async function listMine(owner) {

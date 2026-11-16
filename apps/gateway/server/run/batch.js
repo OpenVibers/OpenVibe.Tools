@@ -15,7 +15,7 @@
 // caller runs tools one at a time, so the batch is never a way to multiply anonymous runs.
 // ═══════════════════════════════════════════════════════════════
 
-const TOOL_ID = /^[a-z0-9][a-z0-9.-]{0,63}$/;
+const TOOL_ID = /^[a-z0-9][a-z0-9.-]{0,63}$|^mtl_[0-9A-HJKMNP-TV-Z]{26}$/;  // a catalogue tool or one people made (11-15)
 const MAX_CALLS = 16;
 const MAX_CONCURRENCY = 8;
 

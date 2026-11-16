@@ -1,6 +1,8 @@
 'use strict';
 // ═══════════════════════════════════════════════════════════════
-// Triggers: a made tool runs without anyone pressing Run (plan 2026-11-13 §AD.12 (g); migration 0019).
+// Triggers: a tool runs without anyone pressing Run (plan 2026-11-13 §AD.12 (g); migrations 0019, 0021). Any tool: one
+// people made (its owner's alone) or a catalogue tool with an API (anyone signed in sets their own; the owner, 11-15: "all
+// existing tools use the same universal shared modular system that users can make tools with").
 //
 //   link      a secret URL, https://openvibe.tools/hooks/<mth_…>: GET or POST it and the tool runs as its owner with the
 //             request's input over the trigger's fixed input. A webhook's own payload (GitHub, a form, a shop) goes
@@ -55,8 +57,16 @@ function describe(row) {
     return row.every_minutes === 60 ? `Every hour at :${mm}` : `Every day at ${hh}:${mm} UTC`;
 }
 
-/** Can this tool take a trigger? Words when it cannot. A code tool can once code tools run on machines (codeRuns). */
+/** Can this tool take a trigger? Words when it cannot. A code tool can once code tools run on machines (codeRuns). A
+ *  catalogue tool (kind 'catalogue', its tools.tool@1 descriptor's facts) can when it has an API, needs no file and
+ *  runs for anyone: a trigger runs it with no one's sign-in, as a chain's steps do. */
 function refusal(tool, { codeRuns = false } = {}) {
+    if (tool.kind === 'catalogue') {
+        if (!tool.api) return 'This tool works only on its own page, so it cannot run on its own';
+        if (tool.files && tool.files.min > 0) return 'This tool takes a file each time, so it runs when you give it one';
+        if (tool.auth && tool.auth.anonymous === false) return 'This tool needs you signed in for each run, so it cannot run on its own yet';
+        return null;
+    }
     if (tool.kind === 'code' && !codeRuns) return 'A code tool runs in your browser for now, so it cannot run on its own yet';
     if (tool.kind === 'chain' && ((tool.chain && tool.chain.steps) || []).some((s) => /^mtl_/.test(String(s.tool)))) {
         return 'A chain that calls tools people made needs you there to run them; a trigger can run chains of catalogue tools';
@@ -104,6 +114,17 @@ function createTriggers({ db, now = () => Date.now(), baseUrl = 'https://openvib
 
     async function list(toolId, owner) {
         return (await db.many('SELECT * FROM made_tool_triggers WHERE tool_id = $1 AND owner_subject = $2 ORDER BY created_at', [toolId, owner])).map((r) => present(r));
+    }
+
+    /** Every trigger the owner has, on any tool (GET /api/v1/me/triggers). */
+    async function listOwner(owner) {
+        return (await db.many('SELECT * FROM made_tool_triggers WHERE owner_subject = $1 ORDER BY created_at LIMIT $2', [owner, MAX_PER_OWNER * 2])).map((r) => present(r));
+    }
+
+    /** A made tool deleted: its triggers go with it (the table no longer cascades, since a trigger may name a catalogue
+     *  tool; migration 0021). */
+    async function removeForTool(toolId, owner) {
+        return db.exec('DELETE FROM made_tool_triggers WHERE tool_id = $1 AND owner_subject = $2', [toolId, owner]);
     }
 
     /** { enabled?, notify? }: pause or resume, and whether a schedule tells its owner. */
@@ -165,20 +186,26 @@ function createTriggers({ db, now = () => Date.now(), baseUrl = 'https://openvib
         return true;
     }
 
-    /** The scheduler: every `everyMs`, the due schedules run (run(row) → tools.run@1), one at a time; told(row, out) after
-     *  each one whose owner wants to know. */
-    function start({ run, told = null, everyMs = 30_000, log = console } = {}) {
+    /** The scheduler: every `everyMs`, the due schedules run (run(row) → tools.run@1), `width` at a time (a slow model
+     *  or a 90-second job never holds up the hour's other schedules); told(row, out) after each one whose owner wants to
+     *  know. */
+    function start({ run, told = null, everyMs = 30_000, width = 4, log = console } = {}) {
         let busy = false;
+        const one = async (row) => {
+            let out;
+            try { out = await run(row); } catch (err) { out = { state: 'failed', error: { detail: (err && err.message) || 'The run failed' } }; }
+            await record(row.id, out).catch(() => {});
+            if (told && row.notify) await Promise.resolve(told(row, out)).catch(() => {});
+        };
         const tick = async () => {
             if (busy) return;
             busy = true;
             try {
-                for (const row of await claimDue(5)) {
-                    let out;
-                    try { out = await run(row); } catch (err) { out = { state: 'failed', error: { detail: (err && err.message) || 'The run failed' } }; }
-                    await record(row.id, out).catch(() => {});
-                    if (told && row.notify) await Promise.resolve(told(row, out)).catch(() => {});
-                }
+                const due = await claimDue(width * 3);
+                let next = 0;
+                await Promise.all(Array.from({ length: Math.min(width, due.length) }, async () => {
+                    while (next < due.length) await one(due[next++]);
+                }));
             } catch (err) {
                 log.error(`[made-triggers] ${(err && err.message) || err}`);
             } finally { busy = false; }
@@ -188,7 +215,7 @@ function createTriggers({ db, now = () => Date.now(), baseUrl = 'https://openvib
         return { stop: () => clearInterval(timer), tick };
     }
 
-    return { create, list, change, setEnabled, remove, byToken, claimDue, record, allowLink, start, present };
+    return { create, list, listOwner, removeForTool, change, setEnabled, remove, byToken, claimDue, record, allowLink, start, present };
 }
 
 module.exports = { createTriggers, nextRun, describe, refusal, TriggerError, hashOf };

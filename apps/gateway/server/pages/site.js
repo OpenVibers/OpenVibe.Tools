@@ -400,7 +400,16 @@ function apiSection(t, d = descriptorOf(t.id)) {
     return `<section class="api-box" aria-labelledby="api-h"><div class="sec-h"><h2 id="api-h">Use it from code</h2></div>
 <ul class="api-facts"><li><code>${esc(d.run.method)} ${esc(SITE + d.run.path)}</code></li><li>${who}</li><li>${esc([how, files].filter(Boolean).join(' '))}</li></ul>
 <pre tabindex="0"><code>${esc(lines.join(' \\\n  '))}</code></pre>
-<p class="sec-p">Inputs: <a href="/api/v1/tools/${esc(d.id)}/schema">JSON Schema</a> · <a href="/api/v1/openapi.json">OpenAPI</a> · from JavaScript: <code>tools.run(${esc(JSON.stringify(d.id))}, …)</code> in <a href="https://github.com/OpenVibers/OpenVibe.SDK">openvibe-sdk</a> · <a href="/developers">How the API works</a></p></section>`;
+<p class="sec-p">Inputs: <a href="/api/v1/tools/${esc(d.id)}/schema">JSON Schema</a> · <a href="/api/v1/openapi.json">OpenAPI</a> · from JavaScript: <code>tools.run(${esc(JSON.stringify(d.id))}, …)</code> in <a href="https://github.com/OpenVibers/OpenVibe.SDK">openvibe-sdk</a> · <a href="/developers">How the API works</a></p>${buildWith(t, d)}</section>`;
+}
+
+/** Build with it (one tool system, 11-15): every tool that takes no file is a step of a tool you make, and one that runs
+ *  for anyone also runs on its own, on a schedule or from a private link (made/triggers.js). */
+function buildWith(t, d) {
+    if (!d || !d.api || d.files) return '';
+    const links = [`<a href="${SITE}/make#from=${esc(d.id)}">Make your own tool from it</a>`];
+    if (d.auth && d.auth.anonymous) links.push(`<a href="${SITE}/make#automate=${esc(d.id)}">Run it on a schedule or from a private link</a>`);
+    return `<p class="sec-p api-build">Build with ${esc(t.name)}: ${links.join(' · ')}</p>`;
 }
 
 /** The home's questions: shown on the page and published as its FAQPage, from this one list. */
@@ -628,7 +637,9 @@ function pageDevelopers() {
     const quotas = require('../../../_shared/guard/limits').quotas();
     const rate = (cls, tier = 'anonymous') => { const q = quotas[cls] && quotas[cls][tier]; return q ? `${q.perMinute.toLocaleString('en-US')}/min${q.perDay ? ` · ${q.perDay.toLocaleString('en-US')}/day` : ''}` : '—'; };
     const apiRows = [
-        ['POST /api/v1/tools/{id}/run', 'Run a tool inline; long work answers with a job', 'Anonymous; session or token for file jobs', rate('tools-run'), `curl -X POST ${SITE}/api/v1/tools/fancy/run`],
+        ['POST /api/v1/tools/{id}/run', 'Run a tool inline; long work answers with a job. A tool people made (an mtl_ id) runs here too', 'Anonymous; session or token for file jobs and made tools', rate('tools-run'), `curl -X POST ${SITE}/api/v1/tools/fancy/run`],
+        ['POST /api/v1/tools/{id}/triggers', 'Run any tool every hour, every day or from a private link (a webhook), with a fixed input', 'Signed in: your own triggers', rate('tools-api'), `curl -X POST ${SITE}/api/v1/tools/dns/triggers -d '{"kind":"schedule","every":"day","at":"09:00","input":{"target":"example.com"}}'`],
+        ['GET /api/v1/me/triggers', 'Every schedule and private link you have, on any tool', 'Signed in', rate('tools-api'), `curl ${SITE}/api/v1/me/triggers`],
         ['GET /api/v1/tools', 'List every tool with its inputs, limits and access', 'Public', rate('tools-api'), `curl ${SITE}/api/v1/tools?api=true`],
         ['GET /api/v1/tools/{id}/schema', "JSON Schema for a tool's input and output", 'Public', rate('tools-api'), `curl ${SITE}/api/v1/tools/fancy/schema`],
         ['POST /api/v1/jobs', 'Start a long job with files and follow it', 'Session or token for file jobs', rate('tools-job'), `curl -X POST ${SITE}/api/v1/jobs`],
@@ -815,6 +826,13 @@ const MAKE_CSS = `.mk{max-width:1120px;margin:0 auto;padding:8px 0 24px}
 .mk-tool:active{transform:scale(.99)}
 .mk-tool span{color:var(--ovk-muted);font-size:.88rem;line-height:1.4}
 .mk-tool small{color:var(--ovk-muted);font-size:.78rem}
+.mk-autorow{grid-template-columns:auto minmax(0,1fr);align-items:center;column-gap:12px;text-decoration:none}
+.mk-autorow-text{display:grid;gap:2px;min-width:0}
+.mk-autorow-text b,.mk-autorow-text span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mk-autorow-text span{color:var(--ovk-muted);font-size:.88rem}
+.mk-autos>.ovk-btn{justify-self:start;margin-top:10px}
+.mk-autohead .mk-auto-bar{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 0}
+.api-build a{font-weight:600}
 .mk-answer{display:grid;gap:8px;min-width:0}
 .mk-answer.is-busy{color:var(--ovk-muted)}
 .mk-dots::after{content:"…";display:inline-block;animation:mk-dots 1.2s steps(4,end) infinite;width:1.2em;overflow:hidden;vertical-align:bottom}

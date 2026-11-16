@@ -166,7 +166,8 @@ module.exports = function createFrame({ kit, serve }) {
 
     /**
      * The folds: About the tool, Questions, and the real call from code.
-     * @param {object} rec { name, about, bullets, faq: [[q, a]], api: { path, fields, needsAccount, capability, input } }
+     * @param {object} rec { name, about, bullets, faq: [[q, a]], api: { path, fields, needsAccount, capability, input, build } }
+     *   api.build: the tool takes no file, so it is a step of a tool people make (and, run for anyone, takes triggers)
      */
     function folds(rec) {
         const out = [];
@@ -190,7 +191,10 @@ module.exports = function createFrame({ kit, serve }) {
             out.push(kit.fold({
                 title: 'Use it from code', meta: 'API',
                 body: `<p>Input: <code>${esc(a.fields || 'none')}</code>. ${who}</p>${kit.snippet({ code: lines.join(' \\\n  ') })}`
-                    + `<p><a href="${SITE}/api/v1/tools/${esc(a.id)}/schema">JSON Schema</a> · <a href="${SITE}/api/v1/openapi.json">OpenAPI</a> · <a href="${SITE}/developers">API docs</a></p>`,
+                    + `<p><a href="${SITE}/api/v1/tools/${esc(a.id)}/schema">JSON Schema</a> · <a href="${SITE}/api/v1/openapi.json">OpenAPI</a> · <a href="${SITE}/developers">API docs</a></p>`
+                    // Build with it (one tool system, 11-15): a tool that takes no file is a step of a tool you make,
+                    // and one that runs for anyone runs on a schedule or from a private link too.
+                    + (a.build ? `<p>Build with it: <a href="${SITE}/make#from=${esc(a.id)}">Make your own tool from it</a>${a.needsAccount ? '' : ` · <a href="${SITE}/make#automate=${esc(a.id)}">Run it on a schedule or from a private link</a>`}</p>` : ''),
             }));
         }
         return out.filter(Boolean);

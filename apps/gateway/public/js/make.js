@@ -1,6 +1,8 @@
 /* Make a tool (openvibe.tools/make; plan 2026-11-13 §AD.7 step 3): a person tells a model what to do, names what it
  * takes and what it gives back, picks any model on OpenVibe.Exchange, tries it and shares it. The API is
- * /api/v1/made-tools (tools.made-tool@1). Every text people typed is set with textContent, never as markup. */
+ * /api/v1/made-tools (tools.made-tool@1). Every text people typed is set with textContent, never as markup.
+ * One tool system (11-15): #automate=<tool> runs any tool (catalogue ones too) on a schedule or from a private link,
+ * #from=<tool> starts a tool of your own with that tool as its first step, and Automations lists every trigger you have. */
 (function () {
     'use strict';
     var root = document.getElementById('mk-app');
@@ -23,7 +25,7 @@
         opts = opts || {};
         var headers = { Accept: 'application/json' };
         if (opts.body) headers['Content-Type'] = 'application/json';
-        return fetch('/api/v1/made-tools' + path, { method: opts.method || 'GET', credentials: 'same-origin', headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined })
+        return fetch((path.indexOf('/api/') === 0 ? '' : '/api/v1/made-tools') + path, { method: opts.method || 'GET', credentials: 'same-origin', headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined })
             .then(function (r) {
                 return r.text().then(function (t) { var j = null; try { j = t ? JSON.parse(t) : null; } catch (e) { j = null; } return { status: r.status, ok: r.ok, body: j }; });
             })
@@ -552,13 +554,14 @@
     function drawAuto(t) {
         var box = h('section', 'mk-card mk-enter mk-auto'); box.id = 'mk-auto';
         box.append(h('h2', null, 'Run it on its own'));
-        box.append(h('p', 'mk-sub', 'From a private link (a webhook, a form, a shortcut) or on a schedule. Every run is yours: your allowance pays.'));
+        var intro = h('p', 'mk-sub', t.kind === 'catalogue' ? 'From a private link (a webhook, a form, a shortcut) or on a schedule. Yours alone: nobody else sees them.' : 'From a private link (a webhook, a form, a shortcut) or on a schedule. Every run is yours: your allowance pays.');
+        box.append(intro);
         var list = h('div', 'mk-trigs');
         var adders = h('p', 'mk-auto-add');
         var panel = h('div', 'mk-auto-panel');
         var say2 = h('p', 'mk-status'); say2.setAttribute('role', 'status'); say2.setAttribute('aria-live', 'polite');
         box.append(list, panel, adders, say2);
-        var base = '/' + encodeURIComponent(t.id) + '/triggers';
+        var base = '/api/v1/tools/' + encodeURIComponent(t.id) + '/triggers';
         function row(tr) {
             var r = h('div', 'mk-trig');
             var ic = h('span', 'mk-trig-ic'); ic.setAttribute('aria-hidden', 'true');
@@ -596,6 +599,12 @@
             api(base).then(function (res) {
                 list.textContent = ''; adders.textContent = '';
                 if (!res.ok || !res.body) { list.append(h('p', 'mk-sub', words(res, 'Its triggers did not load.'))); return; }
+                if (res.body.tool) {
+                    // A catalogue tool: its name and its input come with its triggers.
+                    if (!t.input) t.input = res.body.tool.input;
+                    if (!t.name) t.name = res.body.tool.name;
+                    if (box.onTool) box.onTool(res.body.tool);
+                }
                 if (res.body.unsupported) { list.append(h('p', 'mk-sub', res.body.unsupported + '.')); return; }
                 (res.body.triggers || []).forEach(function (tr) { list.append(row(tr)); });
                 adders.append(btn('Add a link', 'quiet', function () { openLink(); }), btn('Add a schedule', 'quiet', function () { openSchedule(); }));
@@ -743,6 +752,109 @@
         return b;
     }
 
+    // ── One tool system: any tool on its own, every trigger you have, a tool of your own from any tool ──
+    function automations() {
+        var sec = h('section', 'mk-card mk-enter mk-autos');
+        sec.append(h('h2', null, 'Automations'));
+        var sub = h('p', 'mk-sub', 'Every schedule and private link you have, on any tool.');
+        var box = h('div', 'mk-tools'); box.append(h('p', 'mk-sub', 'Loading…'));
+        var add = btn('Automate a tool', 'quiet', function () {
+            picker.pick(function (tl) {
+                if (tl.made && !tl.yours) { say('Only its maker runs a tool people made on its own. Make your own from it instead.', 'bad'); return; }
+                location.hash = tl.made ? tl.tool : 'automate=' + tl.tool;
+            });
+        });
+        sec.append(sub, box, add);
+        api('/api/v1/me/triggers').then(function (res) {
+            box.textContent = '';
+            var list = (res.body && res.body.triggers) || [];
+            if (!res.ok) { box.append(h('p', 'mk-sub', words(res, 'Your automations did not load.'))); return; }
+            if (!list.length) { box.append(h('p', 'mk-sub', 'None yet. Any tool can run every hour, every day or from a link: a webhook, a form, a shortcut.')); return; }
+            list.forEach(function (tr) {
+                var a = h('a', 'mk-tool mk-autorow');
+                a.href = '#' + (/^mtl_/.test(tr.tool) ? tr.tool : 'automate=' + tr.tool);
+                var ic = h('span', 'mk-trig-ic'); ic.setAttribute('aria-hidden', 'true');
+                var g = h('i'); g.setAttribute('data-ov-icon', tr.kind === 'link' ? 'link' : 'clock'); ic.append(g);
+                var bits = [tr.enabled ? (tr.last_run_at ? (tr.last_state === 'succeeded' ? 'Ran ' : 'Failed ') + ago(tr.last_run_at) : 'Not run yet') : 'Paused'];
+                if (tr.enabled && tr.kind === 'schedule') bits.push(whenNext(tr.next_run_at));
+                var text = h('span', 'mk-autorow-text');
+                text.append(h('b', null, tr.tool_name || 'A tool that is gone'), h('span', null, tr.says), h('small', null, bits.join(' · ')));
+                a.append(ic, text);
+                box.append(a);
+            });
+            if (window.OVGlyphs && typeof window.OVGlyphs.swap === 'function') { try { window.OVGlyphs.swap(sec); } catch (e) { /* later */ } }
+        });
+        return sec;
+    }
+
+    /** #automate=<tool>: any tool on its own, in the form's column. */
+    function showAutomate(id) {
+        formCol.textContent = '';
+        var head = h('section', 'mk-card mk-enter mk-autohead');
+        var title = h('h2', null, 'Automate a tool');
+        var what = h('p', 'mk-sub', '');
+        var links = h('p', 'mk-auto-bar');
+        var from = h('a', 'ovk-btn ovk-btn--quiet', 'Make your own tool from it'); from.href = '#from=' + encodeURIComponent(id);
+        var back = h('a', 'ovk-btn ovk-btn--quiet', 'Make a tool instead'); back.href = '#';
+        links.append(from, back);
+        head.append(title, what, links);
+        var t = { id: id, kind: /^mtl_/.test(id) ? 'made' : 'catalogue', name: null, input: null };
+        var auto = drawAuto(t);
+        auto.onTool = function (tool) {
+            title.textContent = 'Automate ' + tool.name;
+            what.textContent = 'Run ' + tool.name + ' every hour, every day or from a private link, with the input you set here. Each answer is kept below.';
+        };
+        formCol.append(head, auto);
+        say('');
+    }
+
+    /** #from=<tool>: a tool of your own whose first step is that tool, its inputs asked of whoever runs yours. */
+    function startFrom(id) {
+        var gotDescriptor = /^mtl_/.test(id) ? api('/' + encodeURIComponent(id)) : fetch('/api/v1/tools/' + encodeURIComponent(id), { headers: { Accept: 'application/json' } })
+            .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, body: b }; }); }).catch(function () { return { ok: false, body: null }; });
+        Promise.all([gotDescriptor, schemaFor(id)]).then(function (got) {
+            var d = got[0].ok && got[0].body ? got[0].body : null;
+            if (!d) { say('No tool has that id.', 'bad'); return; }
+            var schema = got[1].input && got[1].input.properties ? got[1].input : (d.input && d.input.properties ? d.input : { properties: {} });
+            var props = schema.properties || {};
+            var req = Array.isArray(schema.required) && schema.required.length ? schema.required : Object.keys(props).slice(0, 1);
+            var taken = {}, inputs = [], stepInput = {};
+            req.forEach(function (k) {
+                var p = props[k] || {};
+                if (['string', 'number', 'integer'].indexOf(p.type) < 0 || inputs.length >= 6) return;
+                var label = p.title || k.replace(/_/g, ' ').replace(/^./, function (c) { return c.toUpperCase(); });
+                var key = keyOf(label, taken);
+                inputs.push({ label: label, kind: p.type === 'string' ? (p.maxLength && p.maxLength <= 500 ? 'short' : 'long') : 'number' });
+                stepInput[k] = '{{input.' + key + '}}';
+            });
+            var f = blank();
+            f.kind = 'chain';
+            f.inputs = inputs.length ? inputs : [{ label: 'Text', kind: 'long' }];
+            f.steps = [{ tool: id, name: d.name || id, input: stepInput }, { tool: '', name: '', input: {} }];
+            f.summary = '';
+            state.form = f;
+            drawAll();
+            say('Step 1 is ' + (d.name || id) + '. Pick what happens next with its answer, name it and make it.', 'good');
+        });
+    }
+
+    function route() {
+        var hsh = location.hash.slice(1);
+        var m = /^(automate|from)=([A-Za-z0-9_.-]{1,64})$/.exec(hsh);
+        if (!m || !state.signedIn) return false;
+        if (m[1] === 'automate') { state.form = blank(); showAutomate(m[2]); drawSide(); }
+        else { state.form = blank(); drawAll(); startFrom(m[2]); }
+        return true;
+    }
+    window.addEventListener('hashchange', function () {
+        if (state.signedIn === null) return;
+        if (route()) { window.scrollTo({ top: root.offsetTop - 70, behavior: 'smooth' }); return; }
+        var id = location.hash.slice(1);
+        var own = state.mine.filter(function (t) { return t.id === id; })[0];
+        if (own) { state.form = formOf(own); drawAll(); }
+        else if (!id) { state.form = blank(); drawAll(); }
+    });
+
     function drawSide() {
         side.textContent = '';
         var f = state.form;
@@ -757,7 +869,7 @@
             var ul = h('div', 'mk-tools');
             state.mine.forEach(function (x) { ul.append(rowOf(x, function (tool) { state.form = formOf(tool); drawAll(); window.scrollTo({ top: root.offsetTop - 70, behavior: 'smooth' }); }, true)); });
             yours.append(ul);
-            side.append(yours);
+            side.append(yours, automations());
         }
         side.append(publicList());
     }
@@ -860,7 +972,7 @@
             var want = location.hash.slice(1);
             var own = state.mine.filter(function (t) { return t.id === want; })[0];
             if (own) state.form = formOf(own);
-            drawAll();
+            if (!route()) drawAll();
             if (!res.ok) say(words(res, 'Your tools could not be read just now.'), 'bad');
         }
         // A shared link (#mtl_…) opens that tool's Try it.
