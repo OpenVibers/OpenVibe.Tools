@@ -636,7 +636,9 @@ app.get('*', (req, res) => {
 const satellitePolling = toolRegistry.startSatellitePolling(SATELLITES);
 
 // Every tool as an OpenVibe.Search document (owner tools), kept in step with the registry (S9).
-const searchIndex = require('./search-index').searchIndexerFromEnv({ snapshot: toolRegistry.snapshot, dataDir: require('path').resolve(__dirname, '..', process.env.DATA_DIR || 'data') });
+const searchIndex = require('./search-index').searchIndexerFromEnv({ snapshot: toolRegistry.snapshot, dataDir: require('path').resolve(__dirname, '..', process.env.DATA_DIR || 'data'),
+    // The public tools people make are found in every OpenVibe search too (one tool system, 11-15).
+    madeTools: () => madeTools.listForSearch() });
 if (searchIndex.indexer) searchIndex.indexer.start(); else console.log(`[SearchIndex] off: ${searchIndex.reason}`);
 
 // Zero-downtime restarts (as OpenVibe.Live): when systemd owns the listener (deploy/systemd/openvibe-tools.socket) it
