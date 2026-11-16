@@ -35,10 +35,12 @@ function openCors(res) {
 
 // The run API and the jobs API take calls from any site's page with a token (openvibe-sdk in a
 // browser): such an origin gets CORS without credentials (so the browser never sends our cookies
-// along); first-party pages keep the app's own credentialed CORS.
-const RUN_OR_JOBS_RE = /^\/api\/v1\/(?:tools\/[a-z][a-z0-9-]{0,39}\/run|jobs(?:\/.*)?)\/?$/;
+// along); first-party pages keep the app's own credentialed CORS. The same for every way an agent or another site
+// reaches the tools (one tool system, 11-16): a made tool's run (mtl_…), a batch, the MCP server and a trigger's
+// private link. Before, a page on another OpenVibe site asking any of those met the credentialed CORS's refusal: a 500.
+const RUN_OR_JOBS_RE = /^\/(?:api\/v1\/(?:tools\/(?:[a-z][a-z0-9-]{0,39}|mtl_[0-9A-HJKMNP-TV-Z]{26})\/run|tools\/batch|jobs(?:\/.*)?)|mcp|hooks\/mth_[A-Za-z0-9_-]{43})\/?$/;
 const isPublicApiPath = (p) => RUN_OR_JOBS_RE.test(String(p || ''));
-const API_HEADERS = 'X-Tools-Prefer, Authorization, Content-Type, Idempotency-Key, Last-Event-ID, Cache-Control, traceparent, X-OpenVibe-Request-Id';
+const API_HEADERS = 'X-Tools-Prefer, Authorization, Content-Type, Idempotency-Key, Last-Event-ID, Cache-Control, traceparent, X-OpenVibe-Request-Id, Mcp-Session-Id, MCP-Protocol-Version';
 const API_EXPOSE = 'Location, Idempotent-Replayed, Retry-After, RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset, X-OpenVibe-Request-Id, traceparent, Content-Disposition, Deprecation, Sunset, Link';
 
 /**
@@ -49,8 +51,9 @@ const API_EXPOSE = 'Location, Idempotent-Replayed, Retry-After, RateLimit-Limit,
  */
 function exceptRegistry(corsMiddleware, opts = {}) {
     return function corsExceptToolRegistry(req, res, next) {
-        if (isRegistryPath(req.path)) { openCors(res); return next(); }
         const origin = req.headers.origin;
+        // /api/v1/tools/batch reads like a tool's registry path (a tool called "batch"): a run path is asked first.
+        if (isRegistryPath(req.path) && !isPublicApiPath(req.path)) { openCors(res); return next(); }
         if (opts.isFirstParty && origin && isPublicApiPath(req.path) && !opts.isFirstParty(origin)) {
             res.setHeader('Access-Control-Allow-Origin', '*');
             res.setHeader('Access-Control-Expose-Headers', API_EXPOSE);
