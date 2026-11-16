@@ -758,12 +758,7 @@
         sec.append(h('h2', null, 'Automations'));
         var sub = h('p', 'mk-sub', 'Every schedule and private link you have, on any tool.');
         var box = h('div', 'mk-tools'); box.append(h('p', 'mk-sub', 'Loading…'));
-        var add = btn('Automate a tool', 'quiet', function () {
-            picker.pick(function (tl) {
-                if (tl.made && !tl.yours) { say('Only its maker runs a tool people made on its own. Make your own from it instead.', 'bad'); return; }
-                location.hash = tl.made ? tl.tool : 'automate=' + tl.tool;
-            });
-        });
+        var add = btn('Automate a tool', 'quiet', pickToAutomate);
         sec.append(sub, box, add);
         api('/api/v1/me/triggers').then(function (res) {
             box.textContent = '';
@@ -838,8 +833,16 @@
         });
     }
 
+    // Pick any tool to run on its own (the Automations button, and #automate from the home page).
+    function pickToAutomate() {
+        picker.pick(function (tl) {
+            if (tl.made && !tl.yours) { say('Only its maker runs a tool people made on its own. Make your own from it instead.', 'bad'); return; }
+            location.hash = tl.made ? tl.tool : 'automate=' + tl.tool;
+        });
+    }
     function route() {
         var hsh = location.hash.slice(1);
+        if (hsh === 'automate' && state.signedIn) { setTimeout(pickToAutomate, 0); return false; }
         var m = /^(automate|from)=([A-Za-z0-9_.-]{1,64})$/.exec(hsh);
         if (!m || !state.signedIn) return false;
         if (m[1] === 'automate') { state.form = blank(); showAutomate(m[2]); drawSide(); }
