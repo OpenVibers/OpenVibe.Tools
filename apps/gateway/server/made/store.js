@@ -264,11 +264,16 @@ function createMadeTools({ db, now = () => new Date(), baseUrl = 'https://openvi
             [n, ...words.map((w) => `%${w.replace(/[\\%_]/g, (c) => `\\${c}`)}%`)]);
     }
 
+    /** Every public tool, for OpenVibe Search (search-index.js): the newest first, only what a document needs. */
+    async function listForSearch({ limit = 5000 } = {}) {
+        return db.many(`SELECT id, slug, name, summary, kind, updated_at FROM made_tools WHERE visibility = 'public' ORDER BY updated_at DESC LIMIT $1`, [Math.max(1, Math.min(20000, Number(limit) || 5000))]);
+    }
+
     async function counted(id) {
         await db.exec('UPDATE made_tools SET runs = runs + 1 WHERE id = $1', [id]);
     }
 
-    return { create, get, update, remove, listMine, listPublic, counted, present, codeUrl };
+    return { create, get, update, remove, listMine, listPublic, listForSearch, counted, present, codeUrl };
 }
 
 module.exports = { createMadeTools, fieldsFrom, present, newId, Invalid, SLUG };

@@ -60,6 +60,25 @@ const make = () => createSearchIndexer({ snapshot: () => ({ tools, updated_at: '
     s = await ix.run();
     assert.strictEqual(stored.get('yaml').revision, 3, 'lost state: re-sent above the stored revision, never refused as stale');
     assert.strictEqual(s.failed, 0);
+
+    // The public tools people make: found beside the catalogue (one tool system, 11-15), id mtl.<ULID>, linked to /make.
+    const MADE = 'mtl_01JCZ3NDEKTSV4RRFFQ69G5FAW';
+    let made = [{ id: MADE, slug: 'reply-kindly', name: 'Reply kindly', summary: 'Drafts a kind reply.', kind: 'prompt', updated_at: new Date('2026-11-15T10:00:00Z') }];
+    const withMade = () => createSearchIndexer({ snapshot: () => ({ tools, updated_at: '2026-09-24T00:00:00.000Z' }), searchUrl: 'http://search.test', tokens: { authHeaders: async () => ({ Authorization: 'Bearer svc' }) }, stateFile: path.join(dir, 'search-index.json'), fetchImpl, log: { warn() {} },
+        madeTools: async () => { if (made === 'down') throw new Error('database down'); return made; } });
+    ix = withMade();
+    s = await ix.run();
+    const m = stored.get('mtl.01JCZ3NDEKTSV4RRFFQ69G5FAW');
+    assert.ok(m && !m.deleted, 'a public made tool is a document');
+    assert.deepStrictEqual([m.doc.canonical_url, m.doc.title, m.doc.facets], [`https://openvibe.tools/make#${MADE}`, 'Reply kindly', { family: 'made', execution: 'prompt', api: true }]);
+    assert.strictEqual(m.doc.updated_at, '2026-11-15T10:00:00.000Z');
+    made = 'down';
+    s = await ix.run();
+    assert.strictEqual(stored.get('mtl.01JCZ3NDEKTSV4RRFFQ69G5FAW').deleted, false, 'made tools that cannot be read are left as they are');
+    made = [];
+    s = await ix.run();
+    assert.strictEqual(stored.get('mtl.01JCZ3NDEKTSV4RRFFQ69G5FAW').deleted, true, 'a tool made private or deleted is tombstoned');
+    assert.strictEqual(stored.get('yaml').deleted, false, 'the catalogue stays');
     fs.rmSync(dir, { recursive: true, force: true });
     console.log('search index: all checks passed');
 })().catch((e) => { console.error(e); process.exit(1); });

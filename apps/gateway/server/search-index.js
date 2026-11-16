@@ -10,6 +10,10 @@
  * differs from the last one sent (data/search-index.json), so a quiet registry costs one listing.
  *
  * Off unless SEARCH_URL and OV_OAUTH_CLIENT_SECRET are set (TOOLS_SEARCH_INDEX=off disables it).
+ *
+ * The public tools people make are documents too (one tool system, 11-15: every OpenVibe search box finds them beside
+ * the catalogue): type tool, id mtl.<ULID> (Search ids take no underscore), linked to their page on /make. When the made
+ * tools cannot be read, their documents are left as they are rather than tombstoned.
  */
 const fs = require('fs');
 const path = require('path');
@@ -36,9 +40,28 @@ function documentFor(t, updatedAt) {
         indexability: { decision: 'index', reasons: [] },
     };
 }
+/** A public tool people made → its document body. */
+const KIND_WORD = { prompt: 'Instructions for a model', code: 'Code', chain: 'A chain of tools' };
+function documentForMade(t) {
+    return {
+        visibility: 'public',
+        canonical_url: `https://openvibe.tools/make#${t.id}`,
+        title: String(t.name || t.slug || t.id).slice(0, 500),
+        summary: String(t.summary || '').slice(0, 4000),
+        body: [t.name, t.summary, `A tool people made on OpenVibe Tools: ${KIND_WORD[t.kind] || 'a tool'}. Run it on its page, from code, from an agent, on a schedule or from a link.`].filter(Boolean).join('\n').slice(0, 48000),
+        facets: { family: 'made', execution: String(t.kind || 'prompt'), api: true },
+        language: 'en',
+        authorship: 'human',
+        publication_state: 'published',
+        ...(t.updated_at ? { updated_at: new Date(t.updated_at).toISOString() } : {}),
+        indexability: { decision: 'index', reasons: [] },
+    };
+}
+const MADE_DOC = /^mtl\.[0-9A-HJKMNP-TV-Z]{26}$/;
+const madeDocId = (id) => `mtl.${String(id).slice(4)}`;
 const hashOf = (doc) => crypto.createHash('sha256').update(JSON.stringify(doc)).digest('hex');
 
-function createSearchIndexer({ snapshot, searchUrl, tokens, stateFile, fetchImpl = globalThis.fetch, log = console, now = () => Date.now() }) {
+function createSearchIndexer({ snapshot, searchUrl, tokens, stateFile, fetchImpl = globalThis.fetch, log = console, now = () => Date.now(), madeTools = null }) {
     const base = String(searchUrl).replace(/\/+$/, '');
     const stats = { runs: 0, upserted: 0, deleted: 0, unchanged: 0, failed: 0, last_run_at: null, last_error: null };
     let state = {};
@@ -71,9 +94,15 @@ function createSearchIndexer({ snapshot, searchUrl, tokens, stateFile, fetchImpl
         const tools = (snap.tools || []).filter((t) => t.status !== 'unavailable' && /^[a-z][a-z0-9-]{0,39}$/.test(t.id));
         const remote = await remoteDocs();
         const keep = new Set();
-        for (const t of tools) {
+        const made = madeTools ? await madeTools().catch((err) => { log.warn('[SearchIndex] made tools not read:', err.message); return null; }) : [];
+        if (made === null) for (const id of remote.keys()) if (MADE_DOC.test(id)) keep.add(id);
+        const docs = [
+            ...tools.map((t) => ({ id: t.id, doc: documentFor(t, snap.updated_at || null) })),
+            ...(made || []).filter((t) => /^mtl_[0-9A-HJKMNP-TV-Z]{26}$/.test(String(t.id))).map((t) => ({ id: madeDocId(t.id), doc: documentForMade(t) })),
+        ];
+        for (const t of docs) {
             keep.add(t.id);
-            const doc = documentFor(t, snap.updated_at || null);
+            const doc = t.doc;
             const h = hashOf(doc);
             const r = remote.get(t.id);
             if (r && !r.deleted && state[t.id] && state[t.id].hash === h) { stats.unchanged++; continue; }
@@ -101,14 +130,14 @@ function createSearchIndexer({ snapshot, searchUrl, tokens, stateFile, fetchImpl
 }
 
 /** The gateway's indexer from its environment, or null (with why) when it is off. */
-function searchIndexerFromEnv({ snapshot, dataDir, env = process.env, contracts = require('openvibe-contracts'), log = console }) {
+function searchIndexerFromEnv({ snapshot, dataDir, env = process.env, contracts = require('openvibe-contracts'), log = console, madeTools = null }) {
     const url = String(env.SEARCH_URL || '').trim();
     if (!url) return { indexer: null, reason: 'SEARCH_URL is not set' };
     if (String(env.TOOLS_SEARCH_INDEX || '').toLowerCase() === 'off') return { indexer: null, reason: 'TOOLS_SEARCH_INDEX=off' };
     if (!env.OV_OAUTH_CLIENT_SECRET) return { indexer: null, reason: 'OV_OAUTH_CLIENT_SECRET is not set' };
     const network = String(env.OV_NETWORK_INTERNAL_URL || 'http://127.0.0.1:4000').replace(/\/+$/, '');
     const tokens = contracts.serviceAuth.createTokenClient({ tokenUrl: `${network}/oauth/token`, clientId: env.OV_OAUTH_CLIENT_ID || 'tools', clientSecret: env.OV_OAUTH_CLIENT_SECRET, audience: 'openvibe.search', scope: 'search.document.write' });
-    return { indexer: createSearchIndexer({ snapshot, searchUrl: url, tokens, stateFile: path.join(dataDir, 'search-index.json'), log }) };
+    return { indexer: createSearchIndexer({ snapshot, searchUrl: url, tokens, stateFile: path.join(dataDir, 'search-index.json'), log, madeTools }) };
 }
 
-module.exports = { createSearchIndexer, searchIndexerFromEnv, documentFor };
+module.exports = { createSearchIndexer, searchIndexerFromEnv, documentFor, documentForMade };
