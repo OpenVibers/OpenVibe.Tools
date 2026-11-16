@@ -21,6 +21,9 @@
 const PROTOCOL = '2025-06-18';
 const SUPPORTED = ['2025-11-25', '2025-06-18', '2025-03-26'];
 const SERVER = { name: 'openvibe-tools', title: 'OpenVibe Tools', version: '1.0' };
+const INSTRUCTIONS = 'OpenVibe Tools: 180+ tools (network, developer, text, image, PDF, audio, video) and the tools people made. Use find_tools to find one for a need, then run_tool (or run_tools for several at once); when nothing fits, make_tool makes one of your own from a description, and bring_tool brings one from Val Town or Pipedream. Sign in (a Bearer token for openvibe.tools) to run your own tools and the ones people made, and to make tools; their runs are paid from your own allowance.';
+// MCP 2026-07-28 (stateless: the version and the method on every request, server/discover) beside the handshake era.
+const mcpKit = require('openvibe-sdk/mcp');
 const RPC = { parse: -32700, invalid: -32600, method: -32601, params: -32602, internal: -32603 };
 const MADE_ID = /^mtl_[0-9A-HJKMNP-TV-Z]{26}$/;
 const TOOL_ID = /^[a-z0-9][a-z0-9.-]{0,63}$/;
@@ -283,16 +286,31 @@ function createToolsMcp({ address, snapshot, store, verify, extractToken, fetchI
             return res.status(400).json({ jsonrpc: '2.0', id: null, error: { code: RPC.invalid, message: 'One JSON-RPC 2.0 request per POST' } });
         }
         const id = msg.id === undefined ? null : msg.id;
-        const ok = (out) => res.json({ jsonrpc: '2.0', id, result: out });
+        // A 2026-07-28 request: headers checked against the body; every result complete; the tool list (yours too:
+        // private) kept a minute; an unknown method a 404.
+        const modern = !!mcpKit.requestVersion(msg.params);
+        const ok = (out) => res.json({ jsonrpc: '2.0', id, result: !modern ? out
+            : msg.method === 'tools/list' ? mcpKit.listResult('tools', out.tools, { cacheScope: 'private', ttlMs: 60000 }) : mcpKit.complete(out) });
         const fail = (code, message) => res.json({ jsonrpc: '2.0', id, error: { code, message } });
         if (msg.id === undefined) return res.status(202).end();   // a notification: no answer
+        if (modern) {
+            const bad = mcpKit.checkRequest({ header: (n) => req.get(n), method: msg.method, params: msg.params });
+            if (bad) return res.status(bad.status).json({ jsonrpc: '2.0', id, error: bad.error });
+            if (msg.method === 'server/discover') {
+                return res.json({ jsonrpc: '2.0', id, result: mcpKit.discoverResult({ serverInfo: SERVER, capabilities: { tools: {} }, instructions: INSTRUCTIONS, versions: [...mcpKit.MODERN_VERSIONS, ...SUPPORTED] }) });
+            }
+            if (msg.method !== 'tools/list' && msg.method !== 'tools/call') {
+                const nf = mcpKit.methodNotFound(msg.method);
+                return res.status(nf.status).json({ jsonrpc: '2.0', id, error: nf.error });
+            }
+        }
         try {
             const p = msg.params && typeof msg.params === 'object' ? msg.params : {};
             switch (msg.method) {
             case 'initialize': {
                 const asked = String(p.protocolVersion || '');
                 return ok({ protocolVersion: SUPPORTED.includes(asked) ? asked : PROTOCOL, capabilities: { tools: { listChanged: false } }, serverInfo: SERVER,
-                    instructions: 'OpenVibe Tools: 180+ tools (network, developer, text, image, PDF, audio, video) and the tools people made. Use find_tools to find one for a need, then run_tool (or run_tools for several at once); when nothing fits, make_tool makes one of your own from a description, and bring_tool brings one from Val Town or Pipedream. Sign in (a Bearer token for openvibe.tools) to run your own tools and the ones people made, and to make tools; their runs are paid from your own allowance.' });
+                    instructions: INSTRUCTIONS });
             }
             case 'ping': return ok({});
             case 'tools/list': {
