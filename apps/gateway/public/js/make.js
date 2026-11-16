@@ -730,6 +730,30 @@
             });
         });
         box.append(form);
+        // Remix (plan §AD.12: "Remix any public tool"): someone else's tool, copied into the form as a private tool of your
+        // own: its instructions, code or steps, its inputs and answer. Nothing is saved until you make it.
+        if (state.signedIn && !state.mine.some(function (x) { return x.id === t.id; })) {
+            var remix = btn('Make your own from it', 'quiet', function () {
+                remix.disabled = true;
+                var src = t.kind === 'code'
+                    ? fetch('/api/v1/made-tools/' + encodeURIComponent(t.id) + '/source', { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.text() : null; }).catch(function () { return null; })
+                    : Promise.resolve(null);
+                src.then(function (code) {
+                    remix.disabled = false;
+                    if (t.kind === 'code' && code == null) { say('Its code could not be read just now. Try again.', 'bad'); return; }
+                    var f = formOf(t);
+                    f.id = null; f.version = 0; f.runs = 0; f.slug = ''; f.visibility = 'private';
+                    f.name = (t.name + ' (yours)').slice(0, 80);
+                    if (t.kind === 'code') f.source = code;
+                    state.form = f;
+                    drawAll();
+                    window.scrollTo({ top: root.offsetTop - 70, behavior: 'smooth' });
+                    say('A copy of ' + t.name + ', yours and private: change what you like, then make it.', 'good');
+                });
+            });
+            remix.classList.add('mk-remix');
+            box.append(remix);
+        }
         if (t.visibility !== 'private') {
             var share = h('p', 'mk-share');
             var link = location.origin + '/make#' + t.id;
