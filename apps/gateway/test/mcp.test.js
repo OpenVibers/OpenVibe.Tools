@@ -194,6 +194,28 @@ const PUB = 'mtl_01JCZ3NDEKTSV4RRFFQ69G5FA2';
         assert.strictEqual((await call('nope', {})).error.code, -32602);
         const bad = await fetch(base, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '[]' });
         assert.strictEqual(bad.status, 400);
+
+        // MCP 2026-07-28 (stateless; 2026-11-16, openvibe-sdk/mcp): the version and the method on every request,
+        // server/discover, resultType on every result, the tool list (yours too) private; the handshake above still works.
+        const mcpKit = require('openvibe-sdk/mcp');
+        const modern = async (method, params = {}, extra = {}) => {
+            const built = mcpKit.modernRequest({ id: 70, method, params, clientInfo: { name: 'test', version: '1' } });
+            const r = await fetch(base, { method: 'POST', headers: { ...built.headers, ...extra }, body: JSON.stringify(built.body) });
+            return { status: r.status, body: await r.json() };
+        };
+        let m = await modern('server/discover');
+        assert.deepStrictEqual([m.status, m.body.result.resultType, m.body.result.cacheScope], [200, 'complete', 'public']);
+        assert.ok(m.body.result.supportedVersions.includes('2026-07-28') && m.body.result.supportedVersions.includes('2025-11-25'));
+        assert.match(m.body.result.instructions, /OpenVibe Tools/);
+        m = await modern('tools/list');
+        assert.deepStrictEqual([m.status, m.body.result.resultType, m.body.result.cacheScope], [200, 'complete', 'private']);
+        assert.ok(m.body.result.tools.some((t) => t.name === 'find_tools'));
+        m = await modern('tools/call', { name: 'find_tools', arguments: { need: 'qr code' } });
+        assert.deepStrictEqual([m.status, m.body.result.resultType], [200, 'complete']);
+        m = await modern('tools/call', { name: 'find_tools', arguments: { need: 'qr code' } }, { 'Mcp-Name': 'run_tool' });
+        assert.deepStrictEqual([m.status, m.body.error.code], [400, -32020], 'a header that disagrees is refused');
+        m = await modern('resources/list');
+        assert.deepStrictEqual([m.status, m.body.error.code], [404, -32601], 'an unknown method is a 404');
     } finally {
         server.close(); api.close();
     }
