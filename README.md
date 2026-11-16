@@ -647,7 +647,3 @@ All eight apps use one PostgreSQL database through `openvibe-sdk/db`. Production
 at boot. Development and tests use embedded PGlite through the same API. Job records, abuse logs,
 revocations, analytics, and the event outbox live in PostgreSQL. The guard's transient throttle
 counters and salt use Valkey through `VALKEY_URL`, with process-local state when it is unset.
-
-<!-- versions:start -->
-- openvibe-contracts: v0.439.0
-<!-- versions:end -->
