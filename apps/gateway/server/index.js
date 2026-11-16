@@ -328,6 +328,14 @@ app.post(['/api/v1/jobs', '/api/v1/jobs/:id/retry'], actorLimits.backstop('tools
 const { createBatch } = require('./run/batch');
 const batchApi = createBatch({ address: () => { try { return server.address(); } catch { return null; } } });
 app.post('/api/v1/tools/batch', actorLimits.backstop('tools.tool.run'), express.json({ limit: '2mb' }), (req, res) => batchApi.handle(req, res));
+// One tool system (11-15; made/routes.js): a tool people made answers at every tool's address. POST /api/v1/tools/mtl_…/run
+// is its run (as the caller, paid from their allowance), GET /api/v1/tools/mtl_… is its tools.made-tool@1, and
+// /api/v1/tools/:id/triggers sets schedules and private links on any tool, catalogue tools too.
+const MADE_TOOL_ID = /^mtl_[0-9A-HJKMNP-TV-Z]{26}$/;
+const madeRunBody = express.json({ limit: '256kb' });
+app.post('/api/v1/tools/:id/run', (req, res, next) => (MADE_TOOL_ID.test(req.params.id) ? madeRunBody(req, res, (err) => (err ? next(err) : madeRoutes.runRoute(req, res))) : next()));
+app.get('/api/v1/tools/:id', (req, res, next) => (MADE_TOOL_ID.test(req.params.id) ? res.redirect(308, `/api/v1/made-tools/${req.params.id}`) : next()));
+app.use('/api/v1/tools', (req, res, next) => (/^\/[^/]+\/triggers(\/|$)/.test(req.path) ? madeRoutes.anyTools(req, res, next) : next()));
 app.use(runApi.handle);
 app.use((req, res, next) => { jobsFacade.handle(req, res, next); });
 
@@ -382,8 +390,12 @@ const madeRoutes = require('./made/routes').createMadeToolRoutes({
     address: () => { try { return server.address(); } catch { return null; } },
     triggers: madeTriggers,
     codeRunner: madeCodeRunner,
+    // Catalogue tools take triggers too (their descriptors: one tool system, 11-15).
+    snapshot: () => toolRegistry.snapshot(),
 });
 app.use('/api/v1/made-tools', madeRoutes);
+// Every trigger the person has, on any tool (the make page's Automations).
+app.get('/api/v1/me/triggers', (req, res) => madeRoutes.mineRoute(req, res));
 // A link trigger: GET or POST https://openvibe.tools/hooks/<mth_…> runs its tool as the owner (made/routes.js hook).
 app.options('/hooks/:token', (req, res) => { res.set({ 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Max-Age': '600' }); res.status(204).end(); });
 app.get('/hooks/:token', actorLimits.backstop('tools.tool.run'), (req, res) => madeRoutes.hook(req, res));

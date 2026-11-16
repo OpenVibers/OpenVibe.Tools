@@ -182,7 +182,7 @@ function frameAround(html, host, ctx = {}) {
             ['Can I call it from code?', 'Some of these tools have an API: POST /api/v1/tools/<tool>/run. The <a href="https://openvibe.tools/developers">API docs</a> has the list.'],
         ],
         api: {
-            id: toolId, path: `/api/v1/tools/${toolId}/run`, fields: 'text',
+            id: toolId, path: `/api/v1/tools/${toolId}/run`, fields: 'text', build: !!((SPEC.get(toolId) || {}).api),
             payload: { input: { text: 'Hello, World!' } }, needsAccount: false,
         },
     });
