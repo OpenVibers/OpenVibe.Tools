@@ -7,8 +7,9 @@
 //   initialize, notifications/initialized, ping
 //   tools/list   find_tools, run_tool and run_tools (the whole catalogue, the public tools people made, and the
 //                caller's own, without putting 200 schemas in an agent's context), make_tool (a new tool of the
-//                caller's own from a description: drafted by a model and saved private, §AD.12), then the caller's own
-//                made tools by name (made_<slug>)
+//                caller's own from a description: drafted by a model and saved private, §AD.12), bring_tool,
+//                automate_tool and my_automations (any tool on a schedule or from a private link, as the caller: one
+//                tool system, 11-15), then the caller's own made tools by name (made_<slug>)
 //   tools/call   one of those
 //
 // Who: anyone (the anonymous tools run for anyone, as on their pages), or a person's Bearer token for openvibe.tools
@@ -60,6 +61,25 @@ const META = [
             name: { type: 'string', maxLength: 64, description: 'A name, for pasted code' },
         }, required: ['from'], additionalProperties: false },
         annotations: { title: 'Bring a tool from Val Town or Pipedream', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
+    {
+        name: 'automate_tool',
+        description: 'Run a tool on its own, as you: every hour or every day at a time (UTC), or from a private link (a webhook URL that runs it whenever something calls it: GitHub, a form, a shop, a shortcut). Any catalogue tool that runs without a sign-in, or one of your own made tools. The input you give is sent every time; the caller of a link adds theirs on top. A schedule tells you what it answered unless notify is false. The URL of a link is shown once.',
+        inputSchema: { type: 'object', properties: {
+            tool: { type: 'string', description: 'The tool id (from find_tools), or the mtl_ id of a tool you made' },
+            kind: { enum: ['schedule', 'link'], description: 'schedule: every hour or day; link: a private URL that runs it' },
+            every: { enum: ['hour', 'day'], description: 'For a schedule' },
+            at: { type: 'string', pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$', description: 'For a schedule: HH:MM in UTC (every hour uses the minutes)' },
+            input: { type: 'object', description: 'The input sent every time, as the schema of the tool says' },
+            notify: { type: 'boolean', description: 'For a schedule: tell you what it answered (default true)' },
+        }, required: ['tool', 'kind'], additionalProperties: false },
+        annotations: { title: 'Automate a tool', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
+    {
+        name: 'my_automations',
+        description: 'List every schedule and private link you have, on any tool: what it runs, when it runs next, its last answer and how many times it ran. Change or delete them on openvibe.tools/make.',
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        annotations: { title: 'Your automations', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
 ];
 
@@ -194,6 +214,42 @@ function createToolsMcp({ address, snapshot, store, verify, extractToken, fetchI
         } catch { return { ok: false, text: 'Bringing the tool took too long. Try again.' }; }
     }
 
+    /** automate_tool: a schedule or a private link on any tool (POST /api/v1/tools/:id/triggers), as the caller. */
+    async function automateOne(req, args) {
+        const base = origin();
+        if (!base) return { ok: false, text: 'The tools cannot be reached right now' };
+        const a = args || {};
+        const id = String(a.tool || '');
+        if (!MADE_ID.test(id) && !TOOL_ID.test(id)) return { ok: false, text: `No tool is called ${id.slice(0, 64)}: use find_tools` };
+        const body = a.kind === 'link' ? { kind: 'link', input: a.input || {} }
+            : { kind: 'schedule', every: a.every || 'day', at: a.at || '09:00', input: a.input || {}, ...(a.notify === false ? { notify: false } : {}) };
+        try {
+            const res = await fetchImpl(`${base}/api/v1/tools/${encodeURIComponent(id)}/triggers`, { method: 'POST', headers: callerHeaders(req), body: JSON.stringify(body), redirect: 'error', signal: AbortSignal.timeout(15_000) });
+            const out = await res.json().catch(() => null);
+            if (res.status === 401) return { ok: false, text: 'Sign in (a Bearer token for openvibe.tools) to automate a tool' };
+            if (res.status !== 201 || !out) return { ok: false, text: refusal(out, res.status, 'It was not set up') };
+            const page = `https://openvibe.tools/make#${MADE_ID.test(id) ? id : `automate=${id}`}`;
+            return { ok: true, text: JSON.stringify({ automation: { id: out.id, tool: out.tool, says: out.says, next_run_at: out.next_run_at, notify: out.notify, input: out.input },
+                ...(out.url ? { url: out.url, note: 'The link is shown once: keep it. POST JSON (or GET with a query) to run the tool.' } : {}), page }) };
+        } catch { return { ok: false, text: 'Setting it up took too long. Try again.' }; }
+    }
+
+    /** my_automations: every trigger the caller has (GET /api/v1/me/triggers). */
+    async function automations(req) {
+        const base = origin();
+        if (!base) return { ok: false, text: 'The tools cannot be reached right now' };
+        try {
+            const h = callerHeaders(req);
+            delete h['Content-Type'];
+            const res = await fetchImpl(`${base}/api/v1/me/triggers`, { headers: h, redirect: 'error', signal: AbortSignal.timeout(15_000) });
+            const out = await res.json().catch(() => null);
+            if (res.status === 401) return { ok: false, text: 'Sign in (a Bearer token for openvibe.tools) to see your automations' };
+            if (!res.ok || !out) return { ok: false, text: refusal(out, res.status, 'They could not be read') };
+            return { ok: true, text: JSON.stringify({ automations: (out.triggers || []).map((t) => ({ id: t.id, tool: t.tool, tool_name: t.tool_name, kind: t.kind, says: t.says, enabled: t.enabled,
+                next_run_at: t.next_run_at, last_run_at: t.last_run_at, last_state: t.last_state, runs: t.runs, page: t.page })), count: out.count || 0 }) };
+        } catch { return { ok: false, text: 'Reading them took too long. Try again.' }; }
+    }
+
     /** One run through the gateway's own run API, with the caller's credentials and address. */
     async function runOne(req, tool, input) {
         const base = origin();
@@ -260,6 +316,8 @@ function createToolsMcp({ address, snapshot, store, verify, extractToken, fetchI
                 if (name === 'run_tool') return ok(result(await runOne(req, args.tool, args.input)));
                 if (name === 'make_tool') return ok(result(await makeOne(req, args)));
                 if (name === 'bring_tool') return ok(result(await bringOne(req, args)));
+                if (name === 'automate_tool') return ok(result(await automateOne(req, args)));
+                if (name === 'my_automations') return ok(result(await automations(req)));
                 if (name === 'run_tools') {
                     const calls = Array.isArray(args.calls) ? args.calls.slice(0, MAX_CALLS) : [];
                     if (!calls.length) return fail(RPC.params, `run_tools needs { calls: [1..${MAX_CALLS}] }`);

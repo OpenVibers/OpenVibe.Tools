@@ -4,6 +4,8 @@
 //   - tools/list is find_tools, run_tool, run_tools, make_tool and bring_tool, then the signed-in person's own made tools by name;
 //   - make_tool drafts a tool from words and saves it private, both as the caller; a taken slug gets a suffix;
 //   - bring_tool converts a Val Town val or a Pipedream step and saves it private, as the caller, with its notes;
+//   - automate_tool sets a schedule or a private link on any tool as the caller (the link's URL once); my_automations
+//     lists them (one tool system, 11-15);
 //   - find_tools finds catalogue and made tools for a need, with their input schemas (private tools only for their owner);
 //   - run_tool and run_tools go through the run API over loopback with the caller's own Authorization, a made tool to
 //     /api/v1/made-tools/:id/run; a failure is isError with the run's own words; an unknown method or tool is an error.
@@ -40,6 +42,17 @@ const PUB = 'mtl_01JCZ3NDEKTSV4RRFFQ69G5FA2';
                 const d = JSON.parse(body);
                 if (d.url === 'https://www.val.town/v/ada/pkgs') return json(422, { code: 'tools.made.val_imports', detail: 'ada/pkgs imports npm:zod. A tool runs with no packages.' });
                 return json(200, { draft: { kind: 'code', name: 'Greet' }, notes: ['It reads Deno.env (its secrets on Val Town).'], net: 'deny', body: { slug: 'greet', name: 'Greet', summary: 'Greets.', kind: 'code', net: 'deny', input: { type: 'object', properties: { name: { type: 'string' } } }, output: { kind: 'text' }, source_code: 'async function run(input) { return "hi"; }', visibility: 'private' } });
+            }
+            if (req.url === '/api/v1/tools/dns/triggers') {
+                if (req.headers.authorization !== 'Bearer ada') return json(401, { title: 'Sign in with your OpenVibe account' });
+                const b = JSON.parse(body);
+                if (b.kind === 'link') return json(201, { id: 'mtt_01JCZ3NDEKTSV4RRFFQ69G5FA1', tool: 'dns', kind: 'link', says: 'A link …k3Zq', input: b.input, notify: false, next_run_at: null, url: 'https://openvibe.tools/hooks/mth_secret' });
+                return json(201, { id: 'mtt_01JCZ3NDEKTSV4RRFFQ69G5FA2', tool: 'dns', kind: 'schedule', says: `Every ${b.every} at ${b.at} UTC`, input: b.input, notify: b.notify !== false, next_run_at: '2026-11-16T09:00:00.000Z' });
+            }
+            if (req.url === '/api/v1/tools/portscan/triggers') return json(422, { code: 'tools.trigger.unsupported', detail: 'This tool needs you signed in for each run, so it cannot run on its own yet' });
+            if (req.url === '/api/v1/me/triggers') {
+                if (req.headers.authorization !== 'Bearer ada') return json(401, { title: 'Sign in with your OpenVibe account' });
+                return json(200, { triggers: [{ id: 'mtt_01JCZ3NDEKTSV4RRFFQ69G5FA2', tool: 'dns', tool_name: 'DNS lookup', tool_kind: 'catalogue', kind: 'schedule', says: 'Every day at 09:00 UTC', enabled: true, runs: 3, last_state: 'succeeded', next_run_at: '2026-11-16T09:00:00.000Z', page: 'https://openvibe.tools/make#automate=dns' }], count: 1 });
             }
             if (req.url === '/api/v1/made-tools') {
                 const b = JSON.parse(body);
@@ -92,10 +105,10 @@ const PUB = 'mtl_01JCZ3NDEKTSV4RRFFQ69G5FA2';
 
         // tools/list: the three, then your own made tools by name.
         const anon = (await rpc('tools/list')).body.result.tools.map((t) => t.name);
-        assert.deepStrictEqual(anon, ['find_tools', 'run_tool', 'run_tools', 'make_tool', 'bring_tool']);
+        assert.deepStrictEqual(anon, ['find_tools', 'run_tool', 'run_tools', 'make_tool', 'bring_tool', 'automate_tool', 'my_automations']);
         const mine = (await rpc('tools/list', null, { as: 'ada' })).body.result.tools;
-        assert.deepStrictEqual(mine.map((t) => t.name), ['find_tools', 'run_tool', 'run_tools', 'make_tool', 'bring_tool', 'made_reply_kindly']);
-        assert.deepStrictEqual(mine[5].inputSchema, { type: 'object', properties: { message: { type: 'string' } } }, 'your tool with its own input schema');
+        assert.deepStrictEqual(mine.map((t) => t.name), ['find_tools', 'run_tool', 'run_tools', 'make_tool', 'bring_tool', 'automate_tool', 'my_automations', 'made_reply_kindly']);
+        assert.deepStrictEqual(mine.find((t) => t.name === 'made_reply_kindly').inputSchema, { type: 'object', properties: { message: { type: 'string' } } }, 'your tool with its own input schema');
 
         // find_tools: the catalogue (with its schema) and the made tools; a private tool only for its owner.
         const dns = JSON.parse(textOf(await call('find_tools', { need: 'mx records for a domain' })));
@@ -129,6 +142,23 @@ const PUB = 'mtl_01JCZ3NDEKTSV4RRFFQ69G5FA2';
         // Your own tool by name.
         assert.strictEqual(textOf(await call('made_reply_kindly', { message: 'hi' }, { as: 'ada' })), '{"reply":"Thanks!"}');
         assert.strictEqual((await call('made_reply_kindly', {})).result.isError, true, 'signed out: no own tools');
+
+        // automate_tool: a schedule or a private link on any tool, as the caller; my_automations lists them.
+        const daily = await call('automate_tool', { tool: 'dns', kind: 'schedule', every: 'day', at: '09:00', input: { domain: 'example.com' } }, { as: 'ada' });
+        assert.ok(!daily.result.isError, textOf(daily));
+        const dailyOut = JSON.parse(textOf(daily));
+        assert.deepStrictEqual([dailyOut.automation.says, dailyOut.automation.notify, dailyOut.page], ['Every day at 09:00 UTC', true, 'https://openvibe.tools/make#automate=dns']);
+        const sentTrigger = runs.filter((r) => r.path === '/api/v1/tools/dns/triggers').pop();
+        assert.deepStrictEqual([sentTrigger.auth, sentTrigger.body], ['Bearer ada', { kind: 'schedule', every: 'day', at: '09:00', input: { domain: 'example.com' } }], 'as the caller, their input');
+        const linkOut = JSON.parse(textOf(await call('automate_tool', { tool: 'dns', kind: 'link' }, { as: 'ada' })));
+        assert.strictEqual(linkOut.url, 'https://openvibe.tools/hooks/mth_secret', 'the link, once');
+        const probe = await call('automate_tool', { tool: 'portscan', kind: 'link' }, { as: 'ada' });
+        assert.deepStrictEqual([probe.result.isError, /signed in/.test(textOf(probe))], [true, true], 'a refusal in its own words');
+        assert.match(textOf(await call('automate_tool', { tool: 'dns', kind: 'link' })), /Sign in/, 'signed in only');
+        assert.match(textOf(await call('automate_tool', { tool: '../etc', kind: 'link' }, { as: 'ada' })), /No tool is called/);
+        const listed = JSON.parse(textOf(await call('my_automations', {}, { as: 'ada' })));
+        assert.deepStrictEqual([listed.count, listed.automations[0].tool_name, listed.automations[0].runs], [1, 'DNS lookup', 3]);
+        assert.match(textOf(await call('my_automations', {})), /Sign in/);
 
         // make_tool: drafted and saved as the caller, private; the slug they already use gets a suffix.
         const before = runs.length;
