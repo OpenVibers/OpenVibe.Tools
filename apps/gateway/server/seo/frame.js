@@ -289,8 +289,17 @@ function apiFold(rec) {
             : 'No account needed within the free limit; a token with <code>tools.tool.run</code> raises it.';
     return kit.fold({
         title: 'Use it from code', meta: 'API',
-        body: `<p>Input: <code>${esc(fields)}</code>. ${who}</p>${kit.snippet({ code: lines.join(' \\\n  ') })}<p><a href="${SITE}/api/v1/tools/${esc(rec.sub)}/schema">JSON Schema</a> · <a href="${SITE}/api/v1/openapi.json">OpenAPI</a> · ${docs}</p>`,
+        body: `<p>Input: <code>${esc(fields)}</code>. ${who}</p>${kit.snippet({ code: lines.join(' \\\n  ') })}<p><a href="${SITE}/api/v1/tools/${esc(rec.sub)}/schema">JSON Schema</a> · <a href="${SITE}/api/v1/openapi.json">OpenAPI</a> · ${docs}</p>${buildWith(d, probe)}`,
     });
+}
+
+/** Build with it (one tool system, 11-15): a tool that takes no file is a step of a tool people make, and one that runs
+ *  for anyone also runs on its own, on a schedule or from a private link (made/triggers.js). Partner-only probes neither. */
+function buildWith(d, probe) {
+    if (!d || !d.api || d.files || probe) return '';
+    const links = [`<a href="${SITE}/make#from=${esc(d.id)}">Make your own tool from it</a>`];
+    if (d.auth && d.auth.anonymous) links.push(`<a href="${SITE}/make#automate=${esc(d.id)}">Run it on a schedule or from a private link</a>`);
+    return `<p>Build with it: ${links.join(' · ')}</p>`;
 }
 
 function familyItems(rec) {

@@ -13,6 +13,8 @@ const { frameFor } = require('../server/seo/frame');
 const PUB = path.join(__dirname, '..', 'public');
 const net = (sub, q) => renderTool(path.join(PUB, 'net.html'), sub, null, q ? { q } : {});
 const dev = (sub, q) => renderTool(path.join(PUB, 'dev.html'), sub, null, q ? { q } : {});
+// Build with it (one tool system, 11-15): a tool of your own from it, and a schedule or a private link; never a probe.
+assert.ok(frameFor(CATALOG.get('dns')).includes('Build with it: <a href="https://openvibe.tools/make#from=dns">Make your own tool from it</a> · <a href="https://openvibe.tools/make#automate=dns">Run it on a schedule or from a private link</a>'), 'DNS: build with it');
 assert.match(frameFor(CATALOG.get('dns')), /<button type="submit" class="ovk-btn ovk-btn--primary ovk-tool-go" data-ov-guide="tools.job"/,
     'the live framed DNS page exposes the real run control to Quest');
 
