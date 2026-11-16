@@ -267,6 +267,13 @@ function checkProblem(r, status, code, where) {
         assert.strictEqual(r.status, 204);
         assert.strictEqual(r.h.get('access-control-allow-origin'), '*');
         assert.match(r.h.get('access-control-allow-headers'), /Idempotency-Key/);
+        // Every way another site's page or an agent reaches the tools (one tool system, 11-16): a made tool's run, a
+        // batch, the MCP server, a trigger's link. Each answered 500 (the credentialed CORS refusing) before.
+        for (const p of ['/api/v1/tools/mtl_01JCZ3NDEKTSV4RRFFQ69G5FAW/run', '/api/v1/tools/batch', '/mcp', `/hooks/mth_${'A'.repeat(43)}`]) {
+            r = await call(p, { method: 'OPTIONS', headers: { Origin: 'https://openvibe.chat', 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'authorization,content-type,mcp-protocol-version' } });
+            assert.deepStrictEqual([r.status, r.h.get('access-control-allow-origin'), !!r.h.get('access-control-allow-credentials')], [204, '*', false], p);
+            assert.match(r.h.get('access-control-allow-headers'), /MCP-Protocol-Version/, p);
+        }
 
         // ── Health shows the run API ──
         const health = (await call('/api/health', { method: 'GET' })).body;
