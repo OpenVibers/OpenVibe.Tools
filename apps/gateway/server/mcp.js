@@ -9,7 +9,8 @@
 //                caller's own, without putting 200 schemas in an agent's context), make_tool (a new tool of the
 //                caller's own from a description: drafted by a model and saved private, §AD.12), bring_tool,
 //                automate_tool and my_automations (any tool on a schedule or from a private link, as the caller: one
-//                tool system, 11-15), then the caller's own made tools by name (made_<slug>)
+//                tool system, 11-15), run_code (a script that calls tools and returns only what it needs: code mode,
+//                plan §AD.26, openvibe-sdk/code-mode), then the caller's own made tools by name (made_<slug>)
 //   tools/call   one of those
 //
 // Who: anyone (the anonymous tools run for anyone, as on their pages), or a person's Bearer token for openvibe.tools
@@ -24,6 +25,9 @@ const SERVER = { name: 'openvibe-tools', title: 'OpenVibe Tools', version: '1.0'
 const INSTRUCTIONS = 'OpenVibe Tools: 180+ tools (network, developer, text, image, PDF, audio, video) and the tools people made. Use find_tools to find one for a need, then run_tool (or run_tools for several at once); when nothing fits, make_tool makes one of your own from a description, and bring_tool brings one from Val Town or Pipedream. Sign in (a Bearer token for openvibe.tools) to run your own tools and the ones people made, and to make tools; their runs are paid from your own allowance.';
 // MCP 2026-07-28 (stateless: the version and the method on every request, server/discover) beside the handshake era.
 const mcpKit = require('openvibe-sdk/mcp');
+// Code mode (plan §AD.26; the owner, 11-17, sending Cloudflare's Code Mode): a script over the tools, in the SDK's sandbox.
+const codeMode = require('openvibe-sdk/code-mode');
+const SCRIPTS_AT_ONCE = 4;   // a script is a process: this many at once on the gateway, one a person
 const RPC = { parse: -32700, invalid: -32600, method: -32601, params: -32602, internal: -32603 };
 const MADE_ID = /^mtl_[0-9A-HJKMNP-TV-Z]{26}$/;
 const TOOL_ID = /^[a-z0-9][a-z0-9.-]{0,63}$/;
@@ -84,6 +88,12 @@ const META = [
         inputSchema: { type: 'object', properties: {}, additionalProperties: false },
         annotations: { title: 'Your automations', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
+    {
+        name: 'run_code',
+        description: 'Run JavaScript that calls OpenVibe tools and returns only what you need (code mode): `const d = await run("dns-lookup", { domain: "x.com" }); const c = await run("ssl-check", { host: "x.com" }); return { mx: d, expires: c };`. run(id, input) runs one tool (ids from find_tools) as you and answers its result, parsed when it is JSON; find(need) answers find_tools\' list. Chain, loop, filter and join in one step instead of many calls; console.log lines come back too. Only the returned value (8 KB at most) reaches you, so return the facts, not whole pages. No network, files or require: only run and find. 30 seconds and 30 calls a script; needs a sign-in.',
+        inputSchema: { type: 'object', properties: { code: { type: 'string', minLength: 1, maxLength: 20000, description: 'the body of an async function: use await, and return the value you need' } }, required: ['code'], additionalProperties: false },
+        annotations: { title: 'Run code over tools', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    },
 ];
 
 // The words of a need that say something: not a, the, for, my, … (they match every tool).
@@ -95,7 +105,9 @@ const words = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').
  *   address(): the gateway's own listening socket; snapshot(): the tool registry (descriptors with their schemas);
  *   store: the made tools (made/store.js); verify(token) → claims | null (Network user tokens for openvibe.tools).
  */
-function createToolsMcp({ address, snapshot, store, verify, extractToken, fetchImpl = globalThis.fetch } = {}) {
+function createToolsMcp({ address, snapshot, store, verify, extractToken, fetchImpl = globalThis.fetch, runCode = codeMode.runCode } = {}) {
+    // The scripts running now: at most SCRIPTS_AT_ONCE on the gateway, one a person.
+    const running = new Set();
     function origin() {
         const a = typeof address === 'function' ? address() : null;
         if (!a || typeof a !== 'object' || !a.port) return null;
@@ -332,6 +344,32 @@ function createToolsMcp({ address, snapshot, store, verify, extractToken, fetchI
                     return ok({ content: [{ type: 'text', text: JSON.stringify(found.length ? found : { none: `No tool fits "${need}" yet. People can make one at https://openvibe.tools/make` }) }] });
                 }
                 if (name === 'run_tool') return ok(result(await runOne(req, args.tool, args.input)));
+                if (name === 'run_code') {
+                    const code = typeof args.code === 'string' ? args.code : '';
+                    if (!code.trim() || code.length > 20000) return fail(RPC.params, 'run_code needs { code } (at most 20,000 characters)');
+                    const person = await who(req);
+                    if (!person) return ok(result({ ok: false, text: 'Sign in to run code over the tools (a Bearer token for openvibe.tools)' }));
+                    if (running.has(person.sub)) return ok(result({ ok: false, text: 'One script at a time: your last one is still running' }));
+                    if (running.size >= SCRIPTS_AT_ONCE) return ok(result({ ok: false, text: 'The tools are busy running other scripts: try again in a moment' }));
+                    running.add(person.sub);
+                    try {
+                        const out = await runCode(code, { functions: ['run', 'find'], call: async (kind, fn, a) => {
+                            if (fn === 'run') {
+                                const r = await runOne(req, a[0], a[1] && typeof a[1] === 'object' ? a[1] : {});
+                                if (!r.ok) return { ok: false, error: r.text };
+                                let value = r.text;
+                                try { value = JSON.parse(r.text); } catch { /* words */ }
+                                return { ok: true, value };
+                            }
+                            if (fn === 'find') return { ok: true, value: await find(String(a[0] || '').trim().slice(0, 200), Math.max(1, Math.min(20, Number(a[1]) || 8)), person) };
+                            return { ok: false, error: `there is no function ${fn}` };
+                        } });
+                        const text = JSON.stringify(out.ok ? { result: out.value, logs: out.logs, calls: out.calls } : { error: out.error, logs: out.logs, calls: out.calls });
+                        return ok({ content: [{ type: 'text', text }], ...(out.ok ? {} : { isError: true }) });
+                    } finally {
+                        running.delete(person.sub);
+                    }
+                }
                 if (name === 'make_tool') return ok(result(await makeOne(req, args)));
                 if (name === 'bring_tool') return ok(result(await bringOne(req, args)));
                 if (name === 'automate_tool') return ok(result(await automateOne(req, args)));
