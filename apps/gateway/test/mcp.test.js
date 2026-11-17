@@ -105,9 +105,9 @@ const PUB = 'mtl_01JCZ3NDEKTSV4RRFFQ69G5FA2';
 
         // tools/list: the three, then your own made tools by name.
         const anon = (await rpc('tools/list')).body.result.tools.map((t) => t.name);
-        assert.deepStrictEqual(anon, ['find_tools', 'run_tool', 'run_tools', 'make_tool', 'bring_tool', 'automate_tool', 'my_automations']);
+        assert.deepStrictEqual(anon, ['find_tools', 'run_tool', 'run_tools', 'make_tool', 'bring_tool', 'automate_tool', 'my_automations', 'run_code']);
         const mine = (await rpc('tools/list', null, { as: 'ada' })).body.result.tools;
-        assert.deepStrictEqual(mine.map((t) => t.name), ['find_tools', 'run_tool', 'run_tools', 'make_tool', 'bring_tool', 'automate_tool', 'my_automations', 'made_reply_kindly']);
+        assert.deepStrictEqual(mine.map((t) => t.name), ['find_tools', 'run_tool', 'run_tools', 'make_tool', 'bring_tool', 'automate_tool', 'my_automations', 'run_code', 'made_reply_kindly']);
         assert.deepStrictEqual(mine.find((t) => t.name === 'made_reply_kindly').inputSchema, { type: 'object', properties: { message: { type: 'string' } } }, 'your tool with its own input schema');
 
         // find_tools: the catalogue (with its schema) and the made tools; a private tool only for its owner.
@@ -207,6 +207,21 @@ const PUB = 'mtl_01JCZ3NDEKTSV4RRFFQ69G5FA2';
         assert.deepStrictEqual([m.status, m.body.result.resultType, m.body.result.cacheScope], [200, 'complete', 'public']);
         assert.ok(m.body.result.supportedVersions.includes('2026-07-28') && m.body.result.supportedVersions.includes('2025-11-25'));
         assert.match(m.body.result.instructions, /OpenVibe Tools/);
+        // run_code (code mode, plan §AD.26): a script calls run() and find() as the caller and returns only what it needs.
+        assert.match(textOf(await call('run_code', { code: 'return 1' })), /Sign in to run code/, 'a script needs a sign-in');
+        let hasCodeMode = true;
+        try { require.resolve('openvibe-sdk/code-mode'); } catch { hasCodeMode = false; }
+        if (hasCodeMode) {
+            const before = runs.length;
+            const coded = await call('run_code', { code: "const d = await run('dns', { domain: 'example.com' }); const h = await run('hash', { text: 'x' }); let bad; try { await run('broken', {}); } catch (e) { bad = e.message; } const f = await find('dns lookup'); console.log('found', Array.isArray(f)); return { a: d.a[0], h, bad };" }, { as: 'ada' });
+            const body = JSON.parse(textOf(coded));
+            assert.deepStrictEqual(body.result, { a: '93.184.215.14', h: 'abc123', bad: 'input.domain is required' }, JSON.stringify(body));
+            assert.deepStrictEqual(body.logs, ['found true']);
+            assert.deepStrictEqual(runs.slice(before).map((r) => [r.path, r.auth]), [['/api/v1/tools/dns/run', 'Bearer ada'], ['/api/v1/tools/hash/run', 'Bearer ada'], ['/api/v1/tools/broken/run', 'Bearer ada']], 'each run as the caller, through the run API');
+            assert.strictEqual(JSON.parse(textOf(await call('run_code', { code: 'return typeof process' }, { as: 'ada' }))).result, 'undefined', 'the sandbox holds');
+            const thrown = await call('run_code', { code: "await run('broken', {});" }, { as: 'ada' });
+            assert.deepStrictEqual([thrown.result.isError, JSON.parse(textOf(thrown)).error], [true, 'input.domain is required']);
+        } else console.log('  (run_code\'s scripts run with openvibe-sdk 0.183.0)');
         m = await modern('tools/list');
         assert.deepStrictEqual([m.status, m.body.result.resultType, m.body.result.cacheScope], [200, 'complete', 'private']);
         assert.ok(m.body.result.tools.some((t) => t.name === 'find_tools'));
