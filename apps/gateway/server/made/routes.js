@@ -119,7 +119,8 @@ function createMadeToolRoutes({ store, runner, models = null, verify, verifyServ
             return SUBJECT.test(sub) ? { sub, service: v.claims.sub, canRun, canMake } : null;
         }
         const claims = await Promise.resolve(verify(token)).catch(() => null);
-        const sub = claims && (claims.sub || claims.subject);
+        // The person is subject_id (usr_…): a Network token's sub is the numeric account id (11-18).
+        const sub = claims && (claims.subject_id || claims.sub || claims.subject);
         if (!SUBJECT.test(String(sub || ''))) return null;
         if (req.method !== 'GET' && !req.headers.authorization && req.headers.origin !== origin) return { sub, crossSite: true };
         return { sub, name: claims.name || claims.username || null };

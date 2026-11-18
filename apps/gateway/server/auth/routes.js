@@ -171,6 +171,22 @@ function createAuthClient(config) {
         }
     }
 
+    /**
+     * verify, and also a delegated person token that names Tools (openvibe-sdk 0.187: OpenVibe Connect's /mcp/all running
+     * the person's tools for a key they granted; the person, role user, no staff claims, `delegated: { by, scope }`).
+     * For /mcp and the made tools it calls on loopback only: sign-in, sessions and pages keep verify.
+     */
+    async function verifyAgent(token) {
+        if (!token) return null;
+        await ensureKey();
+        if (!client.publicKey) return null;
+        try {
+            return await verifyUserToken(token, { publicKey: client.publicKey, issuer: config.networkUrl, audience: AUDIENCE, delegated: { service: 'tools' } });
+        } catch {
+            return null;
+        }
+    }
+
     // Warm the key cache at boot, and keep trying every 30 s until it loads (non-fatal if Network is down). After the
     // 2026-10-23 reboot the gateway started before Network, its one boot fetch failed, and /status showed it without a
     // key for six hours: only a signed-in request would have fetched it again.
@@ -182,7 +198,7 @@ function createAuthClient(config) {
     });
     warm();
 
-    return { client, ensureKey, verify, stop: () => { if (retry) clearTimeout(retry); retry = null; } };
+    return { client, ensureKey, verify, verifyAgent, stop: () => { if (retry) clearTimeout(retry); retry = null; } };
 }
 
 /** Token from Authorization header or the shared ov_token cookie. */

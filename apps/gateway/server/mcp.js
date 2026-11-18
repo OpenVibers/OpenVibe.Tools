@@ -95,6 +95,8 @@ const META = [
         annotations: { title: 'Run code over tools', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
 ];
+// The tools a read-only grant reaches (a delegated token with scope read).
+const READ_ONLY = new Set(META.filter((t) => t.annotations && t.annotations.readOnlyHint).map((t) => t.name));
 
 // The words of a need that say something: not a, the, for, my, … (they match every tool).
 const STOP = new Set(['the', 'and', 'for', 'with', 'from', 'into', 'that', 'this', 'what', 'how', 'can', 'you', 'your', 'my', 'me', 'some', 'any', 'tool', 'tools', 'make', 'get', 'use']);
@@ -119,8 +121,13 @@ function createToolsMcp({ address, snapshot, store, verify, extractToken, fetchI
         const token = extractToken(req);
         if (!token) return null;
         const claims = await Promise.resolve(verify(token)).catch(() => null);
-        const sub = claims && (claims.sub || claims.subject);
-        return /^usr_[0-9A-HJKMNP-TV-Z]{26}$/.test(String(sub || '')) ? { sub, token } : null;
+        // The person is subject_id (usr_…): a Network token's sub is the numeric account id (11-18: sub first meant no
+        // signed-in caller was ever recognised here).
+        const sub = claims && (claims.subject_id || claims.sub || claims.subject);
+        if (!/^usr_[0-9A-HJKMNP-TV-Z]{26}$/.test(String(sub || ''))) return null;
+        // A delegated token (Connect's /mcp/all, a key the person granted): its scope says whether it may change things.
+        const scope = claims.delegated && typeof claims.delegated === 'object' ? (claims.delegated.scope === 'write' ? 'write' : 'read') : 'full';
+        return { sub, token, scope };
     }
 
     const catalogue = () => {
@@ -337,6 +344,12 @@ function createToolsMcp({ address, snapshot, store, verify, extractToken, fetchI
             case 'tools/call': {
                 const name = String(p.name || '');
                 const args = p.arguments && typeof p.arguments === 'object' ? p.arguments : {};
+                // A key the person granted only reading in Tools (Connect's Apps page) reaches the read-only tools here,
+                // whatever its caller lists (Connect checks it first; this is the second lock).
+                if (!READ_ONLY.has(name)) {
+                    const caller = await who(req);
+                    if (caller && caller.scope === 'read') return ok({ isError: true, content: [{ type: 'text', text: `This key may only read in OpenVibe Tools, and ${name} runs or changes things. The person can give it read and write on the Apps page (connect.openvibe.network).` }] });
+                }
                 if (name === 'find_tools') {
                     const need = String(args.need || '').trim().slice(0, 200);
                     if (!need) return fail(RPC.params, 'find_tools needs { need }');
