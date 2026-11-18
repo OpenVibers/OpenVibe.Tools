@@ -362,7 +362,8 @@ const madeRunner = require('./made/prompt').createPromptRunner({
 // made tools); every run goes through the run API over loopback with the caller's own credentials.
 const toolsMcp = require('./mcp').createToolsMcp({
     address: () => { try { return server.address(); } catch { return null; } },
-    snapshot: () => toolRegistry.snapshot(), store: madeTools, verify: (token) => auth.verify(token), extractToken,
+    // A delegated person token naming Tools is accepted here (Connect's /mcp/all, as the person); sign-in pages keep verify.
+    snapshot: () => toolRegistry.snapshot(), store: madeTools, verify: (token) => auth.verifyAgent(token), extractToken,
 });
 app.options('/mcp', (req, res) => { res.set({ 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Authorization, Content-Type, Mcp-Session-Id, MCP-Protocol-Version, Mcp-Method, Mcp-Name', 'Access-Control-Max-Age': '600' }); res.status(204).end(); });
 app.get('/mcp', (req, res) => res.status(405).set('Allow', 'POST').json({ error: 'POST one JSON-RPC request (MCP Streamable HTTP); this server keeps no stream' }));
@@ -382,7 +383,8 @@ const madeCodeRunner = require('./made/run-code').createCodeRunner({
 });
 const madeRoutes = require('./made/routes').createMadeToolRoutes({
     store: madeTools, runner: madeRunner, models: require('./made/models').createModelList({ exchangeUrl: config.exchange.url }),
-    verify: (token) => auth.verify(token), extractToken,
+    // /mcp's made-tool calls come here on loopback with the caller's token, a delegated one too (verifyAgent).
+    verify: (token) => auth.verifyAgent(token), extractToken,
     // Actor's and Codes' agents (tools.made.run, Contracts 0.437.0) act for the person in X-OV-Subject.
     verifyService: (token) => require('../../_shared/guard/tokens').verifyServiceToken(token, { publicKey: auth && auth.client.publicKey, issuer: config.networkUrl, contracts: require('openvibe-contracts') }),
     origin: new URL(config.baseUrl).origin, ...ajvFrom(require),

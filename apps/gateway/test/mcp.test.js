@@ -79,7 +79,12 @@ const PUB = 'mtl_01JCZ3NDEKTSV4RRFFQ69G5FA2';
     ] });
     const mcp = createToolsMcp({
         address: () => api.address(), snapshot, store,
-        verify: async (t) => (t === 'ada' ? { sub: ADA } : null),
+        // A Network token as it really is: sub is the numeric account id, subject_id the person (11-18: the old stub's
+        // sub: usr_… hid that /mcp never recognised a signed-in caller). ada-read and ada-write: delegated tokens from
+        // Connect's /mcp/all (openvibe-sdk 0.187 verifyUserToken with delegated: { service: 'tools' }).
+        verify: async (t) => (t === 'ada' ? { sub: 4242, id: 4242, subject_id: ADA, username: 'ada', role: 'user' }
+            : t === 'ada-read' || t === 'ada-write' ? { sub: 4242, subject_id: ADA, username: 'ada', role: 'user', typ: 'delegated', delegated: { by: 'ck_01JCZ3NDEKTSV4RRFFQ69G5FA0', scope: t === 'ada-read' ? 'read' : 'write', services: ['tools'] } }
+            : null),
         extractToken: (req) => (req.headers.authorization || '').replace(/^Bearer /, '') || null,
     });
     const app = express();
@@ -231,6 +236,21 @@ const PUB = 'mtl_01JCZ3NDEKTSV4RRFFQ69G5FA2';
         assert.deepStrictEqual([m.status, m.body.error.code], [400, -32020], 'a header that disagrees is refused');
         m = await modern('resources/list');
         assert.deepStrictEqual([m.status, m.body.error.code], [404, -32601], 'an unknown method is a 404');
+
+        // A delegated token from Connect's /mcp/all (a key the person granted on the Apps page, 11-18): the person, by
+        // subject_id; a read grant reaches the read-only tools only; a write grant runs as the person, its token going on.
+        const readList = (await rpc('tools/list', null, { as: 'ada-read' })).body.result.tools.map((t) => t.name);
+        assert.ok(readList.some((n) => n.startsWith('made_')), 'the person\'s own made tools, through a delegated token');
+        const found = await call('find_tools', { need: 'dns' }, { as: 'ada-read' });
+        assert.ok(!found.result.isError, 'find_tools is read-only: a read grant reaches it');
+        const beforeRead = runs.length;
+        const readRefused = await call('run_tool', { tool: 'dns', input: { domain: 'example.com' } }, { as: 'ada-read' });
+        assert.strictEqual(readRefused.result.isError, true);
+        assert.match(textOf(readRefused), /may only read in OpenVibe Tools/);
+        assert.strictEqual(runs.length, beforeRead, 'nothing ran');
+        const wrote = await call('run_tool', { tool: 'dns', input: { domain: 'example.com' } }, { as: 'ada-write' });
+        assert.ok(!wrote.result.isError, textOf(wrote));
+        assert.strictEqual(runs.at(-1).auth, 'Bearer ada-write', 'the run goes through the run API with the delegated token');
     } finally {
         server.close(); api.close();
     }
