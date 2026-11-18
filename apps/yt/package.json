@@ -21,7 +21,7 @@
     "pg": "^8.23.0",
     "@electric-sql/pglite": "^0.5.8",
     "openvibe-sdk": "https://git.openvibe.codes/api/v1/repos/openvibers/openvibe.sdk/archive/v0.187.0.tar.gz",
-    "openvibe-shared": "https://git.openvibe.codes/api/v1/repos/openvibers/openvibe.shared/archive/v4.313.0.tar.gz",
+    "openvibe-shared": "https://git.openvibe.codes/api/v1/repos/openvibers/openvibe.shared/archive/v4.314.0.tar.gz",
     "jsonwebtoken": "^9.0.2",
     "uuid": "^11.1.0"
   }
