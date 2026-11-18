@@ -11,6 +11,9 @@ module.exports = {
     api: '/api/v1',
     openapi: '/api/v1/openapi.json',
     docs: '/developers',
+    // The MCP server (find_tools, run_tool, run_code …), so the network's two-tool gateway (openvibe.services/mcp) and
+    // any agent reading this manifest find it (11-18: it was served but not named here).
+    mcp: { transport: 'streamable-http', url: 'https://openvibe.tools/mcp' },
     policy: {
         auth: ['none', 'Network OIDC', 'bearer'],
         rateLimit: 'Anonymous tool runs follow the per-address tool quota; signing in or an app token raises the tier, and every answer carries RateLimit-* headers',
