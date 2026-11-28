@@ -16,6 +16,8 @@ function createAgentPages({ opens = null } = {}) {
         if (p === '/all-tools') return { html: site.pageAll() };
         // The API guide (11-03: llms.txt listed it as HTML; for an agent it is the page that matters most).
         if (p === '/developers') return { html: site.pageDevelopers() };
+        // Make a tool (11-28: llms.txt listed /make.md and agents got a 404).
+        if (p === '/make') return { html: site.pageMake() };
         const f = registry.get().families.find((x) => x.path === p);
         return f ? { html: site.pageFamily(f) } : null;
     }

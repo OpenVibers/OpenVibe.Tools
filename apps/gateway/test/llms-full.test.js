@@ -48,6 +48,12 @@ function serve(app) {
         assert.ok(!body.includes('/auth/') && !body.includes('/search') && !body.includes('Disallow'), 'no private paths');
         // llms.txt points at the full document.
         assert.ok(idx.includes('/llms-full.txt'), 'llms.txt lists llms-full.txt');
+        // The MCP server is an endpoint, not a page: llms.txt links it as it is, never as a twin (11-28: /mcp.md was a
+        // 404 to agents); Make a tool has its twin.
+        assert.ok(idx.includes('(https://openvibe.tools/mcp)') && !idx.includes('/mcp.md'), 'the MCP endpoint keeps its own address');
+        const { createAgentPages } = require('../server/pages/agent-pages');
+        const make = await createAgentPages().renderPublicPage('/make');
+        assert.ok(make && /Make a tool/.test(make.html), 'the /make twin renders the page');
         // AGT-5: each of the site's own pages at its Markdown twin (the developer guide has one since 11-03), an
         // Optional section last. A tool on another subdomain keeps its URL.
         assert.ok(idx.includes('[Developer guide](https://openvibe.tools/developers.md)'), 'the guide links its twin');
